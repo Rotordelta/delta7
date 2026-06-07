@@ -247,6 +247,17 @@ export default function Delta7Synth() {
   const [tapTimes, setTapTimes] = useState([]); // Timestamps for tap tempo calculation
   const [selectedEchoPresetIdx, setSelectedEchoPresetIdx] = useState(''); // Current echo preset index
   const [selectedRotorPresetIdx, setSelectedRotorPresetIdx] = useState(''); // Current rotor preset index
+  const [editorStatus, setEditorStatus] = useState('');
+  const editorStatusTimeoutRef = useRef(null);
+  const showEditorStatus = (msg) => {
+    setEditorStatus(msg);
+    if (editorStatusTimeoutRef.current) {
+      clearTimeout(editorStatusTimeoutRef.current);
+    }
+    editorStatusTimeoutRef.current = setTimeout(() => {
+      setEditorStatus('');
+    }, 2500);
+  };
   const [isRecording, setIsRecording] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
   const [recordSlotId, setRecordSlotId] = useState('s01'); // Target recording user slot
@@ -647,6 +658,129 @@ export default function Delta7Synth() {
     sampleSlotsRef.current = nextSlots;
     setSampleSlots(nextSlots);
   };
+
+  const handleSaveActiveSlotToDb = async () => {
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot) return;
+    
+    if (!slot.buffer) {
+      const confirmDelete = window.confirm(`Clear slot ${getSlotLabel(slot.id)} from the browser database?`);
+      if (confirmDelete) {
+        try {
+          await deleteSampleFromDb(slot.id);
+          showEditorStatus('Cleared from DB! 🗑️');
+        } catch (err) {
+          console.error(err);
+          alert('Failed to clear database record.');
+        }
+      }
+      return;
+    }
+    
+    try {
+      await saveSampleToDb(slot);
+      showEditorStatus('Saved to DB! 💾');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save to database. Make sure your browser supports IndexedDB.');
+    }
+  };
+
+  const handleExportActiveSlotWav = () => {
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot || !slot.buffer) return;
+    
+    try {
+      const wavBlob = audioBufferToWav(slot.buffer);
+      const url = URL.createObjectURL(wavBlob);
+      const link = document.createElement('a');
+      
+      const cleanName = slot.name.replace(/[^a-zA-Z0-9 _-]/g, '').trim().substring(0, 30);
+      const filename = `${getSlotLabel(slot.id)}_${cleanName || 'sample'}.wav`;
+      
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      showEditorStatus('Exported WAV! 📥');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to export sample as WAV.');
+    }
+  };
+
+  const loadSavedBuffersIntoContext = async (ctx) => {
+    try {
+      const savedRecords = await loadSavedMetadata();
+      if (savedRecords.length === 0) return;
+      
+      setSampleSlots(prev => {
+        const nextSlots = prev.map(slot => {
+          const saved = savedRecords.find(r => r.id === slot.id);
+          if (saved && saved.channels && saved.channels.length > 0) {
+            const numChannels = saved.channels.length;
+            const length = saved.channels[0].length;
+            const sampleRate = saved.sampleRate || ctx.sampleRate;
+            try {
+              const buffer = ctx.createBuffer(numChannels, length, sampleRate);
+              for (let c = 0; c < numChannels; c++) {
+                buffer.getChannelData(c).set(saved.channels[c]);
+              }
+              return {
+                ...slot,
+                buffer: buffer,
+                revBuffer: getReversedBuffer(ctx, buffer)
+              };
+            } catch (err) {
+              console.error(`Error reconstructing buffer for slot ${slot.id}:`, err);
+            }
+          }
+          return slot;
+        });
+        sampleSlotsRef.current = nextSlots;
+        return nextSlots;
+      });
+    } catch (err) {
+      console.error("Failed to restore saved buffers: ", err);
+    }
+  };
+
+  // On mount, load metadata (names and parameters) from IndexedDB
+  useEffect(() => {
+    const initLoad = async () => {
+      try {
+        const savedRecords = await loadSavedMetadata();
+        if (savedRecords.length > 0) {
+          setSampleSlots(prev => prev.map(slot => {
+            const saved = savedRecords.find(r => r.id === slot.id);
+            if (saved) {
+              return {
+                ...slot,
+                name: saved.name,
+                rootNote: saved.rootNote ?? slot.rootNote,
+                volume: saved.volume ?? slot.volume,
+                sliceCount: saved.sliceCount ?? slot.sliceCount,
+                start: saved.start ?? slot.start,
+                end: saved.end ?? slot.end,
+                loopStart: saved.loopStart ?? slot.loopStart,
+                loopEnd: saved.loopEnd ?? slot.loopEnd,
+                loopOn: saved.loopOn ?? slot.loopOn,
+                reverseOn: saved.reverseOn ?? slot.reverseOn,
+                sliceParams: saved.sliceParams ?? slot.sliceParams,
+              };
+            }
+            return slot;
+          }));
+        }
+      } catch (err) {
+        console.error("Error loading saved sampler metadata: ", err);
+      }
+    };
+    initLoad();
+  }, []);
 
   // --- Waveform Editor Actions ---
   const updateSlotParam = (slotId, param, val) => {
@@ -1585,6 +1719,7 @@ export default function Delta7Synth() {
 
     setSynthOn(true);
     startVisualizer();
+    loadSavedBuffersIntoContext(ctx);
   };
 
   const getReversedBuffer = (ctx, originalBuffer) => {
@@ -4840,8 +4975,29 @@ export default function Delta7Synth() {
                           >
                             UNDO
                           </button>
+                          <button
+                            className="btn btn-xs"
+                            onClick={handleSaveActiveSlotToDb}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#00f3ff', color: '#00f3ff' }}
+                            title="Save sample buffer and settings to browser database"
+                          >
+                            💾 SAVE
+                          </button>
+                          <button
+                            className="btn btn-xs"
+                            disabled={!slot.buffer}
+                            onClick={handleExportActiveSlotWav}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ff00ff', color: '#ff00ff' }}
+                            title="Export sample as WAV file"
+                          >
+                            📥 EXPORT
+                          </button>
                         </div>
-                        {selectionStart !== null && selectionEnd !== null ? (
+                        {editorStatus ? (
+                          <div style={{ fontSize: '0.58rem', color: '#00ff66', fontFamily: 'monospace', fontWeight: 'bold', textShadow: '0 0 4px rgba(0,255,102,0.4)' }}>
+                            {editorStatus}
+                          </div>
+                        ) : selectionStart !== null && selectionEnd !== null ? (
                           <div style={{ fontSize: '0.58rem', color: '#00f3ff', fontFamily: 'monospace' }}>
                             SEL: {Math.round(Math.min(selectionStart, selectionEnd) * 100)}% to {Math.round(Math.max(selectionStart, selectionEnd) * 100)}%
                           </div>
@@ -7441,3 +7597,168 @@ function KeyboardTrigger({ playVoice, stopVoice }) {
 
   return null;
 }
+
+// ==========================================
+// 11. SAMPLER DB (INDEXEDDB) & WAV EXPORT UTILITIES
+// ==========================================
+
+export const openSamplerDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('Delta7SamplerDB', 1);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('samples')) {
+        db.createObjectStore('samples', { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const saveSampleToDb = async (slot) => {
+  if (!slot.buffer) return;
+  const db = await openSamplerDB();
+  const tx = db.transaction('samples', 'readwrite');
+  const store = tx.objectStore('samples');
+  
+  // Extract Float32Array from each channel
+  const channels = [];
+  for (let c = 0; c < slot.buffer.numberOfChannels; c++) {
+    // Slice to get a copy/snapshot
+    channels.push(slot.buffer.getChannelData(c).slice());
+  }
+  
+  const record = {
+    id: slot.id,
+    name: slot.name,
+    rootNote: slot.rootNote,
+    volume: slot.volume,
+    sliceCount: slot.sliceCount,
+    start: slot.start,
+    end: slot.end,
+    loopStart: slot.loopStart,
+    loopEnd: slot.loopEnd,
+    loopOn: slot.loopOn,
+    reverseOn: slot.reverseOn,
+    sliceParams: slot.sliceParams,
+    channels: channels,
+    sampleRate: slot.buffer.sampleRate
+  };
+  
+  return new Promise((resolve, reject) => {
+    const req = store.put(record);
+    req.onsuccess = () => resolve();
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const getSavedSampleFromDb = async (id) => {
+  const db = await openSamplerDB();
+  const tx = db.transaction('samples', 'readonly');
+  const store = tx.objectStore('samples');
+  return new Promise((resolve, reject) => {
+    const req = store.get(id);
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const deleteSampleFromDb = async (id) => {
+  const db = await openSamplerDB();
+  const tx = db.transaction('samples', 'readwrite');
+  const store = tx.objectStore('samples');
+  return new Promise((resolve, reject) => {
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const loadSavedMetadata = async () => {
+  try {
+    const db = await openSamplerDB();
+    const tx = db.transaction('samples', 'readonly');
+    const store = tx.objectStore('samples');
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = (e) => resolve(e.target.result);
+      request.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.error("Failed to load saved sampler metadata: ", err);
+    return [];
+  }
+};
+
+export const audioBufferToWav = (buffer) => {
+  const numOfChan = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const format = 1; // 1 = raw PCM
+  const bitDepth = 16;
+  
+  let result;
+  if (numOfChan === 2) {
+    result = interleave(buffer.getChannelData(0), buffer.getChannelData(1));
+  } else if (numOfChan > 2) {
+    const length = buffer.length * numOfChan;
+    result = new Float32Array(length);
+    for (let i = 0; i < buffer.length; i++) {
+      for (let c = 0; c < numOfChan; c++) {
+        result[i * numOfChan + c] = buffer.getChannelData(c)[i];
+      }
+    }
+  } else {
+    result = buffer.getChannelData(0);
+  }
+  
+  const bufferLength = result.length;
+  const byteLength = bufferLength * 2;
+  const bufferArray = new ArrayBuffer(44 + byteLength);
+  const view = new DataView(bufferArray);
+  
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + byteLength, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, format, true);
+  view.setUint16(22, numOfChan, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numOfChan * 2, true);
+  view.setUint16(32, numOfChan * 2, true);
+  view.setUint16(34, bitDepth, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, byteLength, true);
+  
+  floatTo16BitPCM(view, 44, result);
+  
+  return new Blob([view], { type: 'audio/wav' });
+};
+
+const interleave = (inputL, inputR) => {
+  const length = inputL.length + inputR.length;
+  const result = new Float32Array(length);
+  let index = 0;
+  let inputIndex = 0;
+  
+  while (index < length) {
+    result[index++] = inputL[inputIndex];
+    result[index++] = inputR[inputIndex];
+    inputIndex++;
+  }
+  return result;
+};
+
+const writeString = (view, offset, string) => {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+};
+
+const floatTo16BitPCM = (output, offset, input) => {
+  for (let i = 0; i < input.length; i++, offset += 2) {
+    let s = Math.max(-1, Math.min(1, input[i]));
+    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+};
