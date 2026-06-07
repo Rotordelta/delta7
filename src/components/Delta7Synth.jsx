@@ -28,6 +28,9 @@ const DEFAULT_PARAMS = {
   spaceEchoSaturation: 0.2,
   spaceEchoSpring: 0.15,
   leslieSpeed: 'Off',
+  leslieDrive: 0.25,
+  leslieWidth: 0.5,
+  leslieCrossover: 800,
   oscAWave: 's01',
   oscBWave: 's02',
   oscBalance: 0.5,
@@ -1283,14 +1286,60 @@ export default function Delta7Synth() {
         }
       }
 
-      // Update Leslie Rotary speaker speed (Off / Slow: 1.1Hz / Fast: 6.8Hz) on both IFX slots
-      const targetFreq = params.leslieSpeed === 'Fast' ? 6.8 : (params.leslieSpeed === 'Slow' ? 1.1 : 0);
-      if (ifx1EffectRef.current && ifx1EffectRef.current.lfo) {
-        ifx1EffectRef.current.lfo.frequency.setTargetAtTime(targetFreq, now, 0.8);
-      }
-      if (ifx2EffectRef.current && ifx2EffectRef.current.lfo) {
-        ifx2EffectRef.current.lfo.frequency.setTargetAtTime(targetFreq, now, 0.8);
-      }
+      // Update Leslie speed (treble and bass LFOs), drive, width, and crossover on both IFX slots
+      const targetTreble = params.leslieSpeed === 'Fast' ? 7.25 : (params.leslieSpeed === 'Slow' ? 1.2 : 0);
+      const targetBass = params.leslieSpeed === 'Fast' ? 6.0 : (params.leslieSpeed === 'Slow' ? 0.95 : 0);
+
+      const driveVal = typeof params.leslieDrive === 'number' ? params.leslieDrive : 0.25;
+      const widthVal = typeof params.leslieWidth === 'number' ? params.leslieWidth : 0.5;
+      const crossoverVal = typeof params.leslieCrossover === 'number' ? params.leslieCrossover : 800;
+
+      const updateLeslieNode = (fxNode) => {
+        if (!fxNode) return;
+        
+        // Frequencies / Speed (horn has time constant 0.6s, drum has time constant 2.2s)
+        if (fxNode.lfoTreble) {
+          fxNode.lfoTreble.frequency.setTargetAtTime(targetTreble, now, 0.6);
+        }
+        if (fxNode.lfoBass) {
+          fxNode.lfoBass.frequency.setTargetAtTime(targetBass, now, 2.2);
+        }
+        
+        // Drive (distortion curve)
+        if (fxNode.driveNode) {
+          fxNode.driveNode.curve = makeDistCurve(driveVal * 0.45);
+        }
+
+        // Crossover split frequency
+        if (fxNode.crossoverHP) {
+          fxNode.crossoverHP.frequency.setTargetAtTime(crossoverVal, now, 0.05);
+        }
+        if (fxNode.crossoverLP) {
+          fxNode.crossoverLP.frequency.setTargetAtTime(crossoverVal, now, 0.05);
+        }
+
+        // Width modulation depths
+        if (fxNode.trebleLfoGainL && fxNode.trebleLfoGainR && fxNode.bassLfoGainL && fxNode.bassLfoGainR) {
+          const targetTrebleMod = 0.0022 * widthVal;
+          fxNode.trebleLfoGainL.gain.setTargetAtTime(targetTrebleMod, now, 0.05);
+          fxNode.trebleLfoGainR.gain.setTargetAtTime(-targetTrebleMod, now, 0.05);
+
+          const targetBassMod = 0.0012 * widthVal;
+          fxNode.bassLfoGainL.gain.setTargetAtTime(targetBassMod, now, 0.05);
+          fxNode.bassLfoGainR.gain.setTargetAtTime(-targetBassMod, now, 0.05);
+        }
+
+        // Tremolo depths
+        if (fxNode.tremTrebleL && fxNode.tremTrebleR && fxNode.tremBassL && fxNode.tremBassR) {
+          fxNode.tremTrebleL.gain.setTargetAtTime(0.3 * widthVal, now, 0.05);
+          fxNode.tremTrebleR.gain.setTargetAtTime(-0.3 * widthVal, now, 0.05);
+          fxNode.tremBassL.gain.setTargetAtTime(0.15 * widthVal, now, 0.05);
+          fxNode.tremBassR.gain.setTargetAtTime(-0.15 * widthVal, now, 0.05);
+        }
+      };
+
+      if (ifx1EffectRef.current) updateLeslieNode(ifx1EffectRef.current);
+      if (ifx2EffectRef.current) updateLeslieNode(ifx2EffectRef.current);
     }
   }, [params]);
 
@@ -1516,6 +1565,8 @@ export default function Delta7Synth() {
     const oldEffect = slotNum === 1 ? ifx1EffectRef.current : ifx2EffectRef.current;
     if (oldEffect) {
       if (oldEffect.lfo) { try { oldEffect.lfo.stop(); } catch {} }
+      if (oldEffect.lfoTreble) { try { oldEffect.lfoTreble.stop(); } catch {} }
+      if (oldEffect.lfoBass) { try { oldEffect.lfoBass.stop(); } catch {} }
       if (oldEffect.carrier) { try { oldEffect.carrier.stop(); } catch {} }
     }
 
@@ -1601,59 +1652,131 @@ export default function Delta7Synth() {
       filter.connect(wetGain);
       fxNode = { filter, lfo };
     } else if (type === 'Rotary Speaker') {
-      const delayL = ctx.createDelay();
-      const delayR = ctx.createDelay();
+      const crossoverVal = typeof paramsRef.current.leslieCrossover === 'number' ? paramsRef.current.leslieCrossover : 800;
       
-      const speedHz = paramsRef.current.leslieSpeed === 'Fast' ? 6.8 : (paramsRef.current.leslieSpeed === 'Slow' ? 1.1 : 0);
+      const crossoverHP = ctx.createBiquadFilter();
+      crossoverHP.type = 'highpass';
+      crossoverHP.frequency.setValueAtTime(crossoverVal, now);
+      crossoverHP.Q.setValueAtTime(0.707, now);
       
-      delayL.delayTime.setValueAtTime(0.007, now);
-      delayR.delayTime.setValueAtTime(0.007, now);
+      const crossoverLP = ctx.createBiquadFilter();
+      crossoverLP.type = 'lowpass';
+      crossoverLP.frequency.setValueAtTime(crossoverVal, now);
+      crossoverLP.Q.setValueAtTime(0.707, now);
 
-      const lfo = ctx.createOscillator();
-      lfo.type = 'sine';
-      lfo.frequency.setValueAtTime(speedHz, now);
+      const driveNode = ctx.createWaveShaper();
+      const driveAmt = typeof paramsRef.current.leslieDrive === 'number' ? paramsRef.current.leslieDrive : 0.25;
+      driveNode.curve = makeDistCurve(driveAmt * 0.45);
 
-      const lfoGainL = ctx.createGain();
-      lfoGainL.gain.setValueAtTime(0.003, now);
-      
-      const lfoGainR = ctx.createGain();
-      lfoGainR.gain.setValueAtTime(-0.003, now); 
+      inputNode.connect(driveNode);
+      driveNode.connect(crossoverHP);
+      driveNode.connect(crossoverLP);
 
-      lfo.connect(lfoGainL);
-      lfoGainL.connect(delayL.delayTime);
-      lfo.connect(lfoGainR);
-      lfoGainR.connect(delayR.delayTime);
+      // --- Treble Horn ---
+      const delayTrebleL = ctx.createDelay(1.0);
+      const delayTrebleR = ctx.createDelay(1.0);
+      delayTrebleL.delayTime.setValueAtTime(0.005, now);
+      delayTrebleR.delayTime.setValueAtTime(0.005, now);
 
-      const tremoloGainL = ctx.createGain();
-      const tremoloGainR = ctx.createGain();
-      tremoloGainL.gain.setValueAtTime(0.85, now);
-      tremoloGainR.gain.setValueAtTime(0.85, now);
+      const trebleSpeedHz = paramsRef.current.leslieSpeed === 'Fast' ? 7.25 : (paramsRef.current.leslieSpeed === 'Slow' ? 1.2 : 0);
+      const lfoTreble = ctx.createOscillator();
+      lfoTreble.type = 'sine';
+      lfoTreble.frequency.setValueAtTime(trebleSpeedHz, now);
 
-      const tremGainL = ctx.createGain();
-      tremGainL.gain.setValueAtTime(0.15, now);
-      const tremGainR = ctx.createGain();
-      tremGainR.gain.setValueAtTime(-0.15, now);
+      const widthAmt = typeof paramsRef.current.leslieWidth === 'number' ? paramsRef.current.leslieWidth : 0.5;
+      const trebleModDepth = 0.0022 * widthAmt;
 
-      lfo.connect(tremGainL);
-      tremGainL.connect(tremoloGainL.gain);
-      lfo.connect(tremGainR);
-      tremGainR.connect(tremoloGainR.gain);
+      const trebleLfoGainL = ctx.createGain();
+      trebleLfoGainL.gain.setValueAtTime(trebleModDepth, now);
+      const trebleLfoGainR = ctx.createGain();
+      trebleLfoGainR.gain.setValueAtTime(-trebleModDepth, now);
 
-      if (speedHz > 0) {
-        lfo.start(now);
-      }
+      lfoTreble.connect(trebleLfoGainL);
+      trebleLfoGainL.connect(delayTrebleL.delayTime);
+      lfoTreble.connect(trebleLfoGainR);
+      trebleLfoGainR.connect(delayTrebleR.delayTime);
 
-      inputNode.connect(delayL);
-      delayL.connect(tremoloGainL);
-      inputNode.connect(delayR);
-      delayR.connect(tremoloGainR);
+      const tremoloTrebleGainL = ctx.createGain();
+      const tremoloTrebleGainR = ctx.createGain();
+      tremoloTrebleGainL.gain.setValueAtTime(0.7, now);
+      tremoloTrebleGainR.gain.setValueAtTime(0.7, now);
+
+      const tremTrebleL = ctx.createGain();
+      tremTrebleL.gain.setValueAtTime(0.3 * widthAmt, now);
+      const tremTrebleR = ctx.createGain();
+      tremTrebleR.gain.setValueAtTime(-0.3 * widthAmt, now);
+
+      lfoTreble.connect(tremTrebleL);
+      tremTrebleL.connect(tremoloTrebleGainL.gain);
+      lfoTreble.connect(tremTrebleR);
+      tremTrebleR.connect(tremoloTrebleGainR.gain);
+
+      crossoverHP.connect(delayTrebleL);
+      crossoverHP.connect(delayTrebleR);
+      delayTrebleL.connect(tremoloTrebleGainL);
+      delayTrebleR.connect(tremoloTrebleGainR);
+
+      // --- Bass Drum ---
+      const delayBassL = ctx.createDelay(1.0);
+      const delayBassR = ctx.createDelay(1.0);
+      delayBassL.delayTime.setValueAtTime(0.009, now);
+      delayBassR.delayTime.setValueAtTime(0.009, now);
+
+      const bassSpeedHz = paramsRef.current.leslieSpeed === 'Fast' ? 6.0 : (paramsRef.current.leslieSpeed === 'Slow' ? 0.95 : 0);
+      const lfoBass = ctx.createOscillator();
+      lfoBass.type = 'sine';
+      lfoBass.frequency.setValueAtTime(bassSpeedHz, now);
+
+      const bassModDepth = 0.0012 * widthAmt;
+
+      const bassLfoGainL = ctx.createGain();
+      bassLfoGainL.gain.setValueAtTime(bassModDepth, now);
+      const bassLfoGainR = ctx.createGain();
+      bassLfoGainR.gain.setValueAtTime(-bassModDepth, now);
+
+      lfoBass.connect(bassLfoGainL);
+      bassLfoGainL.connect(delayBassL.delayTime);
+      lfoBass.connect(bassLfoGainR);
+      bassLfoGainR.connect(delayBassR.delayTime);
+
+      const tremoloBassGainL = ctx.createGain();
+      const tremoloBassGainR = ctx.createGain();
+      tremoloBassGainL.gain.setValueAtTime(0.85, now);
+      tremoloBassGainR.gain.setValueAtTime(0.85, now);
+
+      const tremBassL = ctx.createGain();
+      tremBassL.gain.setValueAtTime(0.15 * widthAmt, now);
+      const tremBassR = ctx.createGain();
+      tremBassR.gain.setValueAtTime(-0.15 * widthAmt, now);
+
+      lfoBass.connect(tremBassL);
+      tremBassL.connect(tremoloBassGainL.gain);
+      lfoBass.connect(tremBassR);
+      tremBassR.connect(tremoloBassGainR.gain);
+
+      crossoverLP.connect(delayBassL);
+      crossoverLP.connect(delayBassR);
+      delayBassL.connect(tremoloBassGainL);
+      delayBassR.connect(tremoloBassGainR);
+
+      // Start LFOs immediately
+      lfoTreble.start(now);
+      lfoBass.start(now);
 
       const merger = ctx.createChannelMerger(2);
-      tremoloGainL.connect(merger, 0, 0);
-      tremoloGainR.connect(merger, 0, 1);
+      tremoloTrebleGainL.connect(merger, 0, 0);
+      tremoloBassGainL.connect(merger, 0, 0);
+      tremoloTrebleGainR.connect(merger, 0, 1);
+      tremoloBassGainR.connect(merger, 0, 1);
       merger.connect(wetGain);
 
-      fxNode = { delayL, delayR, lfo, tremoloGainL, tremoloGainR, speedHz };
+      fxNode = { 
+        crossoverHP, crossoverLP, driveNode,
+        delayTrebleL, delayTrebleR, lfoTreble, tremoloTrebleGainL, tremoloTrebleGainR, 
+        delayBassL, delayBassR, lfoBass, tremoloBassGainL, tremoloBassGainR,
+        trebleLfoGainL, trebleLfoGainR, tremTrebleL, tremTrebleR,
+        bassLfoGainL, bassLfoGainR, tremBassL, tremBassR
+      };
     } else if (type === 'Flanger') {
       const delay = ctx.createDelay();
       delay.delayTime.setValueAtTime(0.003, now);
@@ -3663,6 +3786,12 @@ export default function Delta7Synth() {
           setParams(prev => ({ ...prev, spaceEchoSaturation: valNormalized }));
         } else if (paramName === 'spaceEchoSpring') {
           setParams(prev => ({ ...prev, spaceEchoSpring: valNormalized }));
+        } else if (paramName === 'leslieDrive') {
+          setParams(prev => ({ ...prev, leslieDrive: valNormalized }));
+        } else if (paramName === 'leslieWidth') {
+          setParams(prev => ({ ...prev, leslieWidth: valNormalized }));
+        } else if (paramName === 'leslieCrossover') {
+          setParams(prev => ({ ...prev, leslieCrossover: Math.round(valNormalized * 1700 + 300) }));
         } else if (paramName === 'stutterOn') {
           const isStut = valNormalized >= 0.5;
           setParams(prev => ({ ...prev, stutterOn: isStut }));
@@ -4055,6 +4184,37 @@ export default function Delta7Synth() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Leslie Knobs Grid */}
+            <div className="leslie-knobs-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 10px', justifyItems: 'center', width: '100%', marginTop: '0.4rem' }}>
+              <Knob 
+                label="Drive" 
+                value={params.leslieDrive !== undefined ? params.leslieDrive : 0.25} 
+                min={0.0} max={1.0} step={0.01}
+                onChange={(v) => setParams(prev => ({ ...prev, leslieDrive: v }))} 
+                midiLearnParam="leslieDrive" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="magenta"
+                size={34}
+              />
+              <Knob 
+                label="Width" 
+                value={params.leslieWidth !== undefined ? params.leslieWidth : 0.5} 
+                min={0.0} max={1.0} step={0.01}
+                onChange={(v) => setParams(prev => ({ ...prev, leslieWidth: v }))} 
+                midiLearnParam="leslieWidth" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="magenta"
+                size={34}
+              />
+              <Knob 
+                label="X-Over" 
+                value={params.leslieCrossover !== undefined ? params.leslieCrossover : 800} 
+                min={300} max={2000} step={10}
+                onChange={(v) => setParams(prev => ({ ...prev, leslieCrossover: v }))} 
+                midiLearnParam="leslieCrossover" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="magenta"
+                size={34}
+              />
             </div>
           </div>
 
@@ -5641,6 +5801,9 @@ export default function Delta7Synth() {
                           { name: 'Echo Wow', key: 'spaceEchoWow' },
                           { name: 'Echo Sat', key: 'spaceEchoSaturation' },
                           { name: 'Echo Spring', key: 'spaceEchoSpring' },
+                          { name: 'Rotr Drv', key: 'leslieDrive' },
+                          { name: 'Rotr Wid', key: 'leslieWidth' },
+                          { name: 'Rotr Crs', key: 'leslieCrossover' },
                           { name: 'Stut On', key: 'stutterOn' },
                           { name: 'Stut Rate', key: 'stutterRate' },
                           { name: 'Stut Gate', key: 'stutterGate' },
