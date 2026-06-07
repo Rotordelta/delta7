@@ -203,14 +203,14 @@ export default function Delta7Synth() {
 
   // --- Sampler States & Slots ---
   const [sampleSlots, setSampleSlots] = useState([
-    { id: 's01', name: 'User Slot 1', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's02', name: 'User Slot 2', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's03', name: 'User Slot 3', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's04', name: 'User Slot 4', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's05', name: 'User Slot 5', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's06', name: 'User Slot 6', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's07', name: 'User Slot 7', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's08', name: 'User Slot 8', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's01', name: 'User Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's02', name: 'User Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's03', name: 'User Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's04', name: 'User Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's05', name: 'User Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's06', name: 'User Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's07', name: 'User Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's08', name: 'User Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
   ]);
   const sampleSlotsRef = useRef(sampleSlots);
   useEffect(() => {
@@ -680,12 +680,17 @@ export default function Delta7Synth() {
     const isReverse = slot.reverseOn;
     source.buffer = isReverse && slot.revBuffer ? slot.revBuffer : slot.buffer;
 
+    const previewGain = ctx.createGain();
+    const slotVol = slot.volume !== undefined ? slot.volume : 1.0;
+    previewGain.gain.setValueAtTime(slotVol, now);
+    source.connect(previewGain);
+
     if (ifx1InputRef.current) {
-      source.connect(ifx1InputRef.current);
+      previewGain.connect(ifx1InputRef.current);
     } else if (masterGainRef.current) {
-      source.connect(masterGainRef.current);
+      previewGain.connect(masterGainRef.current);
     } else {
-      source.connect(ctx.destination);
+      previewGain.connect(ctx.destination);
     }
 
     const startOffset = isReverse ? (1.0 - slot.end) * slot.buffer.duration : slot.start * slot.buffer.duration;
@@ -2026,8 +2031,10 @@ export default function Delta7Synth() {
     const oscBalance = prog.oscBalance !== undefined ? prog.oscBalance : 0.5;
     const oscAVol = prog.oscAVol !== undefined ? prog.oscAVol : 0.8;
     const oscBVol = prog.oscBVol !== undefined ? prog.oscBVol : 0.5;
-    const gainAVol = oscAVol * Math.sqrt(1 - oscBalance);
-    const gainBVol = oscBVol * Math.sqrt(oscBalance);
+    const slotAVol = slotA && slotA.volume !== undefined ? slotA.volume : 1.0;
+    const slotBVol = slotB && slotB.volume !== undefined ? slotB.volume : 1.0;
+    const gainAVol = oscAVol * Math.sqrt(1 - oscBalance) * slotAVol;
+    const gainBVol = oscBVol * Math.sqrt(oscBalance) * slotBVol;
 
     // Amp & Filter EG Setup
     const vca = prog.vcaEG || { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.3, breakLevel: 0.7, slopeTime: 0.5, sustainLevel: 0.5, releaseTime: 0.3 };
@@ -4228,8 +4235,8 @@ export default function Delta7Synth() {
                         )}
                       </div>
 
-                      {/* Loop Enable, Root Note and Preview buttons */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '95px 75px 1.3fr 110px', gap: '8px', marginTop: '4px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '4px', alignItems: 'center' }}>
+                      {/* Loop Enable, Root Note, Volume and Preview buttons */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '95px 75px 120px 1.3fr 110px', gap: '8px', marginTop: '4px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '4px', alignItems: 'center' }}>
                         <button 
                           className={`btn btn-xs ${slot.loopOn ? 'active-green' : ''}`}
                           onClick={() => updateSlotParam(selectedEditSlotId, 'loopOn', !slot.loopOn)}
@@ -4245,6 +4252,20 @@ export default function Delta7Synth() {
                         >
                           {slot.reverseOn ? 'REV: ON' : 'REV: OFF'}
                         </button>
+
+                        {/* Sample Slot Level Volume control */}
+                        <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem' }}>
+                          <span style={{ color: '#00f3ff' }}>Vol:</span>
+                          <input 
+                            type="range" min="0" max="1.5" step="0.05"
+                            value={slot.volume !== undefined ? slot.volume : 1.0}
+                            onChange={(e) => updateSlotParam(selectedEditSlotId, 'volume', parseFloat(e.target.value))}
+                            style={{ flexGrow: 1, height: '6px', accentColor: '#00f3ff' }}
+                          />
+                          <span className="font-mono" style={{ color: '#ffe600', fontSize: '0.52rem', width: '22px', textAlign: 'right' }}>
+                            {Math.round((slot.volume !== undefined ? slot.volume : 1.0) * 100)}%
+                          </span>
+                        </div>
 
                         <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem' }}>
                           <span style={{ color: '#88ccee' }}>Root:</span>
