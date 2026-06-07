@@ -11,4 +11,6 @@
 - **Granular Coordinate Mapping**: Reverse granular paths must align precisely with buffer coordinate spaces, preventing double-inverting offsets for reversed grain schedules.
 - **Web Loopback Capture**: Capture high-quality browser tab audio using display media API, shutting down video tracks instantly to conserve processing resources.
 - **Waveform Selection & DSP Splicing**: Enable fluid click-and-drag range selection overlay on the canvas and map Float32Array operations (Trim, Copy, Cut, Paste, Delete, Undo) to provide precise, destructive sample editing tools with undo history tracking.
+- **Space Echo Ratios & Dub Ramper**: Integrated tempo-synced delay ratios (Free, 1/16 to 1/2) that automatically recalculate delay times on BPM shifts. Designed a Mod Wheel (CC 1) Dub Ramper that glides delay time (for tape-like pitch pitch-bends), scales feedback up to 0.99 for self-oscillation, and ramps tape saturation to create classic dub effects that reset cleanly to base parameters at 0.
+
 
