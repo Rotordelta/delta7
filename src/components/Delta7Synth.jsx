@@ -225,6 +225,7 @@ export default function Delta7Synth() {
 
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('s01'); // Target slot in Editor
   const [selectedSliceIndex, setSelectedSliceIndex] = useState(0); // Selected slice index for editing
+  const [tapTimes, setTapTimes] = useState([]); // Timestamps for tap tempo calculation
   const [isRecording, setIsRecording] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
   const [recordSlotId, setRecordSlotId] = useState('s01'); // Target recording user slot
@@ -664,6 +665,25 @@ export default function Delta7Synth() {
     if (!slot) return;
     const clamped = Math.max(val, slot.loopStart + 0.01);
     updateSlotParam(selectedEditSlotId, 'loopEnd', clamped);
+  };
+
+  const handleTapTempo = () => {
+    const now = performance.now();
+    setTapTimes(prev => {
+      const next = [...prev, now].filter(t => now - t < 2000);
+      if (next.length >= 2) {
+        const intervals = [];
+        for (let i = 1; i < next.length; i++) {
+          intervals.push(next[i] - next[i - 1]);
+        }
+        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const computedBpm = Math.round(60000 / avgInterval);
+        if (computedBpm >= 40 && computedBpm <= 250) {
+          setParams(prev => ({ ...prev, arpBpm: computedBpm }));
+        }
+      }
+      return next;
+    });
   };
 
   const togglePreviewSample = (slotId) => {
@@ -1801,9 +1821,22 @@ export default function Delta7Synth() {
     delay2.connect(panner2);
     delay3.connect(panner3);
 
-    panner1.connect(tapeSat);
-    panner2.connect(tapeSat);
-    panner3.connect(tapeSat);
+    const hpfNode = ctx.createBiquadFilter();
+    hpfNode.type = 'highpass';
+    hpfNode.frequency.setValueAtTime(150, now);
+    hpfNode.Q.setValueAtTime(0.5, now);
+
+    const lpfNode = ctx.createBiquadFilter();
+    lpfNode.type = 'lowpass';
+    lpfNode.frequency.setValueAtTime(1800, now);
+    lpfNode.Q.setValueAtTime(0.5, now);
+
+    panner1.connect(hpfNode);
+    panner2.connect(hpfNode);
+    panner3.connect(hpfNode);
+
+    hpfNode.connect(lpfNode);
+    lpfNode.connect(tapeSat);
 
     tapeSat.connect(feedbackGain1); feedbackGain1.connect(delay1);
     tapeSat.connect(feedbackGain2); feedbackGain2.connect(delay2);
@@ -1827,6 +1860,7 @@ export default function Delta7Synth() {
       flutterGain1, flutterGain2, flutterGain3,
       feedbackGain1, feedbackGain2, feedbackGain3,
       springGain, tapeSat,
+      hpfNode, lpfNode,
       wowLfo, flutterLfo
     };
   };
@@ -3524,9 +3558,21 @@ export default function Delta7Synth() {
           if (ad.delay2) ad.delay2.delayTime.setTargetAtTime(targetTime * 1.5, now, 0.08);
           if (ad.delay3) ad.delay3.delayTime.setTargetAtTime(targetTime * 2.0, now, 0.08);
 
-          if (ad.feedbackGain1) ad.feedbackGain1.gain.setValueAtTime(targetFeedback * 0.5, now);
-          if (ad.feedbackGain2) ad.feedbackGain2.gain.setValueAtTime(targetFeedback * 0.35, now);
-          if (ad.feedbackGain3) ad.feedbackGain3.gain.setValueAtTime(targetFeedback * 0.25, now);
+          if (ad.feedbackGain1) {
+            ad.feedbackGain1.gain.cancelScheduledValues(now);
+            ad.feedbackGain1.gain.setValueAtTime(Math.max(0.0001, ad.feedbackGain1.gain.value), now);
+            ad.feedbackGain1.gain.exponentialRampToValueAtTime(Math.max(0.0001, targetFeedback * 0.5), now + 0.08);
+          }
+          if (ad.feedbackGain2) {
+            ad.feedbackGain2.gain.cancelScheduledValues(now);
+            ad.feedbackGain2.gain.setValueAtTime(Math.max(0.0001, ad.feedbackGain2.gain.value), now);
+            ad.feedbackGain2.gain.exponentialRampToValueAtTime(Math.max(0.0001, targetFeedback * 0.35), now + 0.08);
+          }
+          if (ad.feedbackGain3) {
+            ad.feedbackGain3.gain.cancelScheduledValues(now);
+            ad.feedbackGain3.gain.setValueAtTime(Math.max(0.0001, ad.feedbackGain3.gain.value), now);
+            ad.feedbackGain3.gain.exponentialRampToValueAtTime(Math.max(0.0001, targetFeedback * 0.25), now + 0.08);
+          }
 
           if (ad.tapeSat) ad.tapeSat.curve = makeDistCurve(targetSat * 0.7);
         } else {
@@ -3537,8 +3583,13 @@ export default function Delta7Synth() {
             } else {
               ad.delayR.delayTime.setTargetAtTime(targetTime * 1.33, now, 0.08);
             }
-            ad.feedbackL.gain.setValueAtTime(targetFeedback, now);
-            ad.feedbackR.gain.setValueAtTime(targetFeedback, now);
+            ad.feedbackL.gain.cancelScheduledValues(now);
+            ad.feedbackL.gain.setValueAtTime(Math.max(0.0001, ad.feedbackL.gain.value), now);
+            ad.feedbackL.gain.exponentialRampToValueAtTime(Math.max(0.0001, targetFeedback), now + 0.08);
+
+            ad.feedbackR.gain.cancelScheduledValues(now);
+            ad.feedbackR.gain.setValueAtTime(Math.max(0.0001, ad.feedbackR.gain.value), now);
+            ad.feedbackR.gain.exponentialRampToValueAtTime(Math.max(0.0001, targetFeedback), now + 0.08);
           }
         }
       }
@@ -5310,23 +5361,76 @@ export default function Delta7Synth() {
                         </div>
 
                         {/* Arpeggiator */}
-                        <div className="flex-row-sub" style={{ alignItems: 'center', marginTop: '2px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '2px' }}>
-                          <label>Arp:</label>
+                        <div className="flex-row-sub" style={{ alignItems: 'center', marginTop: '2px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '2px', gap: '3px' }}>
+                          <label style={{ width: '20px', flexShrink: 0 }}>Arp:</label>
                           <button
                             className={`segmented-btn btn-xs ${params.arpOn ? 'active' : ''}`}
                             onClick={() => setParams(prev => ({ ...prev, arpOn: !prev.arpOn }))}
-                            style={{ padding: '0px 4px', fontSize: '0.48rem' }}
+                            style={{ padding: '0px 3px', fontSize: '0.48rem', flexShrink: 0 }}
                           >
                             {params.arpOn ? 'ON' : 'OFF'}
                           </button>
                           <input 
-                            type="range" min="60" max="200" step="5"
+                            type="range" min="40" max="250" step="1"
                             value={params.arpBpm || 120} 
-                            onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseInt(e.target.value) }))} 
-                            style={{ width: '40px', height: '8px' }}
-                            disabled={!params.arpOn}
+                            onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseInt(e.target.value) || 120 }))} 
+                            style={{ flexGrow: 1, height: '8px', minWidth: '30px' }}
                           />
-                          <span className="font-mono text-cyan" style={{ fontSize: '0.48rem' }}>{params.arpBpm}B</span>
+                          <input 
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={params.arpBpm} 
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              if (val === '') {
+                                setParams(prev => ({ ...prev, arpBpm: '' }));
+                              } else {
+                                const parsed = parseInt(val, 10);
+                                setParams(prev => ({ ...prev, arpBpm: Math.min(250, parsed) }));
+                              }
+                            }}
+                            onBlur={() => {
+                              const parsed = parseInt(params.arpBpm, 10);
+                              if (isNaN(parsed) || parsed < 40) {
+                                setParams(prev => ({ ...prev, arpBpm: 40 }));
+                              } else if (parsed > 250) {
+                                setParams(prev => ({ ...prev, arpBpm: 250 }));
+                              }
+                            }}
+                            style={{ 
+                              width: '22px', 
+                              background: '#000', 
+                              border: '1px solid rgba(0, 243, 255, 0.4)', 
+                              color: '#00f3ff', 
+                              fontFamily: 'monospace', 
+                              fontSize: '0.48rem', 
+                              textAlign: 'center', 
+                              borderRadius: '2px', 
+                              padding: '0px',
+                              outline: 'none',
+                              flexShrink: 0
+                            }}
+                          />
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.48rem', flexShrink: 0 }}>B</span>
+                          <button
+                            className="segmented-btn btn-xs"
+                            onClick={handleTapTempo}
+                            style={{ 
+                              padding: '0px 3px', 
+                              fontSize: '0.45rem', 
+                              height: '11px', 
+                              border: '1px solid rgba(255, 0, 255, 0.6)', 
+                              color: '#ff00ff', 
+                              background: 'transparent', 
+                              cursor: 'pointer', 
+                              borderRadius: '2px',
+                              flexShrink: 0,
+                              textShadow: '0 0 2px rgba(255, 0, 255, 0.5)'
+                            }}
+                          >
+                            TAP
+                          </button>
                         </div>
                       </div>
 
