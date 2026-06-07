@@ -227,6 +227,27 @@ export default function Delta7Synth() {
   const previewStartTimeRef = useRef(0);
   const previewStartOffsetRef = useRef(0);
 
+  // --- Waveform selection, clipboard, history & recording states ---
+  const [recordingInputMode, setRecordingInputMode] = useState('mic'); // 'mic' or 'monitor'
+  const [selectionStart, setSelectionStart] = useState(null);
+  const [selectionEnd, setSelectionEnd] = useState(null);
+  const [clipboard, setClipboard] = useState(null);
+  const [undoHistory, setUndoHistory] = useState([]);
+  const isDraggingSelectionRef = useRef(false);
+
+  const [selectedDelayRatio, setSelectedDelayRatio] = useState('Free');
+  const [modWheelVal, setModWheelVal] = useState(0); // 0 to 127
+
+  const DELAY_RATIOS = useMemo(() => ({
+    '1/16': 0.25,
+    '1/8T': 1/3,
+    '1/8': 0.5,
+    '1/8D': 0.75,
+    '1/4': 1.0,
+    '1/4D': 1.5,
+    '1/2': 2.0
+  }), []);
+
   const getSlotLabel = (slotId) => {
     const num = parseInt(slotId.slice(2));
     return `U${num}`;
@@ -417,6 +438,188 @@ export default function Delta7Synth() {
     setIsRecording(false);
   };
 
+  const armMonitor = async () => {
+    if (isArmed) {
+      disarmMicrophone();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: "browser" },
+        audio: true
+      });
+      // Stop the video tracks immediately to capture only the audio tracks
+      stream.getVideoTracks().forEach(track => track.stop());
+
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        stream.getTracks().forEach(t => t.stop());
+        alert("No audio track found. Please check 'Share tab audio' in the screen share dialog.");
+        return;
+      }
+
+      streamRef.current = stream;
+      
+      if (!audioCtxRef.current) initAudio();
+      const ctx = audioCtxRef.current;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      micAnalyserRef.current = analyser;
+      
+      const source = ctx.createMediaStreamSource(stream);
+      source.connect(analyser);
+      micSourceRef.current = source;
+      
+      setIsArmed(true);
+      startMicMonitor();
+    } catch (err) {
+      console.error("Error capturing browser tab audio:", err);
+      alert("Screen audio capture failed or cancelled.");
+    }
+  };
+
+  // --- Waveform Selection Mouse & Touch Handlers ---
+  const handleCanvasMouseDown = (e) => {
+    const canvas = samplerCanvasRef.current;
+    if (!canvas) return;
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot || !slot.buffer) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pct = Math.max(0.0, Math.min(1.0, x / rect.width));
+
+    setSelectionStart(pct);
+    setSelectionEnd(pct);
+    isDraggingSelectionRef.current = true;
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (!isDraggingSelectionRef.current) return;
+    const canvas = samplerCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pct = Math.max(0.0, Math.min(1.0, x / rect.width));
+    setSelectionEnd(pct);
+  };
+
+  const handleCanvasMouseUp = () => {
+    isDraggingSelectionRef.current = false;
+    if (selectionStart !== null && selectionEnd !== null) {
+      if (Math.abs(selectionStart - selectionEnd) < 0.005) {
+        setSelectionStart(null);
+        setSelectionEnd(null);
+      }
+    }
+  };
+
+  const handleCanvasTouchStart = (e) => {
+    if (e.touches.length === 0) return;
+    const canvas = samplerCanvasRef.current;
+    if (!canvas) return;
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot || !slot.buffer) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.touches[0].clientX - rect.left;
+    const pct = Math.max(0.0, Math.min(1.0, x / rect.width));
+
+    setSelectionStart(pct);
+    setSelectionEnd(pct);
+    isDraggingSelectionRef.current = true;
+  };
+
+  const handleCanvasTouchMove = (e) => {
+    if (!isDraggingSelectionRef.current || e.touches.length === 0) return;
+    const canvas = samplerCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.touches[0].clientX - rect.left;
+    const pct = Math.max(0.0, Math.min(1.0, x / rect.width));
+    setSelectionEnd(pct);
+  };
+
+  const handleCanvasTouchEnd = () => {
+    isDraggingSelectionRef.current = false;
+    if (selectionStart !== null && selectionEnd !== null) {
+      if (Math.abs(selectionStart - selectionEnd) < 0.005) {
+        setSelectionStart(null);
+        setSelectionEnd(null);
+      }
+    }
+  };
+
+  // --- Splicing DSP helpers ---
+  const pushUndoState = (slot) => {
+    setUndoHistory(prev => {
+      const next = [
+        {
+          slotId: slot.id,
+          name: slot.name,
+          buffer: slot.buffer,
+          revBuffer: slot.revBuffer,
+          start: slot.start,
+          end: slot.end,
+          loopStart: slot.loopStart,
+          loopEnd: slot.loopEnd
+        },
+        ...prev
+      ];
+      if (next.length > 8) {
+        next.pop();
+      }
+      return next;
+    });
+  };
+
+  const undoLastAction = () => {
+    if (undoHistory.length === 0) return;
+    const [lastState, ...remainingHistory] = undoHistory;
+    setUndoHistory(remainingHistory);
+
+    const nextSlots = sampleSlotsRef.current.map(slot => {
+      if (slot.id === lastState.slotId) {
+        return {
+          ...slot,
+          name: lastState.name,
+          buffer: lastState.buffer,
+          revBuffer: lastState.revBuffer,
+          start: lastState.start,
+          end: lastState.end,
+          loopStart: lastState.loopStart,
+          loopEnd: lastState.loopEnd
+        };
+      }
+      return slot;
+    });
+    sampleSlotsRef.current = nextSlots;
+    setSampleSlots(nextSlots);
+    setSelectionStart(null);
+    setSelectionEnd(null);
+  };
+
+  const updateBufferForSlot = (slotId, buffer, name) => {
+    const ctx = audioCtxRef.current;
+    const nextSlots = sampleSlotsRef.current.map(slot => {
+      if (slot.id === slotId) {
+        return {
+          ...slot,
+          name: name.slice(0, 24),
+          buffer: buffer,
+          revBuffer: buffer ? getReversedBuffer(ctx, buffer) : null,
+          start: 0.0,
+          end: 1.0,
+          loopStart: 0.0,
+          loopEnd: 1.0
+        };
+      }
+      return slot;
+    });
+    sampleSlotsRef.current = nextSlots;
+    setSampleSlots(nextSlots);
+  };
+
   // --- Waveform Editor Actions ---
   const updateSlotParam = (slotId, param, val) => {
     const nextSlots = sampleSlotsRef.current.map(s => {
@@ -585,6 +788,21 @@ export default function Delta7Synth() {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
       ctx.fillRect(0, 0, startX, canvas.height);
       ctx.fillRect(endX, 0, canvas.width - endX, canvas.height);
+
+      // Selection highlight overlay
+      if (selectionStart !== null && selectionEnd !== null) {
+        const selStartX = Math.min(selectionStart, selectionEnd) * canvas.width;
+        const selEndX = Math.max(selectionStart, selectionEnd) * canvas.width;
+        ctx.fillStyle = 'rgba(0, 243, 255, 0.22)';
+        ctx.fillRect(selStartX, 0, selEndX - selStartX, canvas.height);
+
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(selStartX, 0); ctx.lineTo(selStartX, canvas.height);
+        ctx.moveTo(selEndX, 0); ctx.lineTo(selEndX, canvas.height);
+        ctx.stroke();
+      }
       
       // Visual boundary markers
       ctx.lineWidth = 1.5;
@@ -847,7 +1065,19 @@ export default function Delta7Synth() {
     return () => {
       cancelAnimationFrame(samplerCanvasAnimIdRef.current);
     };
-  }, [selectedEditSlotId, isPlayingPreview, selectedSliceIndex]);
+  }, [selectedEditSlotId, isPlayingPreview, selectedSliceIndex, selectionStart, selectionEnd]);
+
+  // Auto-update Tempo Synced Delay times when Master BPM changes
+  useEffect(() => {
+    if (selectedDelayRatio !== 'Free') {
+      const multiplier = DELAY_RATIOS[selectedDelayRatio];
+      if (multiplier) {
+        const beatDuration = 60 / (params.arpBpm || 120);
+        const computedTime = Math.min(1.5, Math.max(0.05, multiplier * beatDuration));
+        setParams(prev => ({ ...prev, spaceEchoTime: parseFloat(computedTime.toFixed(3)) }));
+      }
+    }
+  }, [params.arpBpm, selectedDelayRatio, DELAY_RATIOS]);
 
   // Synced Parameters Ref (for low-latency access in loop)
   const paramsRef = useRef(params);
@@ -2987,6 +3217,49 @@ export default function Delta7Synth() {
   };
 
   const handleMidiCC = (cc, val) => {
+    // 0. Intercept CC 1 (Modulation Wheel) for the Dub Ramper
+    if (cc === 1) {
+      setModWheelVal(val);
+      const modVal = val / 127;
+      const now = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
+      
+      const currentFeedbackBase = paramsRef.current.spaceEchoFeedback;
+      const targetFeedback = currentFeedbackBase + (0.99 - currentFeedbackBase) * modVal;
+      
+      const currentBaseTime = paramsRef.current.spaceEchoTime;
+      const targetTime = currentBaseTime * (1.0 + modVal * 0.5); 
+      
+      const currentSat = paramsRef.current.spaceEchoSaturation;
+      const targetSat = currentSat + (1.0 - currentSat) * modVal;
+
+      if (activeDelayRef.current) {
+        const ad = activeDelayRef.current;
+        if (paramsRef.current.spaceEchoActive) {
+          if (ad.delay1) ad.delay1.delayTime.setTargetAtTime(targetTime, now, 0.08);
+          if (ad.delay2) ad.delay2.delayTime.setTargetAtTime(targetTime * 1.5, now, 0.08);
+          if (ad.delay3) ad.delay3.delayTime.setTargetAtTime(targetTime * 2.0, now, 0.08);
+
+          if (ad.feedbackGain1) ad.feedbackGain1.gain.setValueAtTime(targetFeedback * 0.5, now);
+          if (ad.feedbackGain2) ad.feedbackGain2.gain.setValueAtTime(targetFeedback * 0.35, now);
+          if (ad.feedbackGain3) ad.feedbackGain3.gain.setValueAtTime(targetFeedback * 0.25, now);
+
+          if (ad.tapeSat) ad.tapeSat.curve = makeDistCurve(targetSat * 0.7);
+        } else {
+          if (ad.delayL && ad.delayR) {
+            ad.delayL.delayTime.setTargetAtTime(targetTime, now, 0.08);
+            if (ad.delayR.setTargetAtTime) {
+              ad.delayR.setTargetAtTime(targetTime * 1.33, now, 0.08);
+            } else {
+              ad.delayR.delayTime.setTargetAtTime(targetTime * 1.33, now, 0.08);
+            }
+            ad.feedbackL.gain.setValueAtTime(targetFeedback, now);
+            ad.feedbackR.gain.setValueAtTime(targetFeedback, now);
+          }
+        }
+      }
+      return;
+    }
+
     // 1. Learning system hook
     if (midiLearnParam) {
       setMidiMappings(prev => {
@@ -3330,7 +3603,10 @@ export default function Delta7Synth() {
                 label="Time" 
                 value={params.spaceEchoTime} 
                 min={0.05} max={1.5} step={0.01}
-                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoTime: v }))} 
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, spaceEchoTime: v }));
+                  setSelectedDelayRatio('Free');
+                }} 
                 midiLearnParam="spaceEchoTime" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                 glowColor="cyan"
                 size={34}
@@ -3371,6 +3647,46 @@ export default function Delta7Synth() {
                 glowColor="cyan"
                 size={34}
               />
+            </div>
+
+            {/* Delay Time Ratio Selector & Dub Ramper */}
+            <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px dashed rgba(0, 243, 255, 0.15)', paddingTop: '4px' }}>
+              <div className="flex-row-sub" style={{ flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                <span style={{ color: '#00f3ff', fontSize: '0.55rem', fontWeight: 'bold' }}>DELAY TIME RATIO (TEMPO SYNC):</span>
+                <div className="segmented-strip" style={{ display: 'flex', width: '100%', flexWrap: 'wrap' }}>
+                  {['Free', '1/16', '1/8T', '1/8', '1/8D', '1/4', '1/4D', '1/2'].map(ratio => (
+                    <button
+                      key={ratio}
+                      className={`segmented-btn btn-xs ${selectedDelayRatio === ratio ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedDelayRatio(ratio);
+                        if (ratio !== 'Free') {
+                          const multiplier = DELAY_RATIOS[ratio];
+                          const beatDuration = 60 / (params.arpBpm || 120);
+                          const computedTime = Math.min(1.5, Math.max(0.05, multiplier * beatDuration));
+                          setParams(prev => ({ ...prev, spaceEchoTime: parseFloat(computedTime.toFixed(3)) }));
+                        }
+                      }}
+                      style={{ padding: '2px 3px', fontSize: '0.48rem', flexGrow: 1 }}
+                    >
+                      {ratio}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.58rem', marginTop: '2px' }}>
+                <span style={{ color: '#ff5500', fontWeight: 'bold', fontSize: '0.55rem' }}>DUB RAMPER (MOD WHEEL):</span>
+                <input 
+                  type="range" min="0" max="127" step="1"
+                  value={modWheelVal} 
+                  onChange={(e) => handleMidiCC(1, parseInt(e.target.value))} 
+                  style={{ flexGrow: 1, height: '8px', margin: '0 6px', accentColor: '#ff5500' }}
+                />
+                <span className="val-text font-mono" style={{ color: '#ffe600', fontSize: '0.52rem', width: '24px', textAlign: 'right' }}>
+                  {Math.round((modWheelVal / 127) * 100)}%
+                </span>
+              </div>
             </div>
 
             <div className="leslie-separator"></div>
@@ -3609,7 +3925,13 @@ export default function Delta7Synth() {
                             width="480" 
                             height="75" 
                             className="waveform-draw-canvas"
-                            style={{ display: 'block', width: '100%', height: '75px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.3)', background: '#020d1e' }}
+                            onMouseDown={handleCanvasMouseDown}
+                            onMouseMove={handleCanvasMouseMove}
+                            onMouseUp={handleCanvasMouseUp}
+                            onTouchStart={handleCanvasTouchStart}
+                            onTouchMove={handleCanvasTouchMove}
+                            onTouchEnd={handleCanvasTouchEnd}
+                            style={{ display: 'block', width: '100%', height: '75px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.3)', background: '#020d1e', cursor: slot.buffer ? 'col-resize' : 'default' }}
                           />
                         </div>
 
@@ -3659,6 +3981,249 @@ export default function Delta7Synth() {
                             <span className="val-text font-mono" style={{ color: '#00ff66', opacity: slot.loopOn ? 1 : 0.4, width: '28px', textAlign: 'right' }}>{Math.round(slot.loopEnd * 100)}%</span>
                           </div>
                         </div>
+                      </div>
+
+                      {/* Audio Editor Toolbar */}
+                      <div style={{ display: 'flex', gap: '4px', margin: '4px 0', padding: '4px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.15)', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: '0.62rem', color: '#ffe600', fontWeight: 'bold' }}>EDIT TOOLS:</div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            className="btn btn-xs"
+                            disabled={!slot.buffer}
+                            onClick={() => {
+                              setSelectionStart(0.0);
+                              setSelectionEnd(1.0);
+                            }}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem' }}
+                          >
+                            SELECT ALL
+                          </button>
+                          <button
+                            className="btn btn-xs"
+                            disabled={!slot.buffer || selectionStart === null || selectionEnd === null}
+                            onClick={() => {
+                              const buffer = slot.buffer;
+                              if (!buffer) return;
+                              pushUndoState(slot);
+                              const totalSamples = buffer.length;
+                              const startPct = Math.min(selectionStart, selectionEnd);
+                              const endPct = Math.max(selectionStart, selectionEnd);
+                              const startSample = Math.floor(startPct * totalSamples);
+                              const endSample = Math.floor(endPct * totalSamples);
+                              const selectionLength = endSample - startSample;
+                              if (selectionLength <= 0) return;
+
+                              const ctx = audioCtxRef.current;
+                              const newBuffer = ctx.createBuffer(buffer.numberOfChannels, selectionLength, buffer.sampleRate);
+                              for (let c = 0; c < buffer.numberOfChannels; c++) {
+                                newBuffer.getChannelData(c).set(buffer.getChannelData(c).slice(startSample, endSample), 0);
+                              }
+                              updateBufferForSlot(selectedEditSlotId, newBuffer, `Trim: ${slot.name}`);
+                              setSelectionStart(null);
+                              setSelectionEnd(null);
+                              if (activePreviewNodeRef.current) {
+                                try { activePreviewNodeRef.current.stop(); } catch {}
+                                activePreviewNodeRef.current = null;
+                                setIsPlayingPreview(false);
+                              }
+                            }}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ffe600', color: '#ffe600' }}
+                          >
+                            TRIM
+                          </button>
+                          <button
+                            className="btn btn-xs"
+                            disabled={!slot.buffer || selectionStart === null || selectionEnd === null}
+                            onClick={() => {
+                              const buffer = slot.buffer;
+                              if (!buffer) return;
+                              const totalSamples = buffer.length;
+                              const startPct = Math.min(selectionStart, selectionEnd);
+                              const endPct = Math.max(selectionStart, selectionEnd);
+                              const startSample = Math.floor(startPct * totalSamples);
+                              const endSample = Math.floor(endPct * totalSamples);
+                              if (startSample >= endSample) return;
+
+                              const channelsCopy = [];
+                              for (let c = 0; c < buffer.numberOfChannels; c++) {
+                                channelsCopy.push(buffer.getChannelData(c).slice(startSample, endSample));
+                              }
+                              setClipboard({
+                                numberOfChannels: buffer.numberOfChannels,
+                                sampleRate: buffer.sampleRate,
+                                channels: channelsCopy
+                              });
+                            }}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem' }}
+                          >
+                            COPY
+                          </button>
+                          <button
+                            className="btn btn-xs"
+                            disabled={!slot.buffer || selectionStart === null || selectionEnd === null}
+                            onClick={() => {
+                              const buffer = slot.buffer;
+                              if (!buffer) return;
+                              pushUndoState(slot);
+                              const totalSamples = buffer.length;
+                              const startPct = Math.min(selectionStart, selectionEnd);
+                              const endPct = Math.max(selectionStart, selectionEnd);
+                              const startSample = Math.floor(startPct * totalSamples);
+                              const endSample = Math.floor(endPct * totalSamples);
+                              const selectionLength = endSample - startSample;
+                              if (selectionLength <= 0) return;
+
+                              const channelsCopy = [];
+                              for (let c = 0; c < buffer.numberOfChannels; c++) {
+                                channelsCopy.push(buffer.getChannelData(c).slice(startSample, endSample));
+                              }
+                              setClipboard({
+                                numberOfChannels: buffer.numberOfChannels,
+                                sampleRate: buffer.sampleRate,
+                                channels: channelsCopy
+                              });
+
+                              const newLength = totalSamples - selectionLength;
+                              if (newLength <= 0) {
+                                updateBufferForSlot(selectedEditSlotId, null, "Cut (Empty)");
+                              } else {
+                                const ctx = audioCtxRef.current;
+                                const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newLength, buffer.sampleRate);
+                                for (let c = 0; c < buffer.numberOfChannels; c++) {
+                                  const orig = buffer.getChannelData(c);
+                                  const dest = newBuffer.getChannelData(c);
+                                  dest.set(orig.subarray(0, startSample), 0);
+                                  dest.set(orig.subarray(endSample, totalSamples), startSample);
+                                }
+                                updateBufferForSlot(selectedEditSlotId, newBuffer, `Cut: ${slot.name}`);
+                              }
+                              setSelectionStart(null);
+                              setSelectionEnd(null);
+                              if (activePreviewNodeRef.current) {
+                                try { activePreviewNodeRef.current.stop(); } catch {}
+                                activePreviewNodeRef.current = null;
+                                setIsPlayingPreview(false);
+                              }
+                            }}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem' }}
+                          >
+                            CUT
+                          </button>
+                          <button
+                            className="btn btn-xs"
+                            disabled={!clipboard}
+                            onClick={() => {
+                              if (!clipboard) return;
+                              pushUndoState(slot);
+                              const ctx = audioCtxRef.current;
+                              const buffer = slot.buffer;
+
+                              if (!buffer) {
+                                const newBuffer = ctx.createBuffer(clipboard.numberOfChannels, clipboard.channels[0].length, clipboard.sampleRate);
+                                for (let c = 0; c < clipboard.numberOfChannels; c++) {
+                                  newBuffer.getChannelData(c).set(clipboard.channels[c], 0);
+                                }
+                                updateBufferForSlot(selectedEditSlotId, newBuffer, "Pasted Sample");
+                                return;
+                              }
+
+                              const totalSamples = buffer.length;
+                              const clipboardLength = clipboard.channels[0].length;
+                              let startSample = totalSamples;
+                              let endSample = totalSamples;
+
+                              if (selectionStart !== null && selectionEnd !== null) {
+                                const startPct = Math.min(selectionStart, selectionEnd);
+                                const endPct = Math.max(selectionStart, selectionEnd);
+                                startSample = Math.floor(startPct * totalSamples);
+                                endSample = Math.floor(endPct * totalSamples);
+                              }
+
+                              const selectionLength = endSample - startSample;
+                              const newLength = totalSamples - selectionLength + clipboardLength;
+                              const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newLength, buffer.sampleRate);
+
+                              for (let c = 0; c < buffer.numberOfChannels; c++) {
+                                const orig = buffer.getChannelData(c);
+                                const dest = newBuffer.getChannelData(c);
+                                const clip = clipboard.channels[c] || clipboard.channels[0];
+
+                                dest.set(orig.subarray(0, startSample), 0);
+                                dest.set(clip, startSample);
+                                dest.set(orig.subarray(endSample, totalSamples), startSample + clipboardLength);
+                              }
+                              updateBufferForSlot(selectedEditSlotId, newBuffer, `Paste: ${slot.name}`);
+                              setSelectionStart(null);
+                              setSelectionEnd(null);
+                              if (activePreviewNodeRef.current) {
+                                try { activePreviewNodeRef.current.stop(); } catch {}
+                                activePreviewNodeRef.current = null;
+                                setIsPlayingPreview(false);
+                              }
+                            }}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem' }}
+                          >
+                            PASTE
+                          </button>
+                          <button
+                            className="btn btn-xs"
+                            disabled={!slot.buffer || selectionStart === null || selectionEnd === null}
+                            onClick={() => {
+                              const buffer = slot.buffer;
+                              if (!buffer) return;
+                              pushUndoState(slot);
+                              const totalSamples = buffer.length;
+                              const startPct = Math.min(selectionStart, selectionEnd);
+                              const endPct = Math.max(selectionStart, selectionEnd);
+                              const startSample = Math.floor(startPct * totalSamples);
+                              const endSample = Math.floor(endPct * totalSamples);
+                              const selectionLength = endSample - startSample;
+                              if (selectionLength <= 0) return;
+
+                              const newLength = totalSamples - selectionLength;
+                              if (newLength <= 0) {
+                                updateBufferForSlot(selectedEditSlotId, null, "Deleted (Empty)");
+                              } else {
+                                const ctx = audioCtxRef.current;
+                                const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newLength, buffer.sampleRate);
+                                for (let c = 0; c < buffer.numberOfChannels; c++) {
+                                  const orig = buffer.getChannelData(c);
+                                  const dest = newBuffer.getChannelData(c);
+                                  dest.set(orig.subarray(0, startSample), 0);
+                                  dest.set(orig.subarray(endSample, totalSamples), startSample);
+                                }
+                                updateBufferForSlot(selectedEditSlotId, newBuffer, `Delete: ${slot.name}`);
+                              }
+                              setSelectionStart(null);
+                              setSelectionEnd(null);
+                              if (activePreviewNodeRef.current) {
+                                try { activePreviewNodeRef.current.stop(); } catch {}
+                                activePreviewNodeRef.current = null;
+                                setIsPlayingPreview(false);
+                              }
+                            }}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ff0055', color: '#ff0055' }}
+                          >
+                            DELETE
+                          </button>
+                          <button
+                            className="btn btn-xs"
+                            disabled={undoHistory.length === 0}
+                            onClick={undoLastAction}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#00ff66', color: '#00ff66' }}
+                          >
+                            UNDO
+                          </button>
+                        </div>
+                        {selectionStart !== null && selectionEnd !== null ? (
+                          <div style={{ fontSize: '0.58rem', color: '#00f3ff', fontFamily: 'monospace' }}>
+                            SEL: {Math.round(Math.min(selectionStart, selectionEnd) * 100)}% to {Math.round(Math.max(selectionStart, selectionEnd) * 100)}%
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.55rem', color: '#888', fontStyle: 'italic' }}>
+                            Drag on wave to select
+                          </div>
+                        )}
                       </div>
 
                       {/* Loop Enable, Root Note and Preview buttons */}
@@ -4225,14 +4790,33 @@ export default function Delta7Synth() {
                       </div>
                     </div>
 
-                    {/* Microphone Controls */}
+                    {/* Source Selector & Input Controls */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.62rem', marginTop: '4px', marginBottom: '4px' }}>
+                      <span style={{ color: '#88ccee' }}>REC SOURCE:</span>
+                      <div className="segmented-strip">
+                        {['mic', 'monitor'].map(mode => (
+                          <button
+                            key={mode}
+                            className={`segmented-btn btn-xs ${recordingInputMode === mode ? 'active' : ''}`}
+                            onClick={() => {
+                              if (isArmed) disarmMicrophone();
+                              setRecordingInputMode(mode);
+                            }}
+                            style={{ padding: '2px 6px', fontSize: '0.55rem' }}
+                          >
+                            {mode.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '6px', marginTop: '4px' }}>
                       <button 
                         className={`btn btn-xs ${isArmed ? 'active-yellow' : ''}`} 
-                        onClick={armMicrophone}
+                        onClick={recordingInputMode === 'mic' ? armMicrophone : armMonitor}
                         style={{ margin: 0, fontSize: '0.62rem', padding: '3px' }}
                       >
-                        {isArmed ? 'DISARM MIC' : 'ARM MIC'}
+                        {isArmed ? `DISARM ${recordingInputMode.toUpperCase()}` : `ARM ${recordingInputMode.toUpperCase()}`}
                       </button>
                       <button 
                         className={`btn btn-xs ${isRecording ? 'active-red blinking' : ''}`} 
@@ -4518,9 +5102,14 @@ export default function Delta7Synth() {
                           { name: 'EQ Low', key: 'eqLow' },
                           { name: 'EQ Mid', key: 'eqMid' },
                           { name: 'EQ High', key: 'eqHigh' },
-                          { name: 'Master', key: 'masterVolume' },
                           { name: 'Kaoss X', key: 'kaossX' },
-                          { name: 'Kaoss Y', key: 'kaossY' }
+                          { name: 'Kaoss Y', key: 'kaossY' },
+                          { name: 'Master', key: 'masterVolume' },
+                          { name: 'Echo Time', key: 'spaceEchoTime' },
+                          { name: 'Echo Fb', key: 'spaceEchoFeedback' },
+                          { name: 'Echo Wow', key: 'spaceEchoWow' },
+                          { name: 'Echo Sat', key: 'spaceEchoSaturation' },
+                          { name: 'Echo Spring', key: 'spaceEchoSpring' }
                         ].map(item => {
                           const isLearning = midiLearnParam === item.key;
                           const ccVal = midiMappings[item.key];

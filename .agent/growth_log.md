@@ -9,4 +9,6 @@
 - **Tactile Grid Previews**: Previewing slices via UI buttons should mimic hardware sampler pads—triggering immediately on press (mouse/touch down) and releasing on release (mouse/touch up/leave) to allow quick, responsive preview sweeps.
 - **Decay & Capping Logic**: Looping slices should bypass envelope capping and allow the Attack-Decay envelope to decay completely to zero over the configured duration, while one-shot slices require capping to fit within the buffer limits to prevent clicks.
 - **Granular Coordinate Mapping**: Reverse granular paths must align precisely with buffer coordinate spaces, preventing double-inverting offsets for reversed grain schedules.
+- **Web Loopback Capture**: Capture high-quality browser tab audio using display media API, shutting down video tracks instantly to conserve processing resources.
+- **Waveform Selection & DSP Splicing**: Enable fluid click-and-drag range selection overlay on the canvas and map Float32Array operations (Trim, Copy, Cut, Paste, Delete, Undo) to provide precise, destructive sample editing tools with undo history tracking.
 
