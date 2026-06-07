@@ -37,11 +37,17 @@ const DEFAULT_PARAMS = {
   ifx1Type: 'Bypass',
   ifx1Mix: 0.0,
   ifx2Type: 'Bypass',
-  ifx2Mix: 0.0,
   mfx1SendA: 0.0,
   mfx1SendB: 0.0,
   mfx2SendA: 0.0,
-  mfx2SendB: 0.0
+  mfx2SendB: 0.0,
+  stutterOn: false,
+  stutterRate: '1/16',
+  stutterGate: 1.0,
+  stutterSweepDir: 'None',
+  stutterSweepTime: 1.0,
+  stutterJitter: 0.0,
+  stutterPitchSweep: 0
 };
 
 const FACTORY_PROGRAMS = Array.from({ length: 9 }, (_, i) => ({
@@ -1088,6 +1094,65 @@ export default function Delta7Synth() {
     }
   }, [params.arpBpm, selectedDelayRatio, DELAY_RATIOS]);
 
+  useEffect(() => {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    
+    if (params.stutterOn) {
+      activeVoicesRef.current.forEach(vList => {
+        const triggerStutter = (v) => {
+          if (v && !v.stutterTimeoutId) {
+            startStutterModulation(v);
+          }
+        };
+        if (Array.isArray(vList)) vList.forEach(triggerStutter); else triggerStutter(vList);
+      });
+    } else {
+      activeVoicesRef.current.forEach(vList => {
+        const stopStutter = (v) => {
+          if (v) {
+            if (v.stutterTimeoutId) {
+              clearTimeout(v.stutterTimeoutId);
+              v.stutterTimeoutId = null;
+            }
+            const now = ctx.currentTime;
+            [v.oscA, v.oscA_L, v.oscA_R].forEach(osc => {
+              if (osc) {
+                osc.loop = v.isLoopA || false;
+                if (v.isLoopA) {
+                  osc.loopStart = v.origLoopStartA || 0;
+                  osc.loopEnd = v.origLoopEndA || 0;
+                } else {
+                  osc.loopStart = 0;
+                  osc.loopEnd = 0;
+                }
+                osc.playbackRate.setValueAtTime(v.freqScaleA || 1.0, now);
+              }
+            });
+            if (v.oscB) {
+              v.oscB.loop = v.isLoopB || false;
+              if (v.isLoopB) {
+                v.oscB.loopStart = v.origLoopStartB || 0;
+                v.oscB.loopEnd = v.origLoopEndB || 0;
+              } else {
+                v.oscB.loopStart = 0;
+                v.oscB.loopEnd = 0;
+              }
+              v.oscB.playbackRate.setValueAtTime(v.freqScaleB || 1.0, now);
+            }
+            if (v.stutterGateNode) {
+              v.stutterGateNode.gain.cancelScheduledValues(now);
+              v.stutterGateNode.gain.setValueAtTime(1.0, now);
+            }
+            v.stutterLoopStart = undefined;
+            v.stutterLoopStartB = undefined;
+          }
+        };
+        if (Array.isArray(vList)) vList.forEach(stopStutter); else stopStutter(vList);
+      });
+    }
+  }, [params.stutterOn]);
+
   // Synced Parameters Ref (for low-latency access in loop)
   const paramsRef = useRef(params);
   useEffect(() => {
@@ -1871,6 +1936,155 @@ export default function Delta7Synth() {
   // 4. VOICE ALLOCATION & SCHEDULING (HI SYNTH)
   // ==========================================
 
+  const startStutterModulation = (voice) => {
+    if (!voice || voice.stutterTimeoutId) return;
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+
+    const scheduleStutterStep = (stepIndex) => {
+      if (voice.releasedRef && voice.releasedRef.current) {
+        return;
+      }
+      
+      const currentParams = paramsRef.current;
+      if (!currentParams.stutterOn) {
+        const now = ctx.currentTime;
+        [voice.oscA, voice.oscA_L, voice.oscA_R].forEach(osc => {
+          if (osc) {
+            osc.loop = voice.isLoopA || false;
+            if (voice.isLoopA) {
+              osc.loopStart = voice.origLoopStartA || 0;
+              osc.loopEnd = voice.origLoopEndA || 0;
+            } else {
+              osc.loopStart = 0;
+              osc.loopEnd = 0;
+            }
+            osc.playbackRate.setValueAtTime(voice.freqScaleA || 1.0, now);
+          }
+        });
+
+        if (voice.oscB) {
+          voice.oscB.loop = voice.isLoopB || false;
+          if (voice.isLoopB) {
+            voice.oscB.loopStart = voice.origLoopStartB || 0;
+            voice.oscB.loopEnd = voice.origLoopEndB || 0;
+          } else {
+            voice.oscB.loopStart = 0;
+            voice.oscB.loopEnd = 0;
+          }
+          voice.oscB.playbackRate.setValueAtTime(voice.freqScaleB || 1.0, now);
+        }
+
+        if (voice.stutterGateNode) {
+          voice.stutterGateNode.gain.cancelScheduledValues(now);
+          voice.stutterGateNode.gain.setValueAtTime(1.0, now);
+        }
+
+        voice.stutterTimeoutId = null;
+        voice.stutterLoopStart = undefined;
+        voice.stutterLoopStartB = undefined;
+        return;
+      }
+
+      let rate = currentParams.stutterRate || '1/16';
+      const elapsed = ctx.currentTime - voice.startTime;
+
+      if (currentParams.stutterSweepDir !== 'None') {
+        const sweepDuration = currentParams.stutterSweepTime || 1.0;
+        const progress = Math.min(1.0, elapsed / sweepDuration);
+        
+        const rates = ['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'];
+        const startIndex = rates.indexOf(currentParams.stutterRate || '1/16');
+        if (startIndex !== -1) {
+          if (currentParams.stutterSweepDir === 'Up') {
+            const targetIndex = rates.length - 1;
+            const currentIndex = Math.round(startIndex + (targetIndex - startIndex) * progress);
+            rate = rates[currentIndex];
+          } else {
+            const startIdx = rates.length - 1;
+            const targetIdx = startIndex;
+            const currentIndex = Math.round(startIdx - (startIdx - targetIdx) * progress);
+            rate = rates[currentIndex];
+          }
+        }
+      }
+
+      const bpm = currentParams.arpBpm || 120;
+      const beatDuration = 60 / bpm;
+      let stepDur = beatDuration * 0.25;
+      if (rate === '1/4') stepDur = beatDuration;
+      else if (rate === '1/8') stepDur = beatDuration * 0.5;
+      else if (rate === '1/12') stepDur = beatDuration * (1/3);
+      else if (rate === '1/16') stepDur = beatDuration * 0.25;
+      else if (rate === '1/24') stepDur = beatDuration * (1/6);
+      else if (rate === '1/32') stepDur = beatDuration * 0.125;
+      else if (rate === '1/64') stepDur = beatDuration * 0.0625;
+      else if (rate === '1/128') stepDur = beatDuration * 0.03125;
+
+      if (currentParams.stutterJitter > 0) {
+        const jitterAmount = (Math.random() * 2 - 1) * currentParams.stutterJitter * 0.3 * stepDur;
+        stepDur = Math.max(0.01, stepDur + jitterAmount);
+      }
+
+      const gateDur = stepDur * (currentParams.stutterGate !== undefined ? currentParams.stutterGate : 1.0);
+
+      let pitchOffset = 0;
+      if (currentParams.stutterPitchSweep !== 0) {
+        const sweepDuration = currentParams.stutterSweepTime || 1.0;
+        const progress = Math.min(1.0, elapsed / sweepDuration);
+        pitchOffset = progress * currentParams.stutterPitchSweep;
+      }
+
+      const now = ctx.currentTime;
+
+      if (voice.stutterGateNode) {
+        voice.stutterGateNode.gain.cancelScheduledValues(now);
+        voice.stutterGateNode.gain.setValueAtTime(0, now);
+        voice.stutterGateNode.gain.linearRampToValueAtTime(1, now + 0.003);
+        voice.stutterGateNode.gain.setValueAtTime(1, now + Math.max(0.005, gateDur - 0.003));
+        voice.stutterGateNode.gain.linearRampToValueAtTime(0, now + gateDur);
+      }
+
+      if (voice.bufferA && (voice.oscA || voice.oscA_L || voice.oscA_R)) {
+        if (voice.stutterLoopStart === undefined) {
+          const elapsedBufTime = elapsed * (voice.freqScaleA || 1.0);
+          const activeDurationA = (voice.endA - voice.startA) * voice.bufferA.duration;
+          voice.stutterLoopStart = voice.startOffsetA + (elapsedBufTime % Math.max(0.1, activeDurationA));
+        }
+
+        [voice.oscA, voice.oscA_L, voice.oscA_R].forEach(osc => {
+          if (osc) {
+            osc.loop = true;
+            osc.loopStart = voice.stutterLoopStart;
+            osc.loopEnd = Math.min(voice.bufferA.duration, voice.stutterLoopStart + stepDur * (voice.freqScaleA || 1.0));
+            const finalPitchScale = (voice.freqScaleA || 1.0) * Math.pow(2, pitchOffset / 12);
+            osc.playbackRate.setValueAtTime(finalPitchScale, now);
+          }
+        });
+      }
+
+      if (voice.bufferB && voice.oscB) {
+        if (voice.stutterLoopStartB === undefined) {
+          const elapsedBufTimeB = elapsed * (voice.freqScaleB || 1.0);
+          const activeDurationB = (voice.endB - voice.startB) * voice.bufferB.duration;
+          voice.stutterLoopStartB = voice.startOffsetB + (elapsedBufTimeB % Math.max(0.1, activeDurationB));
+        }
+
+        voice.oscB.loop = true;
+        voice.oscB.loopStart = voice.stutterLoopStartB;
+        voice.oscB.loopEnd = Math.min(voice.bufferB.duration, voice.stutterLoopStartB + stepDur * (voice.freqScaleB || 1.0));
+        const finalPitchScaleB = (voice.freqScaleB || 1.0) * Math.pow(2, pitchOffset / 12);
+        voice.oscB.playbackRate.setValueAtTime(finalPitchScaleB, now);
+      }
+
+      voice.stutterTimeoutId = setTimeout(() => {
+        scheduleStutterStep(stepIndex + 1);
+      }, stepDur * 1000);
+    };
+
+    scheduleStutterStep(0);
+  };
+
   // Triggers one single program sound voice
   const playProgramVoice = (ctx, note, velocity, prog, voiceKey, delayOffset = 0, trackIdx = undefined) => {
     const now = ctx.currentTime + delayOffset;
@@ -2139,7 +2353,15 @@ export default function Delta7Synth() {
             }
             const detuneCents = isSliceGranular ? 0 : ((prog.grainPitchRandom !== undefined ? prog.grainPitchRandom : 0) * (Math.random() * 2 - 1));
 
-            grainSource.playbackRate.setValueAtTime(currentFreqScale * Math.pow(2, (oscADetune + detuneCents) / 1200), nextGrainTime);
+            let stutterPitchOffset = 0;
+            if (paramsRef.current.stutterOn && paramsRef.current.stutterPitchSweep !== 0) {
+              const elapsed = nextGrainTime - voiceObj.startTime;
+              const sweepDuration = paramsRef.current.stutterSweepTime || 1.0;
+              const progress = Math.min(1.0, elapsed / sweepDuration);
+              stutterPitchOffset = progress * paramsRef.current.stutterPitchSweep;
+            }
+
+            grainSource.playbackRate.setValueAtTime(currentFreqScale * Math.pow(2, (oscADetune + detuneCents + stutterPitchOffset * 100) / 1200), nextGrainTime);
 
             if (vibratoLfoGain) {
               const vScale = ctx.createGain();
@@ -2297,6 +2519,9 @@ export default function Delta7Synth() {
               osc.loopEnd = loopEndA;
             }
           });
+          voiceObj.origLoopStartA = loopStartA;
+          voiceObj.origLoopEndA = loopEndA;
+          voiceObj.isLoopA = isLoopA;
 
           if (vibratoLfoGain) {
             vibratoLfoGain.connect(oscA.detune);
@@ -2352,6 +2577,9 @@ export default function Delta7Synth() {
             oscA.loopStart = loopStartA;
             oscA.loopEnd = loopEndA;
           }
+          voiceObj.origLoopStartA = loopStartA;
+          voiceObj.origLoopEndA = loopEndA;
+          voiceObj.isLoopA = isLoopA;
 
           if (vibratoLfoGain) vibratoLfoGain.connect(oscA.detune);
           driftGain.connect(oscA.detune);
@@ -2417,7 +2645,15 @@ export default function Delta7Synth() {
 
             const clampedStartOffset = Math.max(0, Math.min(currentBuf.duration - 0.005, grainStart));
 
-            grainSource.playbackRate.setValueAtTime(freqScaleB * Math.pow(2, oscBDetune / 1200), nextGrainTime);
+            let stutterPitchOffset = 0;
+            if (paramsRef.current.stutterOn && paramsRef.current.stutterPitchSweep !== 0) {
+              const elapsed = nextGrainTime - voiceObj.startTime;
+              const sweepDuration = paramsRef.current.stutterSweepTime || 1.0;
+              const progress = Math.min(1.0, elapsed / sweepDuration);
+              stutterPitchOffset = progress * paramsRef.current.stutterPitchSweep;
+            }
+
+            grainSource.playbackRate.setValueAtTime(freqScaleB * Math.pow(2, (oscBDetune + stutterPitchOffset * 100) / 1200), nextGrainTime);
 
             if (vibratoLfoGain) {
               const vScale = ctx.createGain();
@@ -2517,6 +2753,9 @@ export default function Delta7Synth() {
           oscB.loopStart = loopStartB;
           oscB.loopEnd = loopEndB;
         }
+        voiceObj.origLoopStartB = loopStartB;
+        voiceObj.origLoopEndB = loopEndB;
+        voiceObj.isLoopB = isLoopB;
 
         if (vibratoLfoGain) vibratoLfoGain.connect(oscB.detune);
         driftGain.connect(oscB.detune);
@@ -2528,12 +2767,16 @@ export default function Delta7Synth() {
     const voiceOutGain = ctx.createGain();
     voiceOutGain.gain.setValueAtTime(1.0, now);
 
+    const stutterGateNode = ctx.createGain();
+    stutterGateNode.gain.setValueAtTime(1.0, now);
+
     if (prog.filterMode === 'Double Series') {
       filter1.connect(filter2);
-      filter2.connect(voiceOutGain);
+      filter2.connect(stutterGateNode);
     } else {
-      filter1.connect(voiceOutGain);
+      filter1.connect(stutterGateNode);
     }
+    stutterGateNode.connect(voiceOutGain);
 
     // Voice connects to global static IFX chain
     if (ifx1InputRef.current) {
@@ -2763,6 +3006,7 @@ export default function Delta7Synth() {
     voiceObj.gainA_L = gainA_L;
     voiceObj.gainA_R = gainA_R;
     voiceObj.voiceOutGain = voiceOutGain;
+    voiceObj.stutterGateNode = stutterGateNode;
     voiceObj.subOsc = subOsc;
     voiceObj.noiseSource = noiseSource;
     voiceObj.noiseGain = noiseGain;
@@ -2771,9 +3015,21 @@ export default function Delta7Synth() {
     voiceObj.startTime = now;
     voiceObj.slotAId = slotAId;
     voiceObj.slotBId = slotBId;
+    voiceObj.startA = slotA ? slotA.start : 0;
+    voiceObj.endA = slotA ? slotA.end : 1;
+    voiceObj.startB = slotB ? slotB.start : 0;
+    voiceObj.endB = slotB ? slotB.end : 1;
+    voiceObj.bufferA = bufferA;
+    voiceObj.bufferB = bufferB;
+    voiceObj.freqScaleA = freqScaleA;
+    voiceObj.freqScaleB = freqScaleB;
 
     voiceObj.playheadRateA = freqScaleA / Math.max(0.05, 1 + sliceStretchA);
     voiceObj.playheadRateB = freqScaleB / Math.max(0.05, 1 + sliceStretchB);
+
+    if (prog.stutterOn) {
+      startStutterModulation(voiceObj);
+    }
 
     return voiceObj;
   };;
@@ -2847,6 +3103,9 @@ export default function Delta7Synth() {
         }
         if (voice.granularTimerIdB) {
           clearTimeout(voice.granularTimerIdB);
+        }
+        if (voice.stutterTimeoutId) {
+          clearTimeout(voice.stutterTimeoutId);
         }
 
         // Cancel scheduled gain ramps and drop to zero over release duration
@@ -2942,6 +3201,7 @@ export default function Delta7Synth() {
         if (!v) return;
         if (v.releasedRef) v.releasedRef.current = true;
         if (v.granularTimerId) clearTimeout(v.granularTimerId);
+        if (v.stutterTimeoutId) clearTimeout(v.stutterTimeoutId);
         try { if (v.oscA) v.oscA.stop(); } catch {}
         try { if (v.oscB) v.oscB.stop(); } catch {}
         try { if (v.oscA_L) v.oscA_L.stop(); } catch {}
@@ -3352,6 +3612,17 @@ export default function Delta7Synth() {
           setParams(prev => ({ ...prev, spaceEchoSaturation: valNormalized }));
         } else if (paramName === 'spaceEchoSpring') {
           setParams(prev => ({ ...prev, spaceEchoSpring: valNormalized }));
+        } else if (paramName === 'stutterOn') {
+          const isStut = valNormalized >= 0.5;
+          setParams(prev => ({ ...prev, stutterOn: isStut }));
+        } else if (paramName === 'stutterRate') {
+          const rates = ['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'];
+          const rateIdx = Math.min(rates.length - 1, Math.floor(valNormalized * rates.length));
+          setParams(prev => ({ ...prev, stutterRate: rates[rateIdx] }));
+        } else if (paramName === 'stutterGate') {
+          setParams(prev => ({ ...prev, stutterGate: valNormalized * 0.9 + 0.1 }));
+        } else if (paramName === 'stutterSweepTime') {
+          setParams(prev => ({ ...prev, stutterSweepTime: valNormalized * 3.8 + 0.2 }));
         } else if (paramName === 'filterEnvAmt') {
           setParams(prev => ({ ...prev, filterEnvAmt: Math.round(valNormalized * 4000) }));
         } else if (paramName === 'vcaRelease') {
@@ -4954,7 +5225,8 @@ export default function Delta7Synth() {
                 </div>
 
                 {/* ================= ROW 3: MODULATION ENVELOPES & FX MIX ================= */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '8px' }}>
+                {/* ================= ROW 3: MODULATION ENVELOPES & FX MIX ================= */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.9fr', gap: '8px' }}>
                   
                   {/* Left Column: Filter & Amp Envelopes */}
                   <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px' }}>
@@ -5003,7 +5275,7 @@ export default function Delta7Synth() {
                     </div>
                   </div>
 
-                  {/* Right Column: LFO, ARP & Global FX Mixer Controls */}
+                  {/* Middle Column: LFO, ARP & Global FX Mixer Controls */}
                   <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <h4 style={{ color: '#00f3ff', margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>LFO, ARP & GLOBAL FX</h4>
                     
@@ -5138,10 +5410,102 @@ export default function Delta7Synth() {
                         {midiDevices.length === 0 && <option>No Devices Found</option>}
                       </select>
                     </div>
+                  </div>
+
+                  {/* Column 3: Stutter Edit & MIDI CC Learn Matrix */}
+                  <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <h4 style={{ color: '#ff00ff', margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>STUTTER & MOVEMENT</h4>
+                    
+                    {/* Stutter Controls */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '4px 8px', fontSize: '0.55rem', marginBottom: '4px' }}>
+                      <div className="flex-row-sub" style={{ gridColumn: 'span 2', justifyContent: 'space-between', marginBottom: '2px' }}>
+                        <button
+                          className={`btn btn-xs ${params.stutterOn ? 'active-pink' : ''}`}
+                          onClick={() => setParams(prev => ({ ...prev, stutterOn: !prev.stutterOn }))}
+                          style={{ flexGrow: 1, fontWeight: 'bold', fontSize: '0.58rem', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                        >
+                          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: params.stutterOn ? '#ff0055' : '#888', boxShadow: params.stutterOn ? '0 0 4px #ff0055' : 'none' }} />
+                          STUTTER EFFECT
+                        </button>
+                      </div>
+
+                      <div className="flex-row-sub">
+                        <label>Rate:</label>
+                        <select
+                          value={params.stutterRate}
+                          onChange={(e) => setParams(prev => ({ ...prev, stutterRate: e.target.value }))}
+                          style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '50px' }}
+                        >
+                          {['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'].map(r => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex-row-sub">
+                        <label>Gate:</label>
+                        <input
+                          type="range" min="0.1" max="1.0" step="0.05"
+                          value={params.stutterGate}
+                          onChange={(e) => setParams(prev => ({ ...prev, stutterGate: parseFloat(e.target.value) }))}
+                          style={{ width: '40px', height: '8px' }}
+                        />
+                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '18px', textAlign: 'right' }}>{Math.round(params.stutterGate * 100)}%</span>
+                      </div>
+
+                      <div className="flex-row-sub">
+                        <label>Sweep:</label>
+                        <div className="segmented-strip" style={{ display: 'inline-flex' }}>
+                          {['None', 'Up', 'Down'].map(dir => (
+                            <button
+                              key={dir}
+                              className={`segmented-btn btn-xs ${params.stutterSweepDir === dir ? 'active' : ''}`}
+                              onClick={() => setParams(prev => ({ ...prev, stutterSweepDir: dir }))}
+                              style={{ fontSize: '0.45rem', padding: '0px 2px', height: '12px', lineHeight: '10px' }}
+                            >
+                              {dir.toUpperCase()}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex-row-sub">
+                        <label>Time:</label>
+                        <input
+                          type="range" min="0.2" max="4.0" step="0.2"
+                          value={params.stutterSweepTime}
+                          onChange={(e) => setParams(prev => ({ ...prev, stutterSweepTime: parseFloat(e.target.value) }))}
+                          style={{ width: '40px', height: '8px' }}
+                        />
+                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '18px', textAlign: 'right' }}>{params.stutterSweepTime}s</span>
+                      </div>
+
+                      <div className="flex-row-sub">
+                        <label>Jitter:</label>
+                        <input
+                          type="range" min="0.0" max="1.0" step="0.1"
+                          value={params.stutterJitter}
+                          onChange={(e) => setParams(prev => ({ ...prev, stutterJitter: parseFloat(e.target.value) }))}
+                          style={{ width: '40px', height: '8px' }}
+                        />
+                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '18px', textAlign: 'right' }}>{Math.round(params.stutterJitter * 100)}%</span>
+                      </div>
+
+                      <div className="flex-row-sub">
+                        <label>Pitch Swp:</label>
+                        <input
+                          type="range" min="-12" max="12" step="1"
+                          value={params.stutterPitchSweep}
+                          onChange={(e) => setParams(prev => ({ ...prev, stutterPitchSweep: parseInt(e.target.value) }))}
+                          style={{ width: '40px', height: '8px' }}
+                        />
+                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '18px', textAlign: 'right' }}>{params.stutterPitchSweep > 0 ? `+${params.stutterPitchSweep}` : params.stutterPitchSweep}</span>
+                      </div>
+                    </div>
 
                     {/* MIDI CC Learn Matrix Grid Panel */}
-                    <div style={{ borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '3px', marginTop: '3px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                    <div style={{ borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '3px', marginTop: '2px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                         <span style={{ color: '#00f3ff', fontSize: '0.55rem', fontWeight: 'bold' }}>MIDI CC LEARN MATRIX</span>
                         <button
                           className="btn btn-xs"
@@ -5172,7 +5536,11 @@ export default function Delta7Synth() {
                           { name: 'Echo Fb', key: 'spaceEchoFeedback' },
                           { name: 'Echo Wow', key: 'spaceEchoWow' },
                           { name: 'Echo Sat', key: 'spaceEchoSaturation' },
-                          { name: 'Echo Spring', key: 'spaceEchoSpring' }
+                          { name: 'Echo Spring', key: 'spaceEchoSpring' },
+                          { name: 'Stut On', key: 'stutterOn' },
+                          { name: 'Stut Rate', key: 'stutterRate' },
+                          { name: 'Stut Gate', key: 'stutterGate' },
+                          { name: 'Stut Swp', key: 'stutterSweepTime' }
                         ].map(item => {
                           const isLearning = midiLearnParam === item.key;
                           const ccVal = midiMappings[item.key];
