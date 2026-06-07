@@ -2075,7 +2075,8 @@ export default function Delta7Synth() {
           playhead = (prog.grainPosition !== undefined ? prog.grainPosition : 0.0) * bufferA.duration;
         }
         
-        let nextGrainTime = now;
+        const lookahead = 0.05; // 50ms lookahead to ensure Web Audio scheduling is always in the future
+        let nextGrainTime = now + lookahead;
 
         const scheduleGrain = () => {
           if (releasedRef.current) return;
@@ -2085,11 +2086,11 @@ export default function Delta7Synth() {
           if (!currentBuf) return;
 
           const ctxNow = ctx.currentTime;
-          if (nextGrainTime < ctxNow) {
-            const drift = ctxNow - nextGrainTime;
+          if (nextGrainTime < ctxNow + lookahead) {
+            const drift = (ctxNow + lookahead) - nextGrainTime;
             const speedFactor = isSliceGranular ? (freqScaleA / Math.max(0.05, 1 + sliceStretchA)) : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0);
             playhead += drift * speedFactor;
-            nextGrainTime = ctxNow;
+            nextGrainTime = ctxNow + lookahead;
           }
           
           let gSize, gRate;
@@ -2101,7 +2102,7 @@ export default function Delta7Synth() {
             gRate = (prog.grainRate !== undefined ? prog.grainRate : 40) / 1000;
           }
 
-          while (nextGrainTime < ctxNow + 0.1) {
+          while (nextGrainTime < ctxNow + lookahead + 0.1) {
             if (isSliceGranular && !sliceLoopA && playhead >= sliceEndSecA) {
               break; 
             }
@@ -2146,7 +2147,7 @@ export default function Delta7Synth() {
             const grainRelease = Math.min(0.005, gSize * 0.1);
 
             grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + grainAttack);
-            grainGain.gain.setValueAtTime(1.0, nextGrainTime + gSize - grainRelease);
+            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + gSize - grainRelease);
             grainGain.gain.linearRampToValueAtTime(0.0, nextGrainTime + gSize);
 
             grainSource.connect(grainGain);
@@ -2364,7 +2365,8 @@ export default function Delta7Synth() {
         const sliceEndSecB = startOffsetB + sliceDurationB;
         let playhead = startOffsetB;
 
-        let nextGrainTime = now;
+        const lookahead = 0.05; // 50ms lookahead to ensure Web Audio scheduling is always in the future
+        let nextGrainTime = now + lookahead;
 
         const scheduleGrainB = () => {
           if (releasedRef.current) return;
@@ -2374,16 +2376,16 @@ export default function Delta7Synth() {
           if (!currentBuf) return;
 
           const ctxNow = ctx.currentTime;
-          if (nextGrainTime < ctxNow) {
-            const drift = ctxNow - nextGrainTime;
+          if (nextGrainTime < ctxNow + lookahead) {
+            const drift = (ctxNow + lookahead) - nextGrainTime;
             const speedFactor = freqScaleB / Math.max(0.05, 1 + sliceStretchB);
             playhead += drift * speedFactor;
-            nextGrainTime = ctxNow;
+            nextGrainTime = ctxNow + lookahead;
           }
           const gSize = Math.max(0.03, Math.min(0.08, sliceDurationB));
           const gRate = gSize * 0.4;
 
-          while (nextGrainTime < ctxNow + 0.1) {
+          while (nextGrainTime < ctxNow + lookahead + 0.1) {
             if (!sliceLoopB && playhead >= sliceEndSecB) {
               break;
             }
@@ -2419,7 +2421,7 @@ export default function Delta7Synth() {
             const grainRelease = Math.min(0.005, gSize * 0.1);
 
             grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + grainAttack);
-            grainGain.gain.setValueAtTime(1.0, nextGrainTime + gSize - grainRelease);
+            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + gSize - grainRelease);
             grainGain.gain.linearRampToValueAtTime(0.0, nextGrainTime + gSize);
 
             grainSource.connect(grainGain);
