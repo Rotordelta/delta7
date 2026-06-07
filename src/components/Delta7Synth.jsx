@@ -100,6 +100,22 @@ const FACTORY_COMBIS = Array.from({ length: 3 }, (_, i) => ({
   t4ProgId: 'p01', t4Vol: 0,   t4Pan: 0, t4MinKey: 0, t4MaxKey: 127, t4Octave: 0,
 }));
 
+const ECHO_PRESETS = [
+  { name: 'Default Space Echo', params: { spaceEchoActive: true, spaceEchoTime: 0.35, spaceEchoFeedback: 0.5, spaceEchoWow: 0.25, spaceEchoSaturation: 0.3, spaceEchoSpring: 0.15 } },
+  { name: 'Dub Self-Oscillator', params: { spaceEchoActive: true, spaceEchoTime: 0.45, spaceEchoFeedback: 0.88, spaceEchoWow: 0.4, spaceEchoSaturation: 0.7, spaceEchoSpring: 0.25 } },
+  { name: 'Slapback Tape', params: { spaceEchoActive: true, spaceEchoTime: 0.08, spaceEchoFeedback: 0.15, spaceEchoWow: 0.1, spaceEchoSaturation: 0.5, spaceEchoSpring: 0.05 } },
+  { name: 'Spring Reverb Tank', params: { spaceEchoActive: true, spaceEchoTime: 0.2, spaceEchoFeedback: 0.1, spaceEchoWow: 0.05, spaceEchoSaturation: 0.1, spaceEchoSpring: 0.8 } },
+  { name: 'Clean Stereo Delay', params: { spaceEchoActive: false, spaceEchoTime: 0.375, spaceEchoFeedback: 0.4 } }
+];
+
+const ROTOR_PRESETS = [
+  { name: 'Classic Slow Spin', params: { leslieSpeed: 'Slow', leslieDrive: 0.1, leslieWidth: 0.5, leslieCrossover: 800 } },
+  { name: 'Gritty Rock Fast', params: { leslieSpeed: 'Fast', leslieDrive: 0.65, leslieWidth: 0.7, leslieCrossover: 800 } },
+  { name: 'Deep Stereo Swirl', params: { leslieSpeed: 'Fast', leslieDrive: 0.2, leslieWidth: 1.0, leslieCrossover: 500 } },
+  { name: 'Cabinet Growl (Stop)', params: { leslieSpeed: 'Off', leslieDrive: 0.8, leslieWidth: 0.0, leslieCrossover: 700 } },
+  { name: 'Vocal Horn Crossover', params: { leslieSpeed: 'Slow', leslieDrive: 0.25, leslieWidth: 0.6, leslieCrossover: 1400 } }
+];
+
 // MIDI Pitch to Frequency
 const getFreq = (note) => 440 * Math.pow(2, (note - 69) / 12);
 
@@ -229,6 +245,8 @@ export default function Delta7Synth() {
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('s01'); // Target slot in Editor
   const [selectedSliceIndex, setSelectedSliceIndex] = useState(0); // Selected slice index for editing
   const [tapTimes, setTapTimes] = useState([]); // Timestamps for tap tempo calculation
+  const [selectedEchoPresetIdx, setSelectedEchoPresetIdx] = useState(''); // Current echo preset index
+  const [selectedRotorPresetIdx, setSelectedRotorPresetIdx] = useState(''); // Current rotor preset index
   const [isRecording, setIsRecording] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
   const [recordSlotId, setRecordSlotId] = useState('s01'); // Target recording user slot
@@ -687,6 +705,37 @@ export default function Delta7Synth() {
       }
       return next;
     });
+  };
+
+  const handleLoadEchoPreset = (presetIdx) => {
+    if (presetIdx === '') {
+      setSelectedEchoPresetIdx('');
+      return;
+    }
+    const idx = parseInt(presetIdx, 10);
+    const prst = ECHO_PRESETS[idx];
+    if (!prst) return;
+    setSelectedEchoPresetIdx(presetIdx);
+    setParams(prev => {
+      const next = { ...prev, ...prst.params };
+      if (prev.spaceEchoActive !== next.spaceEchoActive && audioCtxRef.current) {
+        rebuildDelayEffect(audioCtxRef.current, next.spaceEchoActive);
+      }
+      return next;
+    });
+    setSelectedDelayRatio('Free');
+  };
+
+  const handleLoadRotorPreset = (presetIdx) => {
+    if (presetIdx === '') {
+      setSelectedRotorPresetIdx('');
+      return;
+    }
+    const idx = parseInt(presetIdx, 10);
+    const prst = ROTOR_PRESETS[idx];
+    if (!prst) return;
+    setSelectedRotorPresetIdx(presetIdx);
+    setParams(prev => ({ ...prev, ...prst.params }));
   };
 
   const togglePreviewSample = (slotId) => {
@@ -4067,10 +4116,34 @@ export default function Delta7Synth() {
                   if (audioCtxRef.current) {
                     rebuildDelayEffect(audioCtxRef.current, nextActive);
                   }
+                  setSelectedEchoPresetIdx('');
                 }}
               >
                 {params.spaceEchoActive ? 'ON' : 'OFF'}
               </button>
+            </div>
+
+            {/* Echo Preset Selector */}
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '0.2rem 0', justifyContent: 'space-between', display: 'flex' }}>
+              <label style={{ color: '#00f3ff', fontWeight: 'bold' }}>PRST:</label>
+              <select
+                value={selectedEchoPresetIdx}
+                onChange={(e) => handleLoadEchoPreset(e.target.value)}
+                style={{ 
+                  background: '#000', 
+                  border: '1px solid rgba(0, 243, 255, 0.3)', 
+                  color: '#00f3ff', 
+                  fontSize: '0.55rem', 
+                  padding: '1px', 
+                  borderRadius: '3px', 
+                  width: '90px' 
+                }}
+              >
+                <option value="">-- CUSTOM --</option>
+                {ECHO_PRESETS.map((prst, idx) => (
+                  <option key={idx} value={idx}>{prst.name}</option>
+                ))}
+              </select>
             </div>
 
             {/* Space Echo Knobs Grid */}
@@ -4082,6 +4155,7 @@ export default function Delta7Synth() {
                 onChange={(v) => {
                   setParams(prev => ({ ...prev, spaceEchoTime: v }));
                   setSelectedDelayRatio('Free');
+                  setSelectedEchoPresetIdx('');
                 }} 
                 midiLearnParam="spaceEchoTime" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                 glowColor="cyan"
@@ -4091,7 +4165,10 @@ export default function Delta7Synth() {
                 label="Feedback" 
                 value={params.spaceEchoFeedback} 
                 min={0.0} max={0.95} step={0.01}
-                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoFeedback: v }))} 
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, spaceEchoFeedback: v }));
+                  setSelectedEchoPresetIdx('');
+                }} 
                 midiLearnParam="spaceEchoFeedback" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                 glowColor="cyan"
                 size={34}
@@ -4100,7 +4177,10 @@ export default function Delta7Synth() {
                 label="Wow" 
                 value={params.spaceEchoWow} 
                 min={0.0} max={1.0} step={0.01}
-                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoWow: v }))} 
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, spaceEchoWow: v }));
+                  setSelectedEchoPresetIdx('');
+                }} 
                 midiLearnParam="spaceEchoWow" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                 glowColor="cyan"
                 size={34}
@@ -4109,7 +4189,10 @@ export default function Delta7Synth() {
                 label="Saturation" 
                 value={params.spaceEchoSaturation} 
                 min={0.0} max={1.0} step={0.01}
-                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoSaturation: v }))} 
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, spaceEchoSaturation: v }));
+                  setSelectedEchoPresetIdx('');
+                }} 
                 midiLearnParam="spaceEchoSaturation" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                 glowColor="cyan"
                 size={34}
@@ -4118,7 +4201,10 @@ export default function Delta7Synth() {
                 label="Spring" 
                 value={params.spaceEchoSpring} 
                 min={0.0} max={1.0} step={0.01}
-                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoSpring: v }))} 
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, spaceEchoSpring: v }));
+                  setSelectedEchoPresetIdx('');
+                }} 
                 midiLearnParam="spaceEchoSpring" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                 glowColor="cyan"
                 size={34}
@@ -4178,6 +4264,7 @@ export default function Delta7Synth() {
                     className={`btn btn-xs ${params.leslieSpeed === spd ? 'active-magenta' : ''}`}
                     onClick={() => {
                       setParams(prev => ({ ...prev, leslieSpeed: spd }));
+                      setSelectedRotorPresetIdx('');
                     }}
                   >
                     {spd.toUpperCase()}
@@ -4186,13 +4273,39 @@ export default function Delta7Synth() {
               </div>
             </div>
 
+            {/* Leslie Preset Selector */}
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '0.2rem 0', justifyContent: 'space-between', display: 'flex' }}>
+              <label style={{ color: '#ff00ff', fontWeight: 'bold' }}>PRST:</label>
+              <select
+                value={selectedRotorPresetIdx}
+                onChange={(e) => handleLoadRotorPreset(e.target.value)}
+                style={{ 
+                  background: '#000', 
+                  border: '1px solid rgba(255, 0, 255, 0.3)', 
+                  color: '#ff00ff', 
+                  fontSize: '0.55rem', 
+                  padding: '1px', 
+                  borderRadius: '3px', 
+                  width: '90px' 
+                }}
+              >
+                <option value="">-- CUSTOM --</option>
+                {ROTOR_PRESETS.map((prst, idx) => (
+                  <option key={idx} value={idx}>{prst.name}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Leslie Knobs Grid */}
             <div className="leslie-knobs-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 10px', justifyItems: 'center', width: '100%', marginTop: '0.4rem' }}>
               <Knob 
                 label="Drive" 
                 value={params.leslieDrive !== undefined ? params.leslieDrive : 0.25} 
                 min={0.0} max={1.0} step={0.01}
-                onChange={(v) => setParams(prev => ({ ...prev, leslieDrive: v }))} 
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, leslieDrive: v }));
+                  setSelectedRotorPresetIdx('');
+                }} 
                 midiLearnParam="leslieDrive" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                 glowColor="magenta"
                 size={34}
@@ -4201,7 +4314,10 @@ export default function Delta7Synth() {
                 label="Width" 
                 value={params.leslieWidth !== undefined ? params.leslieWidth : 0.5} 
                 min={0.0} max={1.0} step={0.01}
-                onChange={(v) => setParams(prev => ({ ...prev, leslieWidth: v }))} 
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, leslieWidth: v }));
+                  setSelectedRotorPresetIdx('');
+                }} 
                 midiLearnParam="leslieWidth" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                 glowColor="magenta"
                 size={34}
@@ -4210,7 +4326,10 @@ export default function Delta7Synth() {
                 label="X-Over" 
                 value={params.leslieCrossover !== undefined ? params.leslieCrossover : 800} 
                 min={300} max={2000} step={10}
-                onChange={(v) => setParams(prev => ({ ...prev, leslieCrossover: v }))} 
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, leslieCrossover: v }));
+                  setSelectedRotorPresetIdx('');
+                }} 
                 midiLearnParam="leslieCrossover" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                 glowColor="magenta"
                 size={34}
