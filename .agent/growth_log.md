@@ -1,0 +1,12 @@
+# Growth Log
+
+## Session: 2026-06-07
+- **Aesthetic & UX Preferences**: Jimmy values highly tactile visual controls (such as the 2x2 grid for slice envelopes, pitch, and time stretching) and clean HSL-themed visual indicators that pop (yellow/magenta playheads and canvas slice highlights).
+- **DSP Integrity**: Absolute requirement for click-free transients. Initializing nodes synchronously to zero and capping one-shot envelopes relative to playback length keeps the sound quality premium.
+- **Workflow & Architecture**: Prefer unified layouts over nested tabs. Decoupling granular speed and pitch allows for classic sampler capabilities inside standard Web Audio parameters.
+- **MIDI & Sync Integration**: Jimmy prefers low-latency external hardware integration. This includes continuous MIDI Clock (`0xF8`) sync, arpeggiator-bound Start/Stop commands, and a high-density, centralized MIDI CC Learn Matrix grid panel for immediate visual routing feedback.
+- **Per-Slice Loop Override**: Slices should support independent looping behavior, overriding global sample loop parameters, which opens up more flexible rhythmic performance combinations.
+- **Tactile Grid Previews**: Previewing slices via UI buttons should mimic hardware sampler pads—triggering immediately on press (mouse/touch down) and releasing on release (mouse/touch up/leave) to allow quick, responsive preview sweeps.
+- **Decay & Capping Logic**: Looping slices should bypass envelope capping and allow the Attack-Decay envelope to decay completely to zero over the configured duration, while one-shot slices require capping to fit within the buffer limits to prevent clicks.
+- **Granular Coordinate Mapping**: Reverse granular paths must align precisely with buffer coordinate spaces, preventing double-inverting offsets for reversed grain schedules.
+

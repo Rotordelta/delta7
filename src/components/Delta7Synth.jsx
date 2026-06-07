@@ -5,451 +5,91 @@ import Knob from './Knob.jsx';
 // 1. FACTORY PRESETS & WAVEFORMS
 // ==========================================
 
-const FACTORY_PROGRAMS = [
-  {
-    id: 'p01',
-    name: 'A001: Triton Grand Piano',
-    category: 'Keyboard',
-    oscMode: 'double',
-    oscAWave: 'Triton Piano',
-    oscAOctave: 0,
-    oscAPitch: 0,
-    oscADetune: 0,
-    oscAPan: -0.2,
-    oscAVol: 0.8,
-    oscADelay: 0,
-    oscBWave: 'Warm Pad',
-    oscBOctave: 0,
-    oscBPitch: 0,
-    oscBDetune: 5,
-    oscBPan: 0.2,
-    oscBVol: 0.25,
-    oscBDelay: 0.1,
-    filterMode: 'Single',
-    filterType: 'lowpass',
-    cutoff: 2400,
-    resonance: 3.0,
-    filterEnvAmt: 1200,
-    portamento: 0,
-    vcfEG: { startLevel: 0.2, attackTime: 0.05, attackLevel: 1.0, decayTime: 0.3, breakLevel: 0.6, slopeTime: 0.5, sustainLevel: 0.4, releaseTime: 0.25, releaseLevel: 0 },
-    vcaEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.4, breakLevel: 0.7, slopeTime: 1.0, sustainLevel: 0.5, releaseTime: 0.3, releaseLevel: 0 },
-    pitchEG: { startLevel: 0, attackTime: 0.01, attackLevel: 0, decayTime: 0.1, releaseTime: 0.1 },
-    lfo1Rate: 4.5, lfo1Depth: 15, lfo1Target: 'pitch', lfo1Shape: 'sine',
-    lfo2Rate: 3.0, lfo2Depth: 0, lfo2Target: 'filter', lfo2Shape: 'triangle',
-    ifx1Type: 'Bypass', ifx1Mix: 0.3,
-    ifx2Type: 'Bypass', ifx2Mix: 0.3,
-    mfx1SendA: 0.15, mfx1SendB: 0.15, mfx2SendA: 0.3, mfx2SendB: 0.3,
-    eqLow: 0, eqMid: 1, eqHigh: 0,
-    arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
-  },
-  {
-    id: 'p02',
-    name: 'A002: Stereo Orchestra',
-    category: 'Strings',
-    oscMode: 'double',
-    oscAWave: 'Stereo Strings',
-    oscAOctave: 0,
-    oscAPitch: 0,
-    oscADetune: -6,
-    oscAPan: -0.5,
-    oscAVol: 0.6,
-    oscADelay: 0,
-    oscBWave: 'Stereo Strings',
-    oscBOctave: 0,
-    oscBPitch: 0,
-    oscBDetune: 8,
-    oscBPan: 0.5,
-    oscBVol: 0.6,
-    oscBDelay: 0.05,
-    filterMode: 'Double Series',
-    filterType: 'lowpass',
-    cutoff: 1300,
-    resonance: 2.0,
-    filterEnvAmt: 1000,
-    portamento: 0.05,
-    vcfEG: { startLevel: 0, attackTime: 0.4, attackLevel: 1.0, decayTime: 0.8, breakLevel: 0.8, slopeTime: 1.2, sustainLevel: 0.7, releaseTime: 0.8, releaseLevel: 0 },
-    vcaEG: { startLevel: 0, attackTime: 0.3, attackLevel: 1.0, decayTime: 0.6, breakLevel: 0.8, slopeTime: 1.5, sustainLevel: 0.8, releaseTime: 0.75, releaseLevel: 0 },
-    pitchEG: { startLevel: 0, attackTime: 0.05, attackLevel: 0, decayTime: 0.2, releaseTime: 0.2 },
-    lfo1Rate: 5.2, lfo1Depth: 25, lfo1Target: 'pitch', lfo1Shape: 'sine',
-    lfo2Rate: 0.8, lfo2Depth: 150, lfo2Target: 'filter', lfo2Shape: 'sine',
-    ifx1Type: 'Chorus', ifx1Mix: 0.45,
-    ifx2Type: 'Bypass', ifx2Mix: 0.3,
-    mfx1SendA: 0.2, mfx1SendB: 0.2, mfx2SendA: 0.45, mfx2SendB: 0.45,
-    eqLow: 2, eqMid: -1, eqHigh: 3,
-    arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
-  },
-  {
-    id: 'p03',
-    name: 'A003: Sweet Warm Pad',
-    category: 'Pad',
-    oscMode: 'double',
-    oscAWave: 'Warm Pad',
-    oscAOctave: 0,
-    oscAPitch: 0,
-    oscADetune: -5,
-    oscAPan: -0.4,
-    oscAVol: 0.65,
-    oscADelay: 0,
-    oscBWave: 'Bell Tines',
-    oscBOctave: 1,
-    oscBPitch: 0,
-    oscBDetune: 5,
-    oscBPan: 0.4,
-    oscBVol: 0.2,
-    oscBDelay: 0.15,
-    filterMode: 'Single',
-    filterType: 'lowpass',
-    cutoff: 850,
-    resonance: 3.5,
-    filterEnvAmt: 1200,
-    portamento: 0,
-    vcfEG: { startLevel: 0.1, attackTime: 0.6, attackLevel: 0.8, decayTime: 1.0, breakLevel: 0.7, slopeTime: 1.5, sustainLevel: 0.65, releaseTime: 0.9, releaseLevel: 0 },
-    vcaEG: { startLevel: 0, attackTime: 0.5, attackLevel: 1.0, decayTime: 0.8, breakLevel: 0.75, slopeTime: 2.0, sustainLevel: 0.7, releaseTime: 0.85, releaseLevel: 0 },
-    pitchEG: { startLevel: 0, attackTime: 0.1, attackLevel: 0, decayTime: 0.2, releaseTime: 0.2 },
-    lfo1Rate: 3.5, lfo1Depth: 20, lfo1Target: 'pitch', lfo1Shape: 'sine',
-    lfo2Rate: 0.2, lfo2Depth: 250, lfo2Target: 'filter', lfo2Shape: 'triangle',
-    ifx1Type: 'Phaser', ifx1Mix: 0.35,
-    ifx2Type: 'Bypass', ifx2Mix: 0.3,
-    mfx1SendA: 0.3, mfx1SendB: 0.3, mfx2SendA: 0.5, mfx2SendB: 0.5,
-    eqLow: 3, eqMid: 0, eqHigh: 2,
-    arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
-  },
-  {
-    id: 'p04',
-    name: 'A004: Classic Brass Horns',
-    category: 'Brass',
-    oscMode: 'double',
-    oscAWave: 'Classic Brass',
-    oscAOctave: 0,
-    oscAPitch: 0,
-    oscADetune: -3,
-    oscAPan: -0.15,
-    oscAVol: 0.7,
-    oscADelay: 0,
-    oscBWave: 'Classic Brass',
-    oscBOctave: 0,
-    oscBPitch: 12,
-    oscBDetune: 8,
-    oscBPan: 0.15,
-    oscBVol: 0.4,
-    oscBDelay: 0.02,
-    filterMode: 'Single',
-    filterType: 'lowpass',
-    cutoff: 750,
-    resonance: 4.0,
-    filterEnvAmt: 2400,
-    portamento: 0,
-    vcfEG: { startLevel: 0, attackTime: 0.08, attackLevel: 1.0, decayTime: 0.35, breakLevel: 0.5, slopeTime: 0.6, sustainLevel: 0.4, releaseTime: 0.25, releaseLevel: 0 },
-    vcaEG: { startLevel: 0, attackTime: 0.04, attackLevel: 1.0, decayTime: 0.3, breakLevel: 0.7, slopeTime: 0.8, sustainLevel: 0.6, releaseTime: 0.28, releaseLevel: 0 },
-    pitchEG: { startLevel: 0, attackTime: 0.02, attackLevel: 0.08, decayTime: 0.1, releaseTime: 0.15 },
-    lfo1Rate: 4.8, lfo1Depth: 18, lfo1Target: 'pitch', lfo1Shape: 'sine',
-    lfo2Rate: 5.5, lfo2Depth: 50, lfo2Target: 'filter', lfo2Shape: 'sine',
-    ifx1Type: 'Overdrive', ifx1Mix: 0.15,
-    ifx2Type: 'Bypass', ifx2Mix: 0.3,
-    mfx1SendA: 0.1, mfx1SendB: 0.1, mfx2SendA: 0.25, mfx2SendB: 0.25,
-    eqLow: 1, eqMid: 2, eqHigh: 1,
-    arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
-  },
-  {
-    id: 'p05',
-    name: 'A005: 90s Drawbar Organ',
-    category: 'Organ',
-    oscMode: 'double',
-    oscAWave: 'Triton Organ',
-    oscAOctave: 0,
-    oscAPitch: 0,
-    oscADetune: 0,
-    oscAPan: -0.1,
-    oscAVol: 0.7,
-    oscADelay: 0,
-    oscBWave: 'Triton Organ',
-    oscBOctave: 0,
-    oscBPitch: 7,
-    oscBDetune: 4,
-    oscBPan: 0.1,
-    oscBVol: 0.4,
-    oscBDelay: 0,
-    filterMode: 'Single',
-    filterType: 'lowpass',
-    cutoff: 3500,
-    resonance: 1.5,
-    filterEnvAmt: 0,
-    portamento: 0,
-    vcfEG: { startLevel: 1.0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.1, breakLevel: 1.0, slopeTime: 0.1, sustainLevel: 1.0, releaseTime: 0.05, releaseLevel: 0 },
-    vcaEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.1, breakLevel: 1.0, slopeTime: 0.1, sustainLevel: 0.9, releaseTime: 0.08, releaseLevel: 0 },
-    pitchEG: { startLevel: 0, attackTime: 0.01, attackLevel: 0, decayTime: 0.1, releaseTime: 0.1 },
-    lfo1Rate: 6.2, lfo1Depth: 22, lfo1Target: 'pitch', lfo1Shape: 'sine',
-    lfo2Rate: 5.5, lfo2Depth: 0, lfo2Target: 'filter', lfo2Shape: 'sine',
-    ifx1Type: 'Rotary Speaker', ifx1Mix: 0.65,
-    ifx2Type: 'Bypass', ifx2Mix: 0.3,
-    mfx1SendA: 0.15, mfx1SendB: 0.15, mfx2SendA: 0.3, mfx2SendB: 0.3,
-    eqLow: 2, eqMid: 1, eqHigh: 0,
-    arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
-  },
-  {
-    id: 'p06',
-    name: 'A006: Acoustic Nylon Guitar',
-    category: 'Guitar',
-    oscMode: 'double',
-    oscAWave: 'Nylon Guitar',
-    oscAOctave: 0,
-    oscAPitch: 0,
-    oscADetune: 0,
-    oscAPan: -0.2,
-    oscAVol: 0.75,
-    oscADelay: 0,
-    oscBWave: 'Bell Tines',
-    oscBOctave: 1,
-    oscBPitch: 0,
-    oscBDetune: 8,
-    oscBPan: 0.2,
-    oscBVol: 0.15,
-    oscBDelay: 0.08,
-    filterMode: 'Single',
-    filterType: 'lowpass',
-    cutoff: 1800,
-    resonance: 2.5,
-    filterEnvAmt: 600,
-    portamento: 0,
-    vcfEG: { startLevel: 0.2, attackTime: 0.02, attackLevel: 1.0, decayTime: 0.22, breakLevel: 0.5, slopeTime: 0.4, sustainLevel: 0.2, releaseTime: 0.3, releaseLevel: 0 },
-    vcaEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.4, breakLevel: 0.3, slopeTime: 0.5, sustainLevel: 0, releaseTime: 0.32, releaseLevel: 0 },
-    pitchEG: { startLevel: 0, attackTime: 0.01, attackLevel: 0, decayTime: 0.1, releaseTime: 0.1 },
-    lfo1Rate: 4.0, lfo1Depth: 10, lfo1Target: 'pitch', lfo1Shape: 'sine',
-    lfo2Rate: 3.5, lfo2Depth: 0, lfo2Target: 'filter', lfo2Shape: 'sine',
-    ifx1Type: 'Chorus', ifx1Mix: 0.3,
-    ifx2Type: 'Bypass', ifx2Mix: 0.3,
-    mfx1SendA: 0.2, mfx1SendB: 0.2, mfx2SendA: 0.4, mfx2SendB: 0.4,
-    eqLow: 0, eqMid: 2, eqHigh: 3,
-    arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
-  },
-  {
-    id: 'p07',
-    name: 'A007: Mellow Fretless Bass',
-    category: 'Bass',
-    oscMode: 'single',
-    oscAWave: 'Fretless Bass',
-    oscAOctave: -1,
-    oscAPitch: 0,
-    oscADetune: 0,
-    oscAPan: 0.0,
-    oscAVol: 0.95,
-    oscADelay: 0,
-    oscBWave: 'Fretless Bass',
-    oscBOctave: -1,
-    oscBPitch: 0,
-    oscBDetune: 8,
-    oscBPan: 0.1,
-    oscBVol: 0,
-    oscBDelay: 0,
-    filterMode: 'Single',
-    filterType: 'lowpass',
-    cutoff: 600,
-    resonance: 3.5,
-    filterEnvAmt: 400,
-    portamento: 0.15,
-    vcfEG: { startLevel: 0, attackTime: 0.08, attackLevel: 0.8, decayTime: 0.4, breakLevel: 0.5, slopeTime: 0.6, sustainLevel: 0.4, releaseTime: 0.22, releaseLevel: 0 },
-    vcaEG: { startLevel: 0, attackTime: 0.06, attackLevel: 1.0, decayTime: 0.5, breakLevel: 0.6, slopeTime: 0.8, sustainLevel: 0.5, releaseTime: 0.25, releaseLevel: 0 },
-    pitchEG: { startLevel: 0, attackTime: 0.05, attackLevel: 0, decayTime: 0.1, releaseTime: 0.1 },
-    lfo1Rate: 3.8, lfo1Depth: 12, lfo1Target: 'pitch', lfo1Shape: 'sine',
-    lfo2Rate: 4.5, lfo2Depth: 0, lfo2Target: 'filter', lfo2Shape: 'triangle',
-    ifx1Type: 'Bypass', ifx1Mix: 0.3,
-    ifx2Type: 'Bypass', ifx2Mix: 0.3,
-    mfx1SendA: 0.05, mfx1SendB: 0.05, mfx2SendA: 0.15, mfx2SendB: 0.15,
-    eqLow: 3, eqMid: 2, eqHigh: -1,
-    arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
-  },
-  {
-    id: 'p08',
-    name: 'A008: Poly Trance Synth',
-    category: 'Synth',
-    oscMode: 'double',
-    oscAWave: 'Polysynth',
-    oscAOctave: 0,
-    oscAPitch: 0,
-    oscADetune: -8,
-    oscAPan: -0.3,
-    oscAVol: 0.6,
-    oscADelay: 0,
-    oscBWave: 'Trident Square',
-    oscBOctave: 0,
-    oscBPitch: 0,
-    oscBDetune: 10,
-    oscBPan: 0.3,
-    oscBVol: 0.5,
-    oscBDelay: 0.01,
-    filterMode: 'Double Series',
-    filterType: 'lowpass',
-    cutoff: 950,
-    resonance: 6.0,
-    filterEnvAmt: 2000,
-    portamento: 0,
-    vcfEG: { startLevel: 0.1, attackTime: 0.02, attackLevel: 1.0, decayTime: 0.25, breakLevel: 0.4, slopeTime: 0.5, sustainLevel: 0.3, releaseTime: 0.35, releaseLevel: 0 },
-    vcaEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.35, breakLevel: 0.6, slopeTime: 0.8, sustainLevel: 0.55, releaseTime: 0.38, releaseLevel: 0 },
-    pitchEG: { startLevel: 0, attackTime: 0.01, attackLevel: 0, decayTime: 0.1, releaseTime: 0.1 },
-    lfo1Rate: 5.5, lfo1Depth: 0, lfo1Target: 'pitch', lfo1Shape: 'sine',
-    lfo2Rate: 6.5, lfo2Depth: 80, lfo2Target: 'filter', lfo2Shape: 'triangle',
-    ifx1Type: 'Phaser', ifx1Mix: 0.25,
-    ifx2Type: 'Bypass', ifx2Mix: 0.3,
-    mfx1SendA: 0.25, mfx1SendB: 0.25, mfx2SendA: 0.35, mfx2SendB: 0.35,
-    eqLow: 1, eqMid: 0, eqHigh: 3,
-    arpOn: true, arpBpm: 135, arpPattern: 'ALT1', arpGate: 0.7, arpVelocity: 110, arpDivision: 16
-  },
-  {
-    id: 'p09',
-    name: 'A009: Tubular Bell Tines',
-    category: 'Bell',
-    oscMode: 'double',
-    oscAWave: 'Bell Tines',
-    oscAOctave: 1,
-    oscAPitch: 0,
-    oscADetune: -2,
-    oscAPan: -0.25,
-    oscAVol: 0.55,
-    oscADelay: 0,
-    oscBWave: 'Bell Tines',
-    oscBOctave: 1,
-    oscBPitch: 19, // perfect fifth above an octave
-    oscBDetune: 6,
-    oscBPan: 0.25,
-    oscBVol: 0.35,
-    oscBDelay: 0.05,
-    filterMode: 'Single',
-    filterType: 'lowpass',
-    cutoff: 1600,
-    resonance: 4.5,
-    filterEnvAmt: 400,
-    portamento: 0,
-    vcfEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.4, breakLevel: 0.3, slopeTime: 0.6, sustainLevel: 0.1, releaseTime: 0.6, releaseLevel: 0 },
-    vcaEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.6, breakLevel: 0.4, slopeTime: 0.8, sustainLevel: 0.1, releaseTime: 0.7, releaseLevel: 0 },
-    pitchEG: { startLevel: 0, attackTime: 0.01, attackLevel: 0, decayTime: 0.1, releaseTime: 0.1 },
-    lfo1Rate: 2.5, lfo1Depth: 25, lfo1Target: 'pitch', lfo1Shape: 'sine',
-    lfo2Rate: 1.5, lfo2Depth: 80, lfo2Target: 'filter', lfo2Shape: 'sine',
-    ifx1Type: 'Bypass', ifx1Mix: 0.3,
-    ifx2Type: 'Bypass', ifx2Mix: 0.3,
-    mfx1SendA: 0.3, mfx1SendB: 0.3, mfx2SendA: 0.6, mfx2SendB: 0.6,
-    eqLow: 0, eqMid: 1, eqHigh: 4,
-    arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
-  }
-];
-
-const FACTORY_COMBIS = [
-  {
-    id: 'c01',
-    name: 'C001: Piano & String Layer',
-    t1ProgId: 'p01', t1Vol: 0.85, t1Pan: -0.1, t1MinKey: 0, t1MaxKey: 127, t1Octave: 0,
-    t2ProgId: 'p02', t2Vol: 0.45, t2Pan: 0.2,  t2MinKey: 0, t2MaxKey: 127, t2Octave: 0,
-    t3ProgId: 'p09', t3Vol: 0.25, t3Pan: 0.4,  t3MinKey: 48, t3MaxKey: 127, t3Octave: 0,
-    t4ProgId: 'p03', t4Vol: 0.0,  t4Pan: -0.3, t4MinKey: 0, t4MaxKey: 127, t4Octave: 0,
-  },
-  {
-    id: 'c02',
-    name: 'C002: Bass / Lead Split',
-    t1ProgId: 'p07', t1Vol: 0.95, t1Pan: -0.1, t1MinKey: 0, t1MaxKey: 59,  t1Octave: 0, // Bass left
-    t2ProgId: 'p08', t2Vol: 0.70, t2Pan: 0.2,  t2MinKey: 60, t2MaxKey: 127, t2Octave: 0, // Lead right
-    t3ProgId: 'p03', t3Vol: 0.35, t3Pan: -0.4, t3MinKey: 60, t3MaxKey: 127, t3Octave: -1, // Pad right octave lower
-    t4ProgId: 'p09', t4Vol: 0.0,  t4Pan: 0.3,  t4MinKey: 0, t4MaxKey: 127, t4Octave: 0,
-  },
-  {
-    id: 'c03',
-    name: 'C003: Cosmic Bell Station',
-    t1ProgId: 'p03', t1Vol: 0.70, t1Pan: -0.3, t1MinKey: 0, t1MaxKey: 127, t1Octave: -1,
-    t2ProgId: 'p09', t2Vol: 0.65, t2Pan: 0.3,  t2MinKey: 48, t2MaxKey: 127, t2Octave: 0,
-    t3ProgId: 'p08', t3Vol: 0.30, t3Pan: 0.0,  t3MinKey: 0, t3MaxKey: 127, t3Octave: 0,
-    t4ProgId: 'p01', t4Vol: 0.20, t4Pan: -0.2, t4MinKey: 0, t4MaxKey: 127, t4Octave: 0,
-  }
-];
-
-// --- Custom Harmonic Generators for PCM Waveforms ---
-const tritonWaveformsCache = new Map();
-
-const getDelta7Wave = (ctx, type) => {
-  if (tritonWaveformsCache.has(type)) {
-    return tritonWaveformsCache.get(type);
-  }
-
-  const numHarmonics = 32;
-  const real = new Float32Array(numHarmonics);
-  const imag = new Float32Array(numHarmonics);
-  real[0] = 0;
-  imag[0] = 0;
-
-  switch (type) {
-    case 'Triton Piano':
-      imag[1] = 1.0;
-      imag[2] = 0.55;
-      imag[3] = 0.35;
-      imag[4] = 0.20;
-      imag[5] = 0.12;
-      imag[6] = 0.08;
-      imag[7] = 0.05;
-      imag[8] = 0.03;
-      break;
-    case 'Stereo Strings':
-      for (let i = 1; i < numHarmonics; i++) {
-        imag[i] = (1.0 / Math.pow(i, 0.95)) * (i % 2 === 0 ? 1 : -0.7);
-      }
-      break;
-    case 'Warm Pad':
-      imag[1] = 1.0;
-      imag[2] = 0.25;
-      imag[3] = 0.08;
-      imag[4] = 0.02;
-      break;
-    case 'Classic Brass':
-      imag[1] = 0.6;
-      imag[2] = 0.8;
-      imag[3] = 0.65;
-      imag[4] = 0.35;
-      imag[5] = 0.2;
-      imag[6] = 0.1;
-      break;
-    case 'Triton Organ':
-      imag[1] = 0.95;
-      imag[2] = 0.0;
-      imag[3] = 0.72;
-      imag[4] = 0.0;
-      imag[5] = 0.45;
-      imag[8] = 0.28;
-      break;
-    case 'Nylon Guitar':
-      imag[1] = 1.0;
-      imag[2] = 0.68;
-      imag[3] = 0.42;
-      imag[4] = 0.25;
-      imag[5] = 0.18;
-      imag[7] = 0.12;
-      break;
-    case 'Fretless Bass':
-      imag[1] = 1.0;
-      imag[2] = 0.48;
-      imag[3] = 0.08;
-      imag[4] = 0.03;
-      break;
-    case 'Polysynth':
-      for (let i = 1; i < numHarmonics; i++) {
-        imag[i] = 1.0 / i;
-      }
-      break;
-    case 'Bell Tines':
-      imag[1] = 0.25;
-      imag[5] = 0.55;
-      imag[9] = 0.75;
-      imag[14] = 0.45;
-      imag[21] = 0.25;
-      break;
-    case 'Trident Square':
-      for (let i = 1; i < numHarmonics; i += 2) {
-        imag[i] = 1.0 / i;
-      }
-      break;
-    default: // Sine
-      imag[1] = 1.0;
-  }
-
-  const periodicWave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
-  tritonWaveformsCache.set(type, periodicWave);
-  return periodicWave;
+const DEFAULT_PARAMS = {
+  subOscVol: 0.0,
+  subOscOctave: -1,
+  noiseVol: 0.0,
+  keyTracking: 0.5,
+  unisonOn: false,
+  unisonDetune: 10,
+  preampDrive: 0.1,
+  granularActive: false,
+  grainSize: 100,
+  grainRate: 40,
+  grainPosition: 0.0,
+  grainSpray: 0.05,
+  grainPitchRandom: 0,
+  grainSpeed: 1.0,
+  grainReverse: false,
+  spaceEchoActive: false,
+  spaceEchoTime: 0.35,
+  spaceEchoFeedback: 0.4,
+  spaceEchoWow: 0.15,
+  spaceEchoSaturation: 0.2,
+  spaceEchoSpring: 0.15,
+  leslieSpeed: 'Off',
+  oscAWave: 's01',
+  oscBWave: 's02',
+  oscBalance: 0.5,
+  oscATriggerMode: 'pitch',
+  oscBTriggerMode: 'pitch',
+  reverbMix: 0.15,
+  ifx1Type: 'Bypass',
+  ifx1Mix: 0.0,
+  ifx2Type: 'Bypass',
+  ifx2Mix: 0.0,
+  mfx1SendA: 0.0,
+  mfx1SendB: 0.0,
+  mfx2SendA: 0.0,
+  mfx2SendB: 0.0
 };
+
+const FACTORY_PROGRAMS = Array.from({ length: 9 }, (_, i) => ({
+  id: `p${(i + 1).toString().padStart(2, '0')}`,
+  name: `A${(i + 1).toString().padStart(3, '0')}: Initialized`,
+  category: 'User',
+  oscMode: 'single',
+  oscAWave: 's01',
+  oscAOctave: 0,
+  oscAPitch: 0,
+  oscADetune: 0,
+  oscAPan: 0,
+  oscAVol: 0.5,
+  oscADelay: 0,
+  oscBWave: 's02',
+  oscBOctave: 0,
+  oscBPitch: 0,
+  oscBDetune: 0,
+  oscBPan: 0,
+  oscBVol: 0,
+  oscBDelay: 0,
+  oscBalance: 0.5,
+  filterMode: 'Single',
+  filterType: 'lowpass',
+  cutoff: 1000,
+  resonance: 0,
+  filterEnvAmt: 0,
+  portamento: 0,
+  vcfEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.1, breakLevel: 0.8, slopeTime: 0.1, sustainLevel: 0.5, releaseTime: 0.1, releaseLevel: 0 },
+  vcaEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.1, breakLevel: 0.8, slopeTime: 0.1, sustainLevel: 0.5, releaseTime: 0.1, releaseLevel: 0 },
+  pitchEG: { startLevel: 0, attackTime: 0.01, attackLevel: 0, decayTime: 0.1, releaseTime: 0.1 },
+  lfo1Rate: 0, lfo1Depth: 0, lfo1Target: 'pitch', lfo1Shape: 'sine',
+  lfo2Rate: 0, lfo2Depth: 0, lfo2Target: 'filter', lfo2Shape: 'sine',
+  ifx1Type: 'Bypass', ifx1Mix: 0,
+  ifx2Type: 'Bypass', ifx2Mix: 0,
+  mfx1SendA: 0, mfx1SendB: 0, mfx2SendA: 0, mfx2SendB: 0,
+  eqLow: 0, eqMid: 0, eqHigh: 0,
+  arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
+}));
+
+const FACTORY_COMBIS = Array.from({ length: 3 }, (_, i) => ({
+  id: `c${(i + 1).toString().padStart(2, '0')}`,
+  name: `C${(i + 1).toString().padStart(3, '0')}: Initialized`,
+  t1ProgId: 'p01', t1Vol: 0.5, t1Pan: 0, t1MinKey: 0, t1MaxKey: 127, t1Octave: 0,
+  t2ProgId: 'p01', t2Vol: 0,   t2Pan: 0, t2MinKey: 0, t2MaxKey: 127, t2Octave: 0,
+  t3ProgId: 'p01', t3Vol: 0,   t3Pan: 0, t3MinKey: 0, t3MaxKey: 127, t3Octave: 0,
+  t4ProgId: 'p01', t4Vol: 0,   t4Pan: 0, t4MinKey: 0, t4MaxKey: 127, t4Octave: 0,
+}));
 
 // MIDI Pitch to Frequency
 const getFreq = (note) => 440 * Math.pow(2, (note - 69) / 12);
@@ -500,7 +140,7 @@ export default function Delta7Synth() {
   });
 
   // Current operational parameters (dynamically updated from Program or Combi layers)
-  const [params, setParams] = useState({ ...FACTORY_PROGRAMS[0], masterVolume: 80 });
+  const [params, setParams] = useState({ ...DEFAULT_PARAMS, ...FACTORY_PROGRAMS[0], masterVolume: 80 });
 
   // Joystick state
   const [joystick, setJoystick] = useState({ x: 0, y: 0 }); // X: Pitch bend (-1 to 1), Y: LFO pitch (+1) or filter modulation (-1)
@@ -517,13 +157,39 @@ export default function Delta7Synth() {
   const activeVoicesRef = useRef(new Map()); // voiceKey (e.g. note-progId) -> voiceObjects
   const masterGainRef = useRef(null);
   const analyserRef = useRef(null);
+  const midiOutputsRef = useRef([]); // Add this for MIDI outputs caching
+
+  const playVoiceRef = useRef(null);
+  const stopVoiceRef = useRef(null);
+  const handleMidiCCRef = useRef(null);
+  const joystickRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    playVoiceRef.current = playVoice;
+    stopVoiceRef.current = stopVoice;
+    handleMidiCCRef.current = handleMidiCC;
+    joystickRef.current = joystick;
+  });
 
   // FX Nodes
-  const ifx1Ref = useRef(null);
+  const ifx1InputRef = useRef(null);
+  const ifx1OutputRef = useRef(null);
+  const ifx2InputRef = useRef(null);
+  const ifx2OutputRef = useRef(null);
+  const ifx1EffectRef = useRef(null);
+  const ifx2EffectRef = useRef(null);
   const ifx1MixRef = useRef(null);
-  const ifx2Ref = useRef(null);
   const ifx2MixRef = useRef(null);
-  const mfx1Ref = useRef(null);
+  const lastIfx1TypeRef = useRef(null);
+  const lastIfx1MixRef = useRef(null);
+  const lastIfx2TypeRef = useRef(null);
+  const lastIfx2MixRef = useRef(null);
+  
+  const mfx1Ref = useRef(null); // standard input node or ref
+  const delayInputRef = useRef(null);
+  const delayOutputRef = useRef(null);
+  const activeDelayRef = useRef(null);
+
   const mfx1SendGainRef = useRef(null); // combined send
   const mfx2Ref = useRef(null);
   const mfx2SendGainRef = useRef(null); // combined send
@@ -535,24 +201,771 @@ export default function Delta7Synth() {
   const canvasRef = useRef(null);
   const animationFrameIdRef = useRef(null);
 
+  // --- Sampler States & Slots ---
+  const [sampleSlots, setSampleSlots] = useState([
+    { id: 's01', name: 'User Slot 1', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's02', name: 'User Slot 2', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's03', name: 'User Slot 3', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's04', name: 'User Slot 4', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's05', name: 'User Slot 5', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's06', name: 'User Slot 6', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's07', name: 'User Slot 7', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's08', name: 'User Slot 8', buffer: null, revBuffer: null, rootNote: 60, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+  ]);
+  const sampleSlotsRef = useRef(sampleSlots);
+  useEffect(() => {
+    sampleSlotsRef.current = sampleSlots;
+  }, [sampleSlots]);
+
+  const [selectedEditSlotId, setSelectedEditSlotId] = useState('s01'); // Target slot in Editor
+  const [selectedSliceIndex, setSelectedSliceIndex] = useState(0); // Selected slice index for editing
+  const [isRecording, setIsRecording] = useState(false);
+  const [isArmed, setIsArmed] = useState(false);
+  const [recordSlotId, setRecordSlotId] = useState('s01'); // Target recording user slot
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const activePreviewNodeRef = useRef(null);
+  const previewStartTimeRef = useRef(0);
+  const previewStartOffsetRef = useRef(0);
+
+  const getSlotLabel = (slotId) => {
+    const num = parseInt(slotId.slice(2));
+    return `U${num}`;
+  };
+
+  // Recorder and Canvas references
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const streamRef = useRef(null);
+  const micAnalyserRef = useRef(null);
+  const micSourceRef = useRef(null);
+  const recordAnimationFrameIdRef = useRef(null);
+  const samplerCanvasRef = useRef(null);
+
+  // Delta Pad Gater FX Refs
+  const gaterGainNodeRef = useRef(null);
+  const gaterLfoRef = useRef(null);
+  const gaterLfoGainRef = useRef(null);
+
+  // Pre-amp Saturation Ref
+  const preampNodeRef = useRef(null);
+
+  // Glitch Loop Refs
+  const [glitchActive, setGlitchActive] = useState(false);
+  const glitchActiveRef = useRef(false);
+  const glitchDryGainRef = useRef(null);
+  const glitchInputGainRef = useRef(null);
+  const glitchDelayRef = useRef(null);
+  const glitchFeedbackRef = useRef(null);
+
+  // White Noise Buffer cache (for hybrid subosc/noise layers)
+  const whiteNoiseBufferRef = useRef(null);
+  const getWhiteNoiseBuffer = (ctx) => {
+    if (whiteNoiseBufferRef.current) return whiteNoiseBufferRef.current;
+    const bufferSize = ctx.sampleRate * 2;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    whiteNoiseBufferRef.current = buffer;
+    return buffer;
+  };
+
+  // Cleanup mic streaming on unmount & handle browser gesture unlock
+  useEffect(() => {
+    const handleGesture = () => {
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+    };
+    window.addEventListener('click', handleGesture);
+    window.addEventListener('keydown', handleGesture);
+
+    return () => {
+      cancelAnimationFrame(recordAnimationFrameIdRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      window.removeEventListener('click', handleGesture);
+      window.removeEventListener('keydown', handleGesture);
+    };
+  }, []);
+
+  // --- Recorder Deck Action Handlers ---
+  const armMicrophone = async () => {
+    if (isArmed) {
+      disarmMicrophone();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      if (!audioCtxRef.current) initAudio();
+      const ctx = audioCtxRef.current;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      micAnalyserRef.current = analyser;
+      
+      const source = ctx.createMediaStreamSource(stream);
+      source.connect(analyser);
+      micSourceRef.current = source;
+      
+      setIsArmed(true);
+      startMicMonitor();
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("Microphone access failed. Please ensure permissions are enabled.");
+    }
+  };
+
+  const disarmMicrophone = () => {
+    cancelAnimationFrame(recordAnimationFrameIdRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (micSourceRef.current) {
+      try { micSourceRef.current.disconnect(); } catch {}
+      micSourceRef.current = null;
+    }
+    setIsArmed(false);
+    setIsRecording(false);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    const bar = document.getElementById('mic-level-bar-fill');
+    if (bar) bar.style.width = '0%';
+  };
+
+  const startMicMonitor = () => {
+    const analyser = micAnalyserRef.current;
+    if (!analyser) return;
+    const array = new Uint8Array(analyser.frequencyBinCount);
+    
+    const updateLevel = () => {
+      analyser.getByteFrequencyData(array);
+      let sum = 0;
+      for (let i = 0; i < array.length; i++) sum += array[i];
+      const avg = sum / array.length;
+      
+      const bar = document.getElementById('mic-level-bar-fill');
+      if (bar) {
+        bar.style.width = `${Math.min(100, (avg / 150) * 100)}%`;
+      }
+      recordAnimationFrameIdRef.current = requestAnimationFrame(updateLevel);
+    };
+    updateLevel();
+  };
+
+  const startRecording = () => {
+    if (!streamRef.current) return;
+    audioChunksRef.current = [];
+    
+    let options = { mimeType: 'audio/webm' };
+    if (!MediaRecorder.isTypeSupported('audio/webm')) {
+      options = { mimeType: 'audio/mp4' };
+    }
+    
+    const recorder = new MediaRecorder(streamRef.current, options);
+    mediaRecorderRef.current = recorder;
+    
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        audioChunksRef.current.push(e.data);
+      }
+    };
+    
+    recorder.onstop = async () => {
+      const blob = new Blob(audioChunksRef.current, { type: options.mimeType });
+      const arrayBuffer = await blob.arrayBuffer();
+      
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+      
+      ctx.decodeAudioData(arrayBuffer, (buffer) => {
+        const nextSlots = sampleSlotsRef.current.map(slot => {
+          if (slot.id === recordSlotId) {
+            return {
+              ...slot,
+              name: `Rec: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`,
+              buffer: buffer,
+              revBuffer: getReversedBuffer(ctx, buffer),
+              start: 0.0,
+              end: 1.0,
+              loopStart: 0.0,
+              loopEnd: 1.0
+            };
+          }
+          return slot;
+        });
+        sampleSlotsRef.current = nextSlots;
+        setSampleSlots(nextSlots);
+      }, (err) => {
+        console.error("Decoding voice sample buffer failed:", err);
+      });
+    };
+    
+    recorder.start();
+    setIsRecording(true);
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  // --- Waveform Editor Actions ---
+  const updateSlotParam = (slotId, param, val) => {
+    const nextSlots = sampleSlotsRef.current.map(s => {
+      if (s.id === slotId) {
+        return { ...s, [param]: val };
+      }
+      return s;
+    });
+    sampleSlotsRef.current = nextSlots;
+    setSampleSlots(nextSlots);
+  };
+
+  const handleStartChange = (val) => {
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot) return;
+    const clamped = Math.min(val, slot.end - 0.01);
+    updateSlotParam(selectedEditSlotId, 'start', clamped);
+  };
+
+  const handleEndChange = (val) => {
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot) return;
+    const clamped = Math.max(val, slot.start + 0.01);
+    updateSlotParam(selectedEditSlotId, 'end', clamped);
+  };
+
+  const handleLoopStartChange = (val) => {
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot) return;
+    const clamped = Math.min(val, slot.loopEnd - 0.01);
+    updateSlotParam(selectedEditSlotId, 'loopStart', clamped);
+  };
+
+  const handleLoopEndChange = (val) => {
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot) return;
+    const clamped = Math.max(val, slot.loopStart + 0.01);
+    updateSlotParam(selectedEditSlotId, 'loopEnd', clamped);
+  };
+
+  const togglePreviewSample = (slotId) => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+    if (ctx.state === 'suspended') ctx.resume();
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    if (!slot || !slot.buffer) return;
+
+    if (activePreviewNodeRef.current) {
+      try { activePreviewNodeRef.current.stop(); } catch {}
+      activePreviewNodeRef.current = null;
+      setIsPlayingPreview(false);
+      return;
+    }
+
+    const now = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    
+    const isReverse = slot.reverseOn;
+    source.buffer = isReverse && slot.revBuffer ? slot.revBuffer : slot.buffer;
+
+    if (ifx1InputRef.current) {
+      source.connect(ifx1InputRef.current);
+    } else if (masterGainRef.current) {
+      source.connect(masterGainRef.current);
+    } else {
+      source.connect(ctx.destination);
+    }
+
+    const startOffset = isReverse ? (1.0 - slot.end) * slot.buffer.duration : slot.start * slot.buffer.duration;
+    const endOffset = isReverse ? (1.0 - slot.start) * slot.buffer.duration : slot.end * slot.buffer.duration;
+    const duration = endOffset - startOffset;
+
+    source.loop = slot.loopOn;
+    if (slot.loopOn) {
+      source.loopStart = isReverse ? (1.0 - slot.loopEnd) * slot.buffer.duration : slot.loopStart * slot.buffer.duration;
+      source.loopEnd = isReverse ? (1.0 - slot.loopStart) * slot.buffer.duration : slot.loopEnd * slot.buffer.duration;
+      source.start(now, startOffset);
+    } else {
+      source.start(now, startOffset, Math.max(0.01, duration));
+      source.onended = () => {
+        if (activePreviewNodeRef.current === source) {
+          activePreviewNodeRef.current = null;
+          setIsPlayingPreview(false);
+        }
+      };
+    }
+
+    previewStartTimeRef.current = now;
+    previewStartOffsetRef.current = startOffset;
+    activePreviewNodeRef.current = source;
+    setIsPlayingPreview(true);
+  };
+
+  useEffect(() => {
+    if (activePreviewNodeRef.current) {
+      try { activePreviewNodeRef.current.stop(); } catch {}
+      activePreviewNodeRef.current = null;
+      setIsPlayingPreview(false);
+    }
+  }, [selectedEditSlotId, activeTab]);
+
+  // Canvas Drawing & Playhead Loop
+  const samplerCanvasAnimIdRef = useRef(null);
+  useEffect(() => {
+    const canvas = samplerCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    const drawWaveform = () => {
+      samplerCanvasAnimIdRef.current = requestAnimationFrame(drawWaveform);
+      
+      const slot = sampleSlotsRef.current.find(s => s.id === selectedEditSlotId);
+      if (!slot) return;
+      
+      // Clear canvas
+      ctx.fillStyle = '#020d1e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Center line
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, canvas.height / 2);
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+      
+      if (!slot.buffer) {
+        ctx.fillStyle = 'rgba(0, 243, 255, 0.45)';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('NO SAMPLE RECORDED/LOADED', canvas.width / 2, canvas.height / 2 + 3);
+        return;
+      }
+      
+      const buffer = slot.buffer;
+      const data = buffer.getChannelData(0);
+      const step = Math.ceil(data.length / canvas.width);
+      const amp = canvas.height / 2;
+      
+      // Draw Waveform
+      ctx.strokeStyle = '#00f3ff';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      for (let i = 0; i < canvas.width; i++) {
+        let min = 1.0;
+        let max = -1.0;
+        for (let j = 0; j < step; j++) {
+          const idx = i * step + j;
+          if (idx < data.length) {
+            const dat = data[idx];
+            if (dat < min) min = dat;
+            if (dat > max) max = dat;
+          }
+        }
+        const x = i;
+        const yMin = (1 + min) * amp;
+        const yMax = (1 + max) * amp;
+        ctx.moveTo(x, yMin);
+        ctx.lineTo(x, yMax);
+      }
+      ctx.stroke();
+      
+      // Shading inactive start/end regions
+      const startX = slot.start * canvas.width;
+      const endX = slot.end * canvas.width;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(0, 0, startX, canvas.height);
+      ctx.fillRect(endX, 0, canvas.width - endX, canvas.height);
+      
+      // Visual boundary markers
+      ctx.lineWidth = 1.5;
+      // Start (Yellow)
+      ctx.strokeStyle = '#ffe600';
+      ctx.beginPath(); ctx.moveTo(startX, 0); ctx.lineTo(startX, canvas.height); ctx.stroke();
+      // End (Red)
+      ctx.strokeStyle = '#ff0055';
+      ctx.beginPath(); ctx.moveTo(endX, 0); ctx.lineTo(endX, canvas.height); ctx.stroke();
+      
+      // Loop bounds (dashed green)
+      if (slot.loopOn) {
+        const loopStartX = slot.loopStart * canvas.width;
+        const loopEndX = slot.loopEnd * canvas.width;
+        ctx.strokeStyle = '#00ff66';
+        ctx.lineWidth = 1.0;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath(); ctx.moveTo(loopStartX, 0); ctx.lineTo(loopStartX, canvas.height); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(loopEndX, 0); ctx.lineTo(loopEndX, canvas.height); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Draw Slices & tags
+      const activeWidth = endX - startX;
+      const sliceWidth = activeWidth / 16;
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.2)';
+      ctx.lineWidth = 1.0;
+      ctx.fillStyle = 'rgba(0, 243, 255, 0.4)';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      
+      for (let i = 0; i < 16; i++) {
+        const sliceX = startX + i * sliceWidth;
+        if (i > 0) {
+          ctx.beginPath();
+          ctx.moveTo(sliceX, 0);
+          ctx.lineTo(sliceX, canvas.height);
+          ctx.stroke();
+        }
+        ctx.fillText((i + 1).toString(), sliceX + sliceWidth / 2, canvas.height - 4);
+      }
+
+      // Highlight the slice selected for editing
+      const selX = startX + selectedSliceIndex * sliceWidth;
+      ctx.fillStyle = 'rgba(0, 243, 255, 0.06)';
+      ctx.fillRect(selX, 0, sliceWidth, canvas.height);
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.7)';
+      ctx.lineWidth = 1.0;
+      ctx.strokeRect(selX, 0, sliceWidth, canvas.height);
+
+      // Highlight active slices from keyboard voices
+      if (activeVoicesRef.current) {
+        activeVoicesRef.current.forEach(voiceList => {
+          const list = Array.isArray(voiceList) ? voiceList : [voiceList];
+          list.forEach(voice => {
+            if (!voice) return;
+            const isSlotA = voice.slotAId === selectedEditSlotId;
+            const isSlotB = voice.slotBId === selectedEditSlotId;
+            
+            if ((isSlotA || isSlotB) && voice.startTime > 0 && voice.releasedRef && !voice.releasedRef.current) {
+              if (isSlotA && paramsRef.current.oscATriggerMode === 'slice') {
+                const sliceIndex = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                const sX = startX + sliceIndex * sliceWidth;
+                ctx.fillStyle = 'rgba(255, 230, 0, 0.15)'; // yellow highlight for OSC A slice
+                ctx.fillRect(sX, 0, sliceWidth, canvas.height);
+              }
+              if (isSlotB && paramsRef.current.oscBTriggerMode === 'slice') {
+                const sliceIndex = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                const sX = startX + sliceIndex * sliceWidth;
+                ctx.fillStyle = 'rgba(255, 0, 255, 0.15)'; // magenta highlight for OSC B slice
+                ctx.fillRect(sX, 0, sliceWidth, canvas.height);
+              }
+            }
+          });
+        });
+      }
+      
+      // Draw playheads!
+      const now = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
+      
+      // 1. Preview playhead
+      if (isPlayingPreview && activePreviewNodeRef.current && previewStartTimeRef.current > 0) {
+        const elapsed = now - previewStartTimeRef.current;
+        let playheadSec = previewStartOffsetRef.current + elapsed;
+        
+        if (slot.loopOn) {
+          const loopStartSec = slot.loopStart * buffer.duration;
+          const loopEndSec = slot.loopEnd * buffer.duration;
+          const loopLen = loopEndSec - loopStartSec;
+          if (playheadSec > loopEndSec && loopLen > 0) {
+            playheadSec = loopStartSec + ((playheadSec - loopStartSec) % loopLen);
+          }
+        }
+        
+        if (playheadSec <= buffer.duration && playheadSec >= 0) {
+          const ratio = slot.reverseOn ? (1.0 - (playheadSec / buffer.duration)) : (playheadSec / buffer.duration);
+          const playheadX = ratio * canvas.width;
+          ctx.strokeStyle = '#00f3ff';
+          ctx.lineWidth = 2.0;
+          ctx.beginPath();
+          ctx.moveTo(playheadX, 0);
+          ctx.lineTo(playheadX, canvas.height);
+          ctx.stroke();
+        }
+      }
+      
+      // 2. Keyboard voices playheads
+      if (activeVoicesRef.current) {
+        activeVoicesRef.current.forEach(voiceList => {
+          const list = Array.isArray(voiceList) ? voiceList : [voiceList];
+          list.forEach(voice => {
+            if (!voice) return;
+            const isSlotA = voice.slotAId === selectedEditSlotId;
+            const isSlotB = voice.slotBId === selectedEditSlotId;
+            
+            if ((isSlotA || isSlotB) && voice.startTime > 0 && voice.releasedRef && !voice.releasedRef.current) {
+              const elapsed = now - voice.startTime;
+              
+              if (isSlotA) {
+                const startOffset = voice.startOffsetA || 0;
+                const oscNode = voice.oscA || voice.oscA_L || voice.oscA_R;
+                const rate = voice.playheadRateA !== undefined ? voice.playheadRateA : (oscNode && oscNode.playbackRate ? oscNode.playbackRate.value : 1.0);
+                let playheadSec = startOffset + elapsed * rate;
+                
+                const isSliceA = paramsRef.current.oscATriggerMode === 'slice';
+                let sliceLoopA = false;
+                let sliceReverseA = false;
+                if (isSliceA && slot.sliceParams) {
+                  const sliceIndexA = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                  sliceLoopA = slot.sliceParams[sliceIndexA]?.loop || false;
+                  sliceReverseA = slot.sliceParams[sliceIndexA]?.reverse || false;
+                }
+                const isLoopingA = isSliceA ? sliceLoopA : slot.loopOn;
+                const isReverseForRatioA = isSliceA ? sliceReverseA : slot.reverseOn;
+                let valid = true;
+                
+                if (isSliceA) {
+                  const sliceIndex = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                  const activeDuration = (slot.end - slot.start) * buffer.duration;
+                  const sliceDuration = activeDuration / 16;
+                  const sliceStartSec = startOffset;
+                  const sliceEndSec = sliceStartSec + sliceDuration;
+                  
+                  if (isLoopingA) {
+                    if (playheadSec > sliceEndSec && sliceDuration > 0) {
+                      playheadSec = sliceStartSec + ((playheadSec - sliceStartSec) % sliceDuration);
+                    }
+                  } else {
+                    if (playheadSec > sliceEndSec) {
+                      valid = false;
+                    }
+                  }
+                } else {
+                  // Pitch mode
+                  if (isLoopingA) {
+                    let loopStartSec, loopEndSec;
+                    if (isReverseForRatioA) {
+                      loopStartSec = (1.0 - slot.loopEnd) * buffer.duration;
+                      loopEndSec = (1.0 - slot.loopStart) * buffer.duration;
+                    } else {
+                      loopStartSec = slot.loopStart * buffer.duration;
+                      loopEndSec = slot.loopEnd * buffer.duration;
+                    }
+                    const loopLen = loopEndSec - loopStartSec;
+                    if (playheadSec > loopEndSec && loopLen > 0) {
+                      playheadSec = loopStartSec + ((playheadSec - loopStartSec) % loopLen);
+                    }
+                  } else {
+                    let endSec = isReverseForRatioA ? ((1.0 - slot.start) * buffer.duration) : (slot.end * buffer.duration);
+                    if (playheadSec > endSec) {
+                      valid = false;
+                    }
+                  }
+                }
+                
+                if (valid && playheadSec <= buffer.duration && playheadSec >= 0) {
+                  const ratio = isReverseForRatioA ? (1.0 - (playheadSec / buffer.duration)) : (playheadSec / buffer.duration);
+                  const playheadX = ratio * canvas.width;
+                  ctx.strokeStyle = '#ffe600';
+                  ctx.lineWidth = 1.5;
+                  ctx.beginPath();
+                  ctx.moveTo(playheadX, 0);
+                  ctx.lineTo(playheadX, canvas.height);
+                  ctx.stroke();
+                }
+              }
+              
+              if (isSlotB) {
+                const startOffset = voice.startOffsetB || 0;
+                const rate = voice.playheadRateB !== undefined ? voice.playheadRateB : (voice.oscB && voice.oscB.playbackRate ? voice.oscB.playbackRate.value : 1.0);
+                let playheadSec = startOffset + elapsed * rate;
+                
+                const isSliceB = paramsRef.current.oscBTriggerMode === 'slice';
+                let sliceLoopB = false;
+                if (isSliceB && slot.sliceParams) {
+                  const sliceIndexB = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                  sliceLoopB = slot.sliceParams[sliceIndexB]?.loop || false;
+                }
+                const isLoopingB = isSliceB ? sliceLoopB : slot.loopOn;
+                let valid = true;
+                
+                if (isSliceB) {
+                  const sliceIndex = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                  const activeDuration = (slot.end - slot.start) * buffer.duration;
+                  const sliceDuration = activeDuration / 16;
+                  const sliceStartSec = startOffset;
+                  const sliceEndSec = sliceStartSec + sliceDuration;
+                  
+                  if (isLoopingB) {
+                    if (playheadSec > sliceEndSec && sliceDuration > 0) {
+                      playheadSec = sliceStartSec + ((playheadSec - sliceStartSec) % sliceDuration);
+                    }
+                  } else {
+                    if (playheadSec > sliceEndSec) {
+                      valid = false;
+                    }
+                  }
+                } else {
+                  // Pitch mode
+                  if (isLoopingB) {
+                    let loopStartSec, loopEndSec;
+                    if (slot.reverseOn) {
+                      loopStartSec = (1.0 - slot.loopEnd) * buffer.duration;
+                      loopEndSec = (1.0 - slot.loopStart) * buffer.duration;
+                    } else {
+                      loopStartSec = slot.loopStart * buffer.duration;
+                      loopEndSec = slot.loopEnd * buffer.duration;
+                    }
+                    const loopLen = loopEndSec - loopStartSec;
+                    if (playheadSec > loopEndSec && loopLen > 0) {
+                      playheadSec = loopStartSec + ((playheadSec - sliceStartSec) % loopLen); // wait, it was: playheadSec = loopStartSec + ((playheadSec - loopStartSec) % loopLen);
+                    }
+                  } else {
+                    let endSec = slot.reverseOn ? ((1.0 - slot.start) * buffer.duration) : (slot.end * buffer.duration);
+                    if (playheadSec > endSec) {
+                      valid = false;
+                    }
+                  }
+                }
+                
+                if (valid && playheadSec <= buffer.duration && playheadSec >= 0) {
+                  const ratio = slot.reverseOn ? (1.0 - (playheadSec / buffer.duration)) : (playheadSec / buffer.duration);
+                  const playheadX = ratio * canvas.width;
+                  ctx.strokeStyle = '#ff00ff';
+                  ctx.lineWidth = 1.5;
+                  ctx.beginPath();
+                  ctx.moveTo(playheadX, 0);
+                  ctx.lineTo(playheadX, canvas.height);
+                  ctx.stroke();
+                }
+              }
+            }
+          });
+        });
+      }
+    };
+    
+    drawWaveform();
+    
+    return () => {
+      cancelAnimationFrame(samplerCanvasAnimIdRef.current);
+    };
+  }, [selectedEditSlotId, isPlayingPreview, selectedSliceIndex]);
+
   // Synced Parameters Ref (for low-latency access in loop)
   const paramsRef = useRef(params);
   useEffect(() => {
     paramsRef.current = params;
-    // Update live static nodes when params change
     if (audioCtxRef.current) {
       const now = audioCtxRef.current.currentTime;
-      if (masterEqLowRef.current) masterEqLowRef.current.gain.setValueAtTime(params.eqLow * 3, now);
-      if (masterEqMidRef.current) masterEqMidRef.current.gain.setValueAtTime(params.eqMid * 3, now);
-      if (masterEqHighRef.current) masterEqHighRef.current.gain.setValueAtTime(params.eqHigh * 3, now);
       
-      // Update delay/reverb mix live
+      const safeLow = typeof params.eqLow === 'number' && isFinite(params.eqLow) ? params.eqLow : 0;
+      const safeMid = typeof params.eqMid === 'number' && isFinite(params.eqMid) ? params.eqMid : 0;
+      const safeHigh = typeof params.eqHigh === 'number' && isFinite(params.eqHigh) ? params.eqHigh : 0;
+      
+      if (masterEqLowRef.current) masterEqLowRef.current.gain.setValueAtTime(safeLow * 3, now);
+      if (masterEqMidRef.current) masterEqMidRef.current.gain.setValueAtTime(safeMid * 3, now);
+      if (masterEqHighRef.current) masterEqHighRef.current.gain.setValueAtTime(safeHigh * 3, now);
+      
+      const sendA1 = typeof params.mfx1SendA === 'number' && isFinite(params.mfx1SendA) ? params.mfx1SendA : 0;
+      const sendB1 = typeof params.mfx1SendB === 'number' && isFinite(params.mfx1SendB) ? params.mfx1SendB : 0;
+      const sendA2 = typeof params.mfx2SendA === 'number' && isFinite(params.mfx2SendA) ? params.mfx2SendA : 0;
+      const sendB2 = typeof params.mfx2SendB === 'number' && isFinite(params.mfx2SendB) ? params.mfx2SendB : 0;
+      
       if (mfx1SendGainRef.current) {
-        // Approximate average of Program Sends or explicit sends
-        mfx1SendGainRef.current.gain.setValueAtTime((params.mfx1SendA + (params.mfx1SendB || 0)) * 0.5, now);
+        mfx1SendGainRef.current.gain.setValueAtTime((sendA1 + sendB1) * 0.5, now);
       }
       if (mfx2SendGainRef.current) {
-        mfx2SendGainRef.current.gain.setValueAtTime((params.mfx2SendA + (params.mfx2SendB || 0)) * 0.5, now);
+        mfx2SendGainRef.current.gain.setValueAtTime((sendA2 + sendB2) * 0.5, now);
+      }
+      
+      if (preampNodeRef.current && typeof params.preampDrive === 'number' && isFinite(params.preampDrive)) {
+        preampNodeRef.current.curve = makeDistCurve(params.preampDrive);
+      }
+
+      // Rebuild or update IFX1 mix/type
+      const type1 = params.ifx1Type || 'Bypass';
+      const mix1 = typeof params.ifx1Mix === 'number' && isFinite(params.ifx1Mix) ? params.ifx1Mix : 0.0;
+      if (type1 !== lastIfx1TypeRef.current) {
+        connectIFXSlot(audioCtxRef.current, 1, type1, mix1);
+        lastIfx1TypeRef.current = type1;
+        lastIfx1MixRef.current = mix1;
+      } else if (mix1 !== lastIfx1MixRef.current) {
+        if (ifx1MixRef.current) {
+          updateIFXMix(ifx1MixRef.current, mix1);
+        }
+        lastIfx1MixRef.current = mix1;
+      }
+
+      // Rebuild or update IFX2 mix/type
+      const type2 = params.ifx2Type || 'Bypass';
+      const mix2 = typeof params.ifx2Mix === 'number' && isFinite(params.ifx2Mix) ? params.ifx2Mix : 0.0;
+      if (type2 !== lastIfx2TypeRef.current) {
+        connectIFXSlot(audioCtxRef.current, 2, type2, mix2);
+        lastIfx2TypeRef.current = type2;
+        lastIfx2MixRef.current = mix2;
+      } else if (mix2 !== lastIfx2MixRef.current) {
+        if (ifx2MixRef.current) {
+          updateIFXMix(ifx2MixRef.current, mix2);
+        }
+        lastIfx2MixRef.current = mix2;
+      }
+
+      // Update Reverb return/master wet gain
+      const revMix = typeof params.reverbMix === 'number' && isFinite(params.reverbMix) ? params.reverbMix : 0.15;
+      if (mfx2Ref.current && mfx2Ref.current.output) {
+        mfx2Ref.current.output.gain.setValueAtTime(revMix, now);
+      }
+
+      // Update Space Echo and standard delay live parameters
+      if (activeDelayRef.current) {
+        const ad = activeDelayRef.current;
+        if (params.spaceEchoActive) {
+          const baseTime = typeof params.spaceEchoTime === 'number' && isFinite(params.spaceEchoTime) ? params.spaceEchoTime : 0.35;
+          // Smooth tape speed sweeps for pitch-bending wow/flutter!
+          if (ad.delay1) ad.delay1.delayTime.setTargetAtTime(baseTime, now, 0.05);
+          if (ad.delay2) ad.delay2.delayTime.setTargetAtTime(baseTime * 1.5, now, 0.05);
+          if (ad.delay3) ad.delay3.delayTime.setTargetAtTime(baseTime * 2.0, now, 0.05);
+
+          // Wow depth modulation
+          const wow = typeof params.spaceEchoWow === 'number' && isFinite(params.spaceEchoWow) ? params.spaceEchoWow : 0.15;
+          if (ad.wowGain1) ad.wowGain1.gain.setValueAtTime(wow * 0.003, now);
+          if (ad.wowGain2) ad.wowGain2.gain.setValueAtTime(wow * 0.004, now);
+          if (ad.wowGain3) ad.wowGain3.gain.setValueAtTime(wow * 0.005, now);
+
+          if (ad.flutterGain1) ad.flutterGain1.gain.setValueAtTime(wow * 0.0006, now);
+          if (ad.flutterGain2) ad.flutterGain2.gain.setValueAtTime(wow * 0.0008, now);
+          if (ad.flutterGain3) ad.flutterGain3.gain.setValueAtTime(wow * 0.0010, now);
+
+          // Feedback levels
+          const fb = typeof params.spaceEchoFeedback === 'number' && isFinite(params.spaceEchoFeedback) ? params.spaceEchoFeedback : 0.4;
+          if (ad.feedbackGain1) ad.feedbackGain1.gain.setValueAtTime(fb * 0.5, now);
+          if (ad.feedbackGain2) ad.feedbackGain2.gain.setValueAtTime(fb * 0.35, now);
+          if (ad.feedbackGain3) ad.feedbackGain3.gain.setValueAtTime(fb * 0.25, now);
+
+          // Spring Reverb mix and Tape Saturation drive
+          const spring = typeof params.spaceEchoSpring === 'number' && isFinite(params.spaceEchoSpring) ? params.spaceEchoSpring : 0.15;
+          if (ad.springGain) ad.springGain.gain.setValueAtTime(spring, now);
+          
+          const sat = typeof params.spaceEchoSaturation === 'number' && isFinite(params.spaceEchoSaturation) ? params.spaceEchoSaturation : 0.2;
+          if (ad.tapeSat) ad.tapeSat.curve = makeDistCurve(sat * 0.5);
+        } else {
+          // Standard Stereo Delay update
+          const delayTimeVal = typeof params.spaceEchoTime === 'number' && isFinite(params.spaceEchoTime) ? params.spaceEchoTime : 0.35;
+          const fbVal = typeof params.spaceEchoFeedback === 'number' && isFinite(params.spaceEchoFeedback) ? params.spaceEchoFeedback : 0.4;
+          if (ad.delayL && ad.delayR) {
+            ad.delayL.delayTime.setTargetAtTime(delayTimeVal, now, 0.05);
+            ad.delayR.setTargetAtTime ? ad.delayR.setTargetAtTime(delayTimeVal * 1.33, now, 0.05) : ad.delayR.delayTime.setTargetAtTime(delayTimeVal * 1.33, now, 0.05);
+            ad.feedbackL.gain.setValueAtTime(fbVal, now);
+            ad.feedbackR.gain.setValueAtTime(fbVal, now);
+          }
+        }
+      }
+
+      // Update Leslie Rotary speaker speed (Off / Slow: 1.1Hz / Fast: 6.8Hz) on both IFX slots
+      const targetFreq = params.leslieSpeed === 'Fast' ? 6.8 : (params.leslieSpeed === 'Slow' ? 1.1 : 0);
+      if (ifx1EffectRef.current && ifx1EffectRef.current.lfo) {
+        ifx1EffectRef.current.lfo.frequency.setTargetAtTime(targetFreq, now, 0.8);
+      }
+      if (ifx2EffectRef.current && ifx2EffectRef.current.lfo) {
+        ifx2EffectRef.current.lfo.frequency.setTargetAtTime(targetFreq, now, 0.8);
       }
     }
   }, [params]);
@@ -562,6 +975,7 @@ export default function Delta7Synth() {
     setSelectedProgIndex(idx);
     if (currentMode === 'PROG') {
       setParams(prev => ({
+        ...DEFAULT_PARAMS,
         ...prev,
         ...FACTORY_PROGRAMS[idx]
       }));
@@ -576,6 +990,7 @@ export default function Delta7Synth() {
       // Initialize with track 1 settings primarily but mark as combi Mode active
       const prog1 = FACTORY_PROGRAMS.find(p => p.id === combi.t1ProgId) || FACTORY_PROGRAMS[0];
       setParams(prev => ({
+        ...DEFAULT_PARAMS,
         ...prev,
         ...prog1,
         arpOn: false // turn off standard arp
@@ -636,20 +1051,29 @@ export default function Delta7Synth() {
     eqHigh.gain.setValueAtTime(paramsRef.current.eqHigh * 3, now);
     masterEqHighRef.current = eqHigh;
 
-    // FX RACK SETUP
-    // IFX1: Chorus or Overdrive or Phaser or Autowah
-    const ifx1Container = setupIFXNode(ctx, paramsRef.current.ifx1Type, paramsRef.current.ifx1Mix);
-    ifx1Ref.current = ifx1Container.effectNode;
-    ifx1MixRef.current = ifx1Container.mixNode;
+    // FX RACK SETUP - Static Input/Output nodes
+    ifx1InputRef.current = ctx.createGain();
+    ifx1OutputRef.current = ctx.createGain();
+    ifx2InputRef.current = ctx.createGain();
+    ifx2OutputRef.current = ctx.createGain();
 
-    // IFX2: Flanger or Rotary Speaker or RingMod
-    const ifx2Container = setupIFXNode(ctx, paramsRef.current.ifx2Type, paramsRef.current.ifx2Mix);
-    ifx2Ref.current = ifx2Container.effectNode;
-    ifx2MixRef.current = ifx2Container.mixNode;
+    ifx1OutputRef.current.connect(ifx2InputRef.current);
 
-    // MFX1 (Stereo Delay)
-    const mfx1 = createStereoDelay(ctx);
-    mfx1Ref.current = mfx1;
+    // Dynamic Chorus, Phaser, Autowah, Overdrive connections
+    connectIFXSlot(ctx, 1, paramsRef.current.ifx1Type, paramsRef.current.ifx1Mix);
+    connectIFXSlot(ctx, 2, paramsRef.current.ifx2Type, paramsRef.current.ifx2Mix);
+    lastIfx1TypeRef.current = paramsRef.current.ifx1Type;
+    lastIfx1MixRef.current = paramsRef.current.ifx1Mix;
+    lastIfx2TypeRef.current = paramsRef.current.ifx2Type;
+    lastIfx2MixRef.current = paramsRef.current.ifx2Mix;
+
+    // MFX1 (Delay / Space Echo)
+    delayInputRef.current = ctx.createGain();
+    delayOutputRef.current = ctx.createGain();
+    mfx1Ref.current = delayInputRef.current; // for backward compatibility in checks
+
+    rebuildDelayEffect(ctx, paramsRef.current.spaceEchoActive);
+
     const mfx1SendGain = ctx.createGain();
     mfx1SendGain.gain.setValueAtTime(0.2, now);
     mfx1SendGainRef.current = mfx1SendGain;
@@ -661,33 +1085,79 @@ export default function Delta7Synth() {
     mfx2SendGain.gain.setValueAtTime(0.3, now);
     mfx2SendGainRef.current = mfx2SendGain;
 
-    // CONNECTIONS
-    // Voices will connect to IFX1 Input.
-    // IFX1 output connects to IFX2 Input.
-    // IFX2 output splits into:
-    //   - Direct path -> Master EQ
-    //   - MFX1 Send Path -> MFX1 Delay -> Master EQ
-    //   - MFX2 Send Path -> MFX2 Reverb -> Master EQ
+    // Tube Preamp Saturation
+    const preampNode = ctx.createWaveShaper();
+    preampNode.curve = makeDistCurve(paramsRef.current.preampDrive);
+    preampNodeRef.current = preampNode;
 
-    ifx1Container.outputNode.connect(ifx2Container.inputNode);
+    // Connections post-IFX2
+    ifx2OutputRef.current.connect(preampNode);
 
-    // Splits post-IFX2
-    const postIfx2Bus = ifx2Container.outputNode;
-    postIfx2Bus.connect(eqLow); // Direct path to EQ
+    // Splits post-preamp
+    preampNode.connect(eqLow); // Direct path to EQ
 
     // FX Sends
-    postIfx2Bus.connect(mfx1SendGain);
-    mfx1SendGain.connect(mfx1.input);
-    mfx1.output.connect(eqLow); // Delay output to master EQ
+    preampNode.connect(mfx1SendGain);
+    mfx1SendGain.connect(delayInputRef.current);
+    delayOutputRef.current.connect(eqLow); // Delay/Echo output to master EQ
 
-    postIfx2Bus.connect(mfx2SendGain);
+    preampNode.connect(mfx2SendGain);
     mfx2SendGain.connect(mfx2.input);
     mfx2.output.connect(eqLow); // Reverb output to master EQ
 
-    // EQ chain -> Master Gain -> Analyzer -> Destination
+    // EQ chain
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
-    eqHigh.connect(masterGain);
+
+    // Delta Pad Gater DSP Node setup
+    const gaterGainNode = ctx.createGain();
+    gaterGainNode.gain.setValueAtTime(1.0, now);
+    gaterGainNodeRef.current = gaterGainNode;
+
+    const gaterLfo = ctx.createOscillator();
+    gaterLfo.type = 'square';
+    gaterLfo.frequency.setValueAtTime(5, now); // default rate 5Hz
+    gaterLfoRef.current = gaterLfo;
+
+    const gaterLfoGain = ctx.createGain();
+    gaterLfoGain.gain.setValueAtTime(0.0, now); // default depth 0 (bypass)
+    gaterLfoGainRef.current = gaterLfoGain;
+
+    gaterLfo.connect(gaterLfoGain);
+    gaterLfoGain.connect(gaterGainNode.gain);
+    gaterLfo.start(now);
+
+    // Glitch loop chain insertion before masterGain
+    const glitchDryGain = ctx.createGain();
+    glitchDryGain.gain.setValueAtTime(1.0, now);
+    glitchDryGainRef.current = glitchDryGain;
+
+    const glitchInputGain = ctx.createGain();
+    glitchInputGain.gain.setValueAtTime(0.0, now);
+    glitchInputGainRef.current = glitchInputGain;
+
+    const glitchDelay = ctx.createDelay(1.0);
+    glitchDelay.delayTime.setValueAtTime(0.08, now);
+    glitchDelayRef.current = glitchDelay;
+
+    const glitchFeedback = ctx.createGain();
+    glitchFeedback.gain.setValueAtTime(0.0, now);
+    glitchFeedbackRef.current = glitchFeedback;
+
+    // Glitch routing
+    eqHigh.connect(gaterGainNode);
+
+    // Dry path
+    gaterGainNode.connect(glitchDryGain);
+    glitchDryGain.connect(masterGain);
+
+    // Wet (Glitch loop) path
+    gaterGainNode.connect(glitchInputGain);
+    glitchInputGain.connect(glitchDelay);
+    glitchDelay.connect(glitchFeedback);
+    glitchFeedback.connect(glitchDelay); // feedback loop
+    glitchDelay.connect(masterGain);
+
     masterGain.connect(analyser);
     analyser.connect(ctx.destination);
 
@@ -695,12 +1165,38 @@ export default function Delta7Synth() {
     startVisualizer();
   };
 
-  // Helper to build IFX Node structures
-  const setupIFXNode = (ctx, type, mix) => {
-    const inputNode = ctx.createGain();
+  const getReversedBuffer = (ctx, originalBuffer) => {
+    if (!originalBuffer) return null;
+    const reversed = ctx.createBuffer(
+      originalBuffer.numberOfChannels,
+      originalBuffer.length,
+      originalBuffer.sampleRate
+    );
+    for (let c = 0; c < originalBuffer.numberOfChannels; c++) {
+      const origData = originalBuffer.getChannelData(c);
+      const revData = reversed.getChannelData(c);
+      for (let i = 0; i < originalBuffer.length; i++) {
+        revData[i] = origData[originalBuffer.length - 1 - i];
+      }
+    }
+    return reversed;
+  };
+
+  const connectIFXSlot = (ctx, slotNum, type, mix) => {
+    const inputNode = slotNum === 1 ? ifx1InputRef.current : ifx2InputRef.current;
+    const outputNode = slotNum === 1 ? ifx1OutputRef.current : ifx2OutputRef.current;
+    if (!inputNode || !outputNode) return;
+
+    try { inputNode.disconnect(); } catch {}
+
+    const oldEffect = slotNum === 1 ? ifx1EffectRef.current : ifx2EffectRef.current;
+    if (oldEffect) {
+      if (oldEffect.lfo) { try { oldEffect.lfo.stop(); } catch {} }
+      if (oldEffect.carrier) { try { oldEffect.carrier.stop(); } catch {} }
+    }
+
     const dryGain = ctx.createGain();
     const wetGain = ctx.createGain();
-    const outputNode = ctx.createGain();
     const now = ctx.currentTime;
 
     dryGain.gain.setValueAtTime(1.0 - mix, now);
@@ -712,20 +1208,36 @@ export default function Delta7Synth() {
     let fxNode = null;
 
     if (type === 'Chorus') {
-      const chorus = ctx.createDelay();
-      chorus.delayTime.setValueAtTime(0.02, now);
-      // Sweeper LFO
+      const delayL = ctx.createDelay();
+      const delayR = ctx.createDelay();
+      delayL.delayTime.setValueAtTime(0.015, now);
+      delayR.delayTime.setValueAtTime(0.015, now);
+
       const lfo = ctx.createOscillator();
+      lfo.type = 'triangle';
       lfo.frequency.setValueAtTime(1.5, now);
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.setValueAtTime(0.005, now); // 5ms wobble
-      lfo.connect(lfoGain);
-      lfoGain.connect(chorus.delayTime);
+
+      const lfoGainL = ctx.createGain();
+      lfoGainL.gain.setValueAtTime(0.004, now); 
+
+      const lfoGainR = ctx.createGain();
+      lfoGainR.gain.setValueAtTime(-0.004, now); // 180 out-of-phase
+
+      lfo.connect(lfoGainL);
+      lfoGainL.connect(delayL.delayTime);
+      lfo.connect(lfoGainR);
+      lfoGainR.connect(delayR.delayTime);
       lfo.start(now);
-      
-      inputNode.connect(chorus);
-      chorus.connect(wetGain);
-      fxNode = { chorus, lfo };
+
+      inputNode.connect(delayL);
+      inputNode.connect(delayR);
+
+      const merger = ctx.createChannelMerger(2);
+      delayL.connect(merger, 0, 0);
+      delayR.connect(merger, 0, 1);
+      merger.connect(wetGain);
+
+      fxNode = { delayL, delayR, lfo };
     } else if (type === 'Overdrive') {
       const dist = ctx.createWaveShaper();
       dist.curve = makeDistCurve(0.4);
@@ -765,20 +1277,59 @@ export default function Delta7Synth() {
       filter.connect(wetGain);
       fxNode = { filter, lfo };
     } else if (type === 'Rotary Speaker') {
-      // Swept delay + vibrato
-      const delay = ctx.createDelay();
-      delay.delayTime.setValueAtTime(0.01, now);
-      const lfo = ctx.createOscillator();
-      lfo.frequency.setValueAtTime(5.8, now); // Leslie fast speed
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.setValueAtTime(0.003, now);
-      lfo.connect(lfoGain);
-      lfoGain.connect(delay.delayTime);
-      lfo.start(now);
+      const delayL = ctx.createDelay();
+      const delayR = ctx.createDelay();
+      
+      const speedHz = paramsRef.current.leslieSpeed === 'Fast' ? 6.8 : (paramsRef.current.leslieSpeed === 'Slow' ? 1.1 : 0);
+      
+      delayL.delayTime.setValueAtTime(0.007, now);
+      delayR.delayTime.setValueAtTime(0.007, now);
 
-      inputNode.connect(delay);
-      delay.connect(wetGain);
-      fxNode = { delay, lfo };
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.setValueAtTime(speedHz, now);
+
+      const lfoGainL = ctx.createGain();
+      lfoGainL.gain.setValueAtTime(0.003, now);
+      
+      const lfoGainR = ctx.createGain();
+      lfoGainR.gain.setValueAtTime(-0.003, now); 
+
+      lfo.connect(lfoGainL);
+      lfoGainL.connect(delayL.delayTime);
+      lfo.connect(lfoGainR);
+      lfoGainR.connect(delayR.delayTime);
+
+      const tremoloGainL = ctx.createGain();
+      const tremoloGainR = ctx.createGain();
+      tremoloGainL.gain.setValueAtTime(0.85, now);
+      tremoloGainR.gain.setValueAtTime(0.85, now);
+
+      const tremGainL = ctx.createGain();
+      tremGainL.gain.setValueAtTime(0.15, now);
+      const tremGainR = ctx.createGain();
+      tremGainR.gain.setValueAtTime(-0.15, now);
+
+      lfo.connect(tremGainL);
+      tremGainL.connect(tremoloGainL.gain);
+      lfo.connect(tremGainR);
+      tremGainR.connect(tremoloGainR.gain);
+
+      if (speedHz > 0) {
+        lfo.start(now);
+      }
+
+      inputNode.connect(delayL);
+      delayL.connect(tremoloGainL);
+      inputNode.connect(delayR);
+      delayR.connect(tremoloGainR);
+
+      const merger = ctx.createChannelMerger(2);
+      tremoloGainL.connect(merger, 0, 0);
+      tremoloGainR.connect(merger, 0, 1);
+      merger.connect(wetGain);
+
+      fxNode = { delayL, delayR, lfo, tremoloGainL, tremoloGainR, speedHz };
     } else if (type === 'Flanger') {
       const delay = ctx.createDelay();
       delay.delayTime.setValueAtTime(0.003, now);
@@ -795,7 +1346,7 @@ export default function Delta7Synth() {
 
       inputNode.connect(delay);
       delay.connect(feedback);
-      feedback.connect(delay); // feedback loop
+      feedback.connect(delay); 
       delay.connect(wetGain);
       fxNode = { delay, lfo, feedback };
     } else if (type === 'Ring Modulator') {
@@ -804,24 +1355,203 @@ export default function Delta7Synth() {
       const carrier = ctx.createOscillator();
       carrier.frequency.setValueAtTime(440, now);
       
-      // Connect carrier to gain control of multiplier
       carrier.connect(ringMod.gain);
       inputNode.connect(ringMod);
       ringMod.connect(wetGain);
       carrier.start(now);
       fxNode = { ringMod, carrier };
-    } else { // Bypass
+    } else { 
       inputNode.connect(wetGain);
     }
 
     wetGain.connect(outputNode);
 
+    if (slotNum === 1) {
+      ifx1EffectRef.current = fxNode;
+      ifx1MixRef.current = { dryGain, wetGain };
+    } else {
+      ifx2EffectRef.current = fxNode;
+      ifx2MixRef.current = { dryGain, wetGain };
+    }
+  };
+
+  const rebuildDelayEffect = (ctx, useSpaceEcho) => {
+    const input = delayInputRef.current;
+    const output = delayOutputRef.current;
+    if (!input || !output) return;
+
+    try { input.disconnect(); } catch {}
+    
+    if (activeDelayRef.current) {
+      const ad = activeDelayRef.current;
+      if (ad.wowLfo) { try { ad.wowLfo.stop(); } catch {} }
+      if (ad.flutterLfo) { try { ad.flutterLfo.stop(); } catch {} }
+    }
+
+    if (useSpaceEcho) {
+      const echo = createSpaceEchoNode(ctx);
+      input.connect(echo.input);
+      echo.output.connect(output);
+      activeDelayRef.current = echo;
+    } else {
+      const delay = createStereoDelay(ctx);
+      input.connect(delay.input);
+      delay.output.connect(output);
+      activeDelayRef.current = delay;
+    }
+  };
+
+  const createSpringReverb = (ctx) => {
+    const input = ctx.createGain();
+    const output = ctx.createGain();
+
+    const delays = [0.033, 0.041, 0.047];
+    const feedbacks = [0.75, -0.72, 0.70];
+
+    delays.forEach((delayTime, idx) => {
+      const delayNode = ctx.createDelay();
+      delayNode.delayTime.setValueAtTime(delayTime, ctx.currentTime);
+
+      const feedbackNode = ctx.createGain();
+      feedbackNode.gain.setValueAtTime(feedbacks[idx], ctx.currentTime);
+
+      input.connect(delayNode);
+      delayNode.connect(feedbackNode);
+      feedbackNode.connect(delayNode);
+      delayNode.connect(output);
+    });
+
+    return { input, output };
+  };
+
+  const createSpaceEchoNode = (ctx) => {
+    const input = ctx.createGain();
+    const output = ctx.createGain();
+    const now = ctx.currentTime;
+
+    const delay1 = ctx.createDelay(2.0);
+    const delay2 = ctx.createDelay(2.0);
+    const delay3 = ctx.createDelay(2.0);
+
+    const baseTime = paramsRef.current.spaceEchoTime || 0.35;
+    delay1.delayTime.setValueAtTime(baseTime, now);
+    delay2.delayTime.setValueAtTime(baseTime * 1.5, now);
+    delay3.delayTime.setValueAtTime(baseTime * 2.0, now);
+
+    const wowLfo = ctx.createOscillator();
+    wowLfo.frequency.setValueAtTime(0.4, now);
+    const wowGain1 = ctx.createGain();
+    const wowGain2 = ctx.createGain();
+    const wowGain3 = ctx.createGain();
+    
+    const flutterLfo = ctx.createOscillator();
+    flutterLfo.frequency.setValueAtTime(7.0, now);
+    const flutterGain1 = ctx.createGain();
+    const flutterGain2 = ctx.createGain();
+    const flutterGain3 = ctx.createGain();
+
+    const wowAmt = paramsRef.current.spaceEchoWow || 0.15;
+    wowGain1.gain.setValueAtTime(wowAmt * 0.003, now);
+    wowGain2.gain.setValueAtTime(wowAmt * 0.004, now);
+    wowGain3.gain.setValueAtTime(wowAmt * 0.005, now);
+
+    flutterGain1.gain.setValueAtTime(wowAmt * 0.0006, now);
+    flutterGain2.gain.setValueAtTime(wowAmt * 0.0008, now);
+    flutterGain3.gain.setValueAtTime(wowAmt * 0.0010, now);
+
+    wowLfo.connect(wowGain1); wowGain1.connect(delay1.delayTime);
+    wowLfo.connect(wowGain2); wowGain2.connect(delay2.delayTime);
+    wowLfo.connect(wowGain3); wowGain3.connect(delay3.delayTime);
+
+    flutterLfo.connect(flutterGain1); flutterGain1.connect(delay1.delayTime);
+    flutterLfo.connect(flutterGain2); flutterGain2.connect(delay2.delayTime);
+    flutterLfo.connect(flutterGain3); flutterGain3.connect(delay3.delayTime);
+
+    wowLfo.start(now);
+    flutterLfo.start(now);
+
+    const tapeSat = ctx.createWaveShaper();
+    tapeSat.curve = makeDistCurve(paramsRef.current.spaceEchoSaturation * 0.5);
+
+    const feedbackGain1 = ctx.createGain();
+    const feedbackGain2 = ctx.createGain();
+    const feedbackGain3 = ctx.createGain();
+    
+    const fbVal = paramsRef.current.spaceEchoFeedback || 0.4;
+    feedbackGain1.gain.setValueAtTime(fbVal * 0.5, now);
+    feedbackGain2.gain.setValueAtTime(fbVal * 0.35, now);
+    feedbackGain3.gain.setValueAtTime(fbVal * 0.25, now);
+
+    input.connect(delay1);
+    input.connect(delay2);
+    input.connect(delay3);
+
+    const panner1 = ctx.createStereoPanner();
+    panner1.pan.setValueAtTime(-0.3, now);
+    const panner2 = ctx.createStereoPanner();
+    panner2.pan.setValueAtTime(0.1, now);
+    const panner3 = ctx.createStereoPanner();
+    panner3.pan.setValueAtTime(0.4, now);
+
+    delay1.connect(panner1);
+    delay2.connect(panner2);
+    delay3.connect(panner3);
+
+    panner1.connect(tapeSat);
+    panner2.connect(tapeSat);
+    panner3.connect(tapeSat);
+
+    tapeSat.connect(feedbackGain1); feedbackGain1.connect(delay1);
+    tapeSat.connect(feedbackGain2); feedbackGain2.connect(delay2);
+    tapeSat.connect(feedbackGain3); feedbackGain3.connect(delay3);
+
+    const springReverb = createSpringReverb(ctx);
+    const springGain = ctx.createGain();
+    const springMix = paramsRef.current.spaceEchoSpring || 0.15;
+    springGain.gain.setValueAtTime(springMix, now);
+
+    input.connect(springReverb.input);
+    springReverb.output.connect(springGain);
+
+    tapeSat.connect(output);
+    springGain.connect(output);
+
     return {
-      inputNode,
-      outputNode,
-      effectNode: fxNode,
-      mixNode: { dryGain, wetGain }
+      input, output,
+      delay1, delay2, delay3,
+      wowGain1, wowGain2, wowGain3,
+      flutterGain1, flutterGain2, flutterGain3,
+      feedbackGain1, feedbackGain2, feedbackGain3,
+      springGain, tapeSat,
+      wowLfo, flutterLfo
     };
+  };
+
+  const toggleGlitch = (active) => {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    const now = ctx.currentTime;
+    
+    glitchActiveRef.current = active;
+    setGlitchActive(active);
+
+    if (active) {
+      if (glitchDryGainRef.current) glitchDryGainRef.current.gain.setTargetAtTime(0, now, 0.01);
+
+      const glitchSize = 0.05 + Math.random() * 0.10;
+      if (glitchDelayRef.current) glitchDelayRef.current.delayTime.setValueAtTime(glitchSize, now);
+
+      if (glitchInputGainRef.current) {
+        glitchInputGainRef.current.gain.setValueAtTime(1.0, now);
+        glitchInputGainRef.current.gain.setValueAtTime(0.0, now + glitchSize);
+      }
+
+      if (glitchFeedbackRef.current) glitchFeedbackRef.current.gain.setValueAtTime(0.99, now);
+    } else {
+      if (glitchDryGainRef.current) glitchDryGainRef.current.gain.setTargetAtTime(1.0, now, 0.02);
+      if (glitchFeedbackRef.current) glitchFeedbackRef.current.gain.setTargetAtTime(0.0, now, 0.02);
+      if (glitchInputGainRef.current) glitchInputGainRef.current.gain.setValueAtTime(0.0, now);
+    }
   };
 
   const updateIFXMix = (mixNode, mix) => {
@@ -903,7 +1633,7 @@ export default function Delta7Synth() {
   // ==========================================
 
   // Triggers one single program sound voice
-  const playProgramVoice = (ctx, note, velocity, prog, voiceKey, delayOffset = 0) => {
+  const playProgramVoice = (ctx, note, velocity, prog, voiceKey, delayOffset = 0, trackIdx = undefined) => {
     const now = ctx.currentTime + delayOffset;
 
     // Pitch bends
@@ -921,34 +1651,81 @@ export default function Delta7Synth() {
 
     const baseFreq = getFreq(note) * pbFactor;
 
-    // --- Create Oscillators A & B ---
-    let oscA = null, oscB = null;
-    let gainA = null, gainB = null;
+    // Look up sampler slots to get correct root notes and buffers
+    const slotAId = prog.oscAWave || 's01';
+    const slotA = sampleSlotsRef.current.find(s => s.id === slotAId) || sampleSlotsRef.current[0];
+    const rootNoteA = slotA ? slotA.rootNote : 60;
+    const rootFreqA = getFreq(rootNoteA);
 
-    // Oscillator A
-    const freqA = baseFreq * Math.pow(2, prog.oscAOctave) * Math.pow(2, prog.oscAPitch / 12);
-    oscA = ctx.createOscillator();
-    const waveA = getDelta7Wave(ctx, prog.oscAWave);
-    oscA.setPeriodicWave(waveA);
-    oscA.frequency.setValueAtTime(freqA, now);
-    oscA.detune.setValueAtTime(prog.oscADetune, now);
+    const slotBId = prog.oscBWave || 's02';
+    const slotB = sampleSlotsRef.current.find(s => s.id === slotBId) || sampleSlotsRef.current[1];
+    const rootNoteB = slotB ? slotB.rootNote : 60;
+    const rootFreqB = getFreq(rootNoteB);
 
-    gainA = ctx.createGain();
-    gainA.gain.setValueAtTime(0, now);
-    oscA.connect(gainA);
+    // Resolve slice environments and parameters for trigger modes
+    let sliceEnvA = null;
+    let slicePitchA = 0;
+    let sliceStretchA = 0;
+    let sliceLoopA = false;
+    let sliceReverseA = false;
+    if (slotA && slotA.sliceParams && prog.oscATriggerMode === 'slice') {
+      const sliceIndexA = ((note - rootNoteA) % 16 + 16) % 16;
+      sliceEnvA = slotA.sliceParams[sliceIndexA] || { attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false };
+      slicePitchA = sliceEnvA.pitch !== undefined ? sliceEnvA.pitch : 0;
+      sliceStretchA = sliceEnvA.stretch !== undefined ? sliceEnvA.stretch : 0;
+      sliceLoopA = sliceEnvA.loop !== undefined ? sliceEnvA.loop : false;
+      sliceReverseA = sliceEnvA.reverse !== undefined ? sliceEnvA.reverse : false;
+    }
 
-    // Oscillator B
-    if (prog.oscMode === 'double') {
-      const freqB = baseFreq * Math.pow(2, prog.oscBOctave) * Math.pow(2, prog.oscBPitch / 12);
-      oscB = ctx.createOscillator();
-      const waveB = getDelta7Wave(ctx, prog.oscBWave);
-      oscB.setPeriodicWave(waveB);
-      oscB.frequency.setValueAtTime(freqB, now);
-      oscB.detune.setValueAtTime(prog.oscBDetune, now);
+    let sliceEnvB = null;
+    let slicePitchB = 0;
+    let sliceStretchB = 0;
+    let sliceLoopB = false;
+    let sliceReverseB = false;
+    if (slotB && slotB.sliceParams && prog.oscBTriggerMode === 'slice') {
+      const sliceIndexB = ((note - rootNoteB) % 16 + 16) % 16;
+      sliceEnvB = slotB.sliceParams[sliceIndexB] || { attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false };
+      slicePitchB = sliceEnvB.pitch !== undefined ? sliceEnvB.pitch : 0;
+      sliceStretchB = sliceEnvB.stretch !== undefined ? sliceEnvB.stretch : 0;
+      sliceLoopB = sliceEnvB.loop !== undefined ? sliceEnvB.loop : false;
+      sliceReverseB = sliceEnvB.reverse !== undefined ? sliceEnvB.reverse : false;
+    }
 
-      gainB = ctx.createGain();
-      gainB.gain.setValueAtTime(0, now);
-      oscB.connect(gainB);
+    const isReverseA = prog.oscATriggerMode === 'slice' ? sliceReverseA : (slotA ? slotA.reverseOn : false);
+    const isReverseB = prog.oscBTriggerMode === 'slice' ? sliceReverseB : (slotB ? slotB.reverseOn : false);
+
+    const bufferA = slotA ? (isReverseA ? slotA.revBuffer : slotA.buffer) : null;
+    const revBufferA = slotA ? slotA.revBuffer : null;
+    const bufferB = slotB ? (isReverseB ? slotB.revBuffer : slotB.buffer) : null;
+    const revBufferB = slotB ? slotB.revBuffer : null;
+
+    const isLoopA = prog.oscATriggerMode === 'slice' ? sliceLoopA : (slotA ? slotA.loopOn : false);
+    const isLoopB = prog.oscBTriggerMode === 'slice' ? sliceLoopB : (slotB ? slotB.loopOn : false);
+
+    const oscAOctave = prog.oscAOctave !== undefined ? prog.oscAOctave : 0;
+    const oscAPitch = prog.oscAPitch !== undefined ? prog.oscAPitch : 0;
+    const oscADetune = prog.oscADetune !== undefined ? prog.oscADetune : 0;
+
+    const oscBOctave = prog.oscBOctave !== undefined ? prog.oscBOctave : 0;
+    const oscBPitch = prog.oscBPitch !== undefined ? prog.oscBPitch : 0;
+    const oscBDetune = prog.oscBDetune !== undefined ? prog.oscBDetune : 0;
+
+    let freqScaleA = 1.0;
+    if (bufferA) {
+      if (prog.oscATriggerMode === 'slice') {
+        freqScaleA = Math.pow(2, oscAOctave) * Math.pow(2, oscAPitch / 12) * Math.pow(2, slicePitchA / 12);
+      } else {
+        freqScaleA = (baseFreq * Math.pow(2, oscAOctave) * Math.pow(2, oscAPitch / 12)) / rootFreqA;
+      }
+    }
+
+    let freqScaleB = 1.0;
+    if (bufferB) {
+      if (prog.oscBTriggerMode === 'slice') {
+        freqScaleB = Math.pow(2, oscBOctave) * Math.pow(2, oscBPitch / 12) * Math.pow(2, slicePitchB / 12);
+      } else {
+        freqScaleB = (baseFreq * Math.pow(2, oscBOctave) * Math.pow(2, oscBPitch / 12)) / rootFreqB;
+      }
     }
 
     // --- VCF Dual Filter ---
@@ -958,34 +1735,24 @@ export default function Delta7Synth() {
     filter1.type = prog.filterType;
     filter2.type = 'highpass'; // series HPF setup
 
-    const baseCutoff = Math.max(20, Math.min(20000, prog.cutoff + cutoffMod + kaossCutoffOffset));
+    // Filter Key Tracking
+    const trackingAmount = prog.keyTracking !== undefined ? prog.keyTracking : 0.5;
+    const trackingOffset = trackingAmount * (note - 60) * 30; // 30Hz per MIDI note from C4
+    const baseCutoff = Math.max(20, Math.min(20000, prog.cutoff + cutoffMod + kaossCutoffOffset + trackingOffset));
     const baseQ = Math.max(0.1, Math.min(25, prog.resonance + kaossResonanceOffset));
 
     filter1.frequency.setValueAtTime(baseCutoff, now);
     filter1.Q.setValueAtTime(baseQ, now);
-    filter2.frequency.setValueAtTime(150, now); // Subtle low cut on Triton
+    filter2.frequency.setValueAtTime(150, now); // Subtle low cut
     filter2.Q.setValueAtTime(1.0, now);
 
-    // Connections: Osc Gains -> VCF
-    gainA.connect(filter1);
-    if (gainB) gainB.connect(filter1);
-
-    const voiceOutGain = ctx.createGain();
-    voiceOutGain.gain.setValueAtTime(1.0, now);
-
-    if (prog.filterMode === 'Double Series') {
-      filter1.connect(filter2);
-      filter2.connect(voiceOutGain);
-    } else {
-      filter1.connect(voiceOutGain);
-    }
-
-    // Voice connects to global IFX chain
-    if (ifx1Ref.current) {
-      voiceOutGain.connect(ifx1Ref.current);
-    } else {
-      voiceOutGain.connect(masterGainRef.current);
-    }
+    // --- Create Oscillators A & B ---
+    let oscA = null, oscB = null;
+    let oscA_L = null, oscA_R = null;
+    let gainA = null, gainB = null;
+    let gainA_L = null, gainA_R = null;
+    let subOsc = null, noiseSource = null;
+    let subGain = null, noiseGain = null;
 
     // --- LFO Modulation Setup ---
     let vibratoLfo = null;
@@ -995,14 +1762,10 @@ export default function Delta7Synth() {
       vibratoLfo.frequency.setValueAtTime(prog.lfo1Rate, now);
       vibratoLfoGain = ctx.createGain();
       
-      // Calculate Vibrato depth (including joystick modulation Y+ direction)
       const joystickMod = joystick.y > 0 ? (joystick.y * 80) : 0;
       const totalDepth = prog.lfo1Depth + joystickMod;
       vibratoLfoGain.gain.setValueAtTime(totalDepth, now);
-
       vibratoLfo.connect(vibratoLfoGain);
-      vibratoLfoGain.connect(oscA.frequency);
-      if (oscB) vibratoLfoGain.connect(oscB.frequency);
       vibratoLfo.start(now);
     }
 
@@ -1021,28 +1784,638 @@ export default function Delta7Synth() {
       filterLfo.start(now);
     }
 
-    // --- Envelopes Scheduling (5-Stage EGs) ---
-    // Amp EG
-    const vca = prog.vcaEG;
+    // --- Pitch Drift LFO (Analog Instability) ---
+    const driftLfo = ctx.createOscillator();
+    driftLfo.frequency.setValueAtTime(0.15 + Math.random() * 0.2, now); // randomized 0.15Hz - 0.35Hz
+    const driftGain = ctx.createGain();
+    driftGain.gain.setValueAtTime(3.5, now); // 3.5 cents depth
+    driftLfo.connect(driftGain);
+    driftLfo.start(now);
+
+    // Calculate equal-power crossfader gains
+    const oscBalance = prog.oscBalance !== undefined ? prog.oscBalance : 0.5;
+    const oscAVol = prog.oscAVol !== undefined ? prog.oscAVol : 0.8;
+    const oscBVol = prog.oscBVol !== undefined ? prog.oscBVol : 0.5;
+    const gainAVol = oscAVol * Math.sqrt(1 - oscBalance);
+    const gainBVol = oscBVol * Math.sqrt(oscBalance);
+
+    // Amp & Filter EG Setup
+    const vca = prog.vcaEG || { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.3, breakLevel: 0.7, slopeTime: 0.5, sustainLevel: 0.5, releaseTime: 0.3 };
+    const vcf = prog.vcfEG || { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.3, breakLevel: 0.7, slopeTime: 0.5, sustainLevel: 0.5, releaseTime: 0.3 };
     const vcaEnvAmt = (velocity / 127) * 0.45;
     
-    gainA.gain.setValueAtTime(vca.startLevel * vcaEnvAmt * prog.oscAVol, now);
-    const aTime = now + vca.attackTime;
-    gainA.gain.linearRampToValueAtTime(vca.attackLevel * vcaEnvAmt * prog.oscAVol, aTime);
-    const dTime = aTime + vca.decayTime;
-    gainA.gain.linearRampToValueAtTime(vca.breakLevel * vcaEnvAmt * prog.oscAVol, dTime);
-    const sTime = dTime + vca.slopeTime;
-    gainA.gain.linearRampToValueAtTime(vca.sustainLevel * vcaEnvAmt * prog.oscAVol, sTime);
+    gainA = ctx.createGain();
+    gainA.gain.value = 0;
+    gainA.gain.setValueAtTime(0, now);
 
-    if (gainB) {
-      gainB.gain.setValueAtTime(vca.startLevel * vcaEnvAmt * prog.oscBVol, now);
-      gainB.gain.linearRampToValueAtTime(vca.attackLevel * vcaEnvAmt * prog.oscBVol, aTime);
-      gainB.gain.linearRampToValueAtTime(vca.breakLevel * vcaEnvAmt * prog.oscBVol, dTime);
-      gainB.gain.linearRampToValueAtTime(vca.sustainLevel * vcaEnvAmt * prog.oscBVol, sTime);
+    const releasedRef = { current: false };
+    const voiceObj = {
+      note,
+      oscA: null, oscB: null, oscA_L: null, oscA_R: null, gainA, gainB: null, gainA_L: null, gainA_R: null,
+      filter1, filter2, voiceOutGain: null,
+      subOsc: null, noiseSource: null, noiseGain: null, subGain: null, driftLfo,
+      vibratoLfo, vibratoLfoGain, filterLfo, filterLfoGain,
+      vca, vcf, baseCutoff, oscAVol: prog.oscAVol, oscBVol: prog.oscBVol,
+      granularTimerId: null, releasedRef, trackIdx
+    };
+
+    if (prog.granularActive || (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0 && bufferA)) {
+      // --- Granular Synthesis Engine ---
+      if (bufferA) {
+        const isSliceGranular = !prog.granularActive && (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0);
+        
+        let playhead;
+        let startOffsetA = 0;
+        let sliceDurationA = 0;
+        let sliceEndSecA = 0;
+        
+        if (isSliceGranular) {
+          const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+          const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
+          sliceDurationA = activeDurationA / 16;
+          if (isReverseA) {
+            const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+            startOffsetA = bufferA.duration - origSliceStart - sliceDurationA;
+          } else {
+            startOffsetA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+          }
+          sliceEndSecA = startOffsetA + sliceDurationA;
+          playhead = startOffsetA;
+        } else {
+          playhead = (prog.grainPosition !== undefined ? prog.grainPosition : 0.0) * bufferA.duration;
+        }
+        
+        let nextGrainTime = now;
+
+        const scheduleGrain = () => {
+          if (releasedRef.current) return;
+          const currentSlot = sampleSlotsRef.current.find(s => s.id === slotAId) || sampleSlotsRef.current[0];
+          const currentBuf = currentSlot ? currentSlot.buffer : null;
+          const currentRevBuf = currentSlot ? currentSlot.revBuffer : null;
+          if (!currentBuf) return;
+
+          const ctxNow = ctx.currentTime;
+          if (nextGrainTime < ctxNow) {
+            const drift = ctxNow - nextGrainTime;
+            const speedFactor = isSliceGranular ? (freqScaleA / Math.max(0.05, 1 + sliceStretchA)) : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0);
+            playhead += drift * speedFactor;
+            nextGrainTime = ctxNow;
+          }
+          
+          let gSize, gRate;
+          if (isSliceGranular) {
+            gSize = Math.max(0.03, Math.min(0.08, sliceDurationA));
+            gRate = gSize * 0.4;
+          } else {
+            gSize = (prog.grainSize !== undefined ? prog.grainSize : 100) / 1000;
+            gRate = (prog.grainRate !== undefined ? prog.grainRate : 40) / 1000;
+          }
+
+          while (nextGrainTime < ctxNow + 0.1) {
+            if (isSliceGranular && !sliceLoopA && playhead >= sliceEndSecA) {
+              break; 
+            }
+
+            const grainSource = ctx.createBufferSource();
+            const isReverse = isSliceGranular ? isReverseA : (prog.grainReverse || false);
+            grainSource.buffer = isReverse ? currentRevBuf : currentBuf;
+
+            const spray = isSliceGranular ? 0 : ((prog.grainSpray !== undefined ? prog.grainSpray : 0.05) * (Math.random() * 2 - 1));
+            let grainStart = playhead + spray;
+            if (grainStart < 0) grainStart = 0;
+            if (grainStart >= currentBuf.duration) grainStart = currentBuf.duration - 0.01;
+
+            const startOffset = (isReverse && !isSliceGranular) ? (currentBuf.duration - grainStart - gSize) : grainStart;
+            const clampedStartOffset = Math.max(0, Math.min(currentBuf.duration - 0.005, startOffset));
+
+            let currentFreqScale = freqScaleA;
+            if (!isSliceGranular) {
+              currentFreqScale = baseFreq / rootFreqA;
+            }
+            const detuneCents = isSliceGranular ? 0 : ((prog.grainPitchRandom !== undefined ? prog.grainPitchRandom : 0) * (Math.random() * 2 - 1));
+
+            grainSource.playbackRate.setValueAtTime(currentFreqScale * Math.pow(2, (oscADetune + detuneCents) / 1200), nextGrainTime);
+
+            if (vibratoLfoGain) {
+              const vScale = ctx.createGain();
+              vScale.gain.setValueAtTime(1 / rootFreqA, nextGrainTime);
+              vibratoLfoGain.connect(vScale);
+              vScale.connect(grainSource.playbackRate);
+            }
+            if (driftGain) {
+              const dScale = ctx.createGain();
+              dScale.gain.setValueAtTime(1 / 1200, nextGrainTime);
+              driftGain.connect(dScale);
+              dScale.connect(grainSource.playbackRate);
+            }
+
+            const grainGain = ctx.createGain();
+            grainGain.gain.setValueAtTime(0, nextGrainTime);
+
+            const grainAttack = Math.min(0.005, gSize * 0.1);
+            const grainRelease = Math.min(0.005, gSize * 0.1);
+
+            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + grainAttack);
+            grainGain.gain.setValueAtTime(1.0, nextGrainTime + gSize - grainRelease);
+            grainGain.gain.linearRampToValueAtTime(0.0, nextGrainTime + gSize);
+
+            grainSource.connect(grainGain);
+            grainGain.connect(gainA);
+
+            grainSource.start(nextGrainTime, clampedStartOffset, gSize);
+            grainSource.stop(nextGrainTime + gSize + 0.01);
+
+            let speedFactor;
+            if (isSliceGranular) {
+              speedFactor = freqScaleA / Math.max(0.05, 1 + sliceStretchA);
+            } else {
+              speedFactor = prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0;
+            }
+            playhead += gRate * speedFactor;
+
+            if (isSliceGranular) {
+              if (sliceLoopA) {
+                if (playhead >= sliceEndSecA) {
+                  playhead = startOffsetA + ((playhead - startOffsetA) % sliceDurationA);
+                }
+              }
+            } else {
+              if (playhead >= currentBuf.duration) playhead = 0;
+              if (playhead < 0) playhead = currentBuf.duration - 0.01;
+            }
+
+            nextGrainTime += gRate;
+          }
+
+          voiceObj.granularTimerId = setTimeout(scheduleGrain, 35);
+        };
+
+        scheduleGrain();
+      }
+
+      // Connect grain A gain to panner & filter
+      const panner = ctx.createStereoPanner();
+      panner.pan.setValueAtTime(prog.oscAPan || 0, now);
+      gainA.connect(panner);
+      panner.connect(filter1);
+
+      if (isSliceGranular) {
+        const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+        const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
+        const sliceDurationA = activeDurationA / 16;
+        let startOffsetA;
+        if (isReverseA) {
+          const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+          startOffsetA = bufferA.duration - origSliceStart - sliceDurationA;
+        } else {
+          startOffsetA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+        }
+        voiceObj.startOffsetA = startOffsetA;
+      }
+    } else {
+      // --- Standard Sampler OSC A ---
+      if (bufferA) {
+        if (prog.unisonOn) {
+          oscA = ctx.createBufferSource();
+          oscA.buffer = bufferA;
+          oscA.playbackRate.setValueAtTime(freqScaleA, now);
+          oscA.detune.setValueAtTime(prog.oscADetune, now);
+
+          oscA_L = ctx.createBufferSource();
+          oscA_L.buffer = bufferA;
+          oscA_L.playbackRate.setValueAtTime(freqScaleA, now);
+          oscA_L.detune.setValueAtTime(prog.oscADetune - prog.unisonDetune, now);
+
+          oscA_R = ctx.createBufferSource();
+          oscA_R.buffer = bufferA;
+          oscA_R.playbackRate.setValueAtTime(freqScaleA, now);
+          oscA_R.detune.setValueAtTime(prog.oscADetune + prog.unisonDetune, now);
+
+          gainA_L = ctx.createGain();
+          gainA_L.gain.value = 0;
+          gainA_L.gain.setValueAtTime(0, now);
+          gainA_R = ctx.createGain();
+          gainA_R.gain.value = 0;
+          gainA_R.gain.setValueAtTime(0, now);
+
+          const pannerC = ctx.createStereoPanner();
+          pannerC.pan.setValueAtTime(0, now);
+          const pannerL = ctx.createStereoPanner();
+          pannerL.pan.setValueAtTime(-0.85, now);
+          const pannerR = ctx.createStereoPanner();
+          pannerR.pan.setValueAtTime(0.85, now);
+
+          oscA.connect(gainA);
+          gainA.connect(pannerC);
+          pannerC.connect(filter1);
+
+          oscA_L.connect(gainA_L);
+          gainA_L.connect(pannerL);
+          pannerL.connect(filter1);
+
+          oscA_R.connect(gainA_R);
+          gainA_R.connect(pannerR);
+          pannerR.connect(filter1);
+
+          const isSliceA = prog.oscATriggerMode === 'slice';
+          let loopStartA, loopEndA;
+          if (isReverseA) {
+            if (isSliceA) {
+              const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+              const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
+              const sliceDurationA = activeDurationA / 16;
+              const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+              loopStartA = bufferA.duration - origSliceStart - sliceDurationA;
+              loopEndA = loopStartA + sliceDurationA;
+            } else {
+              loopStartA = (1.0 - slotA.loopEnd) * bufferA.duration;
+              loopEndA = (1.0 - slotA.loopStart) * bufferA.duration;
+            }
+          } else {
+            loopStartA = slotA.loopStart * bufferA.duration;
+            loopEndA = slotA.loopEnd * bufferA.duration;
+            if (isSliceA) {
+              const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+              const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
+              const sliceDurationA = activeDurationA / 16;
+              loopStartA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+              loopEndA = loopStartA + sliceDurationA;
+            }
+          }
+
+          [oscA, oscA_L, oscA_R].forEach(osc => {
+            osc.loop = isLoopA;
+            if (isLoopA) {
+              osc.loopStart = loopStartA;
+              osc.loopEnd = loopEndA;
+            }
+          });
+
+          if (vibratoLfoGain) {
+            vibratoLfoGain.connect(oscA.detune);
+            vibratoLfoGain.connect(oscA_L.detune);
+            vibratoLfoGain.connect(oscA_R.detune);
+          }
+          driftGain.connect(oscA.detune);
+          driftGain.connect(oscA_L.detune);
+          driftGain.connect(oscA_R.detune);
+
+        } else {
+          oscA = ctx.createBufferSource();
+          oscA.buffer = bufferA;
+          oscA.playbackRate.setValueAtTime(freqScaleA, now);
+          oscA.detune.setValueAtTime(prog.oscADetune, now);
+
+          oscA.connect(gainA);
+
+          const panner = ctx.createStereoPanner();
+          panner.pan.setValueAtTime(prog.oscAPan || 0, now);
+          gainA.connect(panner);
+          panner.connect(filter1);
+
+          const isSliceA = prog.oscATriggerMode === 'slice';
+          let loopStartA, loopEndA;
+          if (isReverseA) {
+            if (isSliceA) {
+              const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+              const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
+              const sliceDurationA = activeDurationA / 16;
+              const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+              loopStartA = bufferA.duration - origSliceStart - sliceDurationA;
+              loopEndA = loopStartA + sliceDurationA;
+            } else {
+              loopStartA = (1.0 - slotA.loopEnd) * bufferA.duration;
+              loopEndA = (1.0 - slotA.loopStart) * bufferA.duration;
+            }
+          } else {
+            loopStartA = slotA.loopStart * bufferA.duration;
+            loopEndA = slotA.loopEnd * bufferA.duration;
+            if (isSliceA) {
+              const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+              const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
+              const sliceDurationA = activeDurationA / 16;
+              loopStartA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+              loopEndA = loopStartA + sliceDurationA;
+            }
+          }
+
+          oscA.loop = isLoopA;
+          if (isLoopA) {
+            oscA.loopStart = loopStartA;
+            oscA.loopEnd = loopEndA;
+          }
+
+          if (vibratoLfoGain) vibratoLfoGain.connect(oscA.detune);
+          driftGain.connect(oscA.detune);
+        }
+      }
     }
 
+    // Oscillator B
+    if (prog.oscMode === 'double' && bufferB) {
+      const isSliceGranularB = prog.oscBTriggerMode === 'slice' && sliceStretchB !== 0;
+
+      gainB = ctx.createGain();
+      gainB.gain.value = 0;
+      gainB.gain.setValueAtTime(0, now);
+
+      if (isSliceGranularB) {
+        // --- OSC B Granular Synthesis for Time-Stretching ---
+        const sliceIndex = ((note - rootNoteB) % 16 + 16) % 16;
+        const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
+        const sliceDurationB = activeDurationB / 16;
+        let startOffsetB;
+        if (isReverseB) {
+          const origSliceStart = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
+          startOffsetB = bufferB.duration - origSliceStart - sliceDurationB;
+        } else {
+          startOffsetB = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
+        }
+        const sliceEndSecB = startOffsetB + sliceDurationB;
+        let playhead = startOffsetB;
+
+        let nextGrainTime = now;
+
+        const scheduleGrainB = () => {
+          if (releasedRef.current) return;
+          const currentSlot = sampleSlotsRef.current.find(s => s.id === slotBId) || sampleSlotsRef.current[1];
+          const currentBuf = currentSlot ? currentSlot.buffer : null;
+          const currentRevBuf = currentSlot ? currentSlot.revBuffer : null;
+          if (!currentBuf) return;
+
+          const ctxNow = ctx.currentTime;
+          if (nextGrainTime < ctxNow) {
+            const drift = ctxNow - nextGrainTime;
+            const speedFactor = freqScaleB / Math.max(0.05, 1 + sliceStretchB);
+            playhead += drift * speedFactor;
+            nextGrainTime = ctxNow;
+          }
+          const gSize = Math.max(0.03, Math.min(0.08, sliceDurationB));
+          const gRate = gSize * 0.4;
+
+          while (nextGrainTime < ctxNow + 0.1) {
+            if (!sliceLoopB && playhead >= sliceEndSecB) {
+              break;
+            }
+
+            const grainSource = ctx.createBufferSource();
+            grainSource.buffer = isReverseB && currentRevBuf ? currentRevBuf : currentBuf;
+
+            let grainStart = playhead;
+            if (grainStart < 0) grainStart = 0;
+            if (grainStart >= currentBuf.duration) grainStart = currentBuf.duration - 0.01;
+
+            const clampedStartOffset = Math.max(0, Math.min(currentBuf.duration - 0.005, grainStart));
+
+            grainSource.playbackRate.setValueAtTime(freqScaleB * Math.pow(2, oscBDetune / 1200), nextGrainTime);
+
+            if (vibratoLfoGain) {
+              const vScale = ctx.createGain();
+              vScale.gain.setValueAtTime(1 / rootFreqB, nextGrainTime);
+              vibratoLfoGain.connect(vScale);
+              vScale.connect(grainSource.playbackRate);
+            }
+            if (driftGain) {
+              const dScale = ctx.createGain();
+              dScale.gain.setValueAtTime(1 / 1200, nextGrainTime);
+              driftGain.connect(dScale);
+              dScale.connect(grainSource.playbackRate);
+            }
+
+            const grainGain = ctx.createGain();
+            grainGain.gain.setValueAtTime(0, nextGrainTime);
+
+            const grainAttack = Math.min(0.005, gSize * 0.1);
+            const grainRelease = Math.min(0.005, gSize * 0.1);
+
+            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + grainAttack);
+            grainGain.gain.setValueAtTime(1.0, nextGrainTime + gSize - grainRelease);
+            grainGain.gain.linearRampToValueAtTime(0.0, nextGrainTime + gSize);
+
+            grainSource.connect(grainGain);
+            grainGain.connect(gainB);
+
+            grainSource.start(nextGrainTime, clampedStartOffset, gSize);
+            grainSource.stop(nextGrainTime + gSize + 0.01);
+
+            const speedFactor = freqScaleB / Math.max(0.05, 1 + sliceStretchB);
+            playhead += gRate * speedFactor;
+
+            if (sliceLoopB) {
+              if (playhead >= sliceEndSecB) {
+                playhead = startOffsetB + ((playhead - startOffsetB) % sliceDurationB);
+              }
+            }
+
+            nextGrainTime += gRate;
+          }
+
+          voiceObj.granularTimerIdB = setTimeout(scheduleGrainB, 35);
+        };
+
+        scheduleGrainB();
+
+        const pannerB = ctx.createStereoPanner();
+        pannerB.pan.setValueAtTime(prog.oscBPan || 0, now);
+        gainB.connect(pannerB);
+        pannerB.connect(filter1);
+
+        voiceObj.startOffsetB = startOffsetB;
+
+      } else {
+        // --- Standard Sampler OSC B ---
+        oscB = ctx.createBufferSource();
+        oscB.buffer = bufferB;
+        oscB.playbackRate.setValueAtTime(freqScaleB, now);
+        oscB.detune.setValueAtTime(prog.oscBDetune, now);
+        oscB.connect(gainB);
+
+        const pannerB = ctx.createStereoPanner();
+        pannerB.pan.setValueAtTime(prog.oscBPan || 0, now);
+        gainB.connect(pannerB);
+        pannerB.connect(filter1);
+
+        const isSliceB = prog.oscBTriggerMode === 'slice';
+        let loopStartB, loopEndB;
+        if (isReverseB) {
+          if (isSliceB) {
+            const sliceIndex = ((note - rootNoteB) % 16 + 16) % 16;
+            const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
+            const sliceDurationB = activeDurationB / 16;
+            const origSliceStart = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
+            loopStartB = bufferB.duration - origSliceStart - sliceDurationB;
+            loopEndB = loopStartB + sliceDurationB;
+          } else {
+            loopStartB = (1.0 - slotB.loopEnd) * bufferB.duration;
+            loopEndB = (1.0 - slotB.loopStart) * bufferB.duration;
+          }
+        } else {
+          loopStartB = slotB.loopStart * bufferB.duration;
+          loopEndB = slotB.loopEnd * bufferB.duration;
+          if (isSliceB) {
+            const sliceIndex = ((note - rootNoteB) % 16 + 16) % 16;
+            const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
+            const sliceDurationB = activeDurationB / 16;
+            loopStartB = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
+            loopEndB = loopStartB + sliceDurationB;
+          }
+        }
+
+        oscB.loop = isLoopB;
+        if (isLoopB) {
+          oscB.loopStart = loopStartB;
+          oscB.loopEnd = loopEndB;
+        }
+
+        if (vibratoLfoGain) vibratoLfoGain.connect(oscB.detune);
+        driftGain.connect(oscB.detune);
+      }
+    }
+
+
+
+    const voiceOutGain = ctx.createGain();
+    voiceOutGain.gain.setValueAtTime(1.0, now);
+
+    if (prog.filterMode === 'Double Series') {
+      filter1.connect(filter2);
+      filter2.connect(voiceOutGain);
+    } else {
+      filter1.connect(voiceOutGain);
+    }
+
+    // Voice connects to global static IFX chain
+    if (ifx1InputRef.current) {
+      voiceOutGain.connect(ifx1InputRef.current);
+    } else {
+      voiceOutGain.connect(masterGainRef.current);
+    }
+
+    // Resolve slice environments and playback durations for slice trigger modes
+    let dPlayA = 0;
+    if (bufferA) {
+      const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
+      const sliceDurationA = activeDurationA / 16;
+      if (prog.oscATriggerMode === 'slice') {
+        dPlayA = Math.max(0.01, (sliceDurationA * (1 + sliceStretchA)) / freqScaleA);
+      } else {
+        dPlayA = Math.max(0.01, activeDurationA / freqScaleA);
+      }
+    }
+
+    let dPlayB = 0;
+    if (bufferB) {
+      const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
+      const sliceDurationB = activeDurationB / 16;
+      if (prog.oscBTriggerMode === 'slice') {
+        dPlayB = Math.max(0.01, (sliceDurationB * (1 + sliceStretchB)) / freqScaleB);
+      } else {
+        dPlayB = Math.max(0.01, activeDurationB / freqScaleB);
+      }
+    }
+
+    // Amp EG Scheduling
+    const aTime = now + vca.attackTime;
+    const dTime = aTime + vca.decayTime;
+    const sTime = dTime + vca.slopeTime;
+
+    if (gainA && bufferA) {
+      if (sliceEnvA) {
+        let att = sliceEnvA.attack;
+        let dec = sliceEnvA.decay;
+        if (!isLoopA) {
+          if (att >= dPlayA) {
+            att = dPlayA * 0.1;
+          }
+          const maxDec = dPlayA - att;
+          if (dec > maxDec) {
+            dec = Math.max(0.005, maxDec - 0.003);
+          }
+        }
+        const aTimeA = now + att;
+        const dTimeA = aTimeA + dec;
+
+        gainA.gain.setValueAtTime(0, now);
+        gainA.gain.linearRampToValueAtTime(vcaEnvAmt * gainAVol, aTimeA);
+        if (!isLoopA) {
+          gainA.gain.linearRampToValueAtTime(0, dTimeA);
+        }
+      } else {
+        gainA.gain.setValueAtTime(vca.startLevel * vcaEnvAmt * gainAVol, now);
+        gainA.gain.linearRampToValueAtTime(vca.attackLevel * vcaEnvAmt * gainAVol, aTime);
+        gainA.gain.linearRampToValueAtTime(vca.breakLevel * vcaEnvAmt * gainAVol, dTime);
+        gainA.gain.linearRampToValueAtTime(vca.sustainLevel * vcaEnvAmt * gainAVol, sTime);
+      }
+    }
+
+    if (gainA_L && gainA_R && bufferA) {
+      if (sliceEnvA) {
+        let att = sliceEnvA.attack;
+        let dec = sliceEnvA.decay;
+        if (!isLoopA) {
+          if (att >= dPlayA) {
+            att = dPlayA * 0.1;
+          }
+          const maxDec = dPlayA - att;
+          if (dec > maxDec) {
+            dec = Math.max(0.005, maxDec - 0.003);
+          }
+        }
+        const aTimeA = now + att;
+        const dTimeA = aTimeA + dec;
+
+        [gainA_L, gainA_R].forEach(gNode => {
+          gNode.gain.setValueAtTime(0, now);
+          gNode.gain.linearRampToValueAtTime(vcaEnvAmt * gainAVol * 0.65, aTimeA);
+          if (!isLoopA) {
+            gNode.gain.linearRampToValueAtTime(0, dTimeA);
+          }
+        });
+      } else {
+        gainA_L.gain.setValueAtTime(vca.startLevel * vcaEnvAmt * gainAVol * 0.65, now);
+        gainA_L.gain.linearRampToValueAtTime(vca.attackLevel * vcaEnvAmt * gainAVol * 0.65, aTime);
+        gainA_L.gain.linearRampToValueAtTime(vca.breakLevel * vcaEnvAmt * gainAVol * 0.65, dTime);
+        gainA_L.gain.linearRampToValueAtTime(vca.sustainLevel * vcaEnvAmt * gainAVol * 0.65, sTime);
+
+        gainA_R.gain.setValueAtTime(vca.startLevel * vcaEnvAmt * gainAVol * 0.65, now);
+        gainA_R.gain.linearRampToValueAtTime(vca.attackLevel * vcaEnvAmt * gainAVol * 0.65, aTime);
+        gainA_R.gain.linearRampToValueAtTime(vca.breakLevel * vcaEnvAmt * gainAVol * 0.65, dTime);
+        gainA_R.gain.linearRampToValueAtTime(vca.sustainLevel * vcaEnvAmt * gainAVol * 0.65, sTime);
+      }
+    }
+
+    if (gainB && bufferB) {
+      if (sliceEnvB) {
+        let att = sliceEnvB.attack;
+        let dec = sliceEnvB.decay;
+        if (!isLoopB) {
+          if (att >= dPlayB) {
+            att = dPlayB * 0.1;
+          }
+          const maxDec = dPlayB - att;
+          if (dec > maxDec) {
+            dec = Math.max(0.005, maxDec - 0.003);
+          }
+        }
+        const aTimeB = now + att;
+        const dTimeB = aTimeB + dec;
+
+        gainB.gain.setValueAtTime(0, now);
+        gainB.gain.linearRampToValueAtTime(vcaEnvAmt * gainBVol, aTimeB);
+        if (!isLoopB) {
+          gainB.gain.linearRampToValueAtTime(0, dTimeB);
+        }
+      } else {
+        gainB.gain.setValueAtTime(vca.startLevel * vcaEnvAmt * gainBVol, now);
+        gainB.gain.linearRampToValueAtTime(vca.attackLevel * vcaEnvAmt * gainBVol, aTime);
+        gainB.gain.linearRampToValueAtTime(vca.breakLevel * vcaEnvAmt * gainBVol, dTime);
+        gainB.gain.linearRampToValueAtTime(vca.sustainLevel * vcaEnvAmt * gainBVol, sTime);
+      }
+    }
+
+
+
     // Filter EG
-    const vcf = prog.vcfEG;
     if (prog.filterEnvAmt > 0) {
       const vcfEnvAmt = prog.filterEnvAmt;
       const vcfStart = baseCutoff + vcf.startLevel * vcfEnvAmt;
@@ -1056,16 +2429,99 @@ export default function Delta7Synth() {
       filter1.frequency.linearRampToValueAtTime(vcfSustain, sTime);
     }
 
-    // Start Oscillators
-    oscA.start(now);
-    if (oscB) oscB.start(now);
+    // Start oscillators with playback boundary schedule
+    if (!prog.granularActive && bufferA) {
+      let startOffsetA;
+      let durationToPlayA;
 
-    return {
-      oscA, oscB, gainA, gainB, filter1, filter2, voiceOutGain,
-      vibratoLfo, vibratoLfoGain, filterLfo, filterLfoGain,
-      vca, vcf, baseCutoff, oscAVol: prog.oscAVol, oscBVol: prog.oscBVol
-    };
-  };
+      if (prog.oscATriggerMode === 'slice') {
+        const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+        const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
+        const sliceDurationA = activeDurationA / 16;
+        if (isReverseA) {
+          const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+          startOffsetA = bufferA.duration - origSliceStart - sliceDurationA;
+        } else {
+          startOffsetA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
+        }
+        durationToPlayA = sliceDurationA;
+      } else {
+        if (isReverseA) {
+          startOffsetA = (1.0 - slotA.end) * bufferA.duration;
+        } else {
+          startOffsetA = slotA.start * bufferA.duration;
+        }
+        durationToPlayA = (slotA.end - slotA.start) * bufferA.duration;
+      }
+
+      if (isLoopA) {
+        if (oscA) oscA.start(now, startOffsetA);
+        if (oscA_L) oscA_L.start(now, startOffsetA);
+        if (oscA_R) oscA_R.start(now, startOffsetA);
+      } else {
+        const dPlay = Math.max(0.01, durationToPlayA / freqScaleA);
+        if (oscA) oscA.start(now, startOffsetA, dPlay);
+        if (oscA_L) oscA_L.start(now, startOffsetA, dPlay);
+        if (oscA_R) oscA_R.start(now, startOffsetA, dPlay);
+      }
+      voiceObj.startOffsetA = startOffsetA;
+    }
+
+    if (oscB && bufferB) {
+      let startOffsetB;
+      let durationToPlayB;
+
+      if (prog.oscBTriggerMode === 'slice') {
+        const sliceIndex = ((note - rootNoteB) % 16 + 16) % 16;
+        const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
+        const sliceDurationB = activeDurationB / 16;
+        if (isReverseB) {
+          const origSliceStart = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
+          startOffsetB = bufferB.duration - origSliceStart - sliceDurationB;
+        } else {
+          startOffsetB = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
+        }
+        durationToPlayB = sliceDurationB;
+      } else {
+        if (isReverseB) {
+          startOffsetB = (1.0 - slotB.end) * bufferB.duration;
+        } else {
+          startOffsetB = slotB.start * bufferB.duration;
+        }
+        durationToPlayB = (slotB.end - slotB.start) * bufferB.duration;
+      }
+
+      if (isLoopB) {
+        oscB.start(now, startOffsetB);
+      } else {
+        oscB.start(now, startOffsetB, Math.max(0.01, durationToPlayB / freqScaleB));
+      }
+      voiceObj.startOffsetB = startOffsetB;
+    }
+
+    // Save final references back into voiceObj
+    voiceObj.oscA = oscA;
+    voiceObj.oscB = oscB;
+    voiceObj.oscA_L = oscA_L;
+    voiceObj.oscA_R = oscA_R;
+    voiceObj.gainB = gainB;
+    voiceObj.gainA_L = gainA_L;
+    voiceObj.gainA_R = gainA_R;
+    voiceObj.voiceOutGain = voiceOutGain;
+    voiceObj.subOsc = subOsc;
+    voiceObj.noiseSource = noiseSource;
+    voiceObj.noiseGain = noiseGain;
+    voiceObj.subGain = subGain;
+
+    voiceObj.startTime = now;
+    voiceObj.slotAId = slotAId;
+    voiceObj.slotBId = slotBId;
+
+    voiceObj.playheadRateA = freqScaleA / Math.max(0.05, 1 + sliceStretchA);
+    voiceObj.playheadRateB = freqScaleB / Math.max(0.05, 1 + sliceStretchB);
+
+    return voiceObj;
+  };;
 
   const playVoice = (note, velocity) => {
     if (!audioCtxRef.current) initAudio();
@@ -1074,13 +2530,12 @@ export default function Delta7Synth() {
 
     const now = ctx.currentTime;
 
+    // Always stop the note first to prevent duplicates or orphans
+    stopVoice(note);
+
     if (currentMode === 'PROG') {
-      const voiceKey = `${note}-prog`;
-      if (activeVoicesRef.current.has(voiceKey)) {
-        stopVoice(note);
-      }
-      const voice = playProgramVoice(ctx, note, velocity, paramsRef.current, voiceKey);
-      activeVoicesRef.current.set(voiceKey, [voice]);
+      const voice = playProgramVoice(ctx, note, velocity, paramsRef.current, `${note}-prog`);
+      activeVoicesRef.current.set(note, [voice]);
     } else {
       // COMBI MODE: Layer up to 4 tracks concurrently based on split key zones
       const combi = FACTORY_COMBIS[selectedCombiIndex];
@@ -1103,14 +2558,12 @@ export default function Delta7Synth() {
           };
           const voiceKey = `${note}-track-${idx}`;
           // Trigger split/layer oscillator with delay offsets
-          const voice = playProgramVoice(ctx, note + track.oct * 12, velocity, adjustedProg, voiceKey, 0);
+          const voice = playProgramVoice(ctx, note + track.oct * 12, velocity, adjustedProg, voiceKey, 0, idx);
           voicesToTrigger.push(voice);
-          activeVoicesRef.current.set(voiceKey, voice);
         }
       });
 
-      // Save references tied to the source note for release
-      activeVoicesRef.current.set(`combi-${note}`, voicesToTrigger);
+      activeVoicesRef.current.set(note, voicesToTrigger);
     }
 
     setActiveNotes(prev => {
@@ -1128,36 +2581,83 @@ export default function Delta7Synth() {
     const releaseVoice = (voice) => {
       if (!voice) return;
       try {
-        const releaseTime = voice.vca.releaseTime;
+        const releaseTime = Math.max(0.01, voice.vca.releaseTime);
+        const timeConstant = releaseTime / 4;
+
+        if (voice.releasedRef) {
+          voice.releasedRef.current = true;
+        }
+        if (voice.granularTimerId) {
+          clearTimeout(voice.granularTimerId);
+        }
+        if (voice.granularTimerIdB) {
+          clearTimeout(voice.granularTimerIdB);
+        }
 
         // Cancel scheduled gain ramps and drop to zero over release duration
-        voice.gainA.gain.cancelScheduledValues(now);
-        voice.gainA.gain.setValueAtTime(voice.gainA.gain.value, now);
-        voice.gainA.gain.exponentialRampToValueAtTime(0.0001, now + releaseTime);
+        if (voice.gainA) {
+          voice.gainA.gain.cancelScheduledValues(now);
+          voice.gainA.gain.setValueAtTime(voice.gainA.gain.value, now);
+          voice.gainA.gain.setTargetAtTime(0, now, timeConstant);
+        }
+
+        if (voice.gainA_L) {
+          voice.gainA_L.gain.cancelScheduledValues(now);
+          voice.gainA_L.gain.setValueAtTime(voice.gainA_L.gain.value, now);
+          voice.gainA_L.gain.setTargetAtTime(0, now, timeConstant);
+        }
+
+        if (voice.gainA_R) {
+          voice.gainA_R.gain.cancelScheduledValues(now);
+          voice.gainA_R.gain.setValueAtTime(voice.gainA_R.gain.value, now);
+          voice.gainA_R.gain.setTargetAtTime(0, now, timeConstant);
+        }
 
         if (voice.gainB) {
           voice.gainB.gain.cancelScheduledValues(now);
           voice.gainB.gain.setValueAtTime(voice.gainB.gain.value, now);
-          voice.gainB.gain.exponentialRampToValueAtTime(0.0001, now + releaseTime);
+          voice.gainB.gain.setTargetAtTime(0, now, timeConstant);
+        }
+
+        if (voice.subGain) {
+          voice.subGain.gain.cancelScheduledValues(now);
+          voice.subGain.gain.setValueAtTime(voice.subGain.gain.value, now);
+          voice.subGain.gain.setTargetAtTime(0, now, timeConstant);
+        }
+
+        if (voice.noiseGain) {
+          voice.noiseGain.gain.cancelScheduledValues(now);
+          voice.noiseGain.gain.setValueAtTime(voice.noiseGain.gain.value, now);
+          voice.noiseGain.gain.setTargetAtTime(0, now, timeConstant);
         }
 
         // Filter decay on release
         if (voice.filter1) {
           voice.filter1.frequency.cancelScheduledValues(now);
           voice.filter1.frequency.setValueAtTime(voice.filter1.frequency.value, now);
-          voice.filter1.frequency.exponentialRampToValueAtTime(Math.max(20, voice.baseCutoff * 0.1), now + releaseTime);
+          voice.filter1.frequency.setTargetAtTime(Math.max(20, voice.baseCutoff * 0.1), now, timeConstant);
         }
 
         // Clean up node references after release decays
         const oscA = voice.oscA;
         const oscB = voice.oscB;
+        const oscA_L = voice.oscA_L;
+        const oscA_R = voice.oscA_R;
+        const subOsc = voice.subOsc;
+        const noiseSource = voice.noiseSource;
+        const driftLfo = voice.driftLfo;
         const lfo1 = voice.vibratoLfo;
         const lfo2 = voice.filterLfo;
         
         setTimeout(() => {
           try {
-            oscA.stop();
+            if (oscA) oscA.stop();
             if (oscB) oscB.stop();
+            if (oscA_L) oscA_L.stop();
+            if (oscA_R) oscA_R.stop();
+            if (subOsc) subOsc.stop();
+            if (noiseSource) noiseSource.stop();
+            if (driftLfo) driftLfo.stop();
             if (lfo1) lfo1.stop();
             if (lfo2) lfo2.stop();
           } catch {}
@@ -1167,20 +2667,10 @@ export default function Delta7Synth() {
       }
     };
 
-    if (currentMode === 'PROG') {
-      const voiceKey = `${note}-prog`;
-      const voices = activeVoicesRef.current.get(voiceKey);
-      if (voices) {
-        voices.forEach(releaseVoice);
-        activeVoicesRef.current.delete(voiceKey);
-      }
-    } else {
-      const voiceKey = `combi-${note}`;
-      const voices = activeVoicesRef.current.get(voiceKey);
-      if (voices) {
-        voices.forEach(releaseVoice);
-        activeVoicesRef.current.delete(voiceKey);
-      }
+    const voices = activeVoicesRef.current.get(note);
+    if (voices) {
+      voices.forEach(releaseVoice);
+      activeVoicesRef.current.delete(note);
     }
 
     setActiveNotes(prev => {
@@ -1193,12 +2683,24 @@ export default function Delta7Synth() {
   const stopAllNotes = () => {
     if (!audioCtxRef.current) return;
     activeVoicesRef.current.forEach((val) => {
+      const stopVoiceRef = (v) => {
+        if (!v) return;
+        if (v.releasedRef) v.releasedRef.current = true;
+        if (v.granularTimerId) clearTimeout(v.granularTimerId);
+        try { if (v.oscA) v.oscA.stop(); } catch {}
+        try { if (v.oscB) v.oscB.stop(); } catch {}
+        try { if (v.oscA_L) v.oscA_L.stop(); } catch {}
+        try { if (v.oscA_R) v.oscA_R.stop(); } catch {}
+        try { if (v.subOsc) v.subOsc.stop(); } catch {}
+        try { if (v.noiseSource) v.noiseSource.stop(); } catch {}
+        try { if (v.driftLfo) v.driftLfo.stop(); } catch {}
+        try { if (v.vibratoLfo) v.vibratoLfo.stop(); } catch {}
+        try { if (v.filterLfo) v.filterLfo.stop(); } catch {}
+      };
       if (Array.isArray(val)) {
-        val.forEach(v => {
-          try { v.oscA.stop(); if (v.oscB) v.oscB.stop(); } catch {}
-        });
+        val.forEach(stopVoiceRef);
       } else {
-        try { val.oscA.stop(); if (val.oscB) val.oscB.stop(); } catch {}
+        stopVoiceRef(val);
       }
     });
     activeVoicesRef.current.clear();
@@ -1231,10 +2733,18 @@ export default function Delta7Synth() {
         const bendFactor = Math.pow(2, (x * 2) / 12);
         
         // Update primary frequency destinations
-        const freqA = getFreq(60) * bendFactor; // just scale proportionately
-        voice.oscA.frequency.setValueAtTime(voice.oscA.frequency.value * bendFactor, now);
+        if (voice.oscA.frequency) {
+          voice.oscA.frequency.setValueAtTime(voice.oscA.frequency.value * bendFactor, now);
+        } else if (voice.oscA.playbackRate) {
+          voice.oscA.playbackRate.setValueAtTime(voice.oscA.playbackRate.value * bendFactor, now);
+        }
+        
         if (voice.oscB) {
-          voice.oscB.frequency.setValueAtTime(voice.oscB.frequency.value * bendFactor, now);
+          if (voice.oscB.frequency) {
+            voice.oscB.frequency.setValueAtTime(voice.oscB.frequency.value * bendFactor, now);
+          } else if (voice.oscB.playbackRate) {
+            voice.oscB.playbackRate.setValueAtTime(voice.oscB.playbackRate.value * bendFactor, now);
+          }
         }
 
         // Apply vibrato depth on joystick Y+ axis
@@ -1270,12 +2780,32 @@ export default function Delta7Synth() {
       touchActive: true
     }));
 
-    modulateKaossParameters(x, y);
+    modulateKaossParameters(x, y, true);
   };
 
-  const modulateKaossParameters = (x, y) => {
+  const modulateKaossParameters = (x, y, isTouched = false) => {
     if (!audioCtxRef.current) return;
     const now = audioCtxRef.current.currentTime;
+
+    // --- Delta Pad Combi Morph Mixer ---
+    if (currentMode === 'COMBI') {
+      updateCombiVectorGains(x, y);
+      return; 
+    }
+
+    // --- Delta Pad Gater FX Logic ---
+    const isGaterTargeted = (kaossTargetX === 'gater' || kaossTargetY === 'gater');
+    const isGaterActive = isGaterTargeted && (isTouched || kaossPad.holdActive);
+
+    if (isGaterActive && gaterLfoGainRef.current && gaterGainNodeRef.current && gaterLfoRef.current) {
+      const gaterRate = (kaossTargetX === 'gater') ? (x * 23 + 2) : (y * 23 + 2); // 2Hz to 25Hz
+      gaterLfoRef.current.frequency.setValueAtTime(gaterRate, now);
+      gaterLfoGainRef.current.gain.setTargetAtTime(0.5, now, 0.02);
+      gaterGainNodeRef.current.gain.setTargetAtTime(0.5, now, 0.02);
+    } else if (gaterLfoGainRef.current && gaterGainNodeRef.current) {
+      gaterLfoGainRef.current.gain.setTargetAtTime(0.0, now, 0.02);
+      gaterGainNodeRef.current.gain.setTargetAtTime(1.0, now, 0.02);
+    }
 
     // 1. Modulate target parameter on X axis
     if (kaossTargetX === 'cutoff') {
@@ -1298,9 +2828,16 @@ export default function Delta7Synth() {
       if (ifx1MixRef.current) updateIFXMix(ifx1MixRef.current, mixVal);
     } else if (kaossTargetX === 'delayTime') {
       const delayTimeVal = x * 0.95 + 0.05;
-      if (mfx1Ref.current) {
-        mfx1Ref.current.delayL.delayTime.setValueAtTime(delayTimeVal, now);
-        mfx1Ref.current.delayR.delayTime.setValueAtTime(delayTimeVal * 1.33, now);
+      if (activeDelayRef.current) {
+        const ad = activeDelayRef.current;
+        if (ad.delayL && ad.delayR) {
+          ad.delayL.delayTime.setTargetAtTime(delayTimeVal, now, 0.05);
+          ad.delayR.delayTime.setTargetAtTime(delayTimeVal * 1.33, now, 0.05);
+        } else if (ad.delay1) {
+          ad.delay1.delayTime.setTargetAtTime(delayTimeVal, now, 0.05);
+          ad.delay2.delayTime.setTargetAtTime(delayTimeVal * 1.5, now, 0.05);
+          ad.delay3.delayTime.setTargetAtTime(delayTimeVal * 2.0, now, 0.05);
+        }
       }
     }
 
@@ -1312,21 +2849,52 @@ export default function Delta7Synth() {
         if (Array.isArray(vList)) vList.forEach(updateRes); else updateRes(vList);
       });
     } else if (kaossTargetY === 'reverbDecay') {
-      // Reverb size modifier
       const decaySend = y * 0.9;
       if (mfx2SendGainRef.current) mfx2SendGainRef.current.gain.setValueAtTime(decaySend, now);
     } else if (kaossTargetY === 'chorusRate') {
       const feedbackSend = y * 0.8;
-      if (mfx1Ref.current) {
-        mfx1Ref.current.feedbackL.gain.setValueAtTime(feedbackSend, now);
-        mfx1Ref.current.feedbackR.gain.setValueAtTime(feedbackSend, now);
+      if (activeDelayRef.current) {
+        const ad = activeDelayRef.current;
+        if (ad.feedbackL && ad.feedbackR) {
+          ad.feedbackL.gain.setValueAtTime(feedbackSend, now);
+          ad.feedbackR.gain.setValueAtTime(feedbackSend, now);
+        } else if (ad.feedbackGain1) {
+          ad.feedbackGain1.gain.setValueAtTime(feedbackSend * 0.5, now);
+          ad.feedbackGain2.gain.setValueAtTime(feedbackSend * 0.35, now);
+          ad.feedbackGain3.gain.setValueAtTime(feedbackSend * 0.25, now);
+        }
       }
     } else if (kaossTargetY === 'ringModMix') {
       const mixVal = y * 0.8;
       if (ifx2MixRef.current) updateIFXMix(ifx2MixRef.current, mixVal);
+    } else if (kaossTargetY === 'ringModFreq') {
+      const freqVal = y * 2000 + 50; 
+      if (ifx2EffectRef.current && ifx2EffectRef.current.carrier) {
+        ifx2EffectRef.current.carrier.frequency.setValueAtTime(freqVal, now);
+      }
     }
   };
 
+  const updateCombiVectorGains = (x, y) => {
+    if (!audioCtxRef.current) return;
+    const now = audioCtxRef.current.currentTime;
+
+    const gain1 = (1 - x) * y;       
+    const gain2 = x * y;           
+    const gain3 = (1 - x) * (1 - y); 
+    const gain4 = x * (1 - y);       
+    const vectorGains = [gain1, gain2, gain3, gain4];
+
+    activeVoicesRef.current.forEach((voicesList) => {
+      if (Array.isArray(voicesList)) {
+        voicesList.forEach((voice) => {
+          if (voice && voice.trackIdx !== undefined && voice.voiceOutGain) {
+            voice.voiceOutGain.gain.setValueAtTime(vectorGains[voice.trackIdx] * 1.5, now);
+          }
+        });
+      }
+    });
+  };
   // ==========================================
   // 7. WEBMIDI INTEGRATION
   // ==========================================
@@ -1342,10 +2910,57 @@ export default function Delta7Synth() {
             setSelectedMidiDevice(inputs[0].id);
             setupMidiListeners(inputs[0]);
           }
+          // Enumerate and cache MIDI outputs in midiOutputsRef
+          const outputs = Array.from(access.outputs.values());
+          midiOutputsRef.current = outputs;
+          
+          access.onstatechange = (e) => {
+            if (e.port && e.port.type === 'output') {
+              midiOutputsRef.current = Array.from(access.outputs.values());
+            }
+          };
         })
         .catch(() => setIsMidiSupported(false));
     }
   }, []);
+
+  // Continuous MIDI Clock Timing Messages (0xF8)
+  useEffect(() => {
+    const bpm = params.arpBpm || 120;
+    const intervalMs = 2500 / bpm;
+    const intervalId = setInterval(() => {
+      if (midiOutputsRef.current && midiOutputsRef.current.length > 0) {
+        midiOutputsRef.current.forEach(output => {
+          try {
+            output.send([0xF8]);
+          } catch (e) {
+            // Ignore closed port errors
+          }
+        });
+      }
+    }, intervalMs);
+
+    return () => clearInterval(intervalId);
+  }, [params.arpBpm]);
+
+  // MIDI Start (0xFA) / Stop (0xFC) on Arpeggiator On/Off state toggle
+  const isMidiArpMountedRef = useRef(false);
+  useEffect(() => {
+    if (!isMidiArpMountedRef.current) {
+      isMidiArpMountedRef.current = true;
+      return;
+    }
+    if (midiOutputsRef.current && midiOutputsRef.current.length > 0) {
+      const msg = params.arpOn ? 0xFA : 0xFC;
+      midiOutputsRef.current.forEach(output => {
+        try {
+          output.send([msg]);
+        } catch (e) {
+          // Ignore closed port errors
+        }
+      });
+    }
+  }, [params.arpOn]);
 
   const setupMidiListeners = (input) => {
     input.onmidimessage = (message) => {
@@ -1357,15 +2972,16 @@ export default function Delta7Synth() {
       setTimeout(() => setMidiActivity(false), 80);
 
       if (cmd === 9 && data2 > 0) { // Note On
-        playVoice(data1, data2);
+        if (playVoiceRef.current) playVoiceRef.current(data1, data2);
       } else if (cmd === 8 || (cmd === 9 && data2 === 0)) { // Note Off
-        stopVoice(data1);
+        if (stopVoiceRef.current) stopVoiceRef.current(data1);
       } else if (cmd === 11) { // Control Change (CC)
-        handleMidiCC(data1, data2);
+        if (handleMidiCCRef.current) handleMidiCCRef.current(data1, data2);
       } else if (cmd === 14) { // Pitch Bend
         const normalizedPb = ((data2 << 7) + data1 - 8192) / 8192; // -1 to 1
         setJoystick(prev => ({ ...prev, x: normalizedPb }));
-        applyRealtimeModulation(normalizedPb, joystick.y);
+        const joyY = joystickRef.current ? joystickRef.current.y : 0;
+        applyRealtimeModulation(normalizedPb, joyY);
       }
     };
   };
@@ -1388,10 +3004,25 @@ export default function Delta7Synth() {
     // Check custom mappings
     Object.keys(midiMappings).forEach((paramName) => {
       if (midiMappings[paramName] === cc) {
+        const now = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
         if (paramName === 'cutoff') {
-          setParams(prev => ({ ...prev, cutoff: Math.round(valNormalized * 8000 + 100) }));
+          const cutVal = Math.round(valNormalized * 8000 + 100);
+          setParams(prev => ({ ...prev, cutoff: cutVal }));
+          if (activeVoicesRef.current) {
+            activeVoicesRef.current.forEach(vList => {
+              const updateCut = (v) => { if (v && v.filter1) v.filter1.frequency.setValueAtTime(cutVal, now); };
+              if (Array.isArray(vList)) vList.forEach(updateCut); else updateCut(vList);
+            });
+          }
         } else if (paramName === 'resonance') {
-          setParams(prev => ({ ...prev, resonance: valNormalized * 15 }));
+          const resVal = valNormalized * 15;
+          setParams(prev => ({ ...prev, resonance: resVal }));
+          if (activeVoicesRef.current) {
+            activeVoicesRef.current.forEach(vList => {
+              const updateRes = (v) => { if (v && v.filter1) v.filter1.Q.setValueAtTime(resVal, now); };
+              if (Array.isArray(vList)) vList.forEach(updateRes); else updateRes(vList);
+            });
+          }
         } else if (paramName === 'oscAVol') {
           setParams(prev => ({ ...prev, oscAVol: valNormalized }));
         } else if (paramName === 'oscBVol') {
@@ -1405,7 +3036,7 @@ export default function Delta7Synth() {
         } else if (paramName === 'masterVolume') {
           setParams(prev => ({ ...prev, masterVolume: Math.round(valNormalized * 100) }));
           if (masterGainRef.current) {
-            masterGainRef.current.gain.setValueAtTime(valNormalized * 0.5, audioCtxRef.current.currentTime);
+            masterGainRef.current.gain.setValueAtTime(valNormalized * 0.5, now);
           }
         } else if (paramName === 'kaossX') {
           setKaossPad(prev => ({ ...prev, x: valNormalized }));
@@ -1413,6 +3044,36 @@ export default function Delta7Synth() {
         } else if (paramName === 'kaossY') {
           setKaossPad(prev => ({ ...prev, y: valNormalized }));
           modulateKaossParameters(kaossPad.x, valNormalized);
+        } else if (paramName === 'spaceEchoTime') {
+          setParams(prev => ({ ...prev, spaceEchoTime: valNormalized * 0.95 + 0.05 }));
+        } else if (paramName === 'spaceEchoFeedback') {
+          setParams(prev => ({ ...prev, spaceEchoFeedback: valNormalized * 0.95 }));
+        } else if (paramName === 'spaceEchoWow') {
+          setParams(prev => ({ ...prev, spaceEchoWow: valNormalized * 0.5 }));
+        } else if (paramName === 'spaceEchoSaturation') {
+          setParams(prev => ({ ...prev, spaceEchoSaturation: valNormalized }));
+        } else if (paramName === 'spaceEchoSpring') {
+          setParams(prev => ({ ...prev, spaceEchoSpring: valNormalized }));
+        } else if (paramName === 'filterEnvAmt') {
+          setParams(prev => ({ ...prev, filterEnvAmt: Math.round(valNormalized * 4000) }));
+        } else if (paramName === 'vcaRelease') {
+          updateEgParam('VCA', 'releaseTime', valNormalized * 3.99 + 0.01);
+        } else if (paramName === 'lfo1Rate') {
+          const rateVal = valNormalized * 14.9 + 0.1;
+          setParams(prev => ({ ...prev, lfo1Rate: rateVal }));
+          if (activeVoicesRef.current) {
+            activeVoicesRef.current.forEach(vList => {
+              const updateRate = (v) => {
+                if (v) {
+                  if (v.vibratoLfo) v.vibratoLfo.frequency.setValueAtTime(rateVal, now);
+                  if (v.filterLfo) v.filterLfo.frequency.setValueAtTime(rateVal, now);
+                }
+              };
+              if (Array.isArray(vList)) vList.forEach(updateRate); else updateRate(vList);
+            });
+          }
+        } else if (paramName === 'ifxMix') {
+          setParams(prev => ({ ...prev, ifx1Mix: valNormalized, ifx2Mix: valNormalized }));
         }
       }
     });
@@ -1614,37 +3275,123 @@ export default function Delta7Synth() {
         <div className="rack-panel-left steel-plate">
           <div className="section-label">Performance</div>
           
-          {/* Animated pitch joystick */}
-          <div className="joystick-wrapper">
-            <span className="knob-label">JOYSTICK</span>
-            <div 
-              className="joystick-well"
-              onMouseMove={(e) => {
-                if (e.buttons === 1) {
-                  const bounds = e.currentTarget.getBoundingClientRect();
-                  handleJoystickDrag(e, bounds);
-                }
-              }}
-              onMouseLeave={() => {
-                setJoystick({ x: 0, y: 0 });
-                applyRealtimeModulation(0, 0);
-              }}
-              onMouseUp={() => {
-                setJoystick({ x: 0, y: 0 });
-                applyRealtimeModulation(0, 0);
-              }}
-            >
-              <div 
-                className="joystick-handle"
-                style={{
-                  transform: `translate(${joystick.x * 25}px, ${-joystick.y * 25}px)`
-                }}
-              >
-                <div className="joystick-cap"></div>
+          {/* TAPE ECHO & LESLIE CONTROL DECK */}
+          <div className="tape-leslie-deck">
+            <span className="knob-label">TAPE ECHO DECK</span>
+            
+            {/* Spinning Tape Reels */}
+            <div className="tape-deck-reels">
+              <div className={`tape-reel ${params.spaceEchoActive ? 'spinning' : ''}`} style={{ animationDuration: `${Math.max(0.5, (params.spaceEchoTime || 0.35) * 5)}s` }}>
+                <svg viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="45" stroke="#00f3ff" strokeWidth="2" fill="none" />
+                  <circle cx="50" cy="50" r="10" fill="#00f3ff" />
+                  <line x1="50" y1="5" x2="50" y2="95" stroke="#00f3ff" strokeWidth="1.5" />
+                  <line x1="5" y1="50" x2="95" y2="50" stroke="#00f3ff" strokeWidth="1.5" />
+                  <circle cx="50" cy="20" r="4" fill="#00f3ff" />
+                  <circle cx="50" cy="80" r="4" fill="#00f3ff" />
+                  <circle cx="20" cy="50" r="4" fill="#00f3ff" />
+                  <circle cx="80" cy="50" r="4" fill="#00f3ff" />
+                </svg>
+              </div>
+              <div className={`tape-reel ${params.spaceEchoActive ? 'spinning' : ''}`} style={{ animationDuration: `${Math.max(0.5, (params.spaceEchoTime || 0.35) * 5)}s` }}>
+                <svg viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="45" stroke="#00f3ff" strokeWidth="2" fill="none" />
+                  <circle cx="50" cy="50" r="10" fill="#00f3ff" />
+                  <line x1="50" y1="5" x2="50" y2="95" stroke="#00f3ff" strokeWidth="1.5" />
+                  <line x1="5" y1="50" x2="95" y2="50" stroke="#00f3ff" strokeWidth="1.5" />
+                  <circle cx="50" cy="20" r="4" fill="#00f3ff" />
+                  <circle cx="50" cy="80" r="4" fill="#00f3ff" />
+                  <circle cx="20" cy="50" r="4" fill="#00f3ff" />
+                  <circle cx="80" cy="50" r="4" fill="#00f3ff" />
+                </svg>
               </div>
             </div>
-            <div className="joystick-readout font-mono">
-              X: {joystick.x.toFixed(2)} | Y: {joystick.y.toFixed(2)}
+
+            {/* Toggle switch for Space Echo */}
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '0.4rem 0', justifyContent: 'space-between', display: 'flex' }}>
+              <label style={{ color: '#00f3ff', fontWeight: 'bold' }}>SPACE ECHO:</label>
+              <button 
+                className={`btn btn-xs ${params.spaceEchoActive ? 'active-cyan' : ''}`}
+                onClick={() => {
+                  const nextActive = !params.spaceEchoActive;
+                  setParams(prev => ({ ...prev, spaceEchoActive: nextActive }));
+                  if (audioCtxRef.current) {
+                    rebuildDelayEffect(audioCtxRef.current, nextActive);
+                  }
+                }}
+              >
+                {params.spaceEchoActive ? 'ON' : 'OFF'}
+              </button>
+            </div>
+
+            {/* Space Echo Knobs Grid */}
+            <div className="tape-knobs-grid">
+              <Knob 
+                label="Time" 
+                value={params.spaceEchoTime} 
+                min={0.05} max={1.5} step={0.01}
+                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoTime: v }))} 
+                midiLearnParam="spaceEchoTime" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="cyan"
+                size={34}
+              />
+              <Knob 
+                label="Feedback" 
+                value={params.spaceEchoFeedback} 
+                min={0.0} max={0.95} step={0.01}
+                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoFeedback: v }))} 
+                midiLearnParam="spaceEchoFeedback" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="cyan"
+                size={34}
+              />
+              <Knob 
+                label="Wow" 
+                value={params.spaceEchoWow} 
+                min={0.0} max={1.0} step={0.01}
+                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoWow: v }))} 
+                midiLearnParam="spaceEchoWow" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="cyan"
+                size={34}
+              />
+              <Knob 
+                label="Saturation" 
+                value={params.spaceEchoSaturation} 
+                min={0.0} max={1.0} step={0.01}
+                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoSaturation: v }))} 
+                midiLearnParam="spaceEchoSaturation" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="cyan"
+                size={34}
+              />
+              <Knob 
+                label="Spring" 
+                value={params.spaceEchoSpring} 
+                min={0.0} max={1.0} step={0.01}
+                onChange={(v) => setParams(prev => ({ ...prev, spaceEchoSpring: v }))} 
+                midiLearnParam="spaceEchoSpring" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="cyan"
+                size={34}
+              />
+            </div>
+
+            <div className="leslie-separator"></div>
+
+            <span className="knob-label">ROTOR CABINET (LESLIE)</span>
+            {/* Leslie Speed Toggle */}
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '0.4rem 0', justifyContent: 'space-between', display: 'flex' }}>
+              <label style={{ color: '#ff00ff', fontWeight: 'bold' }}>SPEED:</label>
+              <div style={{ display: 'flex', gap: '3px' }}>
+                {['Off', 'Slow', 'Fast'].map(spd => (
+                  <button 
+                    key={spd}
+                    className={`btn btn-xs ${params.leslieSpeed === spd ? 'active-magenta' : ''}`}
+                    onClick={() => {
+                      setParams(prev => ({ ...prev, leslieSpeed: spd }));
+                    }}
+                  >
+                    {spd.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1785,338 +3532,949 @@ export default function Delta7Synth() {
         <div className="rack-panel-center blue-screen-border">
           <div className="lcd-bezel-shadow">
             
-            {/* Screen Header Tabs */}
-            <div className="screen-header-tabs">
-              <button className={`tab-btn ${currentMode === 'PROG' ? 'active-mode' : ''}`} onClick={() => toggleMode('PROG')}>PROG</button>
-              <button className={`tab-btn ${currentMode === 'COMBI' ? 'active-mode' : ''}`} onClick={() => toggleMode('COMBI')}>COMBI</button>
+            {/* Screen Header (No more menus!) */}
+            <div className="screen-header-tabs" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 10px', height: '32px', alignItems: 'center', background: '#000000', borderBottom: '2px solid #00f3ff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#ffe600', boxShadow: '0 0 6px #ffe600' }} />
+                <span className="font-mono text-cyan" style={{ fontSize: '0.75rem', fontWeight: 'bold', letterSpacing: '1px' }}>DELTA7 SAMPLER WORKSTATION</span>
+              </div>
               
-              <div className="divider-line"></div>
-              
-              <button className={`tab-btn ${activeTab === 'MAIN' ? 'active-tab' : ''}`} onClick={() => setActiveTab('MAIN')}>MAIN</button>
-              <button className={`tab-btn ${activeTab === 'OSC' ? 'active-tab' : ''}`} onClick={() => setActiveTab('OSC')}>OSC</button>
-              <button className={`tab-btn ${activeTab === 'FILTER' ? 'active-tab' : ''}`} onClick={() => setActiveTab('FILTER')}>FILTER</button>
-              <button className={`tab-btn ${activeTab === 'AMP' ? 'active-tab' : ''}`} onClick={() => setActiveTab('AMP')}>AMP</button>
-              <button className={`tab-btn ${activeTab === 'FX' ? 'active-tab' : ''}`} onClick={() => setActiveTab('FX')}>FX</button>
-              <button className={`tab-btn ${activeTab === 'ARP' ? 'active-tab' : ''}`} onClick={() => setActiveTab('ARP')}>ARP</button>
-              <button className={`tab-btn ${activeTab === 'MIDI' ? 'active-tab' : ''}`} onClick={() => setActiveTab('MIDI')}>MIDI</button>
+              {/* Presets & Mode Selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {/* PROG / COMBI Toggle */}
+                <div className="segmented-strip" style={{ display: 'flex', padding: '1px' }}>
+                  {['PROG', 'COMBI'].map(mode => (
+                    <button
+                      key={mode}
+                      className={`segmented-btn btn-xs ${currentMode === mode ? 'active' : ''}`}
+                      onClick={() => toggleMode(mode)}
+                      style={{ padding: '2px 6px', fontSize: '0.55rem' }}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Active Preset Dropdown */}
+                {currentMode === 'PROG' ? (
+                  <select
+                    value={selectedProgIndex}
+                    onChange={(e) => handleSelectProgram(parseInt(e.target.value))}
+                    style={{ background: '#000', border: '1px solid #00f3ff', color: '#00f3ff', fontSize: '0.58rem', padding: '1px 3px', borderRadius: '3px', width: '130px' }}
+                  >
+                    {FACTORY_PROGRAMS.map((prog, idx) => (
+                      <option key={prog.id} value={idx}>
+                        A{String(idx + 1).padStart(3, '0')}: {prog.name.split(': ')[1] || prog.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={selectedCombiIndex}
+                    onChange={(e) => handleSelectCombi(parseInt(e.target.value))}
+                    style={{ background: '#000', border: '1px solid #ff00ff', color: '#ff00ff', fontSize: '0.58rem', padding: '1px 3px', borderRadius: '3px', width: '130px' }}
+                  >
+                    {FACTORY_COMBIS.map((combi, idx) => (
+                      <option key={combi.id} value={idx}>
+                        C{String(idx + 1).padStart(3, '0')}: {combi.name.split(': ')[1] || combi.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
 
             {/* Screen Screen Display Contents */}
-            <div className="screen-content-viewport">
-              
-              {/* --- MAIN PAGE VIEW --- */}
-              {activeTab === 'MAIN' && (
-                <div className="lcd-page main-page-lcd">
-                  <div className="lcd-patch-card">
-                    <span className="lcd-cat-tag font-mono">{params.category.toUpperCase()}</span>
-                    <h2 className="lcd-patch-name">
-                      {currentMode === 'PROG' 
-                        ? FACTORY_PROGRAMS[selectedProgIndex].name 
-                        : FACTORY_COMBIS[selectedCombiIndex].name
-                      }
-                    </h2>
-                    <div className="lcd-routing-row font-mono">
-                      <span>MODE: {params.oscMode.toUpperCase()}</span>
-                      <span>FILTER: {params.filterMode.toUpperCase()}</span>
-                      <span>POLYPHONY: 16-VOICES</span>
-                    </div>
-                  </div>
-
-                  {/* Oscilloscope canvas display */}
-                  <div className="oscilloscope-rack-panel">
-                    <canvas ref={canvasRef} width="400" height="120" className="lcd-scope-canvas"></canvas>
-                  </div>
-                </div>
-              )}
-
-              {/* --- OSCILLATORS PAGE VIEW --- */}
-              {activeTab === 'OSC' && (
-                <div className="lcd-page osc-page-lcd">
-                  <div className="parameter-table">
-                    <h3>Oscillator Configurations</h3>
-                    <div className="row-grid-2">
-                      <div className="box-section-sub">
-                        <h4>OSC 1 (A)</h4>
-                        <div className="flex-row-sub">
-                          <label>PCM Wave:</label>
-                          <select 
-                            value={params.oscAWave} 
-                            onChange={(e) => setParams(prev => ({ ...prev, oscAWave: e.target.value }))}
-                          >
-                            <option>Triton Piano</option>
-                            <option>Stereo Strings</option>
-                            <option>Warm Pad</option>
-                            <option>Classic Brass</option>
-                            <option>Triton Organ</option>
-                            <option>Nylon Guitar</option>
-                            <option>Fretless Bass</option>
-                            <option>Polysynth</option>
-                            <option>Bell Tines</option>
-                            <option>Trident Square</option>
-                          </select>
-                        </div>
-                        <div className="flex-row-sub">
-                          <label>Octave:</label>
-                          <input type="number" min="-2" max="2" value={params.oscAOctave} onChange={(e) => setParams(prev => ({ ...prev, oscAOctave: parseInt(e.target.value) }))} />
-                        </div>
-                        <div className="flex-row-sub">
-                          <label>Detune:</label>
-                          <input type="range" min="-50" max="50" value={params.oscADetune} onChange={(e) => setParams(prev => ({ ...prev, oscADetune: parseInt(e.target.value) }))} />
-                          <span className="val-text font-mono">{params.oscADetune}c</span>
+            <div className="screen-content-viewport" style={{ padding: '8px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                
+                {/* ================= ROW 1: WAVEFORM EDITOR ================= */}
+                {(() => {
+                  const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+                  if (!slot) return null;
+                  return (
+                    <div className="box-section-sub" style={{ background: 'rgba(0, 243, 255, 0.02)', border: '1px solid rgba(0, 243, 255, 0.2)', padding: '6px 10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                        <h4 style={{ color: '#00f3ff', margin: 0, fontSize: '0.75rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>WAVEFORM AUDIO EDITOR</h4>
+                        <div className="font-mono text-cyan" style={{ fontSize: '0.7rem' }}>
+                          EDIT SLOT: <span style={{ color: '#ffe600', fontWeight: 'bold' }}>{getSlotLabel(selectedEditSlotId)}</span> &mdash; <span style={{ color: '#fff' }}>{slot.name}</span> {slot.buffer ? `(${Math.round(slot.buffer.duration * 100) / 100}s)` : '(Empty)'}
                         </div>
                       </div>
 
-                      <div className="box-section-sub">
-                        <h4>OSC 2 (B)</h4>
-                        <div className="flex-row-sub">
-                          <label>PCM Wave:</label>
-                          <select 
-                            value={params.oscBWave} 
-                            onChange={(e) => setParams(prev => ({ ...prev, oscBWave: e.target.value }))}
-                            disabled={params.oscMode === 'single'}
-                          >
-                            <option>Triton Piano</option>
-                            <option>Stereo Strings</option>
-                            <option>Warm Pad</option>
-                            <option>Classic Brass</option>
-                            <option>Triton Organ</option>
-                            <option>Nylon Guitar</option>
-                            <option>Fretless Bass</option>
-                            <option>Polysynth</option>
-                            <option>Bell Tines</option>
-                            <option>Trident Square</option>
-                          </select>
+                      {/* Canvas display */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: '10px', alignItems: 'center' }}>
+                        <div>
+                          <canvas 
+                            ref={samplerCanvasRef} 
+                            width="480" 
+                            height="75" 
+                            className="waveform-draw-canvas"
+                            style={{ display: 'block', width: '100%', height: '75px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.3)', background: '#020d1e' }}
+                          />
                         </div>
-                        <div className="flex-row-sub">
-                          <label>Octave:</label>
-                          <input type="number" min="-2" max="2" value={params.oscBOctave} onChange={(e) => setParams(prev => ({ ...prev, oscBOctave: parseInt(e.target.value) }))} disabled={params.oscMode === 'single'} />
+
+                        {/* Trim start/end and Loop controls */}
+                        <div style={{ fontSize: '0.68rem', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <label style={{ color: '#ffe600', width: '55px' }}>Start:</label>
+                            <input 
+                              type="range" min="0" max="1" step="0.01" 
+                              value={slot.start} 
+                              onChange={(e) => handleStartChange(parseFloat(e.target.value))} 
+                              style={{ flexGrow: 1, height: '10px' }}
+                            />
+                            <span className="val-text font-mono" style={{ color: '#ffe600', width: '28px', textAlign: 'right' }}>{Math.round(slot.start * 100)}%</span>
+                          </div>
+                          <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <label style={{ color: '#ff0055', width: '55px' }}>End:</label>
+                            <input 
+                              type="range" min="0" max="1" step="0.01" 
+                              value={slot.end} 
+                              onChange={(e) => handleEndChange(parseFloat(e.target.value))} 
+                              style={{ flexGrow: 1, height: '10px' }}
+                            />
+                            <span className="val-text font-mono" style={{ color: '#ff0055', width: '28px', textAlign: 'right' }}>{Math.round(slot.end * 100)}%</span>
+                          </div>
+
+                          <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <label style={{ color: '#00ff66', opacity: slot.loopOn ? 1 : 0.4, width: '55px' }}>Loop L:</label>
+                            <input 
+                              type="range" min="0" max="1" step="0.01" 
+                              value={slot.loopStart} 
+                              onChange={(e) => handleLoopStartChange(parseFloat(e.target.value))}
+                              disabled={!slot.loopOn}
+                              style={{ flexGrow: 1, height: '10px' }}
+                            />
+                            <span className="val-text font-mono" style={{ color: '#00ff66', opacity: slot.loopOn ? 1 : 0.4, width: '28px', textAlign: 'right' }}>{Math.round(slot.loopStart * 100)}%</span>
+                          </div>
+                          <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <label style={{ color: '#00ff66', opacity: slot.loopOn ? 1 : 0.4, width: '55px' }}>Loop R:</label>
+                            <input 
+                              type="range" min="0" max="1" step="0.01" 
+                              value={slot.loopEnd} 
+                              onChange={(e) => handleLoopEndChange(parseFloat(e.target.value))}
+                              disabled={!slot.loopOn}
+                              style={{ flexGrow: 1, height: '10px' }}
+                            />
+                            <span className="val-text font-mono" style={{ color: '#00ff66', opacity: slot.loopOn ? 1 : 0.4, width: '28px', textAlign: 'right' }}>{Math.round(slot.loopEnd * 100)}%</span>
+                          </div>
                         </div>
-                        <div className="flex-row-sub">
-                          <label>Detune:</label>
-                          <input type="range" min="-50" max="50" value={params.oscBDetune} onChange={(e) => setParams(prev => ({ ...prev, oscBDetune: parseInt(e.target.value) }))} disabled={params.oscMode === 'single'} />
-                          <span className="val-text font-mono">{params.oscBDetune}c</span>
+                      </div>
+
+                      {/* Loop Enable, Root Note and Preview buttons */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '95px 75px 1.3fr 110px', gap: '8px', marginTop: '4px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '4px', alignItems: 'center' }}>
+                        <button 
+                          className={`btn btn-xs ${slot.loopOn ? 'active-green' : ''}`}
+                          onClick={() => updateSlotParam(selectedEditSlotId, 'loopOn', !slot.loopOn)}
+                          style={{ margin: 0, padding: '2px 4px', fontSize: '0.6rem' }}
+                        >
+                          {slot.loopOn ? 'LOOP: ON' : 'LOOP: OFF'}
+                        </button>
+
+                        <button 
+                          className={`btn btn-xs ${slot.reverseOn ? 'active-pink' : ''}`}
+                          onClick={() => updateSlotParam(selectedEditSlotId, 'reverseOn', !slot.reverseOn)}
+                          style={{ margin: 0, padding: '2px 4px', fontSize: '0.6rem' }}
+                        >
+                          {slot.reverseOn ? 'REV: ON' : 'REV: OFF'}
+                        </button>
+
+                        <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem' }}>
+                          <span style={{ color: '#88ccee' }}>Root:</span>
+                          <div className="segmented-strip" style={{ flexGrow: 1 }}>
+                            {[36, 48, 60, 72, 84].map(val => (
+                              <button
+                                key={val}
+                                className={`segmented-btn btn-xs ${slot.rootNote === val ? 'active' : ''}`}
+                                onClick={() => updateSlotParam(selectedEditSlotId, 'rootNote', val)}
+                                style={{ fontSize: '0.55rem', padding: '1px 3px' }}
+                              >
+                                C{val/12 - 1}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <button 
+                          className={`btn btn-xs ${isPlayingPreview ? 'active-cyan' : ''}`}
+                          disabled={!slot.buffer}
+                          onClick={() => togglePreviewSample(selectedEditSlotId)}
+                          style={{ padding: '2px 6px', margin: 0, fontSize: '0.65rem' }}
+                        >
+                          {isPlayingPreview ? 'STOP PREVIEW' : 'PREVIEW SAMPLE'}
+                        </button>
+                      </div>
+
+                      {/* Slice Editor Sub-Panel */}
+                      <div style={{ marginTop: '6px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', border: '1px dashed rgba(0, 243, 255, 0.2)', padding: '5px 8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#00f3ff', fontSize: '0.62rem' }}>SLICE AD ENVELOPES (1-16)</span>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                              className={`btn btn-xs ${slot.sliceParams?.[selectedSliceIndex]?.loop ? 'active-pink' : ''}`}
+                              onClick={() => {
+                                const nextSlots = sampleSlotsRef.current.map(s => {
+                                  if (s.id === selectedEditSlotId) {
+                                    const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
+                                    paramsList[selectedSliceIndex] = { 
+                                      ...paramsList[selectedSliceIndex], 
+                                      loop: !paramsList[selectedSliceIndex].loop 
+                                    };
+                                    return { ...s, sliceParams: paramsList };
+                                  }
+                                  return s;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }}
+                              style={{ 
+                                fontSize: '0.52rem', 
+                                padding: '1px 4px', 
+                                margin: 0, 
+                                height: '16px', 
+                                lineHeight: '14px',
+                                backgroundColor: slot.sliceParams?.[selectedSliceIndex]?.loop ? '#ff0055' : '',
+                                borderColor: slot.sliceParams?.[selectedSliceIndex]?.loop ? '#ff0055' : '',
+                                color: '#fff'
+                              }}
+                            >
+                              LOOP: {slot.sliceParams?.[selectedSliceIndex]?.loop ? 'ON' : 'OFF'}
+                            </button>
+                            <button
+                              className={`btn btn-xs ${slot.sliceParams?.[selectedSliceIndex]?.reverse ? 'active-pink' : ''}`}
+                              onClick={() => {
+                                const nextSlots = sampleSlotsRef.current.map(s => {
+                                  if (s.id === selectedEditSlotId) {
+                                    const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
+                                    paramsList[selectedSliceIndex] = { 
+                                      ...paramsList[selectedSliceIndex], 
+                                      reverse: !paramsList[selectedSliceIndex].reverse 
+                                    };
+                                    return { ...s, sliceParams: paramsList };
+                                  }
+                                  return s;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }}
+                              style={{ 
+                                fontSize: '0.52rem', 
+                                padding: '1px 4px', 
+                                margin: 0, 
+                                height: '16px', 
+                                lineHeight: '14px',
+                                backgroundColor: slot.sliceParams?.[selectedSliceIndex]?.reverse ? '#ff0055' : '',
+                                borderColor: slot.sliceParams?.[selectedSliceIndex]?.reverse ? '#ff0055' : '',
+                                color: '#fff'
+                              }}
+                            >
+                              REV: {slot.sliceParams?.[selectedSliceIndex]?.reverse ? 'ON' : 'OFF'}
+                            </button>
+                            <button
+                              className="btn btn-xs"
+                              onClick={() => {
+                                const nextSlots = sampleSlotsRef.current.map(s => {
+                                  if (s.id === selectedEditSlotId) {
+                                    const currentSlice = s.sliceParams?.[selectedSliceIndex] || { attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false };
+                                    return {
+                                      ...s,
+                                      sliceParams: Array.from({ length: 16 }, () => ({ ...currentSlice }))
+                                    };
+                                  }
+                                  return s;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }}
+                              style={{ fontSize: '0.52rem', padding: '1px 4px', margin: 0, height: '16px', lineHeight: '14px' }}
+                            >
+                              COPY TO ALL
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* 16 Slice Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(16, 1fr)', gap: '2px', marginBottom: '4px' }}>
+                          {Array.from({ length: 16 }).map((_, idx) => {
+                            const isSelected = selectedSliceIndex === idx;
+                            const previewNote = slot.rootNote + idx;
+                            return (
+                              <button
+                                key={idx}
+                                className={`segmented-btn btn-xs ${isSelected ? 'active' : ''}`}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setSelectedSliceIndex(idx);
+                                  if (!audioCtxRef.current) initAudio();
+                                  const ctx = audioCtxRef.current;
+                                  if (ctx.state === 'suspended') ctx.resume();
+                                  
+                                  stopVoice(previewNote);
+                                  
+                                  const tempProg = {
+                                    ...paramsRef.current,
+                                    oscMode: 'single',
+                                    oscAWave: selectedEditSlotId,
+                                    oscATriggerMode: 'slice'
+                                  };
+                                  const voice = playProgramVoice(ctx, previewNote, 100, tempProg, `${previewNote}-prog`);
+                                  activeVoicesRef.current.set(previewNote, [voice]);
+                                  
+                                  setActiveNotes(prev => {
+                                    const next = new Set(prev);
+                                    next.add(previewNote);
+                                    return next;
+                                  });
+                                }}
+                                onMouseUp={() => {
+                                  stopVoice(previewNote);
+                                }}
+                                onMouseLeave={() => {
+                                  stopVoice(previewNote);
+                                }}
+                                onTouchStart={(e) => {
+                                  e.preventDefault();
+                                  setSelectedSliceIndex(idx);
+                                  if (!audioCtxRef.current) initAudio();
+                                  const ctx = audioCtxRef.current;
+                                  if (ctx.state === 'suspended') ctx.resume();
+                                  
+                                  stopVoice(previewNote);
+                                  
+                                  const tempProg = {
+                                    ...paramsRef.current,
+                                    oscMode: 'single',
+                                    oscAWave: selectedEditSlotId,
+                                    oscATriggerMode: 'slice'
+                                  };
+                                  const voice = playProgramVoice(ctx, previewNote, 100, tempProg, `${previewNote}-prog`);
+                                  activeVoicesRef.current.set(previewNote, [voice]);
+                                  
+                                  setActiveNotes(prev => {
+                                    const next = new Set(prev);
+                                    next.add(previewNote);
+                                    return next;
+                                  });
+                                }}
+                                onTouchEnd={(e) => {
+                                  e.preventDefault();
+                                  stopVoice(previewNote);
+                                }}
+                                style={{ fontSize: '0.5rem', padding: '2px 0', textAlign: 'center', border: isSelected ? '1px solid #00f3ff' : '1px solid rgba(255,255,255,0.08)' }}
+                              >
+                                {idx + 1}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        {/* Slice Envelopes Sliders */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                          {/* Row 1: Attack and Decay */}
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem' }}>
+                            <span style={{ color: '#ffe600', width: '40px' }}>Attack:</span>
+                            <input
+                              type="range" min="0.001" max="2.0" step="0.01"
+                              value={slot.sliceParams?.[selectedSliceIndex]?.attack || 0.01}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                const nextSlots = sampleSlotsRef.current.map(s => {
+                                  if (s.id === selectedEditSlotId) {
+                                    const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
+                                    paramsList[selectedSliceIndex] = { ...paramsList[selectedSliceIndex], attack: val };
+                                    return { ...s, sliceParams: paramsList };
+                                  }
+                                  return s;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }}
+                              style={{ flexGrow: 1, height: '8px' }}
+                            />
+                            <span className="font-mono" style={{ color: '#fff', fontSize: '0.52rem', width: '42px', textAlign: 'right' }}>{(slot.sliceParams?.[selectedSliceIndex]?.attack || 0.01).toFixed(3)}s</span>
+                          </div>
+                          
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem' }}>
+                            <span style={{ color: '#ff0055', width: '40px' }}>Decay:</span>
+                            <input
+                              type="range" min="0.01" max="5.0" step="0.05"
+                              value={slot.sliceParams?.[selectedSliceIndex]?.decay || 0.3}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                const nextSlots = sampleSlotsRef.current.map(s => {
+                                  if (s.id === selectedEditSlotId) {
+                                    const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
+                                    paramsList[selectedSliceIndex] = { ...paramsList[selectedSliceIndex], decay: val };
+                                    return { ...s, sliceParams: paramsList };
+                                  }
+                                  return s;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }}
+                              style={{ flexGrow: 1, height: '8px' }}
+                            />
+                            <span className="font-mono" style={{ color: '#fff', fontSize: '0.52rem', width: '42px', textAlign: 'right' }}>{(slot.sliceParams?.[selectedSliceIndex]?.decay || 0.3).toFixed(2)}s</span>
+                          </div>
+
+                          {/* Row 2: Pitch and Stretch */}
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem' }}>
+                            <span style={{ color: '#00f3ff', width: '40px' }}>Pitch:</span>
+                            <input
+                              type="range" min="-24" max="24" step="1"
+                              value={slot.sliceParams?.[selectedSliceIndex]?.pitch !== undefined ? slot.sliceParams[selectedSliceIndex].pitch : 0}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                const nextSlots = sampleSlotsRef.current.map(s => {
+                                  if (s.id === selectedEditSlotId) {
+                                    const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
+                                    paramsList[selectedSliceIndex] = { ...paramsList[selectedSliceIndex], pitch: val };
+                                    return { ...s, sliceParams: paramsList };
+                                  }
+                                  return s;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }}
+                              style={{ flexGrow: 1, height: '8px' }}
+                            />
+                            <span className="font-mono" style={{ color: '#fff', fontSize: '0.52rem', width: '42px', textAlign: 'right' }}>
+                              {(slot.sliceParams?.[selectedSliceIndex]?.pitch > 0 ? '+' : '') + (slot.sliceParams?.[selectedSliceIndex]?.pitch || 0)}
+                            </span>
+                          </div>
+
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem' }}>
+                            <span style={{ color: '#ff00ff', width: '40px' }}>Stretch:</span>
+                            <input
+                              type="range" min="-1.0" max="1.0" step="0.25"
+                              value={slot.sliceParams?.[selectedSliceIndex]?.stretch !== undefined ? slot.sliceParams[selectedSliceIndex].stretch : 0}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                const nextSlots = sampleSlotsRef.current.map(s => {
+                                  if (s.id === selectedEditSlotId) {
+                                    const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
+                                    paramsList[selectedSliceIndex] = { ...paramsList[selectedSliceIndex], stretch: val };
+                                    return { ...s, sliceParams: paramsList };
+                                  }
+                                  return s;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }}
+                              style={{ flexGrow: 1, height: '8px' }}
+                            />
+                            <span className="font-mono" style={{ color: '#fff', fontSize: '0.52rem', width: '42px', textAlign: 'right' }}>
+                              {(slot.sliceParams?.[selectedSliceIndex]?.stretch > 0 ? '+' : '') + Math.round((slot.sliceParams?.[selectedSliceIndex]?.stretch || 0) * 100)}%
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              )}
+                  );
+                })()}
 
-              {/* --- FILTER PAGE VIEW (WITH VISUAL 5-STAGE EG DRAWING) --- */}
-              {activeTab === 'FILTER' && (
-                <div className="lcd-page filter-page-lcd">
-                  <div className="row-grid-2">
-                    <div className="box-section-sub">
-                      <h3>VCF Resonance Filter</h3>
-                      <div className="flex-row-sub">
-                        <label>Routing:</label>
-                        <select value={params.filterMode} onChange={(e) => setParams(prev => ({ ...prev, filterMode: e.target.value }))}>
-                          <option>Single</option>
-                          <option>Double Series</option>
-                        </select>
-                      </div>
-                      <div className="flex-row-sub">
-                        <label>VCF Type:</label>
-                        <select value={params.filterType} onChange={(e) => setParams(prev => ({ ...prev, filterType: e.target.value }))}>
-                          <option>lowpass</option>
-                          <option>bandpass</option>
-                        </select>
-                      </div>
-                      <div className="flex-row-sub">
-                        <label>Cutoff:</label>
-                        <input type="range" min="100" max="10000" value={params.cutoff} onChange={(e) => setParams(prev => ({ ...prev, cutoff: parseInt(e.target.value) }))} />
-                      </div>
-                      <div className="flex-row-sub">
-                        <label>Resonance:</label>
-                        <input type="range" min="0.1" max="15.0" step="0.1" value={params.resonance} onChange={(e) => setParams(prev => ({ ...prev, resonance: parseFloat(e.target.value) }))} />
-                      </div>
-                    </div>
-
-                    <div className="box-section-sub">
-                      <h4>VCF 5-Stage Envelope Editor</h4>
-                      <div className="canvas-container-sub">
-                        <canvas 
-                          ref={(canvas) => {
-                            if (canvas) renderEgPreview(canvas, params.vcfEG);
-                          }}
-                          width="240" height="90" 
-                          className="eg-draw-canvas"
-                          onClick={(e) => handleEgCanvasClick(e, e.currentTarget, 'VCF')}
-                        ></canvas>
-                      </div>
-                      <div className="eg-stages-labels font-mono">
-                        <span>A:{params.vcfEG.attackTime}s</span>
-                        <span>D:{params.vcfEG.decayTime}s</span>
-                        <span>S:{params.vcfEG.sustainLevel}</span>
-                        <span>R:{params.vcfEG.releaseTime}s</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* --- AMP PAGE VIEW (WITH VISUAL 5-STAGE EG DRAWING) --- */}
-              {activeTab === 'AMP' && (
-                <div className="lcd-page amp-page-lcd">
-                  <div className="row-grid-2">
-                    <div className="box-section-sub">
-                      <h3>VCA Amplifier</h3>
-                      <div className="flex-row-sub">
-                        <label>Osc A Pan:</label>
-                        <input type="range" min="-1" max="1" step="0.05" value={params.oscAPan} onChange={(e) => setParams(prev => ({ ...prev, oscAPan: parseFloat(e.target.value) }))} />
-                      </div>
-                      <div className="flex-row-sub">
-                        <label>Osc B Pan:</label>
-                        <input type="range" min="-1" max="1" step="0.05" value={params.oscBPan} onChange={(e) => setParams(prev => ({ ...prev, oscBPan: parseFloat(e.target.value) }))} disabled={params.oscMode === 'single'} />
-                      </div>
-                      <div className="flex-row-sub">
-                        <label>Portamento:</label>
-                        <input type="range" min="0" max="0.5" step="0.01" value={params.portamento} onChange={(e) => setParams(prev => ({ ...prev, portamento: parseFloat(e.target.value) }))} />
-                      </div>
-                    </div>
-
-                    <div className="box-section-sub">
-                      <h4>VCA 5-Stage Envelope Editor</h4>
-                      <div className="canvas-container-sub">
-                        <canvas 
-                          ref={(canvas) => {
-                            if (canvas) renderEgPreview(canvas, params.vcaEG);
-                          }}
-                          width="240" height="90" 
-                          className="eg-draw-canvas"
-                          onClick={(e) => handleEgCanvasClick(e, e.currentTarget, 'VCA')}
-                        ></canvas>
-                      </div>
-                      <div className="eg-stages-labels font-mono">
-                        <span>A:{params.vcaEG.attackTime}s</span>
-                        <span>D:{params.vcaEG.decayTime}s</span>
-                        <span>S:{params.vcaEG.sustainLevel}</span>
-                        <span>R:{params.vcaEG.releaseTime}s</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* --- EFFECTS PAGE VIEW --- */}
-              {activeTab === 'FX' && (
-                <div className="lcd-page fx-page-lcd">
-                  <h3>Hyper Integrated FX Routing</h3>
+                {/* ================= ROW 2: SAMPLER MAPPING & RECORDER ================= */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '8px' }}>
                   
-                  <div className="row-grid-2">
-                    <div className="box-section-sub">
-                      <h4>Insert FX (IFX 1 & 2)</h4>
-                      <div className="flex-row-sub">
-                        <label>IFX 1:</label>
-                        <select 
-                          value={params.ifx1Type} 
-                          onChange={(e) => {
-                            setParams(prev => ({ ...prev, ifx1Type: e.target.value }));
-                            if (audioCtxRef.current) {
-                              // Reset node structure
-                              const container = setupIFXNode(audioCtxRef.current, e.target.value, params.ifx1Mix);
-                              ifx1Ref.current = container.effectNode;
-                              ifx1MixRef.current = container.mixNode;
-                            }
-                          }}
-                        >
-                          <option>Bypass</option>
-                          <option>Chorus</option>
-                          <option>Overdrive</option>
-                          <option>Phaser</option>
-                          <option>Autowah</option>
-                        </select>
+                  {/* Left Column: OSC Mapping & Balance */}
+                  <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px' }}>
+                    <h4 style={{ color: '#ff00ff', margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>OSC 1 & 2 PCM ROUTING</h4>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      {/* OSC 1 (A) Setup */}
+                      <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0, 243, 255, 0.08)', borderRadius: '4px', padding: '4px 6px' }}>
+                        <div className="flex-row-sub" style={{ fontSize: '0.62rem', justifyContent: 'space-between', marginBottom: '2px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#ffe600' }}>OSC 1 (A):</span>
+                          <span style={{ color: '#fff', fontSize: '0.58rem' }}>{(sampleSlots.find(s => s.id === params.oscAWave)?.name || '').slice(0, 10)}</span>
+                        </div>
+                        <div className="segmented-grid" style={{ marginTop: '2px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                          {sampleSlots.map(slot => (
+                            <button
+                              key={slot.id}
+                              className={`segmented-btn btn-xs ${params.oscAWave === slot.id ? 'active' : ''}`}
+                              onClick={() => setParams(prev => ({ ...prev, oscAWave: slot.id }))}
+                              style={{ fontSize: '0.52rem', padding: '1px 2px' }}
+                            >
+                              {getSlotLabel(slot.id)}
+                            </button>
+                          ))}
+                        </div>
+                        
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '4px', marginTop: '4px' }}>
+                          {/* Octave selection */}
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem', flexDirection: 'column', gap: '1px', alignItems: 'flex-start' }}>
+                            <span style={{ color: '#88ccee' }}>Octave:</span>
+                            <div className="segmented-strip">
+                              {[-2, -1, 0, 1, 2].map(oct => (
+                                <button
+                                  key={oct}
+                                  className={`segmented-btn btn-xs ${params.oscAOctave === oct ? 'active' : ''}`}
+                                  onClick={() => setParams(prev => ({ ...prev, oscAOctave: oct }))}
+                                  style={{ padding: '0px 2px', fontSize: '0.5rem' }}
+                                >
+                                  {oct > 0 ? `+${oct}` : oct}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Trigger mode selection */}
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem', flexDirection: 'column', gap: '1px', alignItems: 'flex-end' }}>
+                            <span style={{ color: '#88ccee' }}>Play Mode:</span>
+                            <div className="segmented-strip">
+                              {['pitch', 'slice'].map(m => (
+                                <button
+                                  key={m}
+                                  className={`segmented-btn btn-xs ${params.oscATriggerMode === m ? 'active' : ''}`}
+                                  onClick={() => setParams(prev => ({ ...prev, oscATriggerMode: m }))}
+                                  style={{ padding: '1px 3px', fontSize: '0.5rem' }}
+                                >
+                                  {m.toUpperCase()}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Detune slider */}
+                        <div className="flex-row-sub" style={{ fontSize: '0.58rem', marginTop: '3px' }}>
+                          <span style={{ color: '#88ccee' }}>Detune:</span>
+                          <input 
+                            type="range" min="-50" max="50" 
+                            value={params.oscADetune} 
+                            onChange={(e) => setParams(prev => ({ ...prev, oscADetune: parseInt(e.target.value) }))} 
+                            style={{ flexGrow: 1, height: '8px' }}
+                          />
+                          <span className="val-text font-mono" style={{ color: '#fff', fontSize: '0.55rem' }}>{params.oscADetune}c</span>
+                        </div>
+
+                        {/* Echo Send slider */}
+                        <div className="flex-row-sub" style={{ fontSize: '0.58rem', marginTop: '3px' }}>
+                          <span style={{ color: '#88ccee' }}>Echo Send:</span>
+                          <input 
+                            type="range" min="0" max="1" step="0.05"
+                            value={params.mfx1SendA} 
+                            onChange={(e) => setParams(prev => ({ ...prev, mfx1SendA: parseFloat(e.target.value) }))} 
+                            style={{ flexGrow: 1, height: '8px' }}
+                          />
+                          <span className="val-text font-mono" style={{ color: '#fff', fontSize: '0.55rem' }}>{Math.round(params.mfx1SendA * 100)}%</span>
+                        </div>
+
+                        {/* Reverb Send slider */}
+                        <div className="flex-row-sub" style={{ fontSize: '0.58rem', marginTop: '3px' }}>
+                          <span style={{ color: '#88ccee' }}>Reverb Send:</span>
+                          <input 
+                            type="range" min="0" max="1" step="0.05"
+                            value={params.mfx2SendA} 
+                            onChange={(e) => setParams(prev => ({ ...prev, mfx2SendA: parseFloat(e.target.value) }))} 
+                            style={{ flexGrow: 1, height: '8px' }}
+                          />
+                          <span className="val-text font-mono" style={{ color: '#fff', fontSize: '0.55rem' }}>{Math.round(params.mfx2SendA * 100)}%</span>
+                        </div>
                       </div>
-                      <div className="flex-row-sub">
-                        <label>IFX 2:</label>
-                        <select 
-                          value={params.ifx2Type} 
-                          onChange={(e) => {
-                            setParams(prev => ({ ...prev, ifx2Type: e.target.value }));
-                            if (audioCtxRef.current) {
-                              const container = setupIFXNode(audioCtxRef.current, e.target.value, params.ifx2Mix);
-                              ifx2Ref.current = container.effectNode;
-                              ifx2MixRef.current = container.mixNode;
-                            }
-                          }}
-                        >
-                          <option>Bypass</option>
-                          <option>Flanger</option>
-                          <option>Rotary Speaker</option>
-                          <option>Ring Modulator</option>
-                        </select>
+
+                      {/* OSC 2 (B) Setup */}
+                      <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0, 243, 255, 0.08)', borderRadius: '4px', padding: '4px 6px' }}>
+                        <div className="flex-row-sub" style={{ fontSize: '0.62rem', justifyContent: 'space-between', marginBottom: '2px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#ff00ff' }}>OSC 2 (B):</span>
+                          <span style={{ color: '#fff', fontSize: '0.58rem' }}>{(sampleSlots.find(s => s.id === params.oscBWave)?.name || '').slice(0, 10)}</span>
+                        </div>
+                        <div className="segmented-grid" style={{ marginTop: '2px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                          {sampleSlots.map(slot => (
+                            <button
+                              key={slot.id}
+                              className={`segmented-btn btn-xs ${params.oscBWave === slot.id ? 'active' : ''}`}
+                              onClick={() => setParams(prev => ({ ...prev, oscBWave: slot.id }))}
+                              disabled={params.oscMode === 'single'}
+                              style={{ fontSize: '0.52rem', padding: '1px 2px' }}
+                            >
+                              {getSlotLabel(slot.id)}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '4px', marginTop: '4px' }}>
+                          {/* Octave selection */}
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem', flexDirection: 'column', gap: '1px', alignItems: 'flex-start' }}>
+                            <span style={{ color: '#88ccee', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>Octave:</span>
+                            <div className="segmented-strip">
+                              {[-2, -1, 0, 1, 2].map(oct => (
+                                <button
+                                  key={oct}
+                                  className={`segmented-btn btn-xs ${params.oscBOctave === oct ? 'active' : ''}`}
+                                  onClick={() => setParams(prev => ({ ...prev, oscBOctave: oct }))}
+                                  disabled={params.oscMode === 'single'}
+                                  style={{ padding: '0px 2px', fontSize: '0.5rem' }}
+                                >
+                                  {oct > 0 ? `+${oct}` : oct}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Trigger mode selection */}
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem', flexDirection: 'column', gap: '1px', alignItems: 'flex-end' }}>
+                            <span style={{ color: '#88ccee', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>Play Mode:</span>
+                            <div className="segmented-strip">
+                              {['pitch', 'slice'].map(m => (
+                                <button
+                                  key={m}
+                                  className={`segmented-btn btn-xs ${params.oscBTriggerMode === m ? 'active' : ''}`}
+                                  onClick={() => setParams(prev => ({ ...prev, oscBTriggerMode: m }))}
+                                  disabled={params.oscMode === 'single'}
+                                  style={{ padding: '1px 3px', fontSize: '0.5rem' }}
+                                >
+                                  {m.toUpperCase()}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Detune slider */}
+                        <div className="flex-row-sub" style={{ fontSize: '0.58rem', marginTop: '3px' }}>
+                          <span style={{ color: '#88ccee', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>Detune:</span>
+                          <input 
+                            type="range" min="-50" max="50" 
+                            value={params.oscBDetune} 
+                            onChange={(e) => setParams(prev => ({ ...prev, oscBDetune: parseInt(e.target.value) }))} 
+                            disabled={params.oscMode === 'single'}
+                            style={{ flexGrow: 1, height: '8px' }}
+                          />
+                          <span className="val-text font-mono" style={{ color: '#fff', fontSize: '0.55rem', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>{params.oscBDetune}c</span>
+                        </div>
+
+                        {/* Echo Send slider */}
+                        <div className="flex-row-sub" style={{ fontSize: '0.58rem', marginTop: '3px' }}>
+                          <span style={{ color: '#88ccee', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>Echo Send:</span>
+                          <input 
+                            type="range" min="0" max="1" step="0.05"
+                            value={params.mfx1SendB} 
+                            onChange={(e) => setParams(prev => ({ ...prev, mfx1SendB: parseFloat(e.target.value) }))} 
+                            disabled={params.oscMode === 'single'}
+                            style={{ flexGrow: 1, height: '8px' }}
+                          />
+                          <span className="val-text font-mono" style={{ color: '#fff', fontSize: '0.55rem', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>{Math.round(params.mfx1SendB * 100)}%</span>
+                        </div>
+
+                        {/* Reverb Send slider */}
+                        <div className="flex-row-sub" style={{ fontSize: '0.58rem', marginTop: '3px' }}>
+                          <span style={{ color: '#88ccee', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>Reverb Send:</span>
+                          <input 
+                            type="range" min="0" max="1" step="0.05"
+                            value={params.mfx2SendB} 
+                            onChange={(e) => setParams(prev => ({ ...prev, mfx2SendB: parseFloat(e.target.value) }))} 
+                            disabled={params.oscMode === 'single'}
+                            style={{ flexGrow: 1, height: '8px' }}
+                          />
+                          <span className="val-text font-mono" style={{ color: '#fff', fontSize: '0.55rem', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>{Math.round(params.mfx2SendB * 100)}%</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="box-section-sub">
-                      <h4>Master FX Sends (MFX)</h4>
-                      <div className="flex-row-sub">
-                        <label>MFX 1 Send (Delay):</label>
-                        <input type="range" min="0" max="1" step="0.05" value={params.mfx1SendA} onChange={(e) => setParams(prev => ({ ...prev, mfx1SendA: parseFloat(e.target.value) }))} />
+                    {/* Oscillator Mode and Crossfader */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px', marginTop: '4px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '4px' }}>
+                      <div className="flex-row-sub" style={{ fontSize: '0.62rem', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#88ccee' }}>OSC Mode:</span>
+                        <button
+                          className="segmented-btn btn-xs active"
+                          style={{ margin: 0, padding: '1px 6px', fontSize: '0.55rem', fontWeight: 'bold' }}
+                          onClick={() => setParams(prev => ({ ...prev, oscMode: prev.oscMode === 'single' ? 'double' : 'single' }))}
+                        >
+                          {params.oscMode.toUpperCase()}
+                        </button>
                       </div>
-                      <div className="flex-row-sub">
-                        <label>MFX 2 Send (Reverb):</label>
-                        <input type="range" min="0" max="1" step="0.05" value={params.mfx2SendA} onChange={(e) => setParams(prev => ({ ...prev, mfx2SendA: parseFloat(e.target.value) }))} />
+
+                      <div className="flex-row-sub" style={{ fontSize: '0.62rem', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: '#88ccee', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>Mix Crossfade (1:2):</span>
+                        <input 
+                          type="range" min="0" max="1" step="0.02" 
+                          value={params.oscBalance} 
+                          onChange={(e) => setParams(prev => ({ ...prev, oscBalance: parseFloat(e.target.value) }))} 
+                          disabled={params.oscMode === 'single'}
+                          style={{ flexGrow: 1, height: '10px' }}
+                        />
+                        <span className="font-mono text-cyan" style={{ fontSize: '0.65rem', minWidth: '32px', textAlign: 'right', opacity: params.oscMode === 'single' ? 0.4 : 1 }}>
+                          {Math.round((1 - params.oscBalance) * 100)}:{Math.round(params.oscBalance * 100)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Recorder Deck */}
+                  <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px' }}>
+                    <h4 style={{ color: '#ffe600', margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>INPUT RECORDER DECK</h4>
+                    
+                    {/* Active Edit / Record target slots grid (replaces select menu!) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <div style={{ fontSize: '0.62rem', color: '#88ccee', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Target User / Factory Slot:</span>
+                      </div>
+                      <div className="segmented-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '2px' }}>
+                        {sampleSlots.map(s => (
+                          <button
+                            key={s.id}
+                            className={`segmented-btn btn-xs ${selectedEditSlotId === s.id ? 'active' : ''}`}
+                            onClick={() => setSelectedEditSlotId(s.id)}
+                            style={{ fontSize: '0.52rem', padding: '2px 1px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
+                            title={`${getSlotLabel(s.id)}: ${s.name}`}
+                          >
+                            {getSlotLabel(s.id)}:{s.buffer ? '●' : '○'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Microphone Controls */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '6px', marginTop: '4px' }}>
+                      <button 
+                        className={`btn btn-xs ${isArmed ? 'active-yellow' : ''}`} 
+                        onClick={armMicrophone}
+                        style={{ margin: 0, fontSize: '0.62rem', padding: '3px' }}
+                      >
+                        {isArmed ? 'DISARM MIC' : 'ARM MIC'}
+                      </button>
+                      <button 
+                        className={`btn btn-xs ${isRecording ? 'active-red blinking' : ''}`} 
+                        disabled={!isArmed}
+                        onClick={isRecording ? stopRecording : startRecording}
+                        style={{ margin: 0, fontSize: '0.62rem', padding: '3px' }}
+                      >
+                        {isRecording ? 'STOP REC' : 'RECORD (LIVE)'}
+                      </button>
+                    </div>
+
+                    {/* Level meter and File selector */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '4px', alignItems: 'center' }}>
+                      {/* Level meter */}
+                      <div className="mic-level-meter-container" style={{ padding: '3px 6px', height: '22px' }}>
+                        <div className="mic-level-bar-track" style={{ height: '4px' }}>
+                          <div id="mic-level-bar-fill" className="mic-level-bar-fill"></div>
+                        </div>
+                      </div>
+
+                      {/* File selector */}
+                      <div>
+                        <input 
+                          type="file" 
+                          id="sampler-file-loader-input" 
+                          accept="audio/*" 
+                          style={{ display: 'none' }} 
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            if (!audioCtxRef.current) initAudio();
+                            const ctx = audioCtxRef.current;
+                            try {
+                              const arrayBuffer = await file.arrayBuffer();
+                              ctx.decodeAudioData(arrayBuffer, (buffer) => {
+                                const nextSlots = sampleSlotsRef.current.map(slot => {
+                                  if (slot.id === selectedEditSlotId) {
+                                    return {
+                                      ...slot,
+                                      name: file.name.slice(0, 20),
+                                      buffer: buffer,
+                                      revBuffer: getReversedBuffer(ctx, buffer),
+                                      start: 0.0,
+                                      end: 1.0,
+                                      loopStart: 0.0,
+                                      loopEnd: 1.0
+                                    };
+                                  }
+                                  return slot;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }, (err) => {
+                                console.error("Error decoding imported audio: ", err);
+                                alert("Failed to decode. Verify the audio format is valid.");
+                              });
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                        />
+                        <button 
+                          className="btn btn-xs" 
+                          style={{ borderColor: '#ffe600', color: '#ffe600', width: '100%', margin: 0, fontSize: '0.62rem', padding: '3px' }}
+                          onClick={() => document.getElementById('sampler-file-loader-input').click()}
+                        >
+                          IMPORT FILE...
+                        </button>
                       </div>
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* --- ARPEGGIATOR PAGE VIEW --- */}
-              {activeTab === 'ARP' && (
-                <div className="lcd-page arp-page-lcd">
-                  <h3>Dual Polyphonic Arpeggiator</h3>
-                  <div className="row-grid-2">
-                    <div className="box-section-sub">
-                      <div className="flex-row-sub">
-                        <label>Arp Enabled:</label>
-                        <input type="checkbox" checked={params.arpOn} onChange={(e) => setParams(prev => ({ ...prev, arpOn: e.target.checked }))} />
+                {/* ================= ROW 3: MODULATION ENVELOPES & FX MIX ================= */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '8px' }}>
+                  
+                  {/* Left Column: Filter & Amp Envelopes */}
+                  <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px' }}>
+                    <h4 style={{ color: '#00ff66', margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>FILTER & AMPLIFIER ENVELOPES</h4>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      {/* VCF EG (Filter Env) */}
+                      <div>
+                        <div className="flex-row-sub" style={{ fontSize: '0.6rem', justifyContent: 'space-between', marginBottom: '2px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#88ccee' }}>VCF Env (Filter):</span>
+                          <span style={{ fontSize: '0.52rem', color: '#aaa' }} className="font-mono">A:{params.vcfEG.attackTime}s D:{params.vcfEG.decayTime}s S:{params.vcfEG.sustainLevel}</span>
+                        </div>
+                        <div className="canvas-container-sub" style={{ border: '1px solid rgba(0,243,255,0.25)', borderRadius: '3px', background: '#010915', height: '55px', padding: '1px' }}>
+                          <canvas 
+                            ref={(canvas) => { if (canvas) renderEgPreview(canvas, params.vcfEG); }}
+                            width="160" height="50" 
+                            className="eg-draw-canvas"
+                            onClick={(e) => handleEgCanvasClick(e, e.currentTarget, 'VCF')}
+                            style={{ width: '100%', height: '100%', cursor: 'crosshair' }}
+                          />
+                        </div>
+                        <div style={{ fontSize: '0.5rem', color: '#ff00ff', textAlign: 'center', marginTop: '1px' }}>
+                          🖱️ Click & Drag to shape VCF Filter ADSR
+                        </div>
                       </div>
-                      <div className="flex-row-sub">
-                        <label>BPM Clock:</label>
-                        <input type="number" min="60" max="240" value={params.arpBpm} onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseInt(e.target.value) }))} />
-                      </div>
-                      <div className="flex-row-sub">
-                        <label>Step Div:</label>
-                        <select value={params.arpDivision} onChange={(e) => setParams(prev => ({ ...prev, arpDivision: parseInt(e.target.value) }))}>
-                          <option value="4">Quarter</option>
-                          <option value="8">8th</option>
-                          <option value="16">16th</option>
-                        </select>
-                      </div>
-                    </div>
 
-                    <div className="box-section-sub">
-                      <div className="flex-row-sub">
-                        <label>Direction:</label>
-                        <select value={params.arpPattern} onChange={(e) => setParams(prev => ({ ...prev, arpPattern: e.target.value }))}>
-                          <option>UP</option>
-                          <option>DOWN</option>
-                          <option>ALT1</option>
-                          <option>RANDOM</option>
-                        </select>
-                      </div>
-                      <div className="flex-row-sub">
-                        <label>Gate Length:</label>
-                        <input type="range" min="0.1" max="1.0" step="0.05" value={params.arpGate} onChange={(e) => setParams(prev => ({ ...prev, arpGate: parseFloat(e.target.value) }))} />
+                      {/* VCA EG (Amp Env) */}
+                      <div>
+                        <div className="flex-row-sub" style={{ fontSize: '0.6rem', justifyContent: 'space-between', marginBottom: '2px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#88ccee' }}>VCA Env (Volume):</span>
+                          <span style={{ fontSize: '0.52rem', color: '#aaa' }} className="font-mono">A:{params.vcaEG.attackTime}s D:{params.vcaEG.decayTime}s S:{params.vcaEG.sustainLevel}</span>
+                        </div>
+                        <div className="canvas-container-sub" style={{ border: '1px solid rgba(0,243,255,0.25)', borderRadius: '3px', background: '#010915', height: '55px', padding: '1px' }}>
+                          <canvas 
+                            ref={(canvas) => { if (canvas) renderEgPreview(canvas, params.vcaEG); }}
+                            width="160" height="50" 
+                            className="eg-draw-canvas"
+                            onClick={(e) => handleEgCanvasClick(e, e.currentTarget, 'VCA')}
+                            style={{ width: '100%', height: '100%', cursor: 'crosshair' }}
+                          />
+                        </div>
+                        <div style={{ fontSize: '0.5rem', color: '#ff00ff', textAlign: 'center', marginTop: '1px' }}>
+                          🖱️ Click & Drag to shape VCA Amplitude ADSR
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* --- MIDI SETTINGS VIEW --- */}
-              {activeTab === 'MIDI' && (
-                <div className="lcd-page midi-page-lcd">
-                  <h3>WebMIDI Connectivity & Learn Dashboard</h3>
-                  <div className="box-section-sub">
-                    <div className="flex-row-sub">
-                      <label>MIDI Status:</label>
-                      <span className="font-mono text-cyan">{isMidiSupported ? 'SUPPORTED' : 'NOT SUPPORTED'}</span>
+                  {/* Right Column: LFO, ARP & Global FX Mixer Controls */}
+                  <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <h4 style={{ color: '#00f3ff', margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>LFO, ARP & GLOBAL FX</h4>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.6rem' }}>
+                      {/* LFO & ARP */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        {/* LFO */}
+                        <div className="flex-row-sub">
+                          <label>LFO Rate:</label>
+                          <input 
+                            type="range" min="0.1" max="15" step="0.1" 
+                            value={params.lfo1Rate} 
+                            onChange={(e) => setParams(prev => ({ ...prev, lfo1Rate: parseFloat(e.target.value) }))} 
+                            style={{ width: '45px', height: '8px' }}
+                          />
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.52rem', width: '20px', textAlign: 'right' }}>{Math.round(params.lfo1Rate)}H</span>
+                        </div>
+                        <div className="flex-row-sub" style={{ alignItems: 'center' }}>
+                          <label>LFO Tgt:</label>
+                          <div className="segmented-strip" style={{ flexGrow: 1 }}>
+                            {['pitch', 'filter'].map(t => (
+                              <button
+                                key={t}
+                                className={`segmented-btn btn-xs ${params.lfo1Target === t ? 'active' : ''}`}
+                                onClick={() => setParams(prev => ({ ...prev, lfo1Target: t }))}
+                                style={{ fontSize: '0.48rem', padding: '0px 2px' }}
+                              >
+                                {t.slice(0, 3).toUpperCase()}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Arpeggiator */}
+                        <div className="flex-row-sub" style={{ alignItems: 'center', marginTop: '2px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '2px' }}>
+                          <label>Arp:</label>
+                          <button
+                            className={`segmented-btn btn-xs ${params.arpOn ? 'active' : ''}`}
+                            onClick={() => setParams(prev => ({ ...prev, arpOn: !prev.arpOn }))}
+                            style={{ padding: '0px 4px', fontSize: '0.48rem' }}
+                          >
+                            {params.arpOn ? 'ON' : 'OFF'}
+                          </button>
+                          <input 
+                            type="range" min="60" max="200" step="5"
+                            value={params.arpBpm || 120} 
+                            onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseInt(e.target.value) }))} 
+                            style={{ width: '40px', height: '8px' }}
+                            disabled={!params.arpOn}
+                          />
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.48rem' }}>{params.arpBpm}B</span>
+                        </div>
+                      </div>
+
+                      {/* FX Parameters */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div className="flex-row-sub" style={{ justifyContent: 'space-between' }}>
+                          <span style={{ color: '#ffe600' }}>IFX1:</span>
+                          <select
+                            value={params.ifx1Type}
+                            onChange={(e) => setParams(prev => ({ ...prev, ifx1Type: e.target.value }))}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.55rem', padding: '1px', borderRadius: '3px', width: '75px' }}
+                          >
+                            {['Bypass', 'Chorus', 'Phaser', 'Autowah', 'Overdrive', 'Rotary Speaker', 'Flanger', 'Ring Modulator'].map(type => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-row-sub">
+                          <label>Mix1:</label>
+                          <input 
+                            type="range" min="0" max="1" step="0.05"
+                            value={params.ifx1Mix} 
+                            onChange={(e) => setParams(prev => ({ ...prev, ifx1Mix: parseFloat(e.target.value) }))} 
+                            style={{ width: '45px', height: '8px' }}
+                          />
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.52rem', width: '20px', textAlign: 'right' }}>{Math.round(params.ifx1Mix * 100)}%</span>
+                        </div>
+
+                        <div className="flex-row-sub" style={{ justifyContent: 'space-between', marginTop: '1px' }}>
+                          <span style={{ color: '#ff00ff' }}>IFX2:</span>
+                          <select
+                            value={params.ifx2Type}
+                            onChange={(e) => setParams(prev => ({ ...prev, ifx2Type: e.target.value }))}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.55rem', padding: '1px', borderRadius: '3px', width: '75px' }}
+                          >
+                            {['Bypass', 'Chorus', 'Phaser', 'Autowah', 'Overdrive', 'Rotary Speaker', 'Flanger', 'Ring Modulator'].map(type => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-row-sub">
+                          <label>Mix2:</label>
+                          <input 
+                            type="range" min="0" max="1" step="0.05"
+                            value={params.ifx2Mix} 
+                            onChange={(e) => setParams(prev => ({ ...prev, ifx2Mix: parseFloat(e.target.value) }))} 
+                            style={{ width: '45px', height: '8px' }}
+                          />
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.52rem', width: '20px', textAlign: 'right' }}>{Math.round(params.ifx2Mix * 100)}%</span>
+                        </div>
+
+                        <div className="flex-row-sub" style={{ marginTop: '1px' }}>
+                          <label>Reverb:</label>
+                          <input 
+                            type="range" min="0" max="0.8" step="0.05"
+                            value={params.reverbMix} 
+                            onChange={(e) => setParams(prev => ({ ...prev, reverbMix: parseFloat(e.target.value) }))} 
+                            style={{ width: '45px', height: '8px' }}
+                          />
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.52rem', width: '20px', textAlign: 'right' }}>{Math.round(params.reverbMix * 100)}%</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-row-sub">
-                      <label>Active Input:</label>
+
+                    {/* MIDI active device selection in footer */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.58rem', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '3px', marginTop: '3px' }}>
+                      <span style={{ color: '#ffe600' }}>MIDI IN:</span>
                       <select 
                         value={selectedMidiDevice} 
                         onChange={(e) => {
@@ -2125,28 +4483,78 @@ export default function Delta7Synth() {
                           if (dev) setupMidiListeners(dev);
                         }}
                         disabled={midiDevices.length === 0}
+                        style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.55rem', padding: '1px', borderRadius: '3px', width: '120px' }}
                       >
                         {midiDevices.map((d) => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
+                          <option key={d.id} value={d.id}>{d.name.slice(0, 22)}</option>
                         ))}
                         {midiDevices.length === 0 && <option>No Devices Found</option>}
                       </select>
                     </div>
 
-                    <div className="midi-mappings-dashboard">
-                      <h4>Mapped CC Parameters</h4>
-                      <div className="mappings-tag-grid font-mono">
-                        {Object.entries(midiMappings).map(([param, cc]) => (
-                          <div className="mapping-item-tag" key={param}>
-                            <span className="param-label-tag">{param}:</span>
-                            <span className="cc-number-tag">CC {cc}</span>
-                          </div>
-                        ))}
+                    {/* MIDI CC Learn Matrix Grid Panel */}
+                    <div style={{ borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '3px', marginTop: '3px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                        <span style={{ color: '#00f3ff', fontSize: '0.55rem', fontWeight: 'bold' }}>MIDI CC LEARN MATRIX</span>
+                        <button
+                          className="btn btn-xs"
+                          onClick={() => {
+                            setMidiMappings({});
+                            localStorage.removeItem('delta7_midi_mappings');
+                          }}
+                          style={{ fontSize: '0.45rem', padding: '0px 3px', height: '12px', lineHeight: '10px' }}
+                        >
+                          CLEAR ALL
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2px' }}>
+                        {[
+                          { name: 'Cutoff', key: 'cutoff' },
+                          { name: 'Reso', key: 'resonance' },
+                          { name: 'OscA Vol', key: 'oscAVol' },
+                          { name: 'OscB Vol', key: 'oscBVol' },
+                          { name: 'LFO Rate', key: 'lfo1Rate' },
+                          { name: 'IFX Mix', key: 'ifxMix' },
+                          { name: 'EQ Low', key: 'eqLow' },
+                          { name: 'EQ Mid', key: 'eqMid' },
+                          { name: 'EQ High', key: 'eqHigh' },
+                          { name: 'Master', key: 'masterVolume' },
+                          { name: 'Kaoss X', key: 'kaossX' },
+                          { name: 'Kaoss Y', key: 'kaossY' }
+                        ].map(item => {
+                          const isLearning = midiLearnParam === item.key;
+                          const ccVal = midiMappings[item.key];
+                          return (
+                            <button
+                              key={item.key}
+                              onClick={() => setMidiLearnParam(isLearning ? null : item.key)}
+                              className={`btn btn-xs ${isLearning ? 'active-pink' : ccVal !== undefined ? 'active-cyan' : ''}`}
+                              style={{
+                                fontSize: '0.48rem',
+                                padding: '2px 0',
+                                textAlign: 'center',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minHeight: '22px',
+                                border: isLearning ? '1px solid #ff0055' : ccVal !== undefined ? '1px solid #00f3ff' : '1px solid rgba(255,255,255,0.08)',
+                                background: isLearning ? 'rgba(255, 0, 85, 0.15)' : ccVal !== undefined ? 'rgba(0, 243, 255, 0.05)' : 'rgba(0,0,0,0.2)'
+                              }}
+                            >
+                              <span style={{ color: '#fff', fontSize: '0.46rem' }}>{item.name}</span>
+                              <span style={{ color: isLearning ? '#ff0055' : ccVal !== undefined ? '#00f3ff' : '#888', fontSize: '0.42rem', fontWeight: 'bold' }}>
+                                {isLearning ? 'LEARN' : ccVal !== undefined ? `CC ${ccVal}` : '---'}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
                 </div>
-              )}
+
+              </div>
 
             </div>
           </div>
@@ -2155,27 +4563,56 @@ export default function Delta7Synth() {
         {/* ================= RIGHT SIDE CONTROLS & KAOSS PAD ================= */}
         <div className="rack-panel-right steel-plate">
           
-          {/* Glowing Kaoss Pad Touch pad */}
+          {/* Glowing Delta Pad Touch pad */}
           <div className="kaoss-pad-container">
-            <div className="section-label">Kaoss Pad XY Modulator</div>
-            <div className="kaoss-targets-selectors font-mono">
-              <div className="target-select-row">
-                <label>X-AXIS:</label>
-                <select value={kaossTargetX} onChange={(e) => setKaossTargetX(e.target.value)}>
-                  <option value="cutoff">Filter Cutoff</option>
-                  <option value="lfoRate">LFO Rate</option>
-                  <option value="ifxMix">IFX Wet Mix</option>
-                  <option value="delayTime">Delay Feed/Time</option>
-                </select>
+            <div className="section-label">Delta Pad XY Modulator</div>
+            <div className="kaoss-targets-selectors font-mono" style={{ gap: '6px' }}>
+              <div className="target-select-row-new">
+                <div className="target-row-label">X-AXIS TARGET:</div>
+                <div className="target-btn-strip">
+                  {[
+                    { value: 'cutoff', label: 'CUTOFF' },
+                    { value: 'lfoRate', label: 'LFO' },
+                    { value: 'ifxMix', label: 'IFX' },
+                    { value: 'delayTime', label: 'DELAY' },
+                    { value: 'gater', label: 'GATER' }
+                  ].map(tgt => (
+                    <button
+                      key={tgt.value}
+                      className={`target-btn ${kaossTargetX === tgt.value ? 'selected-x' : ''}`}
+                      onClick={() => {
+                        setKaossTargetX(tgt.value);
+                        modulateKaossParameters(kaossPad.x, kaossPad.y, kaossPad.touchActive);
+                      }}
+                    >
+                      {tgt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="target-select-row">
-                <label>Y-AXIS:</label>
-                <select value={kaossTargetY} onChange={(e) => setKaossTargetY(e.target.value)}>
-                  <option value="resonance">Filter Resonance</option>
-                  <option value="reverbDecay">Reverb Send</option>
-                  <option value="chorusRate">Delay Feedback</option>
-                  <option value="ringModMix">RingMod mix</option>
-                </select>
+              <div className="target-select-row-new">
+                <div className="target-row-label">Y-AXIS TARGET:</div>
+                <div className="target-btn-strip">
+                  {[
+                    { value: 'resonance', label: 'RESO' },
+                    { value: 'reverbDecay', label: 'REVERB' },
+                    { value: 'chorusRate', label: 'FB' },
+                    { value: 'ringModMix', label: 'RM MIX' },
+                    { value: 'ringModFreq', label: 'RM FREQ' },
+                    { value: 'gater', label: 'GATER' }
+                  ].map(tgt => (
+                    <button
+                      key={tgt.value}
+                      className={`target-btn ${kaossTargetY === tgt.value ? 'selected-y' : ''}`}
+                      onClick={() => {
+                        setKaossTargetY(tgt.value);
+                        modulateKaossParameters(kaossPad.x, kaossPad.y, kaossPad.touchActive);
+                      }}
+                    >
+                      {tgt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -2200,7 +4637,7 @@ export default function Delta7Synth() {
                 // Reset coordinates if Hold toggle is inactive
                 if (!kaossPad.holdActive) {
                   setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
-                  modulateKaossParameters(0.5, 0.5);
+                  modulateKaossParameters(0.5, 0.5, false);
                 }
               }}
               onMouseLeave={() => {
@@ -2210,7 +4647,7 @@ export default function Delta7Synth() {
                 }));
                 if (!kaossPad.holdActive) {
                   setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
-                  modulateKaossParameters(0.5, 0.5);
+                  modulateKaossParameters(0.5, 0.5, false);
                 }
               }}
             >
@@ -2232,9 +4669,27 @@ export default function Delta7Synth() {
             <div className="kaoss-footer-actions">
               <button 
                 className={`btn btn-sm ${kaossPad.holdActive ? 'active-red' : ''}`}
-                onClick={() => setKaossPad(prev => ({ ...prev, holdActive: !prev.holdActive }))}
+                onClick={() => {
+                  const nextHold = !kaossPad.holdActive;
+                  setKaossPad(prev => ({ ...prev, holdActive: nextHold }));
+                  if (!nextHold && !kaossPad.touchActive) {
+                    setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
+                    modulateKaossParameters(0.5, 0.5, false);
+                  } else {
+                    modulateKaossParameters(kaossPad.x, kaossPad.y, kaossPad.touchActive);
+                  }
+                }}
               >
                 HOLD COORDINATES
+              </button>
+              <button
+                className={`btn btn-sm ${glitchActive ? 'btn-glitch-active' : ''}`}
+                onMouseDown={() => toggleGlitch(true)}
+                onMouseUp={() => toggleGlitch(false)}
+                onMouseLeave={() => { if (glitchActive) toggleGlitch(false); }}
+                style={{ borderColor: '#ffe600', color: '#ffe600' }}
+              >
+                GLITCH
               </button>
               <div className="coord-readout font-mono">
                 X:{Math.round(kaossPad.x * 100)} | Y:{Math.round(kaossPad.y * 100)}
@@ -2283,10 +4738,10 @@ export default function Delta7Synth() {
       {/* Interactive Piano Keyboard on bottom */}
       <div className="keyboard-section-bezel">
         <div className="white-black-keys-row">
-          {Array.from({ length: 25 }, (_, i) => {
+          {Array.from({ length: 37 }, (_, i) => {
             const baseNote = 48; // starting note C3
             const midiNote = baseNote + i;
-            const isBlack = [1, 3, 6, 8, 10, 13, 15, 18, 20, 22].includes(midiNote % 12);
+            const isBlack = [1, 3, 6, 8, 10].includes(midiNote % 12);
             return (
               <button
                 key={midiNote}
@@ -2297,7 +4752,7 @@ export default function Delta7Synth() {
                   if (activeNotes.has(midiNote)) stopVoice(midiNote);
                 }}
               >
-                {midiNote % 12 === 0 && <span className="label-key-c font-mono">C</span>}
+                {midiNote % 12 === 0 && <span className="label-key-c font-mono">C{3 + i/12}</span>}
               </button>
             );
           })}
@@ -2316,37 +4771,39 @@ export default function Delta7Synth() {
       {/* ================= STYLING SHEET EMBED ================= */}
       <style>{`
         .delta7-hardware-chassis {
-          background: #000000;
+          background: #040509;
           background-image: 
-            linear-gradient(rgba(0, 243, 255, 0.08) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 243, 255, 0.08) 1px, transparent 1px);
-          background-size: 25px 25px;
-          border: 3px solid #00f3ff;
-          border-radius: 12px;
+            linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+          background-size: 30px 30px;
+          border: 2px solid rgba(0, 243, 255, 0.35);
+          border-radius: 16px;
           box-shadow: 
-            0 0 25px rgba(0, 243, 255, 0.4), 
-            inset 0 0 20px rgba(0, 243, 255, 0.2);
+            0 25px 60px rgba(0, 0, 0, 0.95), 
+            0 0 40px rgba(0, 243, 255, 0.15),
+            inset 0 0 30px rgba(0, 243, 255, 0.05);
           padding: 1.25rem;
           color: #e2e8f0;
           display: flex;
           flex-direction: column;
           gap: 1rem;
           width: 100%;
-          max-width: 1100px;
+          max-width: 1200px;
           margin: 0 auto;
           user-select: none;
         }
 
         .rack-header-bar {
-          background: #000000;
-          border-radius: 6px;
-          border: 2px solid #ff00ff;
+          background: rgba(10, 12, 18, 0.95);
+          backdrop-filter: blur(12px);
+          border-radius: 8px;
+          border: 1px solid rgba(255, 0, 255, 0.25);
           display: flex;
           justify-content: space-between;
           align-items: center;
           padding: 0.5rem 1.25rem;
           color: #f1f5f9;
-          box-shadow: 0 0 12px rgba(255, 0, 255, 0.3);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(255, 0, 255, 0.15);
         }
 
         .branding-title {
@@ -2403,21 +4860,32 @@ export default function Delta7Synth() {
         /* Panels layout grid */
         .rack-main-grid {
           display: grid;
-          grid-template-columns: 240px 1fr 260px;
+          grid-template-columns: 260px 1fr 270px;
           gap: 1.25rem;
         }
 
         .steel-plate {
-          background: rgba(0, 0, 0, 0.9);
-          border: 2px solid #ff00ff;
+          background: rgba(10, 12, 18, 0.94);
+          backdrop-filter: blur(16px);
+          border: 1px solid rgba(0, 243, 255, 0.22);
           box-shadow: 
-            0 0 15px rgba(255, 0, 255, 0.3), 
-            inset 0 0 10px rgba(255, 0, 255, 0.15);
-          border-radius: 8px;
+            0 8px 32px 0 rgba(0, 0, 0, 0.7),
+            0 0 15px rgba(0, 243, 255, 0.08), 
+            inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
           padding: 0.85rem;
           display: flex;
           flex-direction: column;
           gap: 1rem;
+          transition: all 0.3s ease;
+        }
+
+        .steel-plate:hover {
+          border-color: rgba(0, 243, 255, 0.35);
+          box-shadow: 
+            0 12px 40px 0 rgba(0, 0, 0, 0.8),
+            0 0 25px rgba(0, 243, 255, 0.15),
+            inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
         }
 
         .section-label {
@@ -2431,6 +4899,95 @@ export default function Delta7Synth() {
           margin-bottom: 0.5rem;
           letter-spacing: 1.5px;
           text-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+        }
+
+        /* Tape Echo Deck reels and Knobs grid styling */
+        .tape-leslie-deck {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          align-items: center;
+          width: 100%;
+        }
+
+        .tape-deck-reels {
+          display: flex;
+          gap: 20px;
+          justify-content: center;
+          align-items: center;
+          margin: 0.5rem 0;
+          background: rgba(0, 0, 0, 0.5);
+          padding: 8px 16px;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          width: 100%;
+        }
+
+        .tape-reel {
+          width: 48px;
+          height: 48px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          transform-origin: center;
+        }
+
+        .tape-reel.spinning {
+          animation: spin linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .tape-knobs-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px 10px;
+          justify-items: center;
+          width: 100%;
+          margin-top: 0.4rem;
+        }
+
+        .leslie-separator {
+          width: 100%;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.2), transparent);
+          margin: 0.5rem 0;
+        }
+
+        .btn-xs.active-cyan {
+          background: #00f3ff;
+          color: #000000;
+          border-color: #ffffff;
+          box-shadow: 0 0 8px #00f3ff;
+          text-shadow: none;
+          font-weight: 800;
+        }
+
+        .btn-xs.active-magenta {
+          background: #ff00ff;
+          color: #000000;
+          border-color: #ffffff;
+          box-shadow: 0 0 8px #ff00ff;
+          text-shadow: none;
+          font-weight: 800;
+        }
+
+        .btn-glitch-active {
+          background: #ffe600 !important;
+          color: #000000 !important;
+          border-color: #ffffff !important;
+          box-shadow: 0 0 15px #ffe600, 0 0 30px #ffe600 !important;
+          text-shadow: none !important;
+          font-weight: 900;
+          animation: pulse-yellow 0.15s infinite alternate;
+        }
+
+        @keyframes pulse-yellow {
+          from { transform: scale(1.0); }
+          to { transform: scale(1.05); }
         }
 
         /* Joystick styles */
@@ -3116,6 +5673,308 @@ export default function Delta7Synth() {
         .cc-number-tag {
           color: #ff00ff;
           text-shadow: 0 0 2px #ff00ff;
+        }
+
+        /* Upgraded Dashboard Grid & Sidebar Styles */
+        .dashboard-grid {
+          display: grid;
+          grid-template-columns: 320px 1fr;
+          height: 250px;
+          gap: 12px;
+        }
+
+        .preset-dashboard-container {
+          background: rgba(0, 0, 0, 0.45);
+          border-right: 1px solid rgba(0, 243, 255, 0.15);
+          padding: 6px;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .preset-category-group {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .category-header {
+          font-size: 0.58rem;
+          color: #ff00ff;
+          font-weight: bold;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+          border-bottom: 1px solid rgba(255, 0, 255, 0.15);
+          padding-bottom: 2px;
+          margin-bottom: 2px;
+        }
+
+        .category-buttons-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 4px;
+        }
+
+        .preset-card {
+          background: rgba(10, 12, 18, 0.8);
+          border: 1px solid rgba(0, 243, 255, 0.15);
+          border-radius: 4px;
+          padding: 4px 6px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          cursor: pointer;
+          transition: all 0.1s ease;
+          min-height: 34px;
+          justify-content: center;
+        }
+
+        .preset-card .card-id {
+          font-size: 0.5rem;
+          color: #00f3ff;
+          opacity: 0.8;
+          line-height: 1;
+        }
+
+        .preset-card .card-name {
+          font-size: 0.58rem;
+          color: #ffffff;
+          font-weight: 500;
+          text-align: left;
+          line-height: 1.2;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          width: 100%;
+        }
+
+        .preset-card:hover {
+          background: rgba(0, 243, 255, 0.15);
+          border-color: rgba(0, 243, 255, 0.4);
+          box-shadow: 0 0 6px rgba(0, 243, 255, 0.15);
+        }
+
+        .preset-card.selected {
+          background: rgba(0, 243, 255, 0.25);
+          border-color: #00f3ff;
+          box-shadow: 0 0 8px rgba(0, 243, 255, 0.25);
+        }
+
+        .preset-card.combi .card-id {
+          color: #ff00ff;
+        }
+
+        .preset-card.combi.selected {
+          background: rgba(255, 0, 255, 0.25);
+          border-color: #ff00ff;
+          box-shadow: 0 0 8px rgba(255, 0, 255, 0.25);
+        }
+
+        .dashboard-main-view {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          overflow: hidden;
+        }
+
+        /* Segmented Controls & Buttons */
+        .segmented-strip {
+          display: flex;
+          background: rgba(0, 0, 0, 0.6);
+          border: 1px solid rgba(0, 243, 255, 0.25);
+          border-radius: 4px;
+          overflow: hidden;
+          padding: 1px;
+        }
+
+        .segmented-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 2px;
+          background: rgba(0, 0, 0, 0.4);
+          border: 1px solid rgba(0, 243, 255, 0.2);
+          border-radius: 4px;
+          padding: 2px;
+        }
+
+        .segmented-btn {
+          background: transparent;
+          border: none;
+          color: #88ccee;
+          font-family: var(--font-mono);
+          font-size: 0.54rem;
+          padding: 2px 4px;
+          cursor: pointer;
+          transition: all 0.1s ease;
+          border-radius: 2px;
+          text-align: center;
+          white-space: nowrap;
+        }
+
+        .segmented-btn:hover {
+          background: rgba(0, 243, 255, 0.15);
+          color: #ffffff;
+        }
+
+        .segmented-btn.active {
+          background: #00f3ff;
+          color: #000000;
+          font-weight: bold;
+          box-shadow: 0 0 6px #00f3ff;
+        }
+
+        .segmented-btn:disabled {
+          opacity: 0.3;
+          cursor: not-allowed;
+          background: transparent !important;
+          color: #88ccee !important;
+          box-shadow: none !important;
+        }
+
+        /* Delta Pad targets selections on right panel */
+        .target-select-row-new {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .target-row-label {
+          font-size: 0.55rem;
+          color: #ff5500;
+          font-weight: bold;
+          letter-spacing: 0.5px;
+        }
+
+        .target-btn-strip {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 2px;
+        }
+
+        .target-btn {
+          background: #000000;
+          border: 1px solid rgba(255, 85, 0, 0.3);
+          color: #ffe600;
+          font-family: var(--font-mono);
+          font-size: 0.52rem;
+          padding: 2px 4px;
+          border-radius: 3px;
+          cursor: pointer;
+          transition: all 0.1s;
+        }
+
+        .target-btn:hover {
+          background: rgba(255, 85, 0, 0.15);
+          border-color: rgba(255, 85, 0, 0.6);
+        }
+
+        .target-btn.selected-x {
+          background: #ff5500;
+          color: #ffffff;
+          border-color: #ffffff;
+          box-shadow: 0 0 6px #ff5500;
+          font-weight: bold;
+        }
+
+        .target-btn.selected-y {
+          background: #ff0055;
+          color: #ffffff;
+          border-color: #ffffff;
+          box-shadow: 0 0 6px #ff0055;
+          font-weight: bold;
+        }
+
+        /* Sampler LCD Page Styles */
+        .sampler-page-lcd {
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+        }
+
+        .mic-level-meter-container {
+          background: rgba(0, 243, 255, 0.04);
+          border: 1px solid rgba(0, 243, 255, 0.15);
+          padding: 6px 10px;
+          border-radius: 4px;
+        }
+
+        .mic-level-bar-label {
+          font-size: 0.55rem;
+          color: rgba(0, 243, 255, 0.75);
+          margin-bottom: 3px;
+        }
+
+        .mic-level-bar-track {
+          width: 100%;
+          height: 6px;
+          background: #020d1e;
+          border-radius: 3px;
+          overflow: hidden;
+          position: relative;
+        }
+
+        .mic-level-bar-fill {
+          height: 100%;
+          width: 0%;
+          background: linear-gradient(90deg, #00ff66 0%, #ffe600 70%, #ff0055 100%);
+          border-radius: 3px;
+          transition: width 0.05s ease-out;
+        }
+
+        .active-yellow {
+          background: rgba(255, 230, 0, 0.15) !important;
+          border-color: #ffe600 !important;
+          color: #ffe600 !important;
+          box-shadow: 0 0 6px rgba(255, 230, 0, 0.3) !important;
+        }
+
+        .active-red {
+          background: rgba(255, 0, 85, 0.25) !important;
+          border-color: #ff0055 !important;
+          color: #ffffff !important;
+          box-shadow: 0 0 8px rgba(255, 0, 85, 0.5) !important;
+        }
+
+        .active-green {
+          background: rgba(0, 255, 102, 0.15) !important;
+          border-color: #00ff66 !important;
+          color: #00ff66 !important;
+          box-shadow: 0 0 6px rgba(0, 255, 102, 0.3) !important;
+        }
+
+        .active-pink {
+          background: rgba(255, 0, 255, 0.15) !important;
+          border-color: #ff00ff !important;
+          color: #ff00ff !important;
+          box-shadow: 0 0 6px rgba(255, 0, 255, 0.3) !important;
+        }
+
+        @keyframes blink-rec {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
+
+        .blinking {
+          animation: blink-rec 1s infinite;
+        }
+
+        .waveform-draw-canvas {
+          box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.15);
+        }
+
+        .sampler-help-alert {
+          background: rgba(0, 243, 255, 0.05);
+          border: 1px dashed rgba(0, 243, 255, 0.3);
+          border-radius: 4px;
+          padding: 6px 10px;
+          margin-top: 6px;
+          font-size: 0.62rem;
+          color: #00f3ff;
+          text-align: center;
+          font-family: var(--font-mono);
+          text-shadow: 0 0 2px rgba(0, 243, 255, 0.4);
         }
       `}</style>
 
