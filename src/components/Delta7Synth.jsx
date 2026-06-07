@@ -451,12 +451,14 @@ export default function Delta7Synth() {
   const startRecording = () => {
     if (!streamRef.current) return;
     audioChunksRef.current = [];
-    
-    let options = { mimeType: 'audio/webm' };
-    if (!MediaRecorder.isTypeSupported('audio/webm')) {
-      options = { mimeType: 'audio/mp4' };
+    let options = {};
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      options = { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 512000 };
+    } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+      options = { mimeType: 'audio/webm', audioBitsPerSecond: 512000 };
+    } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+      options = { mimeType: 'audio/mp4', audioBitsPerSecond: 512000 };
     }
-    
     // Record from the MediaStreamAudioDestinationNode if available, which contains our digital gain boost
     const streamToRecord = recordingDestRef.current ? recordingDestRef.current.stream : streamRef.current;
     const recorder = new MediaRecorder(streamToRecord, options);
@@ -715,11 +717,38 @@ export default function Delta7Synth() {
     if (!slot) return;
     
     if (!slot.buffer) {
-      const confirmDelete = window.confirm(`Clear slot ${getSlotLabel(slot.id)} from the browser database?`);
-      if (confirmDelete) {
+      const activeNum = selectedEditSlotId.slice(2);
+      const clearInput = window.prompt("Active slot is empty. Which slot would you like to clear from the browser database? Enter slot number (1-8):", parseInt(activeNum).toString());
+      if (clearInput === null) return;
+      
+      const cleanedInput = clearInput.replace(/[^0-9]/g, '');
+      const targetNum = parseInt(cleanedInput);
+      if (isNaN(targetNum) || targetNum < 1 || targetNum > 8) {
+        alert("Invalid slot number. Must be between 1 and 8.");
+        return;
+      }
+      
+      const targetId = `s0${targetNum}`;
+      const confirmClear = window.confirm(`Clear slot U${targetNum} from the browser database?`);
+      if (confirmClear) {
         try {
-          await deleteSampleFromDb(slot.id);
-          showEditorStatus('Cleared from DB! 🗑️');
+          await deleteSampleFromDb(targetId);
+          setSampleSlots(prev => prev.map(s => {
+            if (s.id === targetId) {
+              return {
+                ...s,
+                name: `User Slot ${targetNum}`,
+                buffer: null,
+                revBuffer: null,
+                start: 0.0,
+                end: 1.0,
+                loopStart: 0.0,
+                loopEnd: 1.0
+              };
+            }
+            return s;
+          }));
+          showEditorStatus(`Cleared U${targetNum} from DB! 🗑️`);
         } catch (err) {
           console.error(err);
           alert('Failed to clear database record.');
@@ -728,9 +757,58 @@ export default function Delta7Synth() {
       return;
     }
     
+    const nameInput = window.prompt("Enter sample name:", slot.name);
+    if (nameInput === null) return;
+    const finalName = nameInput.trim() || slot.name;
+    
+    const activeNum = selectedEditSlotId.slice(2);
+    const slotInput = window.prompt("Save to which slot? Enter slot number (1-8):", parseInt(activeNum).toString());
+    if (slotInput === null) return;
+    
+    const cleanedInput = slotInput.replace(/[^0-9]/g, '');
+    const targetNum = parseInt(cleanedInput);
+    if (isNaN(targetNum) || targetNum < 1 || targetNum > 8) {
+      alert("Invalid slot number. Must be between 1 and 8.");
+      return;
+    }
+    
+    const targetId = `s0${targetNum}`;
+    const targetSlotData = {
+      ...slot,
+      id: targetId,
+      name: finalName.slice(0, 24)
+    };
+    
     try {
-      await saveSampleToDb(slot);
-      showEditorStatus('Saved to DB! 💾');
+      await saveSampleToDb(targetSlotData);
+      
+      setSampleSlots(prev => {
+        const next = prev.map(s => {
+          if (s.id === targetId) {
+            return {
+              ...s,
+              name: targetSlotData.name,
+              buffer: slot.buffer,
+              revBuffer: slot.revBuffer,
+              rootNote: slot.rootNote,
+              volume: slot.volume,
+              sliceCount: slot.sliceCount,
+              start: slot.start,
+              end: slot.end,
+              loopStart: slot.loopStart,
+              loopEnd: slot.loopEnd,
+              loopOn: slot.loopOn,
+              reverseOn: slot.reverseOn,
+              sliceParams: JSON.parse(JSON.stringify(slot.sliceParams))
+            };
+          }
+          return s;
+        });
+        sampleSlotsRef.current = next;
+        return next;
+      });
+      
+      showEditorStatus(`Saved to U${targetNum}! 💾`);
     } catch (err) {
       console.error(err);
       alert('Failed to save to database. Make sure your browser supports IndexedDB.');
