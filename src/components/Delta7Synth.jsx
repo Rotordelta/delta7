@@ -260,6 +260,8 @@ export default function Delta7Synth() {
   };
   const [isRecording, setIsRecording] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
+  const [recordingInputGain, setRecordingInputGain] = useState(1.0);
+  const recordingInputGainRef = useRef(1.0);
   const [recordSlotId, setRecordSlotId] = useState('s01'); // Target recording user slot
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
   const activePreviewNodeRef = useRef(null);
@@ -298,6 +300,8 @@ export default function Delta7Synth() {
   const streamRef = useRef(null);
   const micAnalyserRef = useRef(null);
   const micSourceRef = useRef(null);
+  const micInputGainNodeRef = useRef(null);
+  const recordingDestRef = useRef(null);
   const recordAnimationFrameIdRef = useRef(null);
   const samplerCanvasRef = useRef(null);
 
@@ -358,18 +362,39 @@ export default function Delta7Synth() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
       streamRef.current = stream;
       
       if (!audioCtxRef.current) initAudio();
       const ctx = audioCtxRef.current;
+      
+      const source = ctx.createMediaStreamSource(stream);
+      micSourceRef.current = source;
+
+      // Create recording input gain node
+      const inputGainNode = ctx.createGain();
+      inputGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+      micInputGainNodeRef.current = inputGainNode;
+
+      // Create media stream destination node
+      const recordingDest = ctx.createMediaStreamDestination();
+      recordingDestRef.current = recordingDest;
+
+      // Connect source -> inputGainNode -> recordingDest
+      source.connect(inputGainNode);
+      inputGainNode.connect(recordingDest);
+
+      // Connect inputGainNode -> level analyser
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       micAnalyserRef.current = analyser;
-      
-      const source = ctx.createMediaStreamSource(stream);
-      source.connect(analyser);
-      micSourceRef.current = source;
+      inputGainNode.connect(analyser);
       
       setIsArmed(true);
       startMicMonitor();
@@ -389,6 +414,11 @@ export default function Delta7Synth() {
       try { micSourceRef.current.disconnect(); } catch {}
       micSourceRef.current = null;
     }
+    if (micInputGainNodeRef.current) {
+      try { micInputGainNodeRef.current.disconnect(); } catch {}
+      micInputGainNodeRef.current = null;
+    }
+    recordingDestRef.current = null;
     setIsArmed(false);
     setIsRecording(false);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -427,7 +457,9 @@ export default function Delta7Synth() {
       options = { mimeType: 'audio/mp4' };
     }
     
-    const recorder = new MediaRecorder(streamRef.current, options);
+    // Record from the MediaStreamAudioDestinationNode if available, which contains our digital gain boost
+    const streamToRecord = recordingDestRef.current ? recordingDestRef.current.stream : streamRef.current;
+    const recorder = new MediaRecorder(streamToRecord, options);
     mediaRecorderRef.current = recorder;
     
     recorder.ondataavailable = (e) => {
@@ -485,7 +517,11 @@ export default function Delta7Synth() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { displaySurface: "browser" },
-        audio: true
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
       });
       // Stop the video tracks immediately to capture only the audio tracks
       stream.getVideoTracks().forEach(track => track.stop());
@@ -501,13 +537,28 @@ export default function Delta7Synth() {
       
       if (!audioCtxRef.current) initAudio();
       const ctx = audioCtxRef.current;
+      
+      const source = ctx.createMediaStreamSource(stream);
+      micSourceRef.current = source;
+
+      // Create recording input gain node
+      const inputGainNode = ctx.createGain();
+      inputGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+      micInputGainNodeRef.current = inputGainNode;
+
+      // Create media stream destination node
+      const recordingDest = ctx.createMediaStreamDestination();
+      recordingDestRef.current = recordingDest;
+
+      // Connect source -> inputGainNode -> recordingDest
+      source.connect(inputGainNode);
+      inputGainNode.connect(recordingDest);
+
+      // Connect inputGainNode -> level analyser
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       micAnalyserRef.current = analyser;
-      
-      const source = ctx.createMediaStreamSource(stream);
-      source.connect(analyser);
-      micSourceRef.current = source;
+      inputGainNode.connect(analyser);
       
       setIsArmed(true);
       startMicMonitor();
@@ -4977,6 +5028,44 @@ export default function Delta7Synth() {
                           </button>
                           <button
                             className="btn btn-xs"
+                            disabled={!slot.buffer}
+                            onClick={() => {
+                              const buffer = slot.buffer;
+                              if (!buffer) return;
+                              const input = window.prompt("Enter gain scaling factor (e.g. 2.0 to double volume, 1.5 to boost, 0.5 to fade/quiet):", "1.5");
+                              if (input === null) return;
+                              const factor = parseFloat(input);
+                              if (isNaN(factor) || factor <= 0 || factor === 1.0) return;
+                              
+                              pushUndoState(slot);
+                              const ctx = audioCtxRef.current;
+                              const newBuffer = ctx.createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+                              
+                              const startPct = selectionStart !== null && selectionEnd !== null ? Math.min(selectionStart, selectionEnd) : 0.0;
+                              const endPct = selectionStart !== null && selectionEnd !== null ? Math.max(selectionStart, selectionEnd) : 1.0;
+                              
+                              const startSample = Math.floor(startPct * buffer.length);
+                              const endSample = Math.floor(endPct * buffer.length);
+                              
+                              for (let c = 0; c < buffer.numberOfChannels; c++) {
+                                const origData = buffer.getChannelData(c);
+                                const destData = newBuffer.getChannelData(c);
+                                destData.set(origData);
+                                for (let i = startSample; i < endSample; i++) {
+                                  destData[i] = Math.max(-1.0, Math.min(1.0, destData[i] * factor));
+                                }
+                              }
+                              
+                              updateBufferForSlot(selectedEditSlotId, newBuffer, `Gain x${factor}: ${slot.name}`);
+                              showEditorStatus(`Gain scaled x${factor}! 🔊`);
+                            }}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ffe600', color: '#ffe600' }}
+                            title="Adjust amplitude/gain of selection or entire sample"
+                          >
+                            🔊 GAIN
+                          </button>
+                          <button
+                            className="btn btn-xs"
                             onClick={handleSaveActiveSlotToDb}
                             style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#00f3ff', color: '#00f3ff' }}
                             title="Save sample buffer and settings to browser database"
@@ -5646,6 +5735,30 @@ export default function Delta7Synth() {
                       >
                         {isRecording ? 'STOP REC' : 'RECORD (LIVE)'}
                       </button>
+                    </div>
+
+                    {/* Recording Input Gain Slider */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.62rem' }}>
+                      <label style={{ color: '#00f3ff', marginRight: '6px' }}>REC GAIN:</label>
+                      <input 
+                        type="range" 
+                        min="0.0" 
+                        max="4.0" 
+                        step="0.1" 
+                        value={recordingInputGain} 
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setRecordingInputGain(val);
+                          recordingInputGainRef.current = val;
+                          if (micInputGainNodeRef.current && audioCtxRef.current) {
+                            micInputGainNodeRef.current.gain.setValueAtTime(val, audioCtxRef.current.currentTime);
+                          }
+                        }}
+                        style={{ flexGrow: 1, height: '8px' }}
+                      />
+                      <span className="font-mono text-cyan" style={{ width: '30px', textAlign: 'right', marginLeft: '6px' }}>
+                        {Math.round(recordingInputGain * 100)}%
+                      </span>
                     </div>
 
                     {/* Level meter and File selector */}
