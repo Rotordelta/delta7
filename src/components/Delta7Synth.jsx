@@ -203,14 +203,14 @@ export default function Delta7Synth() {
 
   // --- Sampler States & Slots ---
   const [sampleSlots, setSampleSlots] = useState([
-    { id: 's01', name: 'User Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's02', name: 'User Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's03', name: 'User Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's04', name: 'User Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's05', name: 'User Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's06', name: 'User Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's07', name: 'User Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
-    { id: 's08', name: 'User Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's01', name: 'User Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's02', name: 'User Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's03', name: 'User Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's04', name: 'User Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's05', name: 'User Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's06', name: 'User Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's07', name: 'User Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
+    { id: 's08', name: 'User Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false })) },
   ]);
   const sampleSlotsRef = useRef(sampleSlots);
   useEffect(() => {
@@ -831,15 +831,16 @@ export default function Delta7Synth() {
       }
 
       // Draw Slices & tags
+      const sliceCount = slot.sliceCount || 16;
       const activeWidth = endX - startX;
-      const sliceWidth = activeWidth / 16;
+      const sliceWidth = activeWidth / sliceCount;
       ctx.strokeStyle = 'rgba(0, 243, 255, 0.2)';
       ctx.lineWidth = 1.0;
       ctx.fillStyle = 'rgba(0, 243, 255, 0.4)';
       ctx.font = '8px monospace';
       ctx.textAlign = 'center';
       
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < sliceCount; i++) {
         const sliceX = startX + i * sliceWidth;
         if (i > 0) {
           ctx.beginPath();
@@ -868,14 +869,15 @@ export default function Delta7Synth() {
             const isSlotB = voice.slotBId === selectedEditSlotId;
             
             if ((isSlotA || isSlotB) && voice.startTime > 0 && voice.releasedRef && !voice.releasedRef.current) {
+              const sliceCount = slot.sliceCount || 16;
               if (isSlotA && paramsRef.current.oscATriggerMode === 'slice') {
-                const sliceIndex = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                const sliceIndex = ((voice.note - slot.rootNote) % sliceCount + sliceCount) % sliceCount;
                 const sX = startX + sliceIndex * sliceWidth;
                 ctx.fillStyle = 'rgba(255, 230, 0, 0.15)'; // yellow highlight for OSC A slice
                 ctx.fillRect(sX, 0, sliceWidth, canvas.height);
               }
               if (isSlotB && paramsRef.current.oscBTriggerMode === 'slice') {
-                const sliceIndex = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                const sliceIndex = ((voice.note - slot.rootNote) % sliceCount + sliceCount) % sliceCount;
                 const sX = startX + sliceIndex * sliceWidth;
                 ctx.fillStyle = 'rgba(255, 0, 255, 0.15)'; // magenta highlight for OSC B slice
                 ctx.fillRect(sX, 0, sliceWidth, canvas.height);
@@ -935,8 +937,9 @@ export default function Delta7Synth() {
                 const isSliceA = paramsRef.current.oscATriggerMode === 'slice';
                 let sliceLoopA = false;
                 let sliceReverseA = false;
+                const sliceCountA = slot.sliceCount || 16;
                 if (isSliceA && slot.sliceParams) {
-                  const sliceIndexA = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                  const sliceIndexA = ((voice.note - slot.rootNote) % sliceCountA + sliceCountA) % sliceCountA;
                   sliceLoopA = slot.sliceParams[sliceIndexA]?.loop || false;
                   sliceReverseA = slot.sliceParams[sliceIndexA]?.reverse || false;
                 }
@@ -945,9 +948,9 @@ export default function Delta7Synth() {
                 let valid = true;
                 
                 if (isSliceA) {
-                  const sliceIndex = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                  const sliceIndex = ((voice.note - slot.rootNote) % sliceCountA + sliceCountA) % sliceCountA;
                   const activeDuration = (slot.end - slot.start) * buffer.duration;
-                  const sliceDuration = activeDuration / 16;
+                  const sliceDuration = activeDuration / sliceCountA;
                   const sliceStartSec = startOffset;
                   const sliceEndSec = sliceStartSec + sliceDuration;
                   
@@ -1002,17 +1005,18 @@ export default function Delta7Synth() {
                 
                 const isSliceB = paramsRef.current.oscBTriggerMode === 'slice';
                 let sliceLoopB = false;
+                const sliceCountB = slot.sliceCount || 16;
                 if (isSliceB && slot.sliceParams) {
-                  const sliceIndexB = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                  const sliceIndexB = ((voice.note - slot.rootNote) % sliceCountB + sliceCountB) % sliceCountB;
                   sliceLoopB = slot.sliceParams[sliceIndexB]?.loop || false;
                 }
                 const isLoopingB = isSliceB ? sliceLoopB : slot.loopOn;
                 let valid = true;
                 
                 if (isSliceB) {
-                  const sliceIndex = ((voice.note - slot.rootNote) % 16 + 16) % 16;
+                  const sliceIndex = ((voice.note - slot.rootNote) % sliceCountB + sliceCountB) % sliceCountB;
                   const activeDuration = (slot.end - slot.start) * buffer.duration;
-                  const sliceDuration = activeDuration / 16;
+                  const sliceDuration = activeDuration / sliceCountB;
                   const sliceStartSec = startOffset;
                   const sliceEndSec = sliceStartSec + sliceDuration;
                   
@@ -1904,7 +1908,8 @@ export default function Delta7Synth() {
     let sliceLoopA = false;
     let sliceReverseA = false;
     if (slotA && slotA.sliceParams && prog.oscATriggerMode === 'slice') {
-      const sliceIndexA = ((note - rootNoteA) % 16 + 16) % 16;
+      const sliceCountA = slotA.sliceCount || 16;
+      const sliceIndexA = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
       sliceEnvA = slotA.sliceParams[sliceIndexA] || { attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false };
       slicePitchA = sliceEnvA.pitch !== undefined ? sliceEnvA.pitch : 0;
       sliceStretchA = sliceEnvA.stretch !== undefined ? sliceEnvA.stretch : 0;
@@ -1918,7 +1923,8 @@ export default function Delta7Synth() {
     let sliceLoopB = false;
     let sliceReverseB = false;
     if (slotB && slotB.sliceParams && prog.oscBTriggerMode === 'slice') {
-      const sliceIndexB = ((note - rootNoteB) % 16 + 16) % 16;
+      const sliceCountB = slotB.sliceCount || 16;
+      const sliceIndexB = ((note - rootNoteB) % sliceCountB + sliceCountB) % sliceCountB;
       sliceEnvB = slotB.sliceParams[sliceIndexB] || { attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false };
       slicePitchB = sliceEnvB.pitch !== undefined ? sliceEnvB.pitch : 0;
       sliceStretchB = sliceEnvB.stretch !== undefined ? sliceEnvB.stretch : 0;
@@ -2067,9 +2073,10 @@ export default function Delta7Synth() {
         let sliceEndSecA = 0;
         
         if (isSliceGranular) {
-          const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+          const sliceCountA = slotA.sliceCount || 16;
+          const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
           const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-          sliceDurationA = activeDurationA / 16;
+          sliceDurationA = activeDurationA / sliceCountA;
           if (isReverseA) {
             const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
             startOffsetA = bufferA.duration - origSliceStart - sliceDurationA;
@@ -2198,9 +2205,10 @@ export default function Delta7Synth() {
       panner.connect(filter1);
 
       if (isSliceGranular) {
-        const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+        const sliceCountA = slotA.sliceCount || 16;
+        const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
         const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-        const sliceDurationA = activeDurationA / 16;
+        const sliceDurationA = activeDurationA / sliceCountA;
         let startOffsetA;
         if (isReverseA) {
           const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
@@ -2256,12 +2264,13 @@ export default function Delta7Synth() {
           pannerR.connect(filter1);
 
           const isSliceA = prog.oscATriggerMode === 'slice';
+          const sliceCountA = slotA.sliceCount || 16;
           let loopStartA, loopEndA;
           if (isReverseA) {
             if (isSliceA) {
-              const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+              const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
               const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-              const sliceDurationA = activeDurationA / 16;
+              const sliceDurationA = activeDurationA / sliceCountA;
               const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
               loopStartA = bufferA.duration - origSliceStart - sliceDurationA;
               loopEndA = loopStartA + sliceDurationA;
@@ -2273,9 +2282,9 @@ export default function Delta7Synth() {
             loopStartA = slotA.loopStart * bufferA.duration;
             loopEndA = slotA.loopEnd * bufferA.duration;
             if (isSliceA) {
-              const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+              const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
               const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-              const sliceDurationA = activeDurationA / 16;
+              const sliceDurationA = activeDurationA / sliceCountA;
               loopStartA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
               loopEndA = loopStartA + sliceDurationA;
             }
@@ -2312,12 +2321,13 @@ export default function Delta7Synth() {
           panner.connect(filter1);
 
           const isSliceA = prog.oscATriggerMode === 'slice';
+          const sliceCountA = slotA.sliceCount || 16;
           let loopStartA, loopEndA;
           if (isReverseA) {
             if (isSliceA) {
-              const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+              const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
               const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-              const sliceDurationA = activeDurationA / 16;
+              const sliceDurationA = activeDurationA / sliceCountA;
               const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
               loopStartA = bufferA.duration - origSliceStart - sliceDurationA;
               loopEndA = loopStartA + sliceDurationA;
@@ -2329,9 +2339,9 @@ export default function Delta7Synth() {
             loopStartA = slotA.loopStart * bufferA.duration;
             loopEndA = slotA.loopEnd * bufferA.duration;
             if (isSliceA) {
-              const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+              const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
               const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-              const sliceDurationA = activeDurationA / 16;
+              const sliceDurationA = activeDurationA / sliceCountA;
               loopStartA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
               loopEndA = loopStartA + sliceDurationA;
             }
@@ -2359,9 +2369,10 @@ export default function Delta7Synth() {
 
       if (isSliceGranularB) {
         // --- OSC B Granular Synthesis for Time-Stretching ---
-        const sliceIndex = ((note - rootNoteB) % 16 + 16) % 16;
+        const sliceCountB = slotB.sliceCount || 16;
+        const sliceIndex = ((note - rootNoteB) % sliceCountB + sliceCountB) % sliceCountB;
         const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
-        const sliceDurationB = activeDurationB / 16;
+        const sliceDurationB = activeDurationB / sliceCountB;
         let startOffsetB;
         if (isReverseB) {
           const origSliceStart = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
@@ -2475,12 +2486,13 @@ export default function Delta7Synth() {
         pannerB.connect(filter1);
 
         const isSliceB = prog.oscBTriggerMode === 'slice';
+        const sliceCountB = slotB.sliceCount || 16;
         let loopStartB, loopEndB;
         if (isReverseB) {
           if (isSliceB) {
-            const sliceIndex = ((note - rootNoteB) % 16 + 16) % 16;
+            const sliceIndex = ((note - rootNoteB) % sliceCountB + sliceCountB) % sliceCountB;
             const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
-            const sliceDurationB = activeDurationB / 16;
+            const sliceDurationB = activeDurationB / sliceCountB;
             const origSliceStart = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
             loopStartB = bufferB.duration - origSliceStart - sliceDurationB;
             loopEndB = loopStartB + sliceDurationB;
@@ -2492,9 +2504,9 @@ export default function Delta7Synth() {
           loopStartB = slotB.loopStart * bufferB.duration;
           loopEndB = slotB.loopEnd * bufferB.duration;
           if (isSliceB) {
-            const sliceIndex = ((note - rootNoteB) % 16 + 16) % 16;
+            const sliceIndex = ((note - rootNoteB) % sliceCountB + sliceCountB) % sliceCountB;
             const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
-            const sliceDurationB = activeDurationB / 16;
+            const sliceDurationB = activeDurationB / sliceCountB;
             loopStartB = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
             loopEndB = loopStartB + sliceDurationB;
           }
@@ -2533,8 +2545,9 @@ export default function Delta7Synth() {
     // Resolve slice environments and playback durations for slice trigger modes
     let dPlayA = 0;
     if (bufferA) {
+      const sliceCountA = slotA.sliceCount || 16;
       const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-      const sliceDurationA = activeDurationA / 16;
+      const sliceDurationA = activeDurationA / sliceCountA;
       if (prog.oscATriggerMode === 'slice') {
         dPlayA = Math.max(0.01, (sliceDurationA * (1 + sliceStretchA)) / freqScaleA);
       } else {
@@ -2544,8 +2557,9 @@ export default function Delta7Synth() {
 
     let dPlayB = 0;
     if (bufferB) {
+      const sliceCountB = slotB.sliceCount || 16;
       const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
-      const sliceDurationB = activeDurationB / 16;
+      const sliceDurationB = activeDurationB / sliceCountB;
       if (prog.oscBTriggerMode === 'slice') {
         dPlayB = Math.max(0.01, (sliceDurationB * (1 + sliceStretchB)) / freqScaleB);
       } else {
@@ -2674,9 +2688,10 @@ export default function Delta7Synth() {
       let durationToPlayA;
 
       if (prog.oscATriggerMode === 'slice') {
-        const sliceIndex = ((note - rootNoteA) % 16 + 16) % 16;
+        const sliceCountA = slotA.sliceCount || 16;
+        const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
         const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-        const sliceDurationA = activeDurationA / 16;
+        const sliceDurationA = activeDurationA / sliceCountA;
         if (isReverseA) {
           const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
           startOffsetA = bufferA.duration - origSliceStart - sliceDurationA;
@@ -2711,9 +2726,10 @@ export default function Delta7Synth() {
       let durationToPlayB;
 
       if (prog.oscBTriggerMode === 'slice') {
-        const sliceIndex = ((note - rootNoteB) % 16 + 16) % 16;
+        const sliceCountB = slotB.sliceCount || 16;
+        const sliceIndex = ((note - rootNoteB) % sliceCountB + sliceCountB) % sliceCountB;
         const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
-        const sliceDurationB = activeDurationB / 16;
+        const sliceDurationB = activeDurationB / sliceCountB;
         if (isReverseB) {
           const origSliceStart = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
           startOffsetB = bufferB.duration - origSliceStart - sliceDurationB;
@@ -4296,7 +4312,31 @@ export default function Delta7Synth() {
                       {/* Slice Editor Sub-Panel */}
                       <div style={{ marginTop: '6px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', border: '1px dashed rgba(0, 243, 255, 0.2)', padding: '5px 8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 'bold', color: '#00f3ff', fontSize: '0.62rem' }}>SLICE AD ENVELOPES (1-16)</span>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 'bold', color: '#00f3ff', fontSize: '0.62rem' }}>
+                              SLICE AD ENVELOPES (1-{slot.sliceCount || 16})
+                            </span>
+                            <div className="flex-row-sub" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '8px' }}>
+                              <span style={{ color: '#88ccee', fontSize: '0.55rem' }}>SLICES:</span>
+                              <div className="segmented-strip" style={{ display: 'inline-flex' }}>
+                                {[16, 12, 8, 4].map(count => (
+                                  <button
+                                    key={count}
+                                    className={`segmented-btn btn-xs ${ (slot.sliceCount || 16) === count ? 'active' : '' }`}
+                                    onClick={() => {
+                                      updateSlotParam(selectedEditSlotId, 'sliceCount', count);
+                                      if (selectedSliceIndex >= count) {
+                                        setSelectedSliceIndex(0);
+                                      }
+                                    }}
+                                    style={{ padding: '1px 3px', fontSize: '0.48rem', minWidth: '16px', height: '14px', lineHeight: '12px' }}
+                                  >
+                                    {count}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
                           <div style={{ display: 'flex', gap: '4px' }}>
                             <button
                               className={`btn btn-xs ${slot.sliceParams?.[selectedSliceIndex]?.loop ? 'active-pink' : ''}`}
@@ -4381,9 +4421,9 @@ export default function Delta7Synth() {
                           </div>
                         </div>
                         
-                        {/* 16 Slice Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(16, 1fr)', gap: '2px', marginBottom: '4px' }}>
-                          {Array.from({ length: 16 }).map((_, idx) => {
+                        {/* Dynamic Slice Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${slot.sliceCount || 16}, 1fr)`, gap: '2px', marginBottom: '4px' }}>
+                          {Array.from({ length: slot.sliceCount || 16 }).map((_, idx) => {
                             const isSelected = selectedSliceIndex === idx;
                             const previewNote = slot.rootNote + idx;
                             return (
