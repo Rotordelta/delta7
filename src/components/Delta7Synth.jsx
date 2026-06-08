@@ -333,14 +333,13 @@ export default function Delta7Synth() {
   const [isArmed, setIsArmed] = useState(false);
   const [recordingInputGain, setRecordingInputGain] = useState(1.0);
   const recordingInputGainRef = useRef(1.0);
-  const [recordSlotId, setRecordSlotId] = useState('s01'); // Target recording user slot
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
   const activePreviewNodeRef = useRef(null);
   const previewStartTimeRef = useRef(0);
   const previewStartOffsetRef = useRef(0);
 
   // --- Waveform selection, clipboard, history & recording states ---
-  const [recordingInputMode, setRecordingInputMode] = useState('mic'); // 'mic' or 'monitor'
+  const [recordingInputMode, setRecordingInputMode] = useState('mic'); // 'mic', 'monitor', or 'resample'
   const [selectionStart, setSelectionStart] = useState(null);
   const [selectionEnd, setSelectionEnd] = useState(null);
   const [clipboard, setClipboard] = useState(null);
@@ -489,6 +488,9 @@ export default function Delta7Synth() {
       try { micInputGainNodeRef.current.disconnect(); } catch {}
       micInputGainNodeRef.current = null;
     }
+    if (recordingDestRef.current && analyserRef.current) {
+      try { analyserRef.current.disconnect(recordingDestRef.current); } catch {}
+    }
     recordingDestRef.current = null;
     setIsArmed(false);
     setIsRecording(false);
@@ -548,10 +550,11 @@ export default function Delta7Synth() {
       const ctx = audioCtxRef.current;
       if (!ctx) return;
       
-      ctx.decodeAudioData(arrayBuffer, (buffer) => {
+      ctx.decodeAudioData(arrayBuffer, async (buffer) => {
+        let updatedSlot = null;
         const nextSlots = sampleSlotsRef.current.map(slot => {
-          if (slot.id === recordSlotId) {
-            return {
+          if (slot.id === selectedEditSlotId) {
+            updatedSlot = {
               ...slot,
               name: `Rec: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`,
               buffer: buffer,
@@ -561,11 +564,22 @@ export default function Delta7Synth() {
               loopStart: 0.0,
               loopEnd: 1.0
             };
+            return updatedSlot;
           }
           return slot;
         });
         sampleSlotsRef.current = nextSlots;
         setSampleSlots(nextSlots);
+
+        // Auto-save recorded/resampled audio to IndexedDB so it persists on reload!
+        if (updatedSlot) {
+          try {
+            await saveSampleToDb(updatedSlot);
+            showEditorStatus("Saved Rec to DB! 💾");
+          } catch (e) {
+            console.error("Failed to auto-save recorded sample to DB:", e);
+          }
+        }
       }, (err) => {
         console.error("Decoding voice sample buffer failed:", err);
       });
@@ -638,6 +652,32 @@ export default function Delta7Synth() {
     } catch (err) {
       console.error("Error capturing browser tab audio:", err);
       alert("Screen audio capture failed or cancelled.");
+    }
+  };
+
+  const armResampler = () => {
+    if (isArmed) {
+      disarmMicrophone();
+      return;
+    }
+    try {
+      if (!audioCtxRef.current) initAudio();
+      const ctx = audioCtxRef.current;
+
+      // Create media stream destination node
+      const recordingDest = ctx.createMediaStreamDestination();
+      recordingDestRef.current = recordingDest;
+
+      // Connect synth master output analyser to recordingDest
+      if (analyserRef.current) {
+        analyserRef.current.connect(recordingDest);
+      }
+
+      setIsArmed(true);
+      showEditorStatus("Resampler armed! ⏺️");
+    } catch (err) {
+      console.error("Error arming resampler:", err);
+      alert("Resampler arming failed.");
     }
   };
 
@@ -6776,7 +6816,7 @@ export default function Delta7Synth() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.62rem', marginTop: '4px', marginBottom: '4px' }}>
                       <span style={{ color: '#88ccee' }}>REC SOURCE:</span>
                       <div className="segmented-strip">
-                        {['mic', 'monitor'].map(mode => (
+                        {['mic', 'monitor', 'resample'].map(mode => (
                           <button
                             key={mode}
                             className={`segmented-btn btn-xs ${recordingInputMode === mode ? 'active' : ''}`}
@@ -6795,7 +6835,7 @@ export default function Delta7Synth() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '6px', marginTop: '4px' }}>
                       <button 
                         className={`btn btn-xs ${isArmed ? 'active-yellow' : ''}`} 
-                        onClick={recordingInputMode === 'mic' ? armMicrophone : armMonitor}
+                        onClick={recordingInputMode === 'mic' ? armMicrophone : (recordingInputMode === 'monitor' ? armMonitor : armResampler)}
                         style={{ margin: 0, fontSize: '0.62rem', padding: '3px' }}
                       >
                         {isArmed ? `DISARM ${recordingInputMode.toUpperCase()}` : `ARM ${recordingInputMode.toUpperCase()}`}
