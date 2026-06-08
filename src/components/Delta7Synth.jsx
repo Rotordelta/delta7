@@ -1383,7 +1383,7 @@ export default function Delta7Synth() {
                     }
                     const loopLen = loopEndSec - loopStartSec;
                     if (playheadSec > loopEndSec && loopLen > 0) {
-                      playheadSec = loopStartSec + ((playheadSec - sliceStartSec) % loopLen); // wait, it was: playheadSec = loopStartSec + ((playheadSec - loopStartSec) % loopLen);
+                      playheadSec = loopStartSec + ((playheadSec - loopStartSec) % loopLen);
                     }
                   } else {
                     let endSec = slot.reverseOn ? ((1.0 - slot.start) * buffer.duration) : (slot.end * buffer.duration);
@@ -2392,7 +2392,7 @@ export default function Delta7Synth() {
 
   const makeDistCurve = (amount) => {
     const k = typeof amount === 'number' ? amount * 100 : 50;
-    const n_samples = 44100;
+    const n_samples = 512; // 512 is sufficient precision for a waveshaper curve
     const curve = new Float32Array(n_samples);
     const deg = Math.PI / 180;
     for (let i = 0; i < n_samples; ++i) {
@@ -2746,10 +2746,12 @@ export default function Delta7Synth() {
       granularTimerId: null, releasedRef, trackIdx
     };
 
+    // isSliceGranular must be hoisted outside if(bufferA) — it's used in the panner block after that inner if closes
+    const isSliceGranular = !prog.granularActive && (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0);
+
     if (prog.granularActive || (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0 && bufferA)) {
       // --- Granular Synthesis Engine ---
       if (bufferA) {
-        const isSliceGranular = !prog.granularActive && (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0);
         
         let playhead;
         let startOffsetA = 0;
@@ -2784,20 +2786,24 @@ export default function Delta7Synth() {
           if (!currentBuf) return;
 
           const ctxNow = ctx.currentTime;
-          if (nextGrainTime < ctxNow + lookahead) {
-            const drift = (ctxNow + lookahead) - nextGrainTime;
-            const speedFactor = isSliceGranular ? (freqScaleA / Math.max(0.05, 1 + sliceStretchA)) : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0);
-            playhead += drift * speedFactor;
-            nextGrainTime = ctxNow + lookahead;
-          }
-          
+
           let gSize, gRate;
           if (isSliceGranular) {
-            gSize = Math.max(0.03, Math.min(0.08, sliceDurationA));
-            gRate = gSize * 0.4;
+            // Serato-style time-stretch: grain size 80-120ms, hop = 25% of grain (4 grains overlapping)
+            // Clamped to at most the full slice duration to avoid reading beyond boundaries
+            gSize = Math.min(Math.max(0.08, sliceDurationA * 0.5), 0.12);
+            gRate = gSize * 0.25;
           } else {
             gSize = (prog.grainSize !== undefined ? prog.grainSize : 100) / 1000;
             gRate = (prog.grainRate !== undefined ? prog.grainRate : 40) / 1000;
+          }
+
+          if (nextGrainTime < ctxNow + lookahead) {
+            const drift = (ctxNow + lookahead) - nextGrainTime;
+            // Playhead speed: for slice stretch, 1/(1+stretch) — stretch=0 → 1.0 (normal), stretch=1 → 0.5 (half speed = 2× longer)
+            const playheadSpeed = isSliceGranular ? (1.0 / Math.max(0.05, 1.0 + sliceStretchA)) : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0);
+            playhead += drift * playheadSpeed;
+            nextGrainTime = ctxNow + lookahead;
           }
 
           while (nextGrainTime < ctxNow + lookahead + 0.1) {
@@ -2817,10 +2823,17 @@ export default function Delta7Synth() {
             const startOffset = (isReverse && !isSliceGranular) ? (currentBuf.duration - grainStart - gSize) : grainStart;
             const clampedStartOffset = Math.max(0, Math.min(currentBuf.duration - 0.005, startOffset));
 
-            let currentFreqScale = freqScaleA;
-            if (!isSliceGranular) {
-              currentFreqScale = baseFreq / rootFreqA;
+            // CRITICAL: For slice time-stretch, grain playback rate = pitch shift ONLY (1.0 base).
+            // The tempo/duration change is controlled purely by the playhead advance speed above.
+            // For standard granular mode, use baseFreq ratio as before.
+            let grainPlaybackRate;
+            if (isSliceGranular) {
+              // Pitch offset from slice pitch param + OSC A pitch + detune, base rate = 1.0 (no pitch from note)
+              grainPlaybackRate = Math.pow(2, (slicePitchA + oscAPitch + oscAOctave * 12) / 12) * Math.pow(2, oscADetune / 1200);
+            } else {
+              grainPlaybackRate = (baseFreq / rootFreqA) * Math.pow(2, oscADetune / 1200);
             }
+
             const detuneCents = isSliceGranular ? 0 : ((prog.grainPitchRandom !== undefined ? prog.grainPitchRandom : 0) * (Math.random() * 2 - 1));
 
             let stutterPitchOffset = 0;
@@ -2831,30 +2844,31 @@ export default function Delta7Synth() {
               stutterPitchOffset = progress * paramsRef.current.stutterPitchSweep;
             }
 
-            grainSource.playbackRate.setValueAtTime(currentFreqScale * Math.pow(2, (oscADetune + detuneCents + stutterPitchOffset * 100) / 1200), nextGrainTime);
+            grainSource.playbackRate.setValueAtTime(
+              grainPlaybackRate * Math.pow(2, (detuneCents + stutterPitchOffset * 100) / 1200),
+              nextGrainTime
+            );
 
-            if (vibratoLfoGain) {
+            if (vibratoLfoGain && !isSliceGranular) {
               const vScale = ctx.createGain();
               vScale.gain.setValueAtTime(1 / rootFreqA, nextGrainTime);
               vibratoLfoGain.connect(vScale);
               vScale.connect(grainSource.playbackRate);
             }
-            if (driftGain) {
+            if (driftGain && !isSliceGranular) {
               const dScale = ctx.createGain();
               dScale.gain.setValueAtTime(1 / 1200, nextGrainTime);
               driftGain.connect(dScale);
               dScale.connect(grainSource.playbackRate);
             }
 
+            // Raised-cosine envelope (Hann-like): peak at 50% of grain, zero at boundaries
+            // Eliminates inter-grain clicks without costly AudioParam scheduling loops
             const grainGain = ctx.createGain();
             grainGain.gain.setValueAtTime(0, nextGrainTime);
-
-            const grainAttack = Math.min(0.005, gSize * 0.1);
-            const grainRelease = Math.min(0.005, gSize * 0.1);
-
-            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + grainAttack);
-            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + gSize - grainRelease);
+            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + gSize * 0.5);
             grainGain.gain.linearRampToValueAtTime(0.0, nextGrainTime + gSize);
+
 
             grainSource.connect(grainGain);
             grainGain.connect(gainA);
@@ -2862,13 +2876,11 @@ export default function Delta7Synth() {
             grainSource.start(nextGrainTime, clampedStartOffset, gSize);
             grainSource.stop(nextGrainTime + gSize + 0.01);
 
-            let speedFactor;
-            if (isSliceGranular) {
-              speedFactor = freqScaleA / Math.max(0.05, 1 + sliceStretchA);
-            } else {
-              speedFactor = prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0;
-            }
-            playhead += gRate * speedFactor;
+            // Advance playhead at the correct time-stretched speed
+            const playheadSpeed = isSliceGranular
+              ? (1.0 / Math.max(0.05, 1.0 + sliceStretchA))
+              : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0);
+            playhead += gRate * playheadSpeed;
 
             if (isSliceGranular) {
               if (sliceLoopA) {
@@ -3092,14 +3104,17 @@ export default function Delta7Synth() {
           if (!currentBuf) return;
 
           const ctxNow = ctx.currentTime;
+
+          // Serato-style time-stretch: grain size 80-120ms, hop = 25% (4 grains overlapping)
+          const gSize = Math.min(Math.max(0.08, sliceDurationB * 0.5), 0.12);
+          const gRate = gSize * 0.25;
+
           if (nextGrainTime < ctxNow + lookahead) {
             const drift = (ctxNow + lookahead) - nextGrainTime;
-            const speedFactor = freqScaleB / Math.max(0.05, 1 + sliceStretchB);
-            playhead += drift * speedFactor;
+            const playheadSpeed = 1.0 / Math.max(0.05, 1.0 + sliceStretchB);
+            playhead += drift * playheadSpeed;
             nextGrainTime = ctxNow + lookahead;
           }
-          const gSize = Math.max(0.03, Math.min(0.08, sliceDurationB));
-          const gRate = gSize * 0.4;
 
           while (nextGrainTime < ctxNow + lookahead + 0.1) {
             if (!sliceLoopB && playhead >= sliceEndSecB) {
@@ -3115,6 +3130,9 @@ export default function Delta7Synth() {
 
             const clampedStartOffset = Math.max(0, Math.min(currentBuf.duration - 0.005, grainStart));
 
+            // Grain playback rate = pitch-only (base 1.0) — tempo controlled by playhead speed
+            const grainPlaybackRateB = Math.pow(2, (slicePitchB + oscBPitch + oscBOctave * 12) / 12) * Math.pow(2, oscBDetune / 1200);
+
             let stutterPitchOffset = 0;
             if (paramsRef.current.stutterOn && paramsRef.current.stutterPitchSweep !== 0) {
               const elapsed = nextGrainTime - voiceObj.startTime;
@@ -3123,29 +3141,15 @@ export default function Delta7Synth() {
               stutterPitchOffset = progress * paramsRef.current.stutterPitchSweep;
             }
 
-            grainSource.playbackRate.setValueAtTime(freqScaleB * Math.pow(2, (oscBDetune + stutterPitchOffset * 100) / 1200), nextGrainTime);
+            grainSource.playbackRate.setValueAtTime(
+              grainPlaybackRateB * Math.pow(2, (stutterPitchOffset * 100) / 1200),
+              nextGrainTime
+            );
 
-            if (vibratoLfoGain) {
-              const vScale = ctx.createGain();
-              vScale.gain.setValueAtTime(1 / rootFreqB, nextGrainTime);
-              vibratoLfoGain.connect(vScale);
-              vScale.connect(grainSource.playbackRate);
-            }
-            if (driftGain) {
-              const dScale = ctx.createGain();
-              dScale.gain.setValueAtTime(1 / 1200, nextGrainTime);
-              driftGain.connect(dScale);
-              dScale.connect(grainSource.playbackRate);
-            }
-
+            // Raised-cosine (Hann-like) envelope for click-free grain transitions
             const grainGain = ctx.createGain();
             grainGain.gain.setValueAtTime(0, nextGrainTime);
-
-            const grainAttack = Math.min(0.005, gSize * 0.1);
-            const grainRelease = Math.min(0.005, gSize * 0.1);
-
-            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + grainAttack);
-            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + gSize - grainRelease);
+            grainGain.gain.linearRampToValueAtTime(1.0, nextGrainTime + gSize * 0.5);
             grainGain.gain.linearRampToValueAtTime(0.0, nextGrainTime + gSize);
 
             grainSource.connect(grainGain);
@@ -3154,8 +3158,9 @@ export default function Delta7Synth() {
             grainSource.start(nextGrainTime, clampedStartOffset, gSize);
             grainSource.stop(nextGrainTime + gSize + 0.01);
 
-            const speedFactor = freqScaleB / Math.max(0.05, 1 + sliceStretchB);
-            playhead += gRate * speedFactor;
+            // Advance playhead at time-stretched speed (independent of pitch)
+            const playheadSpeed = 1.0 / Math.max(0.05, 1.0 + sliceStretchB);
+            playhead += gRate * playheadSpeed;
 
             if (sliceLoopB) {
               if (playhead >= sliceEndSecB) {
@@ -3289,7 +3294,11 @@ export default function Delta7Synth() {
       if (sliceEnvA) {
         let att = sliceEnvA.attack;
         let dec = sliceEnvA.decay;
-        if (!isLoopA) {
+        // Only clamp attack/decay to dPlayA for standard (non-stretched) slice playback.
+        // When granular time-stretch is active the grain windows handle their own decay —
+        // clamping gainA here would silence the grains before they're audible.
+        const isGranularStretch = sliceStretchA !== 0;
+        if (!isLoopA && !isGranularStretch) {
           if (att >= dPlayA) {
             att = dPlayA * 0.1;
           }
@@ -3303,7 +3312,8 @@ export default function Delta7Synth() {
 
         gainA.gain.setValueAtTime(0, now);
         gainA.gain.linearRampToValueAtTime(vcaEnvAmt * gainAVol, aTimeA);
-        if (!isLoopA) {
+        // For granular stretch: sustain open (grains fade themselves), only close on note release
+        if (!isLoopA && !isGranularStretch) {
           gainA.gain.linearRampToValueAtTime(0, dTimeA);
         }
       } else {
@@ -3313,6 +3323,7 @@ export default function Delta7Synth() {
         gainA.gain.linearRampToValueAtTime(vca.sustainLevel * vcaEnvAmt * gainAVol, sTime);
       }
     }
+
 
     if (gainA_L && gainA_R && bufferA) {
       if (sliceEnvA) {
@@ -3502,7 +3513,7 @@ export default function Delta7Synth() {
     }
 
     return voiceObj;
-  };;
+  };
 
   const playVoice = (note, velocity) => {
     if (!audioCtxRef.current) initAudio();
@@ -3718,10 +3729,12 @@ export default function Delta7Synth() {
         const bendFactor = Math.pow(2, (x * 2) / 12);
         
         // Update primary frequency destinations
-        if (voice.oscA.frequency) {
-          voice.oscA.frequency.setValueAtTime(voice.oscA.frequency.value * bendFactor, now);
-        } else if (voice.oscA.playbackRate) {
-          voice.oscA.playbackRate.setValueAtTime(voice.oscA.playbackRate.value * bendFactor, now);
+        if (voice.oscA) {
+          if (voice.oscA.frequency) {
+            voice.oscA.frequency.setValueAtTime(voice.oscA.frequency.value * bendFactor, now);
+          } else if (voice.oscA.playbackRate) {
+            voice.oscA.playbackRate.setValueAtTime(voice.oscA.playbackRate.value * bendFactor, now);
+          }
         }
         
         if (voice.oscB) {
