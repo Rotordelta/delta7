@@ -4187,7 +4187,7 @@ export default function Delta7Synth() {
       ctx.shadowBlur = 0; // reset shadow
     };
     
-    physics.rafId = requestAnimationFrame(tick);
+    kaossPhysicsRef.current.rafId = requestAnimationFrame(tick);
     
     return () => {
       active = false;
