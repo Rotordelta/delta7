@@ -35,3 +35,9 @@
   - *Reverb Freeze*: Infinite feedback loop with high-pass sweep inside the reverb feedback path creates shimmering ambient clouds.
 - **1-to-1 Physical MIDI Mapping**: Bidirectional mapping using CC 12 (X), CC 13 (Y), CC 92 (Touch Gate), and CC 95 (Hold Button) enables hardware Kaoss Pads (KP3) to control the synth, and screen gestures to control external gear.
 - **Glow-Neon Canvas Visuals**: Real-time canvas renders glowing trails and touch ripples, making the XY pad feel responsive and premium.
+- **Internal Arpeggiator Engine & Slice Sequencing**:
+  - *Low-Latency Scheduling*: Built a Web Audio lookahead scheduler (~60ms lookahead, running on a 25ms timer interval) to ensure rock-solid, jitter-free timing unaffected by UI rendering lag.
+  - *Rhythmic Slice Sequencing*: Integrated the arpeggiator directly with Slice Mode. Holding a single key sequentially rolls through the sample's slice count (UP/DOWN/RANDOM) starting from the held MIDI note, while holding a chord arpeggiates specifically between the corresponding slice indices.
+  - *Legato Gate & Division Controls*: Exposed Arpeggiator Pattern, Division (up to 1/32 triplets), and Gate parameters (0.1 to 1.0) directly on the front panel with clean layout integration.
+  - *Zero Hung Notes Safety*: Bound the arpeggiator lifecycle closely to standard note-on, note-off, and global reset handlers. Releasing all keys, turning off the arpeggiator, or clicking "Stop All" immediately clears the scheduled queue and decays all arpeggiated voices cleanly.
+
