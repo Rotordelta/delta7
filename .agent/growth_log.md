@@ -40,4 +40,6 @@
   - *Rhythmic Slice Sequencing*: Integrated the arpeggiator directly with Slice Mode. Holding a single key sequentially rolls through the sample's slice count (UP/DOWN/RANDOM) starting from the held MIDI note, while holding a chord arpeggiates specifically between the corresponding slice indices.
   - *Legato Gate & Division Controls*: Exposed Arpeggiator Pattern, Division (up to 1/32 triplets), and Gate parameters (0.1 to 1.0) directly on the front panel with clean layout integration.
   - *Zero Hung Notes Safety*: Bound the arpeggiator lifecycle closely to standard note-on, note-off, and global reset handlers. Releasing all keys, turning off the arpeggiator, or clicking "Stop All" immediately clears the scheduled queue and decays all arpeggiated voices cleanly.
+- **Clean Preset Defaults & Filter Configuration**: Initialized presets default to balanced Double Mode (OSC A/B volumes at 0.8) with the VCF filter completely bypassed (Cutoff at 20,000 Hz, Resonance at 0, type 'bypass' mapping to a transparent Web Audio 'allpass' node). This ensures samples play cleanly with full frequency range. A VCF Type dropdown was added to the UI, supporting BYPASS, LOWPASS, HIGHPASS, BANDPASS, and NOTCH, with linear MIDI CC scaling expanded from 20Hz to 20kHz.
+
 
