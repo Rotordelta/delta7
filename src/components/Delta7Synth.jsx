@@ -212,6 +212,17 @@ export default function Delta7Synth() {
     gestureRef.current.mode = gestureMode;
   }, [gestureMode]);
 
+  // Arpeggiator engine states & refs
+  const [arpRunning, setArpRunning] = useState(false);
+  const heldNotesRef = useRef([]);
+  const activeArpKeysRef = useRef(new Set());
+  const arpRef = useRef({
+    nextNoteTime: 0.0,
+    stepIndex: 0,
+    timerId: null,
+    isPlaying: false
+  });
+
   const dubSirenOscRef = useRef(null);
   const dubSirenGainRef = useRef(null);
   const formantInputRef = useRef(null);
@@ -3690,6 +3701,19 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') ctx.resume();
 
+    if (paramsRef.current.arpOn) {
+      if (!heldNotesRef.current.includes(note)) {
+        heldNotesRef.current.push(note);
+      }
+      startArpeggiator();
+      setActiveNotes(prev => {
+        const next = new Set(prev);
+        next.add(note);
+        return next;
+      });
+      return;
+    }
+
     const now = ctx.currentTime;
 
     // Always stop the note first to prevent duplicates or orphans
@@ -3735,102 +3759,114 @@ export default function Delta7Synth() {
     });
   };
 
+  const releaseVoice = (voice) => {
+    if (!audioCtxRef.current || !voice) return;
+    const now = audioCtxRef.current.currentTime;
+    try {
+      const releaseTime = Math.max(0.01, voice.vca.releaseTime);
+      const timeConstant = releaseTime / 4;
+
+      if (voice.releasedRef) {
+        voice.releasedRef.current = true;
+      }
+      if (voice.granularTimerId) {
+        clearTimeout(voice.granularTimerId);
+      }
+      if (voice.granularTimerIdB) {
+        clearTimeout(voice.granularTimerIdB);
+      }
+      if (voice.stutterTimeoutId) {
+        clearTimeout(voice.stutterTimeoutId);
+      }
+
+      // Cancel scheduled gain ramps and drop to zero over release duration
+      if (voice.gainA) {
+        voice.gainA.gain.cancelScheduledValues(now);
+        voice.gainA.gain.setValueAtTime(voice.gainA.gain.value, now);
+        voice.gainA.gain.setTargetAtTime(0, now, timeConstant);
+      }
+
+      if (voice.gainA_L) {
+        voice.gainA_L.gain.cancelScheduledValues(now);
+        voice.gainA_L.gain.setValueAtTime(voice.gainA_L.gain.value, now);
+        voice.gainA_L.gain.setTargetAtTime(0, now, timeConstant);
+      }
+
+      if (voice.gainA_R) {
+        voice.gainA_R.gain.cancelScheduledValues(now);
+        voice.gainA_R.gain.setValueAtTime(voice.gainA_R.gain.value, now);
+        voice.gainA_R.gain.setTargetAtTime(0, now, timeConstant);
+      }
+
+      if (voice.gainB) {
+        voice.gainB.gain.cancelScheduledValues(now);
+        voice.gainB.gain.setValueAtTime(voice.gainB.gain.value, now);
+        voice.gainB.gain.setTargetAtTime(0, now, timeConstant);
+      }
+
+      if (voice.subGain) {
+        voice.subGain.gain.cancelScheduledValues(now);
+        voice.subGain.gain.setValueAtTime(voice.subGain.gain.value, now);
+        voice.subGain.gain.setTargetAtTime(0, now, timeConstant);
+      }
+
+      if (voice.noiseGain) {
+        voice.noiseGain.gain.cancelScheduledValues(now);
+        voice.noiseGain.gain.setValueAtTime(voice.noiseGain.gain.value, now);
+        voice.noiseGain.gain.setTargetAtTime(0, now, timeConstant);
+      }
+
+      // Filter decay on release
+      if (voice.filter1) {
+        voice.filter1.frequency.cancelScheduledValues(now);
+        voice.filter1.frequency.setValueAtTime(voice.filter1.frequency.value, now);
+        voice.filter1.frequency.setTargetAtTime(Math.max(20, voice.baseCutoff * 0.1), now, timeConstant);
+      }
+
+      // Clean up node references after release decays
+      const oscA = voice.oscA;
+      const oscB = voice.oscB;
+      const oscA_L = voice.oscA_L;
+      const oscA_R = voice.oscA_R;
+      const subOsc = voice.subOsc;
+      const noiseSource = voice.noiseSource;
+      const driftLfo = voice.driftLfo;
+      const lfo1 = voice.vibratoLfo;
+      const lfo2 = voice.filterLfo;
+      
+      setTimeout(() => {
+        try {
+          if (oscA) oscA.stop();
+          if (oscB) oscB.stop();
+          if (oscA_L) oscA_L.stop();
+          if (oscA_R) oscA_R.stop();
+          if (subOsc) subOsc.stop();
+          if (noiseSource) noiseSource.stop();
+          if (driftLfo) driftLfo.stop();
+          if (lfo1) lfo1.stop();
+          if (lfo2) lfo2.stop();
+        } catch {}
+      }, (releaseTime + 0.1) * 1000);
+    } catch (err) {
+      console.warn('Error releasing voice nodes:', err);
+    }
+  };
+
   const stopVoice = (note) => {
     if (!audioCtxRef.current) return;
-    const ctx = audioCtxRef.current;
-    const now = ctx.currentTime;
 
-    const releaseVoice = (voice) => {
-      if (!voice) return;
-      try {
-        const releaseTime = Math.max(0.01, voice.vca.releaseTime);
-        const timeConstant = releaseTime / 4;
-
-        if (voice.releasedRef) {
-          voice.releasedRef.current = true;
-        }
-        if (voice.granularTimerId) {
-          clearTimeout(voice.granularTimerId);
-        }
-        if (voice.granularTimerIdB) {
-          clearTimeout(voice.granularTimerIdB);
-        }
-        if (voice.stutterTimeoutId) {
-          clearTimeout(voice.stutterTimeoutId);
-        }
-
-        // Cancel scheduled gain ramps and drop to zero over release duration
-        if (voice.gainA) {
-          voice.gainA.gain.cancelScheduledValues(now);
-          voice.gainA.gain.setValueAtTime(voice.gainA.gain.value, now);
-          voice.gainA.gain.setTargetAtTime(0, now, timeConstant);
-        }
-
-        if (voice.gainA_L) {
-          voice.gainA_L.gain.cancelScheduledValues(now);
-          voice.gainA_L.gain.setValueAtTime(voice.gainA_L.gain.value, now);
-          voice.gainA_L.gain.setTargetAtTime(0, now, timeConstant);
-        }
-
-        if (voice.gainA_R) {
-          voice.gainA_R.gain.cancelScheduledValues(now);
-          voice.gainA_R.gain.setValueAtTime(voice.gainA_R.gain.value, now);
-          voice.gainA_R.gain.setTargetAtTime(0, now, timeConstant);
-        }
-
-        if (voice.gainB) {
-          voice.gainB.gain.cancelScheduledValues(now);
-          voice.gainB.gain.setValueAtTime(voice.gainB.gain.value, now);
-          voice.gainB.gain.setTargetAtTime(0, now, timeConstant);
-        }
-
-        if (voice.subGain) {
-          voice.subGain.gain.cancelScheduledValues(now);
-          voice.subGain.gain.setValueAtTime(voice.subGain.gain.value, now);
-          voice.subGain.gain.setTargetAtTime(0, now, timeConstant);
-        }
-
-        if (voice.noiseGain) {
-          voice.noiseGain.gain.cancelScheduledValues(now);
-          voice.noiseGain.gain.setValueAtTime(voice.noiseGain.gain.value, now);
-          voice.noiseGain.gain.setTargetAtTime(0, now, timeConstant);
-        }
-
-        // Filter decay on release
-        if (voice.filter1) {
-          voice.filter1.frequency.cancelScheduledValues(now);
-          voice.filter1.frequency.setValueAtTime(voice.filter1.frequency.value, now);
-          voice.filter1.frequency.setTargetAtTime(Math.max(20, voice.baseCutoff * 0.1), now, timeConstant);
-        }
-
-        // Clean up node references after release decays
-        const oscA = voice.oscA;
-        const oscB = voice.oscB;
-        const oscA_L = voice.oscA_L;
-        const oscA_R = voice.oscA_R;
-        const subOsc = voice.subOsc;
-        const noiseSource = voice.noiseSource;
-        const driftLfo = voice.driftLfo;
-        const lfo1 = voice.vibratoLfo;
-        const lfo2 = voice.filterLfo;
-        
-        setTimeout(() => {
-          try {
-            if (oscA) oscA.stop();
-            if (oscB) oscB.stop();
-            if (oscA_L) oscA_L.stop();
-            if (oscA_R) oscA_R.stop();
-            if (subOsc) subOsc.stop();
-            if (noiseSource) noiseSource.stop();
-            if (driftLfo) driftLfo.stop();
-            if (lfo1) lfo1.stop();
-            if (lfo2) lfo2.stop();
-          } catch {}
-        }, (releaseTime + 0.1) * 1000);
-      } catch (err) {
-        console.warn('Error releasing voice nodes:', err);
+    if (paramsRef.current.arpOn) {
+      heldNotesRef.current = heldNotesRef.current.filter(n => n !== note);
+      if (heldNotesRef.current.length === 0) {
+        stopArpeggiator();
       }
-    };
+      setActiveNotes(prev => {
+        const next = new Set(prev);
+        next.delete(note);
+        return next;
+      });
+      return;
+    }
 
     const voices = activeVoicesRef.current.get(note);
     if (voices) {
@@ -3845,7 +3881,117 @@ export default function Delta7Synth() {
     });
   };
 
+  const runArpScheduler = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    
+    const now = ctx.currentTime;
+    const lookahead = 0.06; // 60ms lookahead
+    const scheduleInterval = 25; // 25ms timer interval
+    
+    while (arpRef.current.nextNoteTime < now + lookahead) {
+      const held = heldNotesRef.current;
+      if (held.length === 0) {
+        arpRef.current.isPlaying = false;
+        setArpRunning(false);
+        return;
+      }
+      
+      const bpm = paramsRef.current.arpBpm || 120;
+      const division = paramsRef.current.arpDivision || 8;
+      const gate = paramsRef.current.arpGate !== undefined ? paramsRef.current.arpGate : 0.8;
+      const velocity = paramsRef.current.arpVelocity || 100;
+      const pattern = paramsRef.current.arpPattern || 'UP';
+      
+      const stepDuration = (60 / bpm) * (4 / division);
+      
+      let noteToPlay = 60;
+      const isSliceMode = paramsRef.current.oscATriggerMode === 'slice';
+      
+      if (isSliceMode && held.length === 1) {
+        const activeSlotId = paramsRef.current.oscAWave || 's01';
+        const activeSlot = sampleSlotsRef.current.find(s => s.id === activeSlotId) || sampleSlotsRef.current[0];
+        const sliceCount = activeSlot ? activeSlot.sliceCount || 16 : 16;
+        
+        const baseNote = held[0];
+        let offset = arpRef.current.stepIndex % sliceCount;
+        if (pattern === 'DOWN') {
+          offset = sliceCount - 1 - (arpRef.current.stepIndex % sliceCount);
+        } else if (pattern === 'RANDOM') {
+          offset = Math.floor(Math.random() * sliceCount);
+        }
+        noteToPlay = baseNote + offset;
+      } else {
+        const sortedHeld = [...held].sort((a, b) => a - b);
+        let noteIdx = arpRef.current.stepIndex % sortedHeld.length;
+        
+        if (pattern === 'DOWN') {
+          noteIdx = sortedHeld.length - 1 - (arpRef.current.stepIndex % sortedHeld.length);
+        } else if (pattern === 'RANDOM') {
+          noteIdx = Math.floor(Math.random() * sortedHeld.length);
+        }
+        
+        noteToPlay = sortedHeld[noteIdx];
+      }
+      
+      const triggerTime = arpRef.current.nextNoteTime;
+      const delayOffset = Math.max(0, triggerTime - now);
+      const voiceKey = `arp-${arpRef.current.stepIndex}-${noteToPlay}`;
+      
+      const voice = playProgramVoice(ctx, noteToPlay, velocity, paramsRef.current, voiceKey, delayOffset);
+      
+      activeVoicesRef.current.set(voiceKey, [voice]);
+      activeArpKeysRef.current.add(voiceKey);
+      
+      // Release note schedule
+      const stopTimeMs = (delayOffset + stepDuration * gate) * 1000;
+      setTimeout(() => {
+        const voices = activeVoicesRef.current.get(voiceKey);
+        if (voices) {
+          voices.forEach(releaseVoice);
+          activeVoicesRef.current.delete(voiceKey);
+        }
+        activeArpKeysRef.current.delete(voiceKey);
+      }, stopTimeMs);
+      
+      arpRef.current.nextNoteTime += stepDuration;
+      arpRef.current.stepIndex++;
+    }
+    
+    if (arpRef.current.isPlaying) {
+      arpRef.current.timerId = setTimeout(runArpScheduler, scheduleInterval);
+    }
+  };
+
+  const startArpeggiator = () => {
+    if (arpRef.current.isPlaying) return;
+    
+    arpRef.current.isPlaying = true;
+    arpRef.current.stepIndex = 0;
+    arpRef.current.nextNoteTime = audioCtxRef.current.currentTime;
+    setArpRunning(true);
+    
+    runArpScheduler();
+  };
+
+  const stopArpeggiator = () => {
+    arpRef.current.isPlaying = false;
+    if (arpRef.current.timerId) clearTimeout(arpRef.current.timerId);
+    
+    activeArpKeysRef.current.forEach(voiceKey => {
+      const voices = activeVoicesRef.current.get(voiceKey);
+      if (voices) {
+        voices.forEach(releaseVoice);
+        activeVoicesRef.current.delete(voiceKey);
+      }
+    });
+    activeArpKeysRef.current.clear();
+    setArpRunning(false);
+  };
+
   const stopAllNotes = () => {
+    heldNotesRef.current = [];
+    stopArpeggiator();
     if (!audioCtxRef.current) return;
     activeVoicesRef.current.forEach((val) => {
       const stopVoiceRef = (v) => {
@@ -4540,6 +4686,10 @@ export default function Delta7Synth() {
   // MIDI Start (0xFA) / Stop (0xFC) on Arpeggiator On/Off state toggle
   const isMidiArpMountedRef = useRef(false);
   useEffect(() => {
+    if (!params.arpOn) {
+      heldNotesRef.current = [];
+      stopArpeggiator();
+    }
     if (!isMidiArpMountedRef.current) {
       isMidiArpMountedRef.current = true;
       return;
@@ -6701,6 +6851,45 @@ export default function Delta7Synth() {
                           >
                             TAP
                           </button>
+                        </div>
+                        {/* Arpeggiator Parameters (Pattern, Div, Gate) */}
+                        <div className="flex-row-sub" style={{ alignItems: 'center', marginTop: '2px', gap: '3px', fontSize: '0.5rem' }}>
+                          <span style={{ color: '#00f3ff', opacity: 0.8 }}>Pattern:</span>
+                          <select
+                            value={params.arpPattern || 'UP'}
+                            onChange={(e) => setParams(prev => ({ ...prev, arpPattern: e.target.value }))}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.48rem', padding: '0px 1px', borderRadius: '2px', width: '38px', outline: 'none' }}
+                          >
+                            <option value="UP">UP</option>
+                            <option value="DOWN">DOWN</option>
+                            <option value="RANDOM">RAND</option>
+                          </select>
+                          
+                          <span style={{ color: '#00f3ff', opacity: 0.8, marginLeft: '2px' }}>Div:</span>
+                          <select
+                            value={params.arpDivision || 8}
+                            onChange={(e) => setParams(prev => ({ ...prev, arpDivision: parseInt(e.target.value) || 8 }))}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.48rem', padding: '0px 1px', borderRadius: '2px', width: '30px', outline: 'none' }}
+                          >
+                            <option value="4">1/4</option>
+                            <option value="8">1/8</option>
+                            <option value="12">1/12</option>
+                            <option value="16">1/16</option>
+                            <option value="24">1/24</option>
+                            <option value="32">1/32</option>
+                          </select>
+
+                          <span style={{ color: '#00f3ff', opacity: 0.8, marginLeft: '2px' }}>Gate:</span>
+                          <input 
+                            type="range" min="0.1" max="1.0" step="0.05"
+                            value={params.arpGate !== undefined ? params.arpGate : 0.8} 
+                            onChange={(e) => setParams(prev => ({ ...prev, arpGate: parseFloat(e.target.value) }))} 
+                            style={{ flexGrow: 1, height: '8px', minWidth: '20px' }}
+                            title={`Gate: ${(params.arpGate !== undefined ? params.arpGate : 0.8).toFixed(2)}`}
+                          />
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.45rem', width: '15px', textAlign: 'right', color: '#00f3ff' }}>
+                            {Math.round((params.arpGate !== undefined ? params.arpGate : 0.8) * 100)}%
+                          </span>
                         </div>
                       </div>
 
