@@ -25,4 +25,13 @@
 - **Waveform Gain Tool**: Implementing a destructive editor GAIN multiplier that operates on Float32Array channel data (either active selection or entire buffer) allows digital amplitude scaling. Safety-clipping limits must be applied to prevent sample values from overflowing the [-1.0, 1.0] bounds.
 - **Custom Naming & Target Redirection**: Redirecting sample database writes allows duplication and reorganization. Copying must deep clone complex settings like slice Attack/Decay envelope arrays. Sanitizing inputs to extract digit locations makes numeric entry smooth.
 - **High-Bitrate High-Fidelity Recording**: Forcing `audioBitsPerSecond: 512000` with codecs=opus prioritizes maximum compression fidelity, achieving transparent quality for musical captures.
-
+## Session: 2026-06-08 (Kaoss Pad Upgrade)
+- **Kaoss Pad Physics Return Modes**: Added tactile modes (Snap, Hold, Spring, Throw) to the XY pad. Spring utilizes harmonic oscillator physics to pull the playhead back with organic bounce, while Throw tracks drag velocity to apply momentum, edge bounces, and friction deceleration.
+- **Motion Gesture Recording**: Capturing X/Y coordinates at 30fps and looping them allows users to automate complex sweeps. Modes like One-Shot turn gestures into note-triggered envelope modulators.
+- **Advanced Sound-System DSP Effects**:
+  - *Dub Ramper*: Hybrid tone generator (square wave siren) modulated by Y-axis LFO and fed into delay lines where X glides delay time for tape-speed pitch bending.
+  - *Vinyl Break / Tape Stop*: Real-time playbackRate scaling of active buffer sources to simulate turntable braking, pre-cached on voice trigger to prevent transients.
+  - *Formant Vowel filter*: Bilinear interpolation of vowel peaks (Ah, Ee, Oo, Oh) over parallel bandpass filters makes the synth "speak".
+  - *Reverb Freeze*: Infinite feedback loop with high-pass sweep inside the reverb feedback path creates shimmering ambient clouds.
+- **1-to-1 Physical MIDI Mapping**: Bidirectional mapping using CC 12 (X), CC 13 (Y), CC 92 (Touch Gate), and CC 95 (Hold Button) enables hardware Kaoss Pads (KP3) to control the synth, and screen gestures to control external gear.
+- **Glow-Neon Canvas Visuals**: Real-time canvas renders glowing trails and touch ripples, making the XY pad feel responsive and premium.
