@@ -1253,23 +1253,36 @@ export default function Delta7Synth() {
       ctx.textAlign = 'center';
       
       for (let i = 0; i < sliceCount; i++) {
-        const sliceX = startX + i * sliceWidth;
+        const sliceParam = slot.sliceParams?.[i] || {};
+        const sliceStartNorm = sliceParam.start !== undefined ? sliceParam.start : (slot.start + (i / sliceCount) * (slot.end - slot.start));
+        const sliceEndNorm = sliceParam.end !== undefined ? sliceParam.end : (slot.start + ((i + 1) / sliceCount) * (slot.end - slot.start));
+        
+        const sliceStartX = sliceStartNorm * canvas.width;
+        const sliceEndX = sliceEndNorm * canvas.width;
+        
         if (i > 0) {
           ctx.beginPath();
-          ctx.moveTo(sliceX, 0);
-          ctx.lineTo(sliceX, canvas.height);
+          ctx.moveTo(sliceStartX, 0);
+          ctx.lineTo(sliceStartX, canvas.height);
           ctx.stroke();
         }
-        ctx.fillText((i + 1).toString(), sliceX + sliceWidth / 2, canvas.height - 4);
+        
+        ctx.fillText((i + 1).toString(), (sliceStartX + sliceEndX) / 2, canvas.height - 4);
       }
 
       // Highlight the slice selected for editing
-      const selX = startX + selectedSliceIndex * sliceWidth;
+      const selSliceParam = slot.sliceParams?.[selectedSliceIndex] || {};
+      const selStartNorm = selSliceParam.start !== undefined ? selSliceParam.start : (slot.start + (selectedSliceIndex / sliceCount) * (slot.end - slot.start));
+      const selEndNorm = selSliceParam.end !== undefined ? selSliceParam.end : (slot.start + ((selectedSliceIndex + 1) / sliceCount) * (slot.end - slot.start));
+      
+      const selStartX = selStartNorm * canvas.width;
+      const selWidth = (selEndNorm - selStartNorm) * canvas.width;
+      
       ctx.fillStyle = 'rgba(0, 243, 255, 0.06)';
-      ctx.fillRect(selX, 0, sliceWidth, canvas.height);
+      ctx.fillRect(selStartX, 0, selWidth, canvas.height);
       ctx.strokeStyle = 'rgba(0, 243, 255, 0.7)';
       ctx.lineWidth = 1.0;
-      ctx.strokeRect(selX, 0, sliceWidth, canvas.height);
+      ctx.strokeRect(selStartX, 0, selWidth, canvas.height);
 
       // Highlight active slices from keyboard voices
       if (activeVoicesRef.current) {
@@ -1284,15 +1297,27 @@ export default function Delta7Synth() {
               const sliceCount = slot.sliceCount || 16;
               if (isSlotA && paramsRef.current.oscATriggerMode === 'slice') {
                 const sliceIndex = ((voice.note - slot.rootNote) % sliceCount + sliceCount) % sliceCount;
-                const sX = startX + sliceIndex * sliceWidth;
+                const vSliceParam = slot.sliceParams?.[sliceIndex] || {};
+                const vStartNorm = vSliceParam.start !== undefined ? vSliceParam.start : (slot.start + (sliceIndex / sliceCount) * (slot.end - slot.start));
+                const vEndNorm = vSliceParam.end !== undefined ? vSliceParam.end : (slot.start + ((sliceIndex + 1) / sliceCount) * (slot.end - slot.start));
+                
+                const vStartX = vStartNorm * canvas.width;
+                const vWidth = (vEndNorm - vStartNorm) * canvas.width;
+                
                 ctx.fillStyle = 'rgba(255, 230, 0, 0.15)'; // yellow highlight for OSC A slice
-                ctx.fillRect(sX, 0, sliceWidth, canvas.height);
+                ctx.fillRect(vStartX, 0, vWidth, canvas.height);
               }
               if (isSlotB && paramsRef.current.oscBTriggerMode === 'slice') {
                 const sliceIndex = ((voice.note - slot.rootNote) % sliceCount + sliceCount) % sliceCount;
-                const sX = startX + sliceIndex * sliceWidth;
+                const vSliceParam = slot.sliceParams?.[sliceIndex] || {};
+                const vStartNorm = vSliceParam.start !== undefined ? vSliceParam.start : (slot.start + (sliceIndex / sliceCount) * (slot.end - slot.start));
+                const vEndNorm = vSliceParam.end !== undefined ? vSliceParam.end : (slot.start + ((sliceIndex + 1) / sliceCount) * (slot.end - slot.start));
+                
+                const vStartX = vStartNorm * canvas.width;
+                const vWidth = (vEndNorm - vStartNorm) * canvas.width;
+                
                 ctx.fillStyle = 'rgba(255, 0, 255, 0.15)'; // magenta highlight for OSC B slice
-                ctx.fillRect(sX, 0, sliceWidth, canvas.height);
+                ctx.fillRect(vStartX, 0, vWidth, canvas.height);
               }
             }
           });
@@ -2809,6 +2834,63 @@ export default function Delta7Synth() {
     const isLoopA = prog.oscATriggerMode === 'slice' ? sliceLoopA : (slotA ? slotA.loopOn : false);
     const isLoopB = prog.oscBTriggerMode === 'slice' ? sliceLoopB : (slotB ? slotB.loopOn : false);
 
+    // Pre-calculate custom slice bounds and timings
+    let sliceStartNormAPrecalc = 0;
+    let sliceEndNormAPrecalc = 1;
+    let sliceDurationAPrecalc = 0;
+    let sliceStartOffsetAPrecalc = 0;
+    if (slotA && bufferA && prog.oscATriggerMode === 'slice') {
+      const sliceCountA = slotA.sliceCount || 16;
+      const sliceIndexA = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
+      const sliceParam = slotA.sliceParams?.[sliceIndexA] || {};
+      
+      sliceStartNormAPrecalc = sliceParam.start !== undefined ? sliceParam.start : (slotA.start + (sliceIndexA / sliceCountA) * (slotA.end - slotA.start));
+      sliceEndNormAPrecalc = sliceParam.end !== undefined ? sliceParam.end : (slotA.start + ((sliceIndexA + 1) / sliceCountA) * (slotA.end - slotA.start));
+      
+      sliceStartNormAPrecalc = Math.max(0, Math.min(1, sliceStartNormAPrecalc));
+      sliceEndNormAPrecalc = Math.max(0, Math.min(1, sliceEndNormAPrecalc));
+      if (sliceStartNormAPrecalc > sliceEndNormAPrecalc) {
+        const tmp = sliceStartNormAPrecalc;
+        sliceStartNormAPrecalc = sliceEndNormAPrecalc;
+        sliceEndNormAPrecalc = tmp;
+      }
+      
+      sliceDurationAPrecalc = (sliceEndNormAPrecalc - sliceStartNormAPrecalc) * bufferA.duration;
+      if (isReverseA) {
+        sliceStartOffsetAPrecalc = bufferA.duration - (sliceEndNormAPrecalc * bufferA.duration);
+      } else {
+        sliceStartOffsetAPrecalc = sliceStartNormAPrecalc * bufferA.duration;
+      }
+    }
+
+    let sliceStartNormBPrecalc = 0;
+    let sliceEndNormBPrecalc = 1;
+    let sliceDurationBPrecalc = 0;
+    let sliceStartOffsetBPrecalc = 0;
+    if (slotB && bufferB && prog.oscBTriggerMode === 'slice') {
+      const sliceCountB = slotB.sliceCount || 16;
+      const sliceIndexB = ((note - rootNoteB) % sliceCountB + sliceCountB) % sliceCountB;
+      const sliceParam = slotB.sliceParams?.[sliceIndexB] || {};
+      
+      sliceStartNormBPrecalc = sliceParam.start !== undefined ? sliceParam.start : (slotB.start + (sliceIndexB / sliceCountB) * (slotB.end - slotB.start));
+      sliceEndNormBPrecalc = sliceParam.end !== undefined ? sliceParam.end : (slotB.start + ((sliceIndexB + 1) / sliceCountB) * (slotB.end - slotB.start));
+      
+      sliceStartNormBPrecalc = Math.max(0, Math.min(1, sliceStartNormBPrecalc));
+      sliceEndNormBPrecalc = Math.max(0, Math.min(1, sliceEndNormBPrecalc));
+      if (sliceStartNormBPrecalc > sliceEndNormBPrecalc) {
+        const tmp = sliceStartNormBPrecalc;
+        sliceStartNormBPrecalc = sliceEndNormBPrecalc;
+        sliceEndNormBPrecalc = tmp;
+      }
+      
+      sliceDurationBPrecalc = (sliceEndNormBPrecalc - sliceStartNormBPrecalc) * bufferB.duration;
+      if (isReverseB) {
+        sliceStartOffsetBPrecalc = bufferB.duration - (sliceEndNormBPrecalc * bufferB.duration);
+      } else {
+        sliceStartOffsetBPrecalc = sliceStartNormBPrecalc * bufferB.duration;
+      }
+    }
+
     const oscAOctave = prog.oscAOctave !== undefined ? prog.oscAOctave : 0;
     const oscAPitch = prog.oscAPitch !== undefined ? prog.oscAPitch : 0;
     const oscADetune = prog.oscADetune !== undefined ? prog.oscADetune : 0;
@@ -2947,16 +3029,8 @@ export default function Delta7Synth() {
         let sliceEndSecA = 0;
         
         if (isSliceGranular) {
-          const sliceCountA = slotA.sliceCount || 16;
-          const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
-          const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-          sliceDurationA = activeDurationA / sliceCountA;
-          if (isReverseA) {
-            const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
-            startOffsetA = bufferA.duration - origSliceStart - sliceDurationA;
-          } else {
-            startOffsetA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
-          }
+          sliceDurationA = sliceDurationAPrecalc;
+          startOffsetA = sliceStartOffsetAPrecalc;
           sliceEndSecA = startOffsetA + sliceDurationA;
           playhead = startOffsetA;
         } else {
@@ -3161,12 +3235,8 @@ export default function Delta7Synth() {
           let loopStartA, loopEndA;
           if (isReverseA) {
             if (isSliceA) {
-              const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
-              const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-              const sliceDurationA = activeDurationA / sliceCountA;
-              const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
-              loopStartA = bufferA.duration - origSliceStart - sliceDurationA;
-              loopEndA = loopStartA + sliceDurationA;
+              loopStartA = sliceStartOffsetAPrecalc;
+              loopEndA = loopStartA + sliceDurationAPrecalc;
             } else {
               loopStartA = (1.0 - slotA.loopEnd) * bufferA.duration;
               loopEndA = (1.0 - slotA.loopStart) * bufferA.duration;
@@ -3175,11 +3245,8 @@ export default function Delta7Synth() {
             loopStartA = slotA.loopStart * bufferA.duration;
             loopEndA = slotA.loopEnd * bufferA.duration;
             if (isSliceA) {
-              const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
-              const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-              const sliceDurationA = activeDurationA / sliceCountA;
-              loopStartA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
-              loopEndA = loopStartA + sliceDurationA;
+              loopStartA = sliceStartOffsetAPrecalc;
+              loopEndA = loopStartA + sliceDurationAPrecalc;
             }
           }
 
@@ -3222,12 +3289,8 @@ export default function Delta7Synth() {
           let loopStartA, loopEndA;
           if (isReverseA) {
             if (isSliceA) {
-              const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
-              const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-              const sliceDurationA = activeDurationA / sliceCountA;
-              const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
-              loopStartA = bufferA.duration - origSliceStart - sliceDurationA;
-              loopEndA = loopStartA + sliceDurationA;
+              loopStartA = sliceStartOffsetAPrecalc;
+              loopEndA = loopStartA + sliceDurationAPrecalc;
             } else {
               loopStartA = (1.0 - slotA.loopEnd) * bufferA.duration;
               loopEndA = (1.0 - slotA.loopStart) * bufferA.duration;
@@ -3236,11 +3299,8 @@ export default function Delta7Synth() {
             loopStartA = slotA.loopStart * bufferA.duration;
             loopEndA = slotA.loopEnd * bufferA.duration;
             if (isSliceA) {
-              const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
-              const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-              const sliceDurationA = activeDurationA / sliceCountA;
-              loopStartA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
-              loopEndA = loopStartA + sliceDurationA;
+              loopStartA = sliceStartOffsetAPrecalc;
+              loopEndA = loopStartA + sliceDurationAPrecalc;
             }
           }
 
@@ -3269,17 +3329,8 @@ export default function Delta7Synth() {
 
       if (isSliceGranularB) {
         // --- OSC B Granular Synthesis for Time-Stretching ---
-        const sliceCountB = slotB.sliceCount || 16;
-        const sliceIndex = ((note - rootNoteB) % sliceCountB + sliceCountB) % sliceCountB;
-        const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
-        const sliceDurationB = activeDurationB / sliceCountB;
-        let startOffsetB;
-        if (isReverseB) {
-          const origSliceStart = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
-          startOffsetB = bufferB.duration - origSliceStart - sliceDurationB;
-        } else {
-          startOffsetB = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
-        }
+        sliceDurationB = sliceDurationBPrecalc;
+        let startOffsetB = sliceStartOffsetBPrecalc;
         const sliceEndSecB = startOffsetB + sliceDurationB;
         let playhead = startOffsetB;
 
@@ -3603,17 +3654,8 @@ export default function Delta7Synth() {
       let durationToPlayA;
 
       if (prog.oscATriggerMode === 'slice') {
-        const sliceCountA = slotA.sliceCount || 16;
-        const sliceIndex = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
-        const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-        const sliceDurationA = activeDurationA / sliceCountA;
-        if (isReverseA) {
-          const origSliceStart = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
-          startOffsetA = bufferA.duration - origSliceStart - sliceDurationA;
-        } else {
-          startOffsetA = slotA.start * bufferA.duration + sliceIndex * sliceDurationA;
-        }
-        durationToPlayA = sliceDurationA;
+        startOffsetA = sliceStartOffsetAPrecalc;
+        durationToPlayA = sliceDurationAPrecalc;
       } else {
         if (isReverseA) {
           startOffsetA = (1.0 - slotA.end) * bufferA.duration;
@@ -3641,17 +3683,8 @@ export default function Delta7Synth() {
       let durationToPlayB;
 
       if (prog.oscBTriggerMode === 'slice') {
-        const sliceCountB = slotB.sliceCount || 16;
-        const sliceIndex = ((note - rootNoteB) % sliceCountB + sliceCountB) % sliceCountB;
-        const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
-        const sliceDurationB = activeDurationB / sliceCountB;
-        if (isReverseB) {
-          const origSliceStart = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
-          startOffsetB = bufferB.duration - origSliceStart - sliceDurationB;
-        } else {
-          startOffsetB = slotB.start * bufferB.duration + sliceIndex * sliceDurationB;
-        }
-        durationToPlayB = sliceDurationB;
+        startOffsetB = sliceStartOffsetBPrecalc;
+        durationToPlayB = sliceDurationBPrecalc;
       } else {
         if (isReverseB) {
           startOffsetB = (1.0 - slotB.end) * bufferB.duration;
@@ -6321,6 +6354,73 @@ export default function Delta7Synth() {
                             />
                             <span className="font-mono" style={{ color: '#fff', fontSize: '0.52rem', width: '42px', textAlign: 'right' }}>
                               {(slot.sliceParams?.[selectedSliceIndex]?.stretch > 0 ? '+' : '') + Math.round((slot.sliceParams?.[selectedSliceIndex]?.stretch || 0) * 100)}%
+                            </span>
+                          </div>
+                          
+                          {/* Row 3: Slice Start & End points */}
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem' }}>
+                            <span style={{ color: '#00ff66', width: '40px' }}>Start:</span>
+                            <input
+                              type="range" min="0.0" max="1.0" step="0.001"
+                              value={(() => {
+                                const sliceParam = slot.sliceParams?.[selectedSliceIndex] || {};
+                                if (sliceParam.start !== undefined) return sliceParam.start;
+                                return slot.start + (selectedSliceIndex / (slot.sliceCount || 16)) * (slot.end - slot.start);
+                              })()}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                const nextSlots = sampleSlotsRef.current.map(s => {
+                                  if (s.id === selectedEditSlotId) {
+                                    const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
+                                    paramsList[selectedSliceIndex] = { ...paramsList[selectedSliceIndex], start: val };
+                                    return { ...s, sliceParams: paramsList };
+                                  }
+                                  return s;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }}
+                              style={{ flexGrow: 1, height: '8px' }}
+                            />
+                            <span className="font-mono" style={{ color: '#fff', fontSize: '0.52rem', width: '42px', textAlign: 'right' }}>
+                              {(() => {
+                                const sliceParam = slot.sliceParams?.[selectedSliceIndex] || {};
+                                const startVal = sliceParam.start !== undefined ? sliceParam.start : (slot.start + (selectedSliceIndex / (slot.sliceCount || 16)) * (slot.end - slot.start));
+                                return slot.buffer ? (startVal * slot.buffer.duration).toFixed(3) + 's' : Math.round(startVal * 100) + '%';
+                              })()}
+                            </span>
+                          </div>
+
+                          <div className="flex-row-sub" style={{ fontSize: '0.58rem' }}>
+                            <span style={{ color: '#ffea00', width: '40px' }}>End:</span>
+                            <input
+                              type="range" min="0.0" max="1.0" step="0.001"
+                              value={(() => {
+                                const sliceParam = slot.sliceParams?.[selectedSliceIndex] || {};
+                                if (sliceParam.end !== undefined) return sliceParam.end;
+                                return slot.start + ((selectedSliceIndex + 1) / (slot.sliceCount || 16)) * (slot.end - slot.start);
+                              })()}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                const nextSlots = sampleSlotsRef.current.map(s => {
+                                  if (s.id === selectedEditSlotId) {
+                                    const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
+                                    paramsList[selectedSliceIndex] = { ...paramsList[selectedSliceIndex], end: val };
+                                    return { ...s, sliceParams: paramsList };
+                                  }
+                                  return s;
+                                });
+                                sampleSlotsRef.current = nextSlots;
+                                setSampleSlots(nextSlots);
+                              }}
+                              style={{ flexGrow: 1, height: '8px' }}
+                            />
+                            <span className="font-mono" style={{ color: '#fff', fontSize: '0.52rem', width: '42px', textAlign: 'right' }}>
+                              {(() => {
+                                const sliceParam = slot.sliceParams?.[selectedSliceIndex] || {};
+                                const endVal = sliceParam.end !== undefined ? sliceParam.end : (slot.start + ((selectedSliceIndex + 1) / (slot.sliceCount || 16)) * (slot.end - slot.start));
+                                return slot.buffer ? (endVal * slot.buffer.duration).toFixed(3) + 's' : Math.round(endVal * 100) + '%';
+                              })()}
                             </span>
                           </div>
                         </div>
