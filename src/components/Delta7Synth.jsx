@@ -8083,6 +8083,108 @@ export default function Delta7Synth() {
             </div>
           </div>
 
+          {/* Master Tempo & Click Control */}
+          <div className="patches-quick-category" style={{ marginTop: '8px' }}>
+            <span className="knob-label">Master Tempo & Metronome</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '6px' }}>
+              {/* Tempo row */}
+              <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                <span className="font-mono" style={{ color: '#00f3ff', fontSize: '0.55rem' }}>TEMPO:</span>
+                <input 
+                  type="range" min="40" max="250" step="1"
+                  value={params.arpBpm || 120} 
+                  onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseInt(e.target.value) || 120 }))} 
+                  style={{ flexGrow: 1, height: '8px' }}
+                />
+                <input 
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={params.arpBpm} 
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val === '') {
+                      setParams(prev => ({ ...prev, arpBpm: '' }));
+                    } else {
+                      const parsed = parseInt(val, 10);
+                      setParams(prev => ({ ...prev, arpBpm: Math.min(250, parsed) }));
+                    }
+                  }}
+                  onBlur={() => {
+                    const parsed = parseInt(params.arpBpm, 10);
+                    if (isNaN(parsed) || parsed < 40) {
+                      setParams(prev => ({ ...prev, arpBpm: 40 }));
+                    } else if (parsed > 250) {
+                      setParams(prev => ({ ...prev, arpBpm: 250 }));
+                    }
+                  }}
+                  style={{ 
+                    width: '24px', 
+                    background: '#000', 
+                    border: '1px solid rgba(0, 243, 255, 0.4)', 
+                    color: '#00f3ff', 
+                    fontFamily: 'monospace', 
+                    fontSize: '0.52rem', 
+                    textAlign: 'center', 
+                    borderRadius: '2px', 
+                    padding: '1px 0',
+                    outline: 'none'
+                  }}
+                />
+                <button
+                  className="segmented-btn btn-xs"
+                  onClick={handleTapTempo}
+                  style={{ 
+                    padding: '1px 4px', 
+                    fontSize: '0.5rem', 
+                    border: '1px solid rgba(255, 0, 255, 0.6)', 
+                    color: '#ff00ff', 
+                    background: 'transparent', 
+                    cursor: 'pointer', 
+                    borderRadius: '2px',
+                    textShadow: '0 0 2px rgba(255, 0, 255, 0.5)'
+                  }}
+                >
+                  TAP
+                </button>
+              </div>
+
+              {/* Metronome row */}
+              <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', borderTop: '1px dashed rgba(255, 0, 255, 0.15)', paddingTop: '4px' }}>
+                <span className="font-mono" style={{ color: '#ff00ff', fontSize: '0.55rem' }}>CLICK:</span>
+                <button
+                  className={`segmented-btn btn-xs ${metronomeOn ? 'active' : ''}`}
+                  onClick={() => {
+                    if (metronomeOn) {
+                      stopMetronome();
+                      setMetronomeOn(false);
+                    } else {
+                      setMetronomeOn(true);
+                      startMetronome();
+                    }
+                  }}
+                  style={{ padding: '2px 8px', fontSize: '0.52rem', borderColor: '#ff00ff', color: '#ff00ff' }}
+                >
+                  {metronomeOn ? 'ON' : 'OFF'}
+                </button>
+                <span className="font-mono" style={{ color: '#ff00ff', opacity: 0.8, fontSize: '0.52rem', marginLeft: '4px' }}>VOL:</span>
+                <input 
+                  type="range" min="0.0" max="1.0" step="0.05"
+                  value={metronomeVolume} 
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    setMetronomeVolume(v);
+                    metronomeVolumeRef.current = v;
+                  }} 
+                  style={{ flexGrow: 1, height: '8px', accentColor: '#ff00ff' }}
+                />
+                <span style={{ fontFamily: 'monospace', fontSize: '0.52rem', width: '24px', textAlign: 'right', color: '#ff00ff' }}>
+                  {Math.round(metronomeVolume * 100)}%
+                </span>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>
