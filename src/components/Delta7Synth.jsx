@@ -3505,24 +3505,20 @@ export default function Delta7Synth() {
     // Resolve slice environments and playback durations for slice trigger modes
     let dPlayA = 0;
     if (bufferA) {
-      const sliceCountA = slotA.sliceCount || 16;
-      const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
-      const sliceDurationA = activeDurationA / sliceCountA;
       if (prog.oscATriggerMode === 'slice') {
-        dPlayA = Math.max(0.01, (sliceDurationA * (1 + sliceStretchA)) / freqScaleA);
+        dPlayA = Math.max(0.01, (sliceDurationAPrecalc * (1 + sliceStretchA)) / freqScaleA);
       } else {
+        const activeDurationA = (slotA.end - slotA.start) * bufferA.duration;
         dPlayA = Math.max(0.01, activeDurationA / freqScaleA);
       }
     }
 
     let dPlayB = 0;
     if (bufferB) {
-      const sliceCountB = slotB.sliceCount || 16;
-      const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
-      const sliceDurationB = activeDurationB / sliceCountB;
       if (prog.oscBTriggerMode === 'slice') {
-        dPlayB = Math.max(0.01, (sliceDurationB * (1 + sliceStretchB)) / freqScaleB);
+        dPlayB = Math.max(0.01, (sliceDurationBPrecalc * (1 + sliceStretchB)) / freqScaleB);
       } else {
+        const activeDurationB = (slotB.end - slotB.start) * bufferB.duration;
         dPlayB = Math.max(0.01, activeDurationB / freqScaleB);
       }
     }
@@ -3550,13 +3546,13 @@ export default function Delta7Synth() {
           }
         }
         const aTimeA = now + att;
-        const dTimeA = aTimeA + dec;
 
         gainA.gain.setValueAtTime(0, now);
         gainA.gain.linearRampToValueAtTime(vcaEnvAmt * gainAVol, aTimeA);
-        // For granular stretch: sustain open (grains fade themselves), only close on note release
+        // For granular stretch: sustain open (grains fade themselves), only close on note release.
+        // For standard slices, use an exponential decay (release curve) instead of linear gate close.
         if (!isLoopA && !isGranularStretch) {
-          gainA.gain.linearRampToValueAtTime(0, dTimeA);
+          gainA.gain.setTargetAtTime(0, aTimeA, dec / 4);
         }
       } else {
         gainA.gain.setValueAtTime(vca.startLevel * vcaEnvAmt * gainAVol, now);
@@ -3581,13 +3577,12 @@ export default function Delta7Synth() {
           }
         }
         const aTimeA = now + att;
-        const dTimeA = aTimeA + dec;
 
         [gainA_L, gainA_R].forEach(gNode => {
           gNode.gain.setValueAtTime(0, now);
           gNode.gain.linearRampToValueAtTime(vcaEnvAmt * gainAVol * 0.65, aTimeA);
           if (!isLoopA) {
-            gNode.gain.linearRampToValueAtTime(0, dTimeA);
+            gNode.gain.setTargetAtTime(0, aTimeA, dec / 4);
           }
         });
       } else {
@@ -3617,12 +3612,11 @@ export default function Delta7Synth() {
           }
         }
         const aTimeB = now + att;
-        const dTimeB = aTimeB + dec;
 
         gainB.gain.setValueAtTime(0, now);
         gainB.gain.linearRampToValueAtTime(vcaEnvAmt * gainBVol, aTimeB);
         if (!isLoopB) {
-          gainB.gain.linearRampToValueAtTime(0, dTimeB);
+          gainB.gain.setTargetAtTime(0, aTimeB, dec / 4);
         }
       } else {
         gainB.gain.setValueAtTime(vca.startLevel * vcaEnvAmt * gainBVol, now);
@@ -6372,7 +6366,21 @@ export default function Delta7Synth() {
                                 const nextSlots = sampleSlotsRef.current.map(s => {
                                   if (s.id === selectedEditSlotId) {
                                     const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
-                                    paramsList[selectedSliceIndex] = { ...paramsList[selectedSliceIndex], start: val };
+                                    const sliceCount = s.sliceCount || 16;
+                                    
+                                    const oldStart = paramsList[selectedSliceIndex].start !== undefined ? paramsList[selectedSliceIndex].start : (s.start + (selectedSliceIndex / sliceCount) * (s.end - s.start));
+                                    const oldEnd = paramsList[selectedSliceIndex].end !== undefined ? paramsList[selectedSliceIndex].end : (s.start + ((selectedSliceIndex + 1) / sliceCount) * (s.end - s.start));
+                                    
+                                    const oldLen = Math.max(0.001, oldEnd - oldStart);
+                                    const newLen = Math.max(0.001, oldEnd - val);
+                                    const oldDecay = paramsList[selectedSliceIndex].decay !== undefined ? paramsList[selectedSliceIndex].decay : 0.3;
+                                    const newDecay = Math.max(0.01, Math.min(5.0, oldDecay * (newLen / oldLen)));
+                                    
+                                    paramsList[selectedSliceIndex] = { 
+                                      ...paramsList[selectedSliceIndex], 
+                                      start: val,
+                                      decay: newDecay
+                                    };
                                     return { ...s, sliceParams: paramsList };
                                   }
                                   return s;
@@ -6405,7 +6413,21 @@ export default function Delta7Synth() {
                                 const nextSlots = sampleSlotsRef.current.map(s => {
                                   if (s.id === selectedEditSlotId) {
                                     const paramsList = s.sliceParams ? [...s.sliceParams] : Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false }));
-                                    paramsList[selectedSliceIndex] = { ...paramsList[selectedSliceIndex], end: val };
+                                    const sliceCount = s.sliceCount || 16;
+                                    
+                                    const oldStart = paramsList[selectedSliceIndex].start !== undefined ? paramsList[selectedSliceIndex].start : (s.start + (selectedSliceIndex / sliceCount) * (s.end - s.start));
+                                    const oldEnd = paramsList[selectedSliceIndex].end !== undefined ? paramsList[selectedSliceIndex].end : (s.start + ((selectedSliceIndex + 1) / sliceCount) * (s.end - s.start));
+                                    
+                                    const oldLen = Math.max(0.001, oldEnd - oldStart);
+                                    const newLen = Math.max(0.001, val - oldStart);
+                                    const oldDecay = paramsList[selectedSliceIndex].decay !== undefined ? paramsList[selectedSliceIndex].decay : 0.3;
+                                    const newDecay = Math.max(0.01, Math.min(5.0, oldDecay * (newLen / oldLen)));
+                                    
+                                    paramsList[selectedSliceIndex] = { 
+                                      ...paramsList[selectedSliceIndex], 
+                                      end: val,
+                                      decay: newDecay
+                                    };
                                     return { ...s, sliceParams: paramsList };
                                   }
                                   return s;
