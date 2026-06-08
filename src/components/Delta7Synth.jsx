@@ -176,6 +176,60 @@ export default function Delta7Synth() {
   const [kaossPad, setKaossPad] = useState({ x: 0.5, y: 0.5, isHolding: false, holdActive: false, touchActive: false });
   const [kaossTargetX, setKaossTargetX] = useState('cutoff'); // cutoff, lfoRate, ifxMix, delayTime
   const [kaossTargetY, setKaossTargetY] = useState('resonance'); // resonance, reverbDecay, chorusRate, ringModMix
+  const [padReturnMode, setPadReturnMode] = useState('hold'); // hold, snap, spring, throw
+  const [isRecordingGesture, setIsRecordingGesture] = useState(false);
+  const [isPlayingGesture, setIsPlayingGesture] = useState(false);
+  const [gestureMode, setGestureMode] = useState('loop'); // loop, one-shot, ping-pong
+  
+  const padReturnModeRef = useRef('hold');
+  useEffect(() => {
+    padReturnModeRef.current = padReturnMode;
+  }, [padReturnMode]);
+
+  const kaossPhysicsRef = useRef({
+    x: 0.5,
+    y: 0.5,
+    vx: 0,
+    vy: 0,
+    lastX: 0.5,
+    lastY: 0.5,
+    lastTime: 0,
+    isTouched: false,
+    ripple: null,
+    trails: [],
+    rafId: null
+  });
+
+  const gestureRef = useRef({
+    isRecording: false,
+    isPlaying: false,
+    buffer: [],
+    playIndex: 0,
+    direction: 1,
+    mode: 'loop'
+  });
+  useEffect(() => {
+    gestureRef.current.mode = gestureMode;
+  }, [gestureMode]);
+
+  const dubSirenOscRef = useRef(null);
+  const dubSirenGainRef = useRef(null);
+  const formantInputRef = useRef(null);
+  const formantF1Ref = useRef(null);
+  const formantF2Ref = useRef(null);
+  const formantF3Ref = useRef(null);
+  const formantMixGainRef = useRef(null);
+  const formantDryGainRef = useRef(null);
+
+  const bitcrusherInputRef = useRef(null);
+  const bitcrusherOutputRef = useRef(null);
+  const bitcrusherDryGainRef = useRef(null);
+  const bitcrusherMixGainRef = useRef(null);
+  const bitDepthRef = useRef(16.0);
+  const sampleRateRatioRef = useRef(1.0);
+
+  const reverbHPFRef = useRef(null);
+  const reverbFeedbackGainRef = useRef(null);
 
   // Master Audio Context references
   const audioCtxRef = useRef(null);
@@ -1490,6 +1544,7 @@ export default function Delta7Synth() {
 
   // Synced Parameters Ref (for low-latency access in loop)
   const paramsRef = useRef(params);
+  const tapeStopFactorRef = useRef(1.0);
   useEffect(() => {
     paramsRef.current = params;
     if (audioCtxRef.current) {
@@ -1775,11 +1830,102 @@ export default function Delta7Synth() {
     preampNode.curve = makeDistCurve(paramsRef.current.preampDrive);
     preampNodeRef.current = preampNode;
 
-    // Connections post-IFX2
+    // Dub Siren oscillator & gain (sends to echo & master EQ)
+    const dubSirenOsc = ctx.createOscillator();
+    dubSirenOsc.type = 'square';
+    const dubSirenGain = ctx.createGain();
+    dubSirenGain.gain.setValueAtTime(0, now);
+    dubSirenOsc.connect(dubSirenGain);
+    dubSirenGain.connect(delayInputRef.current);
+    dubSirenGain.connect(eqLow);
+    dubSirenOsc.start(now);
+    dubSirenOscRef.current = dubSirenOsc;
+    dubSirenGainRef.current = dubSirenGain;
+
+    // Formant Filter Bank (3 parallel bandpass filters)
+    const formantInput = ctx.createGain();
+    const formantOutput = ctx.createGain();
+    const f1 = ctx.createBiquadFilter(); f1.type = 'bandpass'; f1.Q.setValueAtTime(8, now);
+    const f2 = ctx.createBiquadFilter(); f2.type = 'bandpass'; f2.Q.setValueAtTime(8, now);
+    const f3 = ctx.createBiquadFilter(); f3.type = 'bandpass'; f3.Q.setValueAtTime(8, now);
+    formantInput.connect(f1);
+    formantInput.connect(f2);
+    formantInput.connect(f3);
+    f1.connect(formantOutput);
+    f2.connect(formantOutput);
+    f3.connect(formantOutput);
+    formantInputRef.current = formantInput;
+    formantF1Ref.current = f1;
+    formantF2Ref.current = f2;
+    formantF3Ref.current = f3;
+
+    const formantMixGain = ctx.createGain();
+    formantMixGain.gain.setValueAtTime(0, now);
+    formantMixGainRef.current = formantMixGain;
+    formantOutput.connect(formantMixGain);
+
+    const formantDryGain = ctx.createGain();
+    formantDryGain.gain.setValueAtTime(1.0, now);
+    formantDryGainRef.current = formantDryGain;
+
+    // Bitcrusher Node (1024 buffer size ScriptProcessor)
+    const bitcrusherInput = ctx.createGain();
+    const bitcrusherOutput = ctx.createGain();
+    const bitcrusherNode = ctx.createScriptProcessor(1024, 1, 1);
+    bitcrusherNode.onaudioprocess = (e) => {
+      const input = e.inputBuffer.getChannelData(0);
+      const output = e.outputBuffer.getChannelData(0);
+      const depth = bitDepthRef.current;
+      const ratio = sampleRateRatioRef.current;
+      const step = Math.pow(0.5, depth);
+      
+      let lastVal = 0;
+      for (let i = 0; i < input.length; i++) {
+        if (ratio <= 1.0) {
+          let val = input[i];
+          if (depth < 16.0) {
+            val = Math.round(val / step) * step;
+          }
+          output[i] = val;
+        } else {
+          if (i % Math.floor(ratio) === 0) {
+            let val = input[i];
+            if (depth < 16.0) {
+              val = Math.round(val / step) * step;
+            }
+            lastVal = val;
+          }
+          output[i] = lastVal;
+        }
+      }
+    };
+    bitcrusherInput.connect(bitcrusherNode);
+    bitcrusherNode.connect(bitcrusherOutput);
+    bitcrusherInputRef.current = bitcrusherInput;
+    bitcrusherOutputRef.current = bitcrusherOutput;
+
+    const bitcrusherMixGain = ctx.createGain();
+    bitcrusherMixGain.gain.setValueAtTime(0, now);
+    bitcrusherMixGainRef.current = bitcrusherMixGain;
+    bitcrusherOutput.connect(bitcrusherMixGain);
+
+    const bitcrusherDryGain = ctx.createGain();
+    bitcrusherDryGain.gain.setValueAtTime(1.0, now);
+    bitcrusherDryGainRef.current = bitcrusherDryGain;
+
+    // Connections post-preamp
     ifx2OutputRef.current.connect(preampNode);
 
-    // Splits post-preamp
-    preampNode.connect(eqLow); // Direct path to EQ
+    // Crossfaded parallel effect routing splits post-preamp
+    preampNode.connect(formantDryGain);
+    formantDryGain.connect(bitcrusherDryGain);
+    bitcrusherDryGain.connect(eqLow); // Clean dry path
+
+    preampNode.connect(formantInput);
+    formantMixGain.connect(eqLow); // Formant wet path
+
+    preampNode.connect(bitcrusherInput);
+    bitcrusherMixGain.connect(eqLow); // Bitcrusher wet path
 
     // FX Sends
     preampNode.connect(mfx1SendGain);
@@ -2387,6 +2533,21 @@ export default function Delta7Synth() {
     input.connect(convolver);
     convolver.connect(output);
 
+    // Reverb Freeze feedback path
+    const fbHPF = ctx.createBiquadFilter();
+    fbHPF.type = 'highpass';
+    fbHPF.frequency.setValueAtTime(20, now);
+    reverbHPFRef.current = fbHPF;
+
+    const fbGain = ctx.createGain();
+    fbGain.gain.setValueAtTime(0.0, now);
+    reverbFeedbackGainRef.current = fbGain;
+
+    // Connect feedback loop: convolver -> highpass filter -> feedback gain -> input
+    convolver.connect(fbHPF);
+    fbHPF.connect(fbGain);
+    fbGain.connect(input);
+
     return { input, output };
   };
 
@@ -2743,7 +2904,13 @@ export default function Delta7Synth() {
       subOsc: null, noiseSource: null, noiseGain: null, subGain: null, driftLfo,
       vibratoLfo, vibratoLfoGain, filterLfo, filterLfoGain,
       vca, vcf, baseCutoff, oscAVol: prog.oscAVol, oscBVol: prog.oscBVol,
-      granularTimerId: null, releasedRef, trackIdx
+      granularTimerId: null, releasedRef, trackIdx,
+      orig_oscA_rate: freqScaleA,
+      orig_oscA_L_rate: freqScaleA,
+      orig_oscA_R_rate: freqScaleA,
+      orig_oscB_rate: freqScaleB,
+      orig_oscB_L_rate: freqScaleB,
+      orig_oscB_R_rate: freqScaleB
     };
 
     // isSliceGranular must be hoisted outside if(bufferA) — it's used in the panner block after that inner if closes
@@ -2926,19 +3093,20 @@ export default function Delta7Synth() {
       // --- Standard Sampler OSC A ---
       if (bufferA) {
         if (prog.unisonOn) {
+          const stopFactor = tapeStopFactorRef.current;
           oscA = ctx.createBufferSource();
           oscA.buffer = bufferA;
-          oscA.playbackRate.setValueAtTime(freqScaleA, now);
+          oscA.playbackRate.setValueAtTime(freqScaleA * stopFactor, now);
           oscA.detune.setValueAtTime(prog.oscADetune, now);
 
           oscA_L = ctx.createBufferSource();
           oscA_L.buffer = bufferA;
-          oscA_L.playbackRate.setValueAtTime(freqScaleA, now);
+          oscA_L.playbackRate.setValueAtTime(freqScaleA * stopFactor, now);
           oscA_L.detune.setValueAtTime(prog.oscADetune - prog.unisonDetune, now);
 
           oscA_R = ctx.createBufferSource();
           oscA_R.buffer = bufferA;
-          oscA_R.playbackRate.setValueAtTime(freqScaleA, now);
+          oscA_R.playbackRate.setValueAtTime(freqScaleA * stopFactor, now);
           oscA_R.detune.setValueAtTime(prog.oscADetune + prog.unisonDetune, now);
 
           gainA_L = ctx.createGain();
@@ -3015,9 +3183,10 @@ export default function Delta7Synth() {
           driftGain.connect(oscA_R.detune);
 
         } else {
+          const stopFactor = tapeStopFactorRef.current;
           oscA = ctx.createBufferSource();
           oscA.buffer = bufferA;
-          oscA.playbackRate.setValueAtTime(freqScaleA, now);
+          oscA.playbackRate.setValueAtTime(freqScaleA * stopFactor, now);
           oscA.detune.setValueAtTime(prog.oscADetune, now);
 
           oscA.connect(gainA);
@@ -3185,9 +3354,10 @@ export default function Delta7Synth() {
 
       } else {
         // --- Standard Sampler OSC B ---
+        const stopFactor = tapeStopFactorRef.current;
         oscB = ctx.createBufferSource();
         oscB.buffer = bufferB;
-        oscB.playbackRate.setValueAtTime(freqScaleB, now);
+        oscB.playbackRate.setValueAtTime(freqScaleB * stopFactor, now);
         oscB.detune.setValueAtTime(prog.oscBDetune, now);
         oscB.connect(gainB);
 
@@ -3767,9 +3937,295 @@ export default function Delta7Synth() {
   // 6. KAOSS PAD CONTROLLER & MOD MATRIX
   // ==========================================
 
+  const kaossCanvasRef = useRef(null);
+
+  const sendKaossMidiOut = (x, y, isTouched) => {
+    if (midiOutputsRef.current && midiOutputsRef.current.length > 0) {
+      const valX = Math.round(x * 127);
+      const valY = Math.round(y * 127);
+      const valTouch = isTouched ? 127 : 0;
+      const valHold = kaossPad.holdActive ? 127 : 0;
+      
+      midiOutputsRef.current.forEach(output => {
+        try {
+          output.send([0xB0, 12, valX]);
+          output.send([0xB0, 13, valY]);
+          output.send([0xB0, 92, valTouch]);
+          output.send([0xB0, 95, valHold]);
+        } catch (e) {}
+      });
+    }
+  };
+
+  const updateFormantFrequencies = (x, y) => {
+    if (!audioCtxRef.current || !formantF1Ref.current) return;
+    const now = audioCtxRef.current.currentTime;
+    
+    // Bottom-Left (0, 0) = U ("Oo")
+    // Bottom-Right (1, 0) = O ("Oh")
+    // Top-Left (0, 1) = E ("Ee")
+    // Top-Right (1, 1) = A ("Ah")
+    const vowels = {
+      u: [320, 800, 2200],
+      o: [500, 850, 2400],
+      e: [350, 2200, 3000],
+      a: [750, 1200, 2400]
+    };
+    
+    const f1 = (1 - x) * (1 - y) * vowels.u[0] + x * (1 - y) * vowels.o[0] + (1 - x) * y * vowels.e[0] + x * y * vowels.a[0];
+    const f2 = (1 - x) * (1 - y) * vowels.u[1] + x * (1 - y) * vowels.o[1] + (1 - x) * y * vowels.e[1] + x * y * vowels.a[1];
+    const f3 = (1 - x) * (1 - y) * vowels.u[2] + x * (1 - y) * vowels.o[2] + (1 - x) * y * vowels.e[2] + x * y * vowels.a[2];
+    
+    formantF1Ref.current.frequency.setTargetAtTime(f1, now, 0.05);
+    formantF2Ref.current.frequency.setTargetAtTime(f2, now, 0.05);
+    formantF3Ref.current.frequency.setTargetAtTime(f3, now, 0.05);
+  };
+
+  // Physics and Render loop for Kaoss Pad
+  useEffect(() => {
+    let active = true;
+    let lastTime = performance.now();
+    
+    const tick = () => {
+      if (!active) return;
+      
+      const now = performance.now();
+      let dt = (now - lastTime) / 1000;
+      if (dt > 0.1) dt = 0.1; // clamp delta
+      lastTime = now;
+      
+      const physics = kaossPhysicsRef.current;
+      const gesture = gestureRef.current;
+      
+      // 1. Gesture Recording
+      if (gesture.isRecording && physics.isTouched) {
+        gesture.buffer.push({ x: physics.x, y: physics.y });
+        if (gesture.buffer.length > 240) gesture.buffer.shift();
+      }
+      
+      // 2. Gesture Playback
+      if (gesture.isPlaying && gesture.buffer.length > 0 && !physics.isTouched) {
+        const pt = gesture.buffer[Math.floor(gesture.playIndex)];
+        if (pt) {
+          physics.x = pt.x;
+          physics.y = pt.y;
+          physics.vx = 0;
+          physics.vy = 0;
+          
+          setKaossPad(prev => ({ ...prev, x: pt.x, y: pt.y }));
+          modulateKaossParameters(pt.x, pt.y, false);
+          sendKaossMidiOut(pt.x, pt.y, false);
+        }
+        
+        // Playback movement
+        if (gesture.mode === 'loop') {
+          gesture.playIndex = (gesture.playIndex + 1) % gesture.buffer.length;
+        } else if (gesture.mode === 'one-shot') {
+          gesture.playIndex++;
+          if (gesture.playIndex >= gesture.buffer.length) {
+            gesture.isPlaying = false;
+            setIsPlayingGesture(false);
+            handleKaossRelease();
+          }
+        } else if (gesture.mode === 'ping-pong') {
+          gesture.playIndex += gesture.direction;
+          if (gesture.playIndex >= gesture.buffer.length) {
+            gesture.playIndex = gesture.buffer.length - 1;
+            gesture.direction = -1;
+          } else if (gesture.playIndex < 0) {
+            gesture.playIndex = 0;
+            gesture.direction = 1;
+          }
+        }
+      }
+      
+      // 3. Physics return mode (only if NOT touched and NOT playing a gesture)
+      if (!physics.isTouched && !gesture.isPlaying) {
+        const mode = padReturnModeRef.current;
+        if (mode === 'snap') {
+          if (physics.x !== 0.5 || physics.y !== 0.5) {
+            physics.x = 0.5;
+            physics.y = 0.5;
+            physics.vx = 0;
+            physics.vy = 0;
+            setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
+            modulateKaossParameters(0.5, 0.5, false);
+            sendKaossMidiOut(0.5, 0.5, false);
+          }
+        } else if (mode === 'spring') {
+          const targetX = 0.5;
+          const targetY = 0.5;
+          const k = 15.0; // spring tension
+          const damping = 3.5; // spring friction damping
+          
+          const ax = k * (targetX - physics.x) - damping * physics.vx;
+          const ay = k * (targetY - physics.y) - damping * physics.vy;
+          
+          physics.vx += ax * dt;
+          physics.vy += ay * dt;
+          physics.x += physics.vx * dt;
+          physics.y += physics.vy * dt;
+          
+          // stop spring when close
+          if (Math.abs(physics.x - targetX) < 0.002 && Math.abs(physics.vx) < 0.002) {
+            physics.x = targetX;
+            physics.vx = 0;
+          }
+          if (Math.abs(physics.y - targetY) < 0.002 && Math.abs(physics.vy) < 0.002) {
+            physics.y = targetY;
+            physics.vy = 0;
+          }
+          
+          setKaossPad(prev => ({ ...prev, x: physics.x, y: physics.y }));
+          modulateKaossParameters(physics.x, physics.y, false);
+          sendKaossMidiOut(physics.x, physics.y, false);
+        } else if (mode === 'throw') {
+          if (Math.abs(physics.vx) > 0.005 || Math.abs(physics.vy) > 0.005) {
+            physics.x += physics.vx * dt;
+            physics.y += physics.vy * dt;
+            
+            // drag friction
+            physics.vx *= Math.exp(-1.8 * dt);
+            physics.vy *= Math.exp(-1.8 * dt);
+            
+            // boundaries bounce
+            const coef = -0.7;
+            if (physics.x <= 0) { physics.x = 0; physics.vx *= coef; }
+            else if (physics.x >= 1) { physics.x = 1; physics.vx *= coef; }
+            if (physics.y <= 0) { physics.y = 0; physics.vy *= coef; }
+            else if (physics.y >= 1) { physics.y = 1; physics.vy *= coef; }
+            
+            setKaossPad(prev => ({ ...prev, x: physics.x, y: physics.y }));
+            modulateKaossParameters(physics.x, physics.y, false);
+            sendKaossMidiOut(physics.x, physics.y, false);
+          }
+        }
+      }
+      
+      // Update trail opacity
+      physics.trails.forEach(t => {
+        t.alpha -= 1.8 * dt;
+      });
+      physics.trails = physics.trails.filter(t => t.alpha > 0);
+      
+      // Update ripple
+      if (physics.ripple) {
+        physics.ripple.radius += 110 * dt;
+        physics.ripple.alpha -= 2.2 * dt;
+        if (physics.ripple.alpha <= 0) {
+          physics.ripple = null;
+        }
+      }
+      
+      // Draw elements
+      drawCanvas();
+      
+      physics.rafId = requestAnimationFrame(tick);
+    };
+    
+    const drawCanvas = () => {
+      const canvas = kaossCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      
+      const physics = kaossPhysicsRef.current;
+      
+      // 1. Gridlines
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 1; i < 4; i++) {
+        ctx.moveTo((i / 4) * w, 0);
+        ctx.lineTo((i / 4) * w, h);
+        ctx.moveTo(0, (i / 4) * h);
+        ctx.lineTo(w, (i / 4) * h);
+      }
+      ctx.stroke();
+      
+      // Center cross
+      ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
+      ctx.beginPath();
+      ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h);
+      ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+      ctx.stroke();
+      
+      // 2. Draw Trails
+      if (physics.trails.length > 1) {
+        ctx.lineWidth = 3.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        for (let i = 1; i < physics.trails.length; i++) {
+          const p1 = physics.trails[i - 1];
+          const p2 = physics.trails[i];
+          ctx.beginPath();
+          ctx.moveTo(p1.x * w, (1 - p1.y) * h);
+          ctx.lineTo(p2.x * w, (1 - p2.y) * h);
+          ctx.strokeStyle = `rgba(0, 243, 255, ${p2.alpha})`;
+          ctx.stroke();
+        }
+      }
+      
+      // 3. Draw Touch Ripple
+      if (physics.ripple) {
+        ctx.beginPath();
+        ctx.arc(physics.x * w, (1 - physics.y) * h, physics.ripple.radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = `rgba(255, 0, 85, ${physics.ripple.alpha})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      
+      // 4. Draw Current Dot
+      ctx.beginPath();
+      ctx.arc(physics.x * w, (1 - physics.y) * h, 6.5, 0, 2 * Math.PI);
+      ctx.fillStyle = physics.isTouched ? '#ff0055' : '#00f3ff';
+      ctx.shadowColor = physics.isTouched ? '#ff0055' : '#00f3ff';
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.shadowBlur = 0; // reset shadow
+    };
+    
+    physics.rafId = requestAnimationFrame(tick);
+    
+    return () => {
+      active = false;
+      if (kaossPhysicsRef.current.rafId) {
+        cancelAnimationFrame(kaossPhysicsRef.current.rafId);
+      }
+    };
+  }, []);
+
   const handleKaossTouch = (e, rect) => {
     const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const y = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height)); // invert Y
+
+    const physics = kaossPhysicsRef.current;
+    const now = performance.now();
+    const dt = (now - physics.lastTime) / 1000;
+    
+    if (physics.isTouched && dt > 0) {
+      physics.vx = (x - physics.x) / dt;
+      physics.vy = (y - physics.y) / dt;
+    } else {
+      physics.vx = 0;
+      physics.vy = 0;
+    }
+    
+    physics.x = x;
+    physics.y = y;
+    physics.lastTime = now;
+    physics.isTouched = true;
+    
+    // Add to trails
+    physics.trails.push({ x, y, alpha: 1.0 });
+    if (physics.trails.length > 20) physics.trails.shift();
+    
+    // Trigger ripple if just touched
+    if (!physics.ripple) {
+      physics.ripple = { radius: 2, alpha: 1.0 };
+    }
 
     setKaossPad(prev => ({
       ...prev,
@@ -3779,6 +4235,29 @@ export default function Delta7Synth() {
     }));
 
     modulateKaossParameters(x, y, true);
+    sendKaossMidiOut(x, y, true);
+  };
+
+  const handleKaossRelease = () => {
+    const physics = kaossPhysicsRef.current;
+    physics.isTouched = false;
+    physics.ripple = null;
+    
+    setKaossPad(prev => ({
+      ...prev,
+      touchActive: false
+    }));
+    
+    sendKaossMidiOut(physics.x, physics.y, false);
+    
+    if (padReturnModeRef.current === 'snap') {
+      physics.x = 0.5;
+      physics.y = 0.5;
+      physics.vx = 0;
+      physics.vy = 0;
+      setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
+      modulateKaossParameters(0.5, 0.5, false);
+    }
   };
 
   const modulateKaossParameters = (x, y, isTouched = false) => {
@@ -3791,9 +4270,126 @@ export default function Delta7Synth() {
       return; 
     }
 
+    const isTouchedOrHolding = isTouched || kaossPad.holdActive;
+
+    // --- Dub Siren (Tone Generator + Tape Delay Pitch Ramps) ---
+    const isDubSirenActive = (kaossTargetX === 'dubSiren' || kaossTargetY === 'dubSiren') && isTouchedOrHolding;
+    if (dubSirenOscRef.current && dubSirenGainRef.current) {
+      if (isDubSirenActive) {
+        const sirenX = (kaossTargetX === 'dubSiren') ? x : y;
+        const sirenY = (kaossTargetX === 'dubSiren') ? y : x;
+        const baseFreq = sirenX * 800 + 80; // 80Hz to 880Hz
+        const lfoRate = sirenY * 20 + 2; // 2Hz to 22Hz
+        const freqOffset = Math.sin(now * Math.PI * 2 * lfoRate) * baseFreq * 0.45;
+        
+        dubSirenOscRef.current.frequency.setValueAtTime(baseFreq + freqOffset, now);
+        dubSirenGainRef.current.gain.setTargetAtTime(0.25, now, 0.02);
+        
+        // Also feed into space echo with high feedback and slow catch-up time for tape pitch sweeps
+        if (activeDelayRef.current) {
+          const ad = activeDelayRef.current;
+          const delayTimeVal = sirenX * 0.7 + 0.1; // 100ms to 800ms
+          const feedbackVal = sirenY * 0.35 + 0.65; // 65% to 100%
+          if (ad.delayL && ad.delayR) {
+            ad.delayL.delayTime.setTargetAtTime(delayTimeVal, now, 0.1);
+            ad.delayR.delayTime.setTargetAtTime(delayTimeVal * 1.33, now, 0.1);
+            ad.feedbackL.gain.setValueAtTime(feedbackVal, now);
+            ad.feedbackR.gain.setValueAtTime(feedbackVal, now);
+          } else if (ad.delay1) {
+            ad.delay1.delayTime.setTargetAtTime(delayTimeVal, now, 0.1);
+            ad.delay2.delayTime.setTargetAtTime(delayTimeVal * 1.5, now, 0.1);
+            ad.delay3.delayTime.setTargetAtTime(delayTimeVal * 2.0, now, 0.1);
+            ad.feedbackGain1.gain.setValueAtTime(feedbackVal * 0.5, now);
+            ad.feedbackGain2.gain.setValueAtTime(feedbackVal * 0.35, now);
+            ad.feedbackGain3.gain.setValueAtTime(feedbackVal * 0.25, now);
+          }
+        }
+      } else {
+        dubSirenGainRef.current.gain.setTargetAtTime(0.0, now, 0.05);
+      }
+    }
+
+    // --- Vinyl Break / Tape Stop (Slowing playhead/pitch of active voices) ---
+    const isTapeStopActive = (kaossTargetX === 'tapeStop' || kaossTargetY === 'tapeStop') && isTouchedOrHolding;
+    const stopAmt = isTapeStopActive ? (kaossTargetX === 'tapeStop' ? x : y) : 1.0;
+    activeVoicesRef.current.forEach(vList => {
+      const voices = Array.isArray(vList) ? vList : [vList];
+      voices.forEach(voice => {
+        if (!voice) return;
+        ['oscA', 'oscA_L', 'oscA_R', 'oscB', 'oscB_L', 'oscB_R'].forEach(key => {
+          const node = voice[key];
+          if (node && node.playbackRate) {
+            if (voice[`orig_${key}_rate`] === undefined) {
+              voice[`orig_${key}_rate`] = node.playbackRate.value;
+            }
+            node.playbackRate.setTargetAtTime(voice[`orig_${key}_rate`] * stopAmt, now, 0.06);
+          }
+        });
+        ['oscA', 'oscB'].forEach(key => {
+          const node = voice[key];
+          if (node && node.frequency && node.type !== 'buffer') {
+            if (voice[`orig_${key}_freq`] === undefined) {
+              voice[`orig_${key}_freq`] = node.frequency.value;
+            }
+            node.frequency.setTargetAtTime(voice[`orig_${key}_freq`] * stopAmt, now, 0.06);
+          }
+        });
+      });
+    });
+
+    // --- Formant Vowel Filter ---
+    const isFormantActive = (kaossTargetX === 'formant' || kaossTargetY === 'formant') && isTouchedOrHolding;
+    if (formantDryGainRef.current && formantMixGainRef.current) {
+      if (isFormantActive) {
+        const formantMix = 0.95;
+        formantDryGainRef.current.gain.setTargetAtTime(1.0 - formantMix, now, 0.02);
+        formantMixGainRef.current.gain.setTargetAtTime(formantMix, now, 0.02);
+        updateFormantFrequencies(x, y);
+      } else {
+        formantDryGainRef.current.gain.setTargetAtTime(1.0, now, 0.02);
+        formantMixGainRef.current.gain.setTargetAtTime(0.0, now, 0.02);
+      }
+    }
+
+    // --- Bitcrusher ---
+    const isBitcrushActive = (kaossTargetX === 'bitcrush' || kaossTargetY === 'bitcrush') && isTouchedOrHolding;
+    if (bitcrusherDryGainRef.current && bitcrusherMixGainRef.current) {
+      if (isBitcrushActive) {
+        const crushMix = 0.85;
+        bitcrusherDryGainRef.current.gain.setTargetAtTime(1.0 - crushMix, now, 0.02);
+        bitcrusherMixGainRef.current.gain.setTargetAtTime(crushMix, now, 0.02);
+        
+        const ratioVal = (kaossTargetX === 'bitcrush') ? (x * 23 + 1) : (y * 23 + 1);
+        sampleRateRatioRef.current = ratioVal;
+        
+        const depthVal = (kaossTargetX === 'bitcrush') ? (16 - x * 14) : (16 - y * 14);
+        bitDepthRef.current = depthVal;
+      } else {
+        bitcrusherDryGainRef.current.gain.setTargetAtTime(1.0, now, 0.02);
+        bitcrusherMixGainRef.current.gain.setTargetAtTime(0.0, now, 0.02);
+        sampleRateRatioRef.current = 1.0;
+        bitDepthRef.current = 16.0;
+      }
+    }
+
+    // --- Reverb Freeze ---
+    const isReverbFreezeActive = (kaossTargetX === 'reverbFreeze' || kaossTargetY === 'reverbFreeze') && isTouchedOrHolding;
+    if (reverbFeedbackGainRef.current && reverbHPFRef.current) {
+      if (isReverbFreezeActive) {
+        const fbVal = (kaossTargetX === 'reverbFreeze') ? (x * 0.88) : (y * 0.88);
+        reverbFeedbackGainRef.current.gain.setTargetAtTime(fbVal, now, 0.05);
+        
+        const hpfVal = (kaossTargetX === 'reverbFreeze') ? (x * 3980 + 20) : (y * 3980 + 20);
+        reverbHPFRef.current.frequency.setTargetAtTime(hpfVal, now, 0.05);
+      } else {
+        reverbFeedbackGainRef.current.gain.setTargetAtTime(0.0, now, 0.05);
+        reverbHPFRef.current.frequency.setTargetAtTime(20, now, 0.05);
+      }
+    }
+
     // --- Delta Pad Gater FX Logic ---
     const isGaterTargeted = (kaossTargetX === 'gater' || kaossTargetY === 'gater');
-    const isGaterActive = isGaterTargeted && (isTouched || kaossPad.holdActive);
+    const isGaterActive = isGaterTargeted && isTouchedOrHolding;
 
     if (isGaterActive && gaterLfoGainRef.current && gaterGainNodeRef.current && gaterLfoRef.current) {
       const gaterRate = (kaossTargetX === 'gater') ? (x * 23 + 2) : (y * 23 + 2); // 2Hz to 25Hz
@@ -3805,7 +4401,7 @@ export default function Delta7Synth() {
       gaterGainNodeRef.current.gain.setTargetAtTime(1.0, now, 0.02);
     }
 
-    // 1. Modulate target parameter on X axis
+    // Standard X target modulations
     if (kaossTargetX === 'cutoff') {
       const cutVal = x * 4000 + 100;
       activeVoicesRef.current.forEach(vList => {
@@ -3839,7 +4435,7 @@ export default function Delta7Synth() {
       }
     }
 
-    // 2. Modulate target parameter on Y axis
+    // Standard Y target modulations
     if (kaossTargetY === 'resonance') {
       const resVal = y * 18 + 0.2;
       activeVoicesRef.current.forEach(vList => {
@@ -3985,6 +4581,42 @@ export default function Delta7Synth() {
   };
 
   const handleMidiCC = (cc, val) => {
+    // Intercept hardware Kaoss Pad controller MIDI mapping
+    const valNormalized = val / 127;
+    const now = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
+
+    if (cc === 12) {
+      const physics = kaossPhysicsRef.current;
+      physics.x = valNormalized;
+      setKaossPad(prev => ({ ...prev, x: valNormalized }));
+      modulateKaossParameters(valNormalized, physics.y, physics.isTouched || kaossPad.holdActive);
+      return;
+    }
+    if (cc === 13) {
+      const physics = kaossPhysicsRef.current;
+      physics.y = valNormalized;
+      setKaossPad(prev => ({ ...prev, y: valNormalized }));
+      modulateKaossParameters(physics.x, valNormalized, physics.isTouched || kaossPad.holdActive);
+      return;
+    }
+    if (cc === 92) {
+      const physics = kaossPhysicsRef.current;
+      const isTouched = val >= 64;
+      physics.isTouched = isTouched;
+      setKaossPad(prev => ({ ...prev, touchActive: isTouched }));
+      if (!isTouched) {
+        handleKaossRelease();
+      } else {
+        if (!physics.ripple) physics.ripple = { radius: 2, alpha: 1.0 };
+      }
+      return;
+    }
+    if (cc === 95) {
+      const isHold = val >= 64;
+      setKaossPad(prev => ({ ...prev, holdActive: isHold }));
+      return;
+    }
+
     // 0. Intercept CC 1 (Modulation Wheel) for the Dub Ramper
     if (cc === 1) {
       setModWheelVal(val);
@@ -4057,7 +4689,6 @@ export default function Delta7Synth() {
     }
 
     // 2. Control routings mapping
-    const valNormalized = val / 127;
 
     // Check custom mappings
     Object.keys(midiMappings).forEach((paramName) => {
@@ -6332,20 +6963,26 @@ export default function Delta7Synth() {
           {/* Glowing Delta Pad Touch pad */}
           <div className="kaoss-pad-container">
             <div className="section-label">Delta Pad XY Modulator</div>
-            <div className="kaoss-targets-selectors font-mono" style={{ gap: '6px' }}>
-              <div className="target-select-row-new">
-                <div className="target-row-label">X-AXIS TARGET:</div>
-                <div className="target-btn-strip">
+            <div className="kaoss-targets-selectors font-mono" style={{ gap: '4px' }}>
+              <div className="target-select-row-new" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <div className="target-row-label" style={{ fontSize: '0.42rem', marginBottom: '2px' }}>X-AXIS TARGET:</div>
+                <div className="target-btn-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px' }}>
                   {[
                     { value: 'cutoff', label: 'CUTOFF' },
                     { value: 'lfoRate', label: 'LFO' },
                     { value: 'ifxMix', label: 'IFX' },
                     { value: 'delayTime', label: 'DELAY' },
-                    { value: 'gater', label: 'GATER' }
+                    { value: 'gater', label: 'GATER' },
+                    { value: 'dubSiren', label: 'SIREN' },
+                    { value: 'tapeStop', label: 'T-STOP' },
+                    { value: 'formant', label: 'VOWEL' },
+                    { value: 'bitcrush', label: 'CRUSH' },
+                    { value: 'reverbFreeze', label: 'FREEZE' }
                   ].map(tgt => (
                     <button
                       key={tgt.value}
                       className={`target-btn ${kaossTargetX === tgt.value ? 'selected-x' : ''}`}
+                      style={{ fontSize: '0.36rem', padding: '2px 0' }}
                       onClick={() => {
                         setKaossTargetX(tgt.value);
                         modulateKaossParameters(kaossPad.x, kaossPad.y, kaossPad.touchActive);
@@ -6356,20 +6993,26 @@ export default function Delta7Synth() {
                   ))}
                 </div>
               </div>
-              <div className="target-select-row-new">
-                <div className="target-row-label">Y-AXIS TARGET:</div>
-                <div className="target-btn-strip">
+              <div className="target-select-row-new" style={{ flexDirection: 'column', alignItems: 'stretch', marginTop: '4px' }}>
+                <div className="target-row-label" style={{ fontSize: '0.42rem', marginBottom: '2px' }}>Y-AXIS TARGET:</div>
+                <div className="target-btn-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px' }}>
                   {[
                     { value: 'resonance', label: 'RESO' },
                     { value: 'reverbDecay', label: 'REVERB' },
                     { value: 'chorusRate', label: 'FB' },
                     { value: 'ringModMix', label: 'RM MIX' },
                     { value: 'ringModFreq', label: 'RM FREQ' },
-                    { value: 'gater', label: 'GATER' }
+                    { value: 'gater', label: 'GATER' },
+                    { value: 'dubSiren', label: 'SIREN' },
+                    { value: 'tapeStop', label: 'T-STOP' },
+                    { value: 'formant', label: 'VOWEL' },
+                    { value: 'bitcrush', label: 'CRUSH' },
+                    { value: 'reverbFreeze', label: 'FREEZE' }
                   ].map(tgt => (
                     <button
                       key={tgt.value}
                       className={`target-btn ${kaossTargetY === tgt.value ? 'selected-y' : ''}`}
+                      style={{ fontSize: '0.36rem', padding: '2px 0' }}
                       onClick={() => {
                         setKaossTargetY(tgt.value);
                         modulateKaossParameters(kaossPad.x, kaossPad.y, kaossPad.touchActive);
@@ -6385,6 +7028,7 @@ export default function Delta7Synth() {
             {/* Neon Touch pad Screen */}
             <div 
               className={`kaoss-touchpad ${kaossPad.touchActive ? 'glow-red' : ''}`}
+              style={{ position: 'relative', overflow: 'hidden', height: '170px', marginTop: '8px' }}
               onMouseDown={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 handleKaossTouch(e, rect);
@@ -6395,70 +7039,127 @@ export default function Delta7Synth() {
                   handleKaossTouch(e, rect);
                 }
               }}
-              onMouseUp={() => {
-                setKaossPad(prev => ({ 
-                  ...prev, 
-                  touchActive: false 
-                }));
-                // Reset coordinates if Hold toggle is inactive
-                if (!kaossPad.holdActive) {
-                  setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
-                  modulateKaossParameters(0.5, 0.5, false);
-                }
-              }}
-              onMouseLeave={() => {
-                setKaossPad(prev => ({ 
-                  ...prev, 
-                  touchActive: false 
-                }));
-                if (!kaossPad.holdActive) {
-                  setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
-                  modulateKaossParameters(0.5, 0.5, false);
-                }
-              }}
+              onMouseUp={handleKaossRelease}
+              onMouseLeave={handleKaossRelease}
             >
-              {/* Touch Crosshair Dot */}
-              <div 
-                className="kaoss-crosshair"
+              <canvas
+                ref={kaossCanvasRef}
+                width={280}
+                height={170}
                 style={{
-                  left: `${kaossPad.x * 100}%`,
-                  bottom: `${kaossPad.y * 100}%`
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  display: 'block'
                 }}
-              ></div>
-
-              {/* Grid Markings */}
-              <div className="kaoss-gridlines">
-                <span className="grid-center-cross"></span>
-              </div>
+              />
             </div>
 
-            <div className="kaoss-footer-actions">
+            {/* Physics Return Modes */}
+            <div className="pad-settings-row font-mono" style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ color: '#aaa', marginRight: '4px', fontSize: '0.38rem' }}>RETURN:</span>
+                <div style={{ display: 'flex', gap: '2px' }}>
+                  {['hold', 'snap', 'spring', 'throw'].map(mode => (
+                    <button
+                      key={mode}
+                      className={`btn btn-xs ${padReturnMode === mode ? 'active-red' : ''}`}
+                      style={{ fontSize: '0.36rem', padding: '1px 3px' }}
+                      onClick={() => setPadReturnMode(mode)}
+                    >
+                      {mode.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <button 
-                className={`btn btn-sm ${kaossPad.holdActive ? 'active-red' : ''}`}
+                className={`btn btn-xs ${kaossPad.holdActive ? 'active-red' : ''}`}
+                style={{ fontSize: '0.36rem', padding: '1px 4px' }}
                 onClick={() => {
                   const nextHold = !kaossPad.holdActive;
                   setKaossPad(prev => ({ ...prev, holdActive: nextHold }));
                   if (!nextHold && !kaossPad.touchActive) {
+                    const physics = kaossPhysicsRef.current;
+                    physics.x = 0.5;
+                    physics.y = 0.5;
+                    physics.vx = 0;
+                    physics.vy = 0;
                     setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
                     modulateKaossParameters(0.5, 0.5, false);
+                    sendKaossMidiOut(0.5, 0.5, false);
                   } else {
                     modulateKaossParameters(kaossPad.x, kaossPad.y, kaossPad.touchActive);
                   }
                 }}
               >
-                HOLD COORDINATES
+                HOLD
               </button>
+            </div>
+
+            {/* Gesture Recorder & Player */}
+            <div className="pad-settings-row font-mono" style={{ marginTop: '4px', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.45rem' }}>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <button
+                  className={`btn btn-xs ${isRecordingGesture ? 'active-red' : ''}`}
+                  style={{ fontSize: '0.36rem', padding: '1px 3px', borderColor: isRecordingGesture ? '#ff0055' : '#888' }}
+                  onClick={() => {
+                    const nextRec = !isRecordingGesture;
+                    setIsRecordingGesture(nextRec);
+                    gestureRef.current.isRecording = nextRec;
+                    if (nextRec) {
+                      gestureRef.current.buffer = [];
+                      gestureRef.current.playIndex = 0;
+                      gestureRef.current.isPlaying = false;
+                      setIsPlayingGesture(false);
+                    }
+                  }}
+                >
+                  ● REC
+                </button>
+                <button
+                  className={`btn btn-xs ${isPlayingGesture ? 'active-cyan' : ''}`}
+                  style={{ fontSize: '0.36rem', padding: '1px 3px', borderColor: isPlayingGesture ? '#00f3ff' : '#888', opacity: gestureRef.current.buffer.length > 0 ? 1 : 0.5 }}
+                  disabled={gestureRef.current.buffer.length === 0}
+                  onClick={() => {
+                    const nextPlay = !isPlayingGesture;
+                    setIsPlayingGesture(nextPlay);
+                    gestureRef.current.isPlaying = nextPlay;
+                    if (nextPlay) {
+                      gestureRef.current.playIndex = 0;
+                    }
+                  }}
+                >
+                  ► PLAY
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ color: '#aaa', marginRight: '4px', fontSize: '0.38rem' }}>MODE:</span>
+                <select
+                  value={gestureMode}
+                  onChange={(e) => setGestureMode(e.target.value)}
+                  style={{ background: '#051122', color: '#00f3ff', border: '1px solid #0a2a4d', fontSize: '0.38rem', padding: '0 2px', borderRadius: '3px' }}
+                >
+                  <option value="loop">LOOP</option>
+                  <option value="one-shot">1-SHOT</option>
+                  <option value="ping-pong">PINGPONG</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="kaoss-footer-actions" style={{ marginTop: '8px' }}>
               <button
                 className={`btn btn-sm ${glitchActive ? 'btn-glitch-active' : ''}`}
                 onMouseDown={() => toggleGlitch(true)}
                 onMouseUp={() => toggleGlitch(false)}
                 onMouseLeave={() => { if (glitchActive) toggleGlitch(false); }}
-                style={{ borderColor: '#ffe600', color: '#ffe600' }}
+                style={{ borderColor: '#ffe600', color: '#ffe600', flex: 1 }}
               >
                 GLITCH
               </button>
-              <div className="coord-readout font-mono">
-                X:{Math.round(kaossPad.x * 100)} | Y:{Math.round(kaossPad.y * 100)}
+              <div className="coord-readout font-mono" style={{ fontSize: '0.42rem' }}>
+                X:{Math.round(kaossPad.x * 127)} | Y:{Math.round(kaossPad.y * 127)}
               </div>
             </div>
           </div>
