@@ -42,6 +42,8 @@
   - *Zero Hung Notes Safety*: Bound the arpeggiator lifecycle closely to standard note-on, note-off, and global reset handlers. Releasing all keys, turning off the arpeggiator, or clicking "Stop All" immediately clears the scheduled queue and decays all arpeggiated voices cleanly.
 - **Clean Preset Defaults & Filter Configuration**: Initialized presets default to balanced Double Mode (OSC A/B volumes at 0.8) with the VCF filter completely bypassed (Cutoff at 20,000 Hz, Resonance at 0, type 'bypass' mapping to a transparent Web Audio 'allpass' node). This ensures samples play cleanly with full frequency range. A VCF Type dropdown was added to the UI, supporting BYPASS, LOWPASS, HIGHPASS, BANDPASS, and NOTCH, with linear MIDI CC scaling expanded from 20Hz to 20kHz.
 - **FX Send Initialization Leak Fix**: Resolved a silent bug where delay and reverb sends were hardcoded to `0.2` and `0.3` upon Web Audio context initialization (`initAudio`), leaking background delay/reverb on the first triggered note until program parameter changes manually triggered the sync hook. Now, master sends read and apply the active program's CC/UI parameters immediately on audio context startup.
+- **Adjustable Slice Boundaries**: Shifted the sampler from strictly even, mathematical slice divisions to organic, custom-sized slice mapping. Added high-resolution `Start` and `End` sliders (0.001 resolution step size) to the Slice parameter panel. The waveform canvas's vertical division markers and active voice overlays update dynamically to reflect custom boundaries. The triggering engine calculates start offsets, loop points, and sample playback durations based on custom boundaries in standard, unison, granular time-stretch, and arpeggiation modes.
+
 
 
 
