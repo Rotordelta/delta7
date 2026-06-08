@@ -11,6 +11,12 @@ const DEFAULT_PARAMS = {
   noiseVol: 0.0,
   keyTracking: 0.5,
   unisonOn: false,
+  filterType: 'bypass',
+  cutoff: 20000,
+  resonance: 0.0,
+  oscMode: 'double',
+  oscAVol: 0.8,
+  oscBVol: 0.8,
   unisonDetune: 10,
   preampDrive: 0.1,
   granularActive: false,
@@ -57,30 +63,30 @@ const FACTORY_PROGRAMS = Array.from({ length: 9 }, (_, i) => ({
   id: `p${(i + 1).toString().padStart(2, '0')}`,
   name: `A${(i + 1).toString().padStart(3, '0')}: Initialized`,
   category: 'User',
-  oscMode: 'single',
+  oscMode: 'double',
   oscAWave: 's01',
   oscAOctave: 0,
   oscAPitch: 0,
   oscADetune: 0,
   oscAPan: 0,
-  oscAVol: 0.5,
+  oscAVol: 0.8,
   oscADelay: 0,
   oscBWave: 's02',
   oscBOctave: 0,
   oscBPitch: 0,
   oscBDetune: 0,
   oscBPan: 0,
-  oscBVol: 0,
+  oscBVol: 0.8,
   oscBDelay: 0,
   oscBalance: 0.5,
   filterMode: 'Single',
-  filterType: 'lowpass',
-  cutoff: 1000,
+  filterType: 'bypass',
+  cutoff: 20000,
   resonance: 0,
   filterEnvAmt: 0,
   portamento: 0,
   vcfEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.1, breakLevel: 0.8, slopeTime: 0.1, sustainLevel: 0.5, releaseTime: 0.1, releaseLevel: 0 },
-  vcaEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.1, breakLevel: 0.8, slopeTime: 0.1, sustainLevel: 0.5, releaseTime: 0.1, releaseLevel: 0 },
+  vcaEG: { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.0, breakLevel: 1.0, slopeTime: 0.0, sustainLevel: 1.0, releaseTime: 0.1, releaseLevel: 0 },
   pitchEG: { startLevel: 0, attackTime: 0.01, attackLevel: 0, decayTime: 0.1, releaseTime: 0.1 },
   lfo1Rate: 0, lfo1Depth: 0, lfo1Target: 'pitch', lfo1Shape: 'sine',
   lfo2Rate: 0, lfo2Depth: 0, lfo2Target: 'filter', lfo2Shape: 'sine',
@@ -2829,7 +2835,7 @@ export default function Delta7Synth() {
     const filter1 = ctx.createBiquadFilter();
     const filter2 = ctx.createBiquadFilter();
 
-    filter1.type = prog.filterType;
+    filter1.type = (prog.filterType === 'bypass') ? 'allpass' : (prog.filterType || 'lowpass');
     filter2.type = 'highpass'; // series HPF setup
 
     // Filter Key Tracking
@@ -4845,7 +4851,7 @@ export default function Delta7Synth() {
       if (midiMappings[paramName] === cc) {
         const now = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
         if (paramName === 'cutoff') {
-          const cutVal = Math.round(valNormalized * 8000 + 100);
+          const cutVal = Math.round(valNormalized * 19980 + 20);
           setParams(prev => ({ ...prev, cutoff: cutVal }));
           if (activeVoicesRef.current) {
             activeVoicesRef.current.forEach(vList => {
@@ -5455,7 +5461,7 @@ export default function Delta7Synth() {
                   <Knob 
                     label="Cutoff" 
                     value={params.cutoff} 
-                    min={100} max={10000} step={10}
+                    min={20} max={20000} step={10}
                     onChange={(v) => setParams(prev => ({ ...prev, cutoff: v }))} 
                     midiLearnParam="cutoff" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
                     glowColor="cyan"
@@ -6706,8 +6712,21 @@ export default function Delta7Synth() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                       {/* VCF EG (Filter Env) */}
                       <div>
-                        <div className="flex-row-sub" style={{ fontSize: '0.6rem', justifyContent: 'space-between', marginBottom: '2px' }}>
-                          <span style={{ fontWeight: 'bold', color: '#88ccee' }}>VCF Env (Filter):</span>
+                        <div className="flex-row-sub" style={{ fontSize: '0.6rem', justifyContent: 'space-between', marginBottom: '2px', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontWeight: 'bold', color: '#88ccee' }}>VCF Type:</span>
+                            <select
+                              value={params.filterType || 'lowpass'}
+                              onChange={(e) => setParams(prev => ({ ...prev, filterType: e.target.value }))}
+                              style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.48rem', padding: '0px 1px', borderRadius: '2px', outline: 'none' }}
+                            >
+                              <option value="bypass">BYPASS</option>
+                              <option value="lowpass">LOWPASS</option>
+                              <option value="highpass">HIGHPASS</option>
+                              <option value="bandpass">BANDPASS</option>
+                              <option value="notch">NOTCH</option>
+                            </select>
+                          </div>
                           <span style={{ fontSize: '0.52rem', color: '#aaa' }} className="font-mono">A:{params.vcfEG.attackTime}s D:{params.vcfEG.decayTime}s S:{params.vcfEG.sustainLevel}</span>
                         </div>
                         <div className="canvas-container-sub" style={{ border: '1px solid rgba(0,243,255,0.25)', borderRadius: '3px', background: '#010915', height: '55px', padding: '1px' }}>
