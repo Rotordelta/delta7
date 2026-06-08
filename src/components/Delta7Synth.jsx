@@ -56,7 +56,10 @@ const DEFAULT_PARAMS = {
   stutterSweepDir: 'None',
   stutterSweepTime: 1.0,
   stutterJitter: 0.0,
-  stutterPitchSweep: 0
+  stutterPitchSweep: 0,
+  stutterPattern: 'None',
+  stutterPanMode: 'None',
+  stutterFilterSweep: 0
 };
 
 const FACTORY_PROGRAMS = Array.from({ length: 9 }, (_, i) => ({
@@ -229,6 +232,17 @@ export default function Delta7Synth() {
     isPlaying: false
   });
 
+  // Metronome click track states & refs
+  const [metronomeOn, setMetronomeOn] = useState(false);
+  const [metronomeVolume, setMetronomeVolume] = useState(0.4);
+  const metronomeVolumeRef = useRef(0.4);
+  const metronomeRef = useRef({
+    isPlaying: false,
+    timerId: null,
+    nextNoteTime: 0,
+    beatIndex: 0
+  });
+
   const dubSirenOscRef = useRef(null);
   const dubSirenGainRef = useRef(null);
   const formantInputRef = useRef(null);
@@ -314,6 +328,7 @@ export default function Delta7Synth() {
   }, [sampleSlots]);
 
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('s01'); // Target slot in Editor
+  const [uiScale, setUiScale] = useState(1.0);
   const [selectedSliceIndex, setSelectedSliceIndex] = useState(0); // Selected slice index for editing
   const [tapTimes, setTapTimes] = useState([]); // Timestamps for tap tempo calculation
   const [selectedEchoPresetIdx, setSelectedEchoPresetIdx] = useState(''); // Current echo preset index
@@ -333,6 +348,12 @@ export default function Delta7Synth() {
   const [isArmed, setIsArmed] = useState(false);
   const [recordingInputGain, setRecordingInputGain] = useState(1.0);
   const recordingInputGainRef = useRef(1.0);
+  const resamplerGainNodeRef = useRef(null);
+  const recordingTargetSlotIdRef = useRef('s01');
+  const recordingScriptNodeRef = useRef(null);
+  const recordedChunksL = useRef([]);
+  const recordedChunksR = useRef([]);
+  const isRecordingRef = useRef(false);
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
   const activePreviewNodeRef = useRef(null);
   const previewStartTimeRef = useRef(0);
@@ -420,6 +441,9 @@ export default function Delta7Synth() {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
+      if (metronomeRef.current.timerId) {
+        clearTimeout(metronomeRef.current.timerId);
+      }
       window.removeEventListener('click', handleGesture);
       window.removeEventListener('keydown', handleGesture);
     };
@@ -431,6 +455,7 @@ export default function Delta7Synth() {
       disarmMicrophone();
       return;
     }
+    recordingTargetSlotIdRef.current = selectedEditSlotId;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -488,9 +513,20 @@ export default function Delta7Synth() {
       try { micInputGainNodeRef.current.disconnect(); } catch {}
       micInputGainNodeRef.current = null;
     }
-    if (recordingDestRef.current && analyserRef.current) {
-      try { analyserRef.current.disconnect(recordingDestRef.current); } catch {}
+    if (analyserRef.current && resamplerGainNodeRef.current) {
+      try { analyserRef.current.disconnect(resamplerGainNodeRef.current); } catch {}
     }
+    if (resamplerGainNodeRef.current) {
+      try { resamplerGainNodeRef.current.disconnect(); } catch {}
+      resamplerGainNodeRef.current = null;
+    }
+    if (recordingScriptNodeRef.current) {
+      try { recordingScriptNodeRef.current.disconnect(); } catch {}
+      recordingScriptNodeRef.current = null;
+    }
+    recordedChunksL.current = [];
+    recordedChunksR.current = [];
+    isRecordingRef.current = false;
     recordingDestRef.current = null;
     setIsArmed(false);
     setIsRecording(false);
@@ -521,8 +557,107 @@ export default function Delta7Synth() {
     updateLevel();
   };
 
+  const normalizeBuffer = (buffer) => {
+    const channels = buffer.numberOfChannels;
+    const length = buffer.length;
+    let maxVal = 0;
+    
+    // Find the absolute peak amplitude across all channels
+    for (let c = 0; c < channels; c++) {
+      const data = buffer.getChannelData(c);
+      for (let i = 0; i < length; i++) {
+        const val = Math.abs(data[i]);
+        if (val > maxVal) {
+          maxVal = val;
+        }
+      }
+    }
+    
+    // Scale the buffer so the peak is exactly 0.98
+    if (maxVal > 0 && maxVal < 0.99) {
+      const scale = 0.98 / maxVal;
+      for (let c = 0; c < channels; c++) {
+        const data = buffer.getChannelData(c);
+        for (let i = 0; i < length; i++) {
+          data[i] *= scale;
+        }
+      }
+    }
+  };
+
+  const saveResampledAudio = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    
+    const chunksL = recordedChunksL.current;
+    const chunksR = recordedChunksR.current;
+    if (chunksL.length === 0) return;
+    
+    // Calculate total length
+    let totalLength = 0;
+    for (let i = 0; i < chunksL.length; i++) {
+      totalLength += chunksL[i].length;
+    }
+    
+    // Create new AudioBuffer
+    const buffer = ctx.createBuffer(2, totalLength, ctx.sampleRate);
+    const channelL = buffer.getChannelData(0);
+    const channelR = buffer.getChannelData(1);
+    
+    // Copy data
+    let offset = 0;
+    for (let i = 0; i < chunksL.length; i++) {
+      channelL.set(chunksL[i], offset);
+      channelR.set(chunksR[i], offset);
+      offset += chunksL[i].length;
+    }
+    
+    // Normalize the buffer to 98% peak amplitude (lossless gain maximization)
+    normalizeBuffer(buffer);
+    
+    let updatedSlot = null;
+    const targetSlotId = recordingTargetSlotIdRef.current || selectedEditSlotId;
+    const nextSlots = sampleSlotsRef.current.map(slot => {
+      if (slot.id === targetSlotId) {
+        updatedSlot = {
+          ...slot,
+          name: `Resample: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`,
+          buffer: buffer,
+          revBuffer: getReversedBuffer(ctx, buffer),
+          start: 0.0,
+          end: 1.0,
+          loopStart: 0.0,
+          loopEnd: 1.0
+        };
+        return updatedSlot;
+      }
+      return slot;
+    });
+    sampleSlotsRef.current = nextSlots;
+    setSampleSlots(nextSlots);
+
+    // Auto-save recorded/resampled audio to IndexedDB so it persists on reload!
+    if (updatedSlot) {
+      saveSampleToDb(updatedSlot)
+        .then(() => {
+          showEditorStatus(`Saved Lossless Resample to ${targetSlotId.toUpperCase().replace('S0', 'U')}! 💾`);
+        })
+        .catch((e) => {
+          console.error("Failed to auto-save resampled sample to DB:", e);
+        });
+    }
+  };
+
   const startRecording = () => {
-    if (!streamRef.current) return;
+    if (recordingInputMode === 'resample') {
+      recordedChunksL.current = [];
+      recordedChunksR.current = [];
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      return;
+    }
+
+    if (!streamRef.current && !recordingDestRef.current) return;
     audioChunksRef.current = [];
     let options = {};
     if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -552,8 +687,9 @@ export default function Delta7Synth() {
       
       ctx.decodeAudioData(arrayBuffer, async (buffer) => {
         let updatedSlot = null;
+        const targetSlotId = recordingTargetSlotIdRef.current || selectedEditSlotId;
         const nextSlots = sampleSlotsRef.current.map(slot => {
-          if (slot.id === selectedEditSlotId) {
+          if (slot.id === targetSlotId) {
             updatedSlot = {
               ...slot,
               name: `Rec: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`,
@@ -575,7 +711,7 @@ export default function Delta7Synth() {
         if (updatedSlot) {
           try {
             await saveSampleToDb(updatedSlot);
-            showEditorStatus("Saved Rec to DB! 💾");
+            showEditorStatus(`Saved Rec to ${targetSlotId.toUpperCase().replace('S0', 'U')}! 💾`);
           } catch (e) {
             console.error("Failed to auto-save recorded sample to DB:", e);
           }
@@ -590,6 +726,13 @@ export default function Delta7Synth() {
   };
 
   const stopRecording = () => {
+    if (recordingInputMode === 'resample') {
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      saveResampledAudio();
+      return;
+    }
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
@@ -601,6 +744,7 @@ export default function Delta7Synth() {
       disarmMicrophone();
       return;
     }
+    recordingTargetSlotIdRef.current = selectedEditSlotId;
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { displaySurface: "browser" },
@@ -660,21 +804,71 @@ export default function Delta7Synth() {
       disarmMicrophone();
       return;
     }
+    
+    let destInput = window.prompt("Enter destination slot to record to (e.g. U1-U8, or 1-8):", selectedEditSlotId.toUpperCase().replace('S0', 'U'));
+    if (destInput === null) return; // User cancelled
+    destInput = destInput.trim().toLowerCase();
+    const match = destInput.match(/\d+/);
+    if (!match) {
+      alert("Invalid slot. Please enter a slot between 1 and 8 (e.g., U2 or 2).");
+      return;
+    }
+    const slotNum = parseInt(match[0]);
+    if (slotNum < 1 || slotNum > 8) {
+      alert("Invalid slot. Please enter a slot between 1 and 8 (e.g., U2 or 2).");
+      return;
+    }
+    const targetSlotId = `s0${slotNum}`;
+    setSelectedEditSlotId(targetSlotId);
+    setParams(prev => ({ ...prev, oscAWave: targetSlotId, oscBWave: targetSlotId }));
+    recordingTargetSlotIdRef.current = targetSlotId;
+
     try {
       if (!audioCtxRef.current) initAudio();
       const ctx = audioCtxRef.current;
 
-      // Create media stream destination node
-      const recordingDest = ctx.createMediaStreamDestination();
-      recordingDestRef.current = recordingDest;
+      // Create resampler gain node to apply REC GAIN
+      const resamplerGainNode = ctx.createGain();
+      resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+      resamplerGainNodeRef.current = resamplerGainNode;
 
-      // Connect synth master output analyser to recordingDest
+      // Connect synth master output analyser to resamplerGainNode
       if (analyserRef.current) {
-        analyserRef.current.connect(recordingDest);
+        analyserRef.current.connect(resamplerGainNode);
       }
 
+      // Connect resamplerGainNode -> level analyser for visual feedback
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      micAnalyserRef.current = analyser;
+      resamplerGainNode.connect(analyser);
+
+      // Create ScriptProcessorNode for lossless recording (2 inputs, 2 outputs)
+      const scriptNode = ctx.createScriptProcessor(4096, 2, 2);
+      scriptNode.onaudioprocess = (e) => {
+        const inputL = e.inputBuffer.getChannelData(0);
+        const inputR = e.inputBuffer.getChannelData(1);
+        
+        // Pass-through silence to output to avoid double playing the sound
+        const outputL = e.outputBuffer.getChannelData(0);
+        const outputR = e.outputBuffer.getChannelData(1);
+        outputL.fill(0);
+        outputR.fill(0);
+        
+        if (isRecordingRef.current) {
+          recordedChunksL.current.push(new Float32Array(inputL));
+          recordedChunksR.current.push(new Float32Array(inputR));
+        }
+      };
+      recordingScriptNodeRef.current = scriptNode;
+
+      // Connect resamplerGainNode -> scriptNode -> ctx.destination (required to drive onaudioprocess events)
+      resamplerGainNode.connect(scriptNode);
+      scriptNode.connect(ctx.destination);
+
       setIsArmed(true);
-      showEditorStatus("Resampler armed! ⏺️");
+      startMicMonitor();
+      showEditorStatus(`Resampler armed for ${targetSlotId.toUpperCase().replace('S0', 'U')}! ⏺️`);
     } catch (err) {
       console.error("Error arming resampler:", err);
       alert("Resampler arming failed.");
@@ -1796,11 +1990,15 @@ export default function Delta7Synth() {
   const handleSelectProgram = (idx) => {
     setSelectedProgIndex(idx);
     if (currentMode === 'PROG') {
+      const prog = FACTORY_PROGRAMS[idx];
       setParams(prev => ({
         ...DEFAULT_PARAMS,
         ...prev,
-        ...FACTORY_PROGRAMS[idx]
+        ...prog
       }));
+      if (prog) {
+        setSelectedEditSlotId(prog.oscAWave || 's01');
+      }
     }
   };
 
@@ -2697,6 +2895,20 @@ export default function Delta7Synth() {
           voice.stutterGateNode.gain.setValueAtTime(1.0, now);
         }
 
+        if (voice.stutterPannerNode) {
+          voice.stutterPannerNode.pan.cancelScheduledValues(now);
+          voice.stutterPannerNode.pan.setValueAtTime(0.0, now);
+        }
+
+        if (voice.filter1) {
+          voice.filter1.frequency.cancelScheduledValues(now);
+          voice.filter1.frequency.setValueAtTime(voice.baseCutoff || 1000, now);
+        }
+        if (voice.filter2) {
+          voice.filter2.frequency.cancelScheduledValues(now);
+          voice.filter2.frequency.setValueAtTime(voice.baseCutoff || 1000, now);
+        }
+
         voice.stutterTimeoutId = null;
         voice.stutterLoopStart = undefined;
         voice.stutterLoopStartB = undefined;
@@ -2705,11 +2917,10 @@ export default function Delta7Synth() {
 
       let rate = currentParams.stutterRate || '1/16';
       const elapsed = ctx.currentTime - voice.startTime;
+      const sweepDuration = currentParams.stutterSweepTime || 1.0;
+      const progress = Math.min(1.0, elapsed / sweepDuration);
 
       if (currentParams.stutterSweepDir !== 'None') {
-        const sweepDuration = currentParams.stutterSweepTime || 1.0;
-        const progress = Math.min(1.0, elapsed / sweepDuration);
-        
         const rates = ['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'];
         const startIndex = rates.indexOf(currentParams.stutterRate || '1/16');
         if (startIndex !== -1) {
@@ -2738,28 +2949,80 @@ export default function Delta7Synth() {
       else if (rate === '1/64') stepDur = beatDuration * 0.0625;
       else if (rate === '1/128') stepDur = beatDuration * 0.03125;
 
+      // Apply Stutter Pattern Modulations
+      let skipStep = false;
+      const pattern = currentParams.stutterPattern || 'None';
+      if (pattern === 'BouncingBall') {
+        // Exponentially decrease step duration on each step to sound like a bouncing ball
+        stepDur = stepDur * Math.pow(0.85, stepIndex);
+      } else if (pattern === 'Swing') {
+        // Shuffle alternate steps
+        const swingRatio = 1.33;
+        stepDur = (stepIndex % 2 === 0) ? (stepDur * 2 / (1 + swingRatio)) : (stepDur * 2 * swingRatio / (1 + swingRatio));
+      } else if (pattern === 'RandomSkip') {
+        // 30% chance to mute the step entirely for a glitch breakbeat feel
+        if (Math.random() < 0.3) {
+          skipStep = true;
+        }
+      }
+
       if (currentParams.stutterJitter > 0) {
         const jitterAmount = (Math.random() * 2 - 1) * currentParams.stutterJitter * 0.3 * stepDur;
-        stepDur = Math.max(0.01, stepDur + jitterAmount);
+        stepDur = Math.max(0.005, stepDur + jitterAmount);
       }
 
       const gateDur = stepDur * (currentParams.stutterGate !== undefined ? currentParams.stutterGate : 1.0);
 
       let pitchOffset = 0;
       if (currentParams.stutterPitchSweep !== 0) {
-        const sweepDuration = currentParams.stutterSweepTime || 1.0;
-        const progress = Math.min(1.0, elapsed / sweepDuration);
         pitchOffset = progress * currentParams.stutterPitchSweep;
       }
 
       const now = ctx.currentTime;
 
+      // Gate the volume
       if (voice.stutterGateNode) {
         voice.stutterGateNode.gain.cancelScheduledValues(now);
-        voice.stutterGateNode.gain.setValueAtTime(0, now);
-        voice.stutterGateNode.gain.linearRampToValueAtTime(1, now + 0.003);
-        voice.stutterGateNode.gain.setValueAtTime(1, now + Math.max(0.005, gateDur - 0.003));
-        voice.stutterGateNode.gain.linearRampToValueAtTime(0, now + gateDur);
+        if (skipStep) {
+          voice.stutterGateNode.gain.setValueAtTime(0, now);
+        } else {
+          voice.stutterGateNode.gain.setValueAtTime(0, now);
+          voice.stutterGateNode.gain.linearRampToValueAtTime(1, now + 0.002);
+          voice.stutterGateNode.gain.setValueAtTime(1, now + Math.max(0.003, gateDur - 0.002));
+          voice.stutterGateNode.gain.linearRampToValueAtTime(0, now + gateDur);
+        }
+      }
+
+      // Pan the voice
+      if (voice.stutterPannerNode) {
+        let panVal = 0.0;
+        const panMode = currentParams.stutterPanMode || 'None';
+        if (panMode === 'Alternating') {
+          panVal = (stepIndex % 2 === 0) ? -0.85 : 0.85;
+        } else if (panMode === 'LCR') {
+          const lcrCycle = [-0.8, 0.0, 0.8, 0.0];
+          panVal = lcrCycle[stepIndex % 4];
+        } else if (panMode === 'Sine') {
+          panVal = Math.sin(elapsed * Math.PI); // cycles every 2s
+        }
+        voice.stutterPannerNode.pan.cancelScheduledValues(now);
+        voice.stutterPannerNode.pan.linearRampToValueAtTime(panVal, now + 0.005);
+      }
+
+      // Sweep filter cutoff
+      if (currentParams.stutterFilterSweep && currentParams.stutterFilterSweep !== 0) {
+        const filterOffset = progress * currentParams.stutterFilterSweep;
+        const baseCutoff = voice.baseCutoff !== undefined ? voice.baseCutoff : 1000;
+        const targetCutoff = Math.max(20, Math.min(20000, baseCutoff + filterOffset));
+        
+        if (voice.filter1) {
+          voice.filter1.frequency.cancelScheduledValues(now);
+          voice.filter1.frequency.linearRampToValueAtTime(targetCutoff, now + 0.005);
+        }
+        if (voice.filter2) {
+          voice.filter2.frequency.cancelScheduledValues(now);
+          voice.filter2.frequency.linearRampToValueAtTime(targetCutoff, now + 0.005);
+        }
       }
 
       if (voice.bufferA && (voice.oscA || voice.oscA_L || voice.oscA_R)) {
@@ -3566,13 +3829,17 @@ export default function Delta7Synth() {
     const stutterGateNode = ctx.createGain();
     stutterGateNode.gain.setValueAtTime(1.0, now);
 
+    const stutterPannerNode = ctx.createStereoPanner();
+    stutterPannerNode.pan.setValueAtTime(0.0, now);
+
     if (prog.filterMode === 'Double Series') {
       filter1.connect(filter2);
       filter2.connect(stutterGateNode);
     } else {
       filter1.connect(stutterGateNode);
     }
-    stutterGateNode.connect(voiceOutGain);
+    stutterGateNode.connect(stutterPannerNode);
+    stutterPannerNode.connect(voiceOutGain);
 
     // Voice connects to global static IFX chain
     if (ifx1InputRef.current) {
@@ -3785,6 +4052,10 @@ export default function Delta7Synth() {
     voiceObj.gainA_R = gainA_R;
     voiceObj.voiceOutGain = voiceOutGain;
     voiceObj.stutterGateNode = stutterGateNode;
+    voiceObj.stutterPannerNode = stutterPannerNode;
+    voiceObj.filter1 = filter1;
+    voiceObj.filter2 = filter2;
+    voiceObj.baseCutoff = baseCutoff;
     voiceObj.subOsc = subOsc;
     voiceObj.noiseSource = noiseSource;
     voiceObj.noiseGain = noiseGain;
@@ -4103,6 +4374,76 @@ export default function Delta7Synth() {
     });
     activeArpKeysRef.current.clear();
     setArpRunning(false);
+  };
+
+  const playMetronomeClick = (ctx, time, isDownbeat) => {
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    osc.type = 'triangle';
+    const freq = isDownbeat ? 1000 : 700;
+    osc.frequency.setValueAtTime(freq, time);
+    osc.frequency.exponentialRampToValueAtTime(150, time + 0.04);
+    
+    const vol = metronomeVolumeRef.current;
+    gainNode.gain.setValueAtTime(0, time);
+    gainNode.gain.linearRampToValueAtTime(vol * 0.35, time + 0.002);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+    
+    osc.connect(gainNode);
+    // Connect DIRECTLY to ctx.destination to completely bypass the master analyser / resampler!
+    gainNode.connect(ctx.destination);
+    
+    osc.start(time);
+    osc.stop(time + 0.05);
+  };
+
+  const runMetronomeScheduler = () => {
+    if (!metronomeRef.current.isPlaying) return;
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    const now = ctx.currentTime;
+    const lookahead = 0.06;
+    const scheduleInterval = 25;
+    
+    const bpm = paramsRef.current.arpBpm || 120;
+    const beatDuration = 60 / bpm;
+    
+    while (metronomeRef.current.nextNoteTime < now + lookahead) {
+      const triggerTime = metronomeRef.current.nextNoteTime;
+      const isDownbeat = (metronomeRef.current.beatIndex % 4 === 0);
+      
+      playMetronomeClick(ctx, triggerTime, isDownbeat);
+      
+      metronomeRef.current.nextNoteTime += beatDuration;
+      metronomeRef.current.beatIndex++;
+    }
+    
+    if (metronomeRef.current.isPlaying) {
+      metronomeRef.current.timerId = setTimeout(runMetronomeScheduler, scheduleInterval);
+    }
+  };
+
+  const startMetronome = () => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+    if (ctx.state === 'suspended') ctx.resume();
+    
+    if (metronomeRef.current.isPlaying) return;
+    
+    metronomeRef.current.isPlaying = true;
+    metronomeRef.current.beatIndex = 0;
+    metronomeRef.current.nextNoteTime = ctx.currentTime + 0.05;
+    
+    runMetronomeScheduler();
+  };
+
+  const stopMetronome = () => {
+    metronomeRef.current.isPlaying = false;
+    if (metronomeRef.current.timerId) {
+      clearTimeout(metronomeRef.current.timerId);
+      metronomeRef.current.timerId = null;
+    }
   };
 
   const stopAllNotes = () => {
@@ -5227,11 +5568,23 @@ export default function Delta7Synth() {
   // ==========================================
 
   return (
-    <div className="delta7-hardware-chassis">
+    <div className="delta7-hardware-chassis" style={{ zoom: uiScale }}>
       {/* Aluminum Top Rack Bar */}
       <div className="rack-header-bar">
         <div className="branding-title">delta7</div>
         <div className="branding-sub">HYPER INTEGRATED SYNTHESIS WORKSTATION</div>
+        <div className="ui-resize-slider-wrap" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.62rem', color: '#ff00ff', marginLeft: 'auto', marginRight: '24px' }}>
+          <span style={{ fontWeight: 'bold', letterSpacing: '0.5px' }}>UI RESIZE:</span>
+          <input 
+            type="range" min="0.6" max="1.4" step="0.05"
+            value={uiScale}
+            onChange={(e) => setUiScale(parseFloat(e.target.value))}
+            style={{ width: '80px', height: '8px', cursor: 'pointer', accentColor: '#ff00ff' }}
+          />
+          <span className="font-mono text-cyan" style={{ fontSize: '0.62rem', minWidth: '32px', textAlign: 'right' }}>
+            {Math.round(uiScale * 100)}%
+          </span>
+        </div>
         <div className="telemetry-bar">
           <div className={`telemetry-led ${synthOn ? 'led-on' : ''}`}></div>
           <span>POWER</span>
@@ -6579,7 +6932,10 @@ export default function Delta7Synth() {
                             <button
                               key={slot.id}
                               className={`segmented-btn btn-xs ${params.oscAWave === slot.id ? 'active' : ''}`}
-                              onClick={() => setParams(prev => ({ ...prev, oscAWave: slot.id }))}
+                              onClick={() => {
+                                setParams(prev => ({ ...prev, oscAWave: slot.id }));
+                                setSelectedEditSlotId(slot.id);
+                              }}
                               style={{ fontSize: '0.52rem', padding: '1px 2px' }}
                             >
                               {getSlotLabel(slot.id)}
@@ -6671,7 +7027,10 @@ export default function Delta7Synth() {
                             <button
                               key={slot.id}
                               className={`segmented-btn btn-xs ${params.oscBWave === slot.id ? 'active' : ''}`}
-                              onClick={() => setParams(prev => ({ ...prev, oscBWave: slot.id }))}
+                              onClick={() => {
+                                setParams(prev => ({ ...prev, oscBWave: slot.id }));
+                                setSelectedEditSlotId(slot.id);
+                              }}
                               disabled={params.oscMode === 'single'}
                               style={{ fontSize: '0.52rem', padding: '1px 2px' }}
                             >
@@ -6802,7 +7161,10 @@ export default function Delta7Synth() {
                           <button
                             key={s.id}
                             className={`segmented-btn btn-xs ${selectedEditSlotId === s.id ? 'active' : ''}`}
-                            onClick={() => setSelectedEditSlotId(s.id)}
+                            onClick={() => {
+                              setSelectedEditSlotId(s.id);
+                              setParams(prev => ({ ...prev, oscAWave: s.id, oscBWave: s.id }));
+                            }}
                             style={{ fontSize: '0.52rem', padding: '2px 1px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
                             title={`${getSlotLabel(s.id)}: ${s.name}`}
                           >
@@ -6863,8 +7225,14 @@ export default function Delta7Synth() {
                           const val = parseFloat(e.target.value);
                           setRecordingInputGain(val);
                           recordingInputGainRef.current = val;
-                          if (micInputGainNodeRef.current && audioCtxRef.current) {
-                            micInputGainNodeRef.current.gain.setValueAtTime(val, audioCtxRef.current.currentTime);
+                          const ctx = audioCtxRef.current;
+                          if (ctx) {
+                            if (micInputGainNodeRef.current) {
+                              micInputGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
+                            }
+                            if (resamplerGainNodeRef.current) {
+                              resamplerGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
+                            }
                           }
                         }}
                         style={{ flexGrow: 1, height: '8px' }}
@@ -7145,6 +7513,41 @@ export default function Delta7Synth() {
                             {Math.round((params.arpGate !== undefined ? params.arpGate : 0.8) * 100)}%
                           </span>
                         </div>
+
+                        {/* Metronome / Click Track */}
+                        <div className="flex-row-sub" style={{ alignItems: 'center', marginTop: '2px', borderTop: '1px dashed rgba(255, 0, 255, 0.15)', paddingTop: '2px', gap: '3px', fontSize: '0.5rem' }}>
+                          <label style={{ width: '20px', flexShrink: 0, color: '#ff00ff' }}>Click:</label>
+                          <button
+                            className={`segmented-btn btn-xs ${metronomeOn ? 'active' : ''}`}
+                            onClick={() => {
+                              if (metronomeOn) {
+                                stopMetronome();
+                                setMetronomeOn(false);
+                              } else {
+                                setMetronomeOn(true);
+                                startMetronome();
+                              }
+                            }}
+                            style={{ padding: '0px 3px', fontSize: '0.48rem', flexShrink: 0, borderColor: '#ff00ff', color: '#ff00ff' }}
+                          >
+                            {metronomeOn ? 'ON' : 'OFF'}
+                          </button>
+                          
+                          <span style={{ color: '#ff00ff', opacity: 0.8, marginLeft: '4px' }}>Vol:</span>
+                          <input 
+                            type="range" min="0.0" max="1.0" step="0.05"
+                            value={metronomeVolume} 
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              setMetronomeVolume(v);
+                              metronomeVolumeRef.current = v;
+                            }} 
+                            style={{ flexGrow: 1, height: '8px', minWidth: '30px', accentColor: '#ff00ff' }}
+                          />
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.45rem', width: '22px', textAlign: 'right', color: '#ff00ff' }}>
+                            {Math.round(metronomeVolume * 100)}%
+                          </span>
+                        </div>
                       </div>
 
                       {/* FX Parameters */}
@@ -7298,6 +7701,34 @@ export default function Delta7Synth() {
                       </div>
 
                       <div className="flex-row-sub">
+                        <label>Pattern:</label>
+                        <select
+                          value={params.stutterPattern || 'None'}
+                          onChange={(e) => setParams(prev => ({ ...prev, stutterPattern: e.target.value }))}
+                          style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '50px' }}
+                        >
+                          <option value="None">None</option>
+                          <option value="Swing">Swing</option>
+                          <option value="BouncingBall">Bounce</option>
+                          <option value="RandomSkip">Glitch</option>
+                        </select>
+                      </div>
+
+                      <div className="flex-row-sub">
+                        <label>Pan:</label>
+                        <select
+                          value={params.stutterPanMode || 'None'}
+                          onChange={(e) => setParams(prev => ({ ...prev, stutterPanMode: e.target.value }))}
+                          style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '50px' }}
+                        >
+                          <option value="None">None</option>
+                          <option value="Alternating">Alt L-R</option>
+                          <option value="LCR">L-C-R</option>
+                          <option value="Sine">Auto-Sweep</option>
+                        </select>
+                      </div>
+
+                      <div className="flex-row-sub">
                         <label>Jitter:</label>
                         <input
                           type="range" min="0.0" max="1.0" step="0.1"
@@ -7317,6 +7748,17 @@ export default function Delta7Synth() {
                           style={{ width: '40px', height: '8px' }}
                         />
                         <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '18px', textAlign: 'right' }}>{params.stutterPitchSweep > 0 ? `+${params.stutterPitchSweep}` : params.stutterPitchSweep}</span>
+                      </div>
+
+                      <div className="flex-row-sub" style={{ gridColumn: 'span 2', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <label style={{ color: '#ff00ff', fontSize: '0.52rem', width: '45px' }}>Flt Sweep:</label>
+                        <input
+                          type="range" min="-8000" max="8000" step="500"
+                          value={params.stutterFilterSweep || 0}
+                          onChange={(e) => setParams(prev => ({ ...prev, stutterFilterSweep: parseInt(e.target.value) }))}
+                          style={{ flexGrow: 1, height: '8px' }}
+                        />
+                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '38px', textAlign: 'right' }}>{(params.stutterFilterSweep || 0) > 0 ? `+${params.stutterFilterSweep}` : params.stutterFilterSweep}Hz</span>
                       </div>
                     </div>
 
