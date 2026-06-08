@@ -1831,15 +1831,19 @@ export default function Delta7Synth() {
 
     rebuildDelayEffect(ctx, paramsRef.current.spaceEchoActive);
 
+    const sendA1 = typeof paramsRef.current.mfx1SendA === 'number' && isFinite(paramsRef.current.mfx1SendA) ? paramsRef.current.mfx1SendA : 0;
+    const sendB1 = typeof paramsRef.current.mfx1SendB === 'number' && isFinite(paramsRef.current.mfx1SendB) ? paramsRef.current.mfx1SendB : 0;
     const mfx1SendGain = ctx.createGain();
-    mfx1SendGain.gain.setValueAtTime(0.2, now);
+    mfx1SendGain.gain.setValueAtTime((sendA1 + sendB1) * 0.5, now);
     mfx1SendGainRef.current = mfx1SendGain;
 
     // MFX2 (Reverb)
     const mfx2 = createReverb(ctx);
     mfx2Ref.current = mfx2;
+    const sendA2 = typeof paramsRef.current.mfx2SendA === 'number' && isFinite(paramsRef.current.mfx2SendA) ? paramsRef.current.mfx2SendA : 0;
+    const sendB2 = typeof paramsRef.current.mfx2SendB === 'number' && isFinite(paramsRef.current.mfx2SendB) ? paramsRef.current.mfx2SendB : 0;
     const mfx2SendGain = ctx.createGain();
-    mfx2SendGain.gain.setValueAtTime(0.3, now);
+    mfx2SendGain.gain.setValueAtTime((sendA2 + sendB2) * 0.5, now);
     mfx2SendGainRef.current = mfx2SendGain;
 
     // Tube Preamp Saturation
