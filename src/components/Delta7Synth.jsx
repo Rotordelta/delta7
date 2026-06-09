@@ -699,6 +699,53 @@ export default function Delta7Synth() {
 
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('a01'); // Target slot in Editor
   const [uiScale, setUiScale] = useState(1.0);
+  const [performanceViewActive, setPerformanceViewActive] = useState(false);
+  const [perfRecordActive, setPerfRecordActive] = useState(false);
+  const [perfPlaybackActive, setPerfPlaybackActive] = useState(false);
+  const [perfEvents, setPerfEvents] = useState([]);
+  const [perfRecordStartBpm, setPerfRecordStartBpm] = useState(120);
+  const [activePerfPads, setActivePerfPads] = useState({});
+  const [deckAPlaying, setDeckAPlaying] = useState(false);
+  const [deckBPlaying, setDeckBPlaying] = useState(false);
+  const [platterAngleA, setPlatterAngleA] = useState(0);
+  const [platterAngleB, setPlatterAngleB] = useState(0);
+  const [deckAVolFader, setDeckAVolFader] = useState(0.8);
+  const [deckBVolFader, setDeckBVolFader] = useState(0.8);
+  const [crossfaderVal, setCrossfaderVal] = useState(0.0);
+  const [deckAEqLow, setDeckAEqLow] = useState(0.0);
+  const [deckAEqMid, setDeckAEqMid] = useState(0.0);
+  const [deckAEqHigh, setDeckAEqHigh] = useState(0.0);
+  const [deckBEqLow, setDeckBEqLow] = useState(0.0);
+  const [deckBEqMid, setDeckBEqMid] = useState(0.0);
+  const [deckBEqHigh, setDeckBEqHigh] = useState(0.0);
+  const [vuLevelL, setVuLevelL] = useState(0);
+  const [vuLevelR, setVuLevelR] = useState(0);
+
+  const perfEventsRef = useRef([]);
+  useEffect(() => {
+    perfEventsRef.current = perfEvents;
+  }, [perfEvents]);
+
+  const perfRecordActiveRef = useRef(false);
+  useEffect(() => {
+    perfRecordActiveRef.current = perfRecordActive;
+  }, [perfRecordActive]);
+
+  const perfPlaybackActiveRef = useRef(false);
+  useEffect(() => {
+    perfPlaybackActiveRef.current = perfPlaybackActive;
+  }, [perfPlaybackActive]);
+
+  const perfStartTimeRef = useRef(0);
+  const perfPlaybackTimerRef = useRef(null);
+  const perfPlayNextEventIdxRef = useRef(0);
+  const perfPlayStartTimeRef = useRef(0);
+  const deckATimerRef = useRef(null);
+  const deckBTimerRef = useRef(null);
+  const isScratchingA = useRef(false);
+  const isScratchingB = useRef(false);
+  const scratchStartAngleA = useRef(0);
+  const scratchStartAngleB = useRef(0);
   const [selectedSliceIndex, setSelectedSliceIndex] = useState(0); // Selected slice index for editing
   const [tapTimes, setTapTimes] = useState([]); // Timestamps for tap tempo calculation
   const [selectedEchoPresetIdx, setSelectedEchoPresetIdx] = useState(''); // Current echo preset index
@@ -730,6 +777,193 @@ export default function Delta7Synth() {
   const activePreviewNodeRef = useRef(null);
   const previewStartTimeRef = useRef(0);
   const previewStartOffsetRef = useRef(0);
+
+  // Toggle Performance View with Tab key and map triggers
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'Tab') {
+        const activeEl = document.activeElement;
+        const tag = activeEl ? activeEl.tagName.toLowerCase() : '';
+        const isEditable = activeEl ? (activeEl.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') : false;
+        
+        if (!isEditable) {
+          e.preventDefault();
+          setPerformanceViewActive(prev => !prev);
+        }
+        return;
+      }
+
+      if (performanceViewActive) {
+        const activeEl = document.activeElement;
+        const tag = activeEl ? activeEl.tagName.toLowerCase() : '';
+        const isEditable = activeEl ? (activeEl.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') : false;
+        if (isEditable) return;
+
+        if (e.repeat) return;
+        const key = e.key.toLowerCase();
+        
+        // Deck A slots: 1 to 8 keys
+        const deckAKeys = ['1', '2', '3', '4', '5', '6', '7', '8'];
+        const aIdx = deckAKeys.indexOf(key);
+        if (aIdx !== -1) {
+          e.preventDefault();
+          triggerPerfPadInternal('A', 'slot', aIdx, 100, true, true);
+        }
+
+        // Deck B slots: Q to I keys
+        const deckBKeys = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i'];
+        const bIdx = deckBKeys.indexOf(key);
+        if (bIdx !== -1) {
+          e.preventDefault();
+          triggerPerfPadInternal('B', 'slot', bIdx, 100, true, true);
+        }
+      }
+    };
+
+    const handleGlobalKeyUp = (e) => {
+      if (performanceViewActive) {
+        const activeEl = document.activeElement;
+        const tag = activeEl ? activeEl.tagName.toLowerCase() : '';
+        const isEditable = activeEl ? (activeEl.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') : false;
+        if (isEditable) return;
+
+        const key = e.key.toLowerCase();
+
+        // Deck A slots release
+        const deckAKeys = ['1', '2', '3', '4', '5', '6', '7', '8'];
+        const aIdx = deckAKeys.indexOf(key);
+        if (aIdx !== -1) {
+          e.preventDefault();
+          triggerPerfPadInternal('A', 'slot', aIdx, 100, false, true);
+        }
+
+        // Deck B slots release
+        const deckBKeys = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i'];
+        const bIdx = deckBKeys.indexOf(key);
+        if (bIdx !== -1) {
+          e.preventDefault();
+          triggerPerfPadInternal('B', 'slot', bIdx, 100, false, true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('keyup', handleGlobalKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('keyup', handleGlobalKeyUp);
+    };
+  }, [performanceViewActive]);
+
+  // Clean up recording / playback / active voices when exiting Performance View
+  useEffect(() => {
+    if (!performanceViewActive) {
+      setPerfPlaybackActive(false);
+      if (perfPlaybackTimerRef.current) {
+        clearInterval(perfPlaybackTimerRef.current);
+        perfPlaybackTimerRef.current = null;
+      }
+      setPerfRecordActive(false);
+      [...activeVoicesRef.current.keys()].forEach(k => {
+        if (typeof k === 'string' && k.startsWith('perf-')) {
+          stopPerfVoice(k);
+        }
+      });
+      setActivePerfPads({});
+    }
+  }, [performanceViewActive]);
+
+  // Platter angle rotation and live VU meter loop
+  useEffect(() => {
+    if (!performanceViewActive) return;
+    
+    let animId;
+    let lastTime = performance.now();
+    
+    const bufferLength = 32;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    const getIsDeckActive = (deck) => {
+      if (deck === 'A') {
+        return deckAPlaying || [...activeVoicesRef.current.keys()].some(k => typeof k === 'string' && k.startsWith('perf-a'));
+      } else {
+        return deckBPlaying || [...activeVoicesRef.current.keys()].some(k => typeof k === 'string' && k.startsWith('perf-b'));
+      }
+    };
+    
+    const tickLoop = () => {
+      animId = requestAnimationFrame(tickLoop);
+      const tNow = performance.now();
+      const delta = (tNow - lastTime) / 1000;
+      lastTime = tNow;
+      
+      // Platter spin increment
+      if (getIsDeckActive('A') && !isScratchingA.current) {
+        setPlatterAngleA(prev => (prev + delta * 180) % 360);
+      }
+      if (getIsDeckActive('B') && !isScratchingB.current) {
+        setPlatterAngleB(prev => (prev + delta * 180) % 360);
+      }
+
+      // VU Meter values
+      if (analyserRef.current) {
+        analyserRef.current.getByteTimeDomainData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const val = (dataArray[i] - 128) / 128;
+          sum += val * val;
+        }
+        const rms = Math.sqrt(sum / bufferLength);
+        const db = rms * 100;
+        
+        const pan = crossfaderVal;
+        const panL = pan <= 0 ? 1.0 : 1.0 - pan;
+        const panR = pan >= 0 ? 1.0 : 1.0 + pan;
+        
+        setVuLevelL(prev => Math.max(0, Math.min(100, Math.round(db * 2.2 * panL * 0.25 + prev * 0.75))));
+        setVuLevelR(prev => Math.max(0, Math.min(100, Math.round(db * 2.2 * panR * 0.25 + prev * 0.75))));
+      }
+    };
+    
+    tickLoop();
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [performanceViewActive, deckAPlaying, deckBPlaying, crossfaderVal]);
+
+  // Real-time Mixer Fader & EQ voice modulator
+  useEffect(() => {
+    if (!audioCtxRef.current) return;
+    const now = audioCtxRef.current.currentTime;
+    
+    activeVoicesRef.current.forEach((vList, voiceKey) => {
+      if (typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
+        const isDeckA = voiceKey.includes('perf-a');
+        const faderVol = isDeckA ? deckAVolFader : deckBVolFader;
+        const cfGain = isDeckA 
+          ? (crossfaderVal <= 0 ? 1.0 : 1.0 - crossfaderVal)
+          : (crossfaderVal >= 0 ? 1.0 : 1.0 + crossfaderVal);
+        
+        const finalGain = faderVol * cfGain;
+        const list = Array.isArray(vList) ? vList : [vList];
+        
+        list.forEach(voice => {
+          if (voice && voice.voiceOutGain) {
+            voice.voiceOutGain.gain.setValueAtTime(finalGain, now);
+          }
+          if (voice && voice.filter1) {
+            const eqLow = isDeckA ? deckAEqLow : deckBEqLow;
+            const eqHigh = isDeckA ? deckAEqHigh : deckBEqHigh;
+            let mult = 1.0;
+            if (eqLow < 0) mult += eqLow * 0.45;
+            if (eqHigh < 0) mult += eqHigh * 0.65;
+            const targetCutoff = Math.max(30, Math.min(19000, voice.baseCutoff * Math.max(0.08, mult)));
+            voice.filter1.frequency.setValueAtTime(targetCutoff, now);
+          }
+        });
+      }
+    });
+  }, [deckAVolFader, deckBVolFader, crossfaderVal, deckAEqLow, deckAEqMid, deckAEqHigh, deckBEqLow, deckBEqMid, deckBEqHigh]);
 
   // --- Waveform selection, clipboard, history & recording states ---
   const [recordingInputMode, setRecordingInputMode] = useState('mic'); // 'mic', 'monitor', or 'resample'
@@ -4872,6 +5106,296 @@ export default function Delta7Synth() {
     });
   };
 
+  const stopPerfVoice = (voiceKey) => {
+    if (!audioCtxRef.current) return;
+    const voices = activeVoicesRef.current.get(voiceKey);
+    if (voices) {
+      voices.forEach(releaseVoice);
+      activeVoicesRef.current.delete(voiceKey);
+    }
+  };
+
+  const triggerPerfPadInternal = (deck, type, index, velocity, isNoteOn, shouldRecord = false) => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const voiceKey = `perf-${deck.toLowerCase()}-${type}-${index}`;
+    const padKey = `${deck}-${type}-${index}`;
+
+    if (!isNoteOn) {
+      stopPerfVoice(voiceKey);
+      setActivePerfPads(prev => {
+        const next = { ...prev };
+        delete next[padKey];
+        return next;
+      });
+      
+      if (shouldRecord && perfRecordActiveRef.current) {
+        const elapsed = ctx.currentTime - perfStartTimeRef.current;
+        const bpm = paramsRef.current.arpBpm || 120;
+        const beatDuration = 60 / bpm;
+        const beat = elapsed / beatDuration;
+        setPerfEvents(prev => [...prev, { beat, deck, type, index, velocity, isNoteOn: false }]);
+      }
+      return;
+    }
+
+    stopPerfVoice(voiceKey);
+
+    const currentParams = paramsRef.current;
+    let slotId = '';
+    
+    if (type === 'slot') {
+      slotId = (deck === 'A' ? 'a0' : 'b0') + (index + 1);
+    } else {
+      slotId = deck === 'A' ? currentParams.oscAWave : currentParams.oscBWave;
+    }
+
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    if (!slot || !slot.buffer) return;
+
+    const rootNote = slot.rootNote || 60;
+    const triggerNote = type === 'slot' ? rootNote : rootNote + index;
+
+    // Use double mode but mute opposite channel to mix separately
+    const tempProg = {
+      ...currentParams,
+      oscMode: 'double',
+      oscAWave: deck === 'A' ? slotId : currentParams.oscAWave,
+      oscBWave: deck === 'B' ? slotId : currentParams.oscBWave,
+      oscATriggerMode: type === 'slice' ? 'slice' : 'normal',
+      oscBTriggerMode: type === 'slice' ? 'slice' : 'normal',
+      oscAVol: deck === 'A' ? currentParams.oscAVol : 0,
+      oscBVol: deck === 'B' ? currentParams.oscBVol : 0
+    };
+
+    const voice = playProgramVoice(ctx, triggerNote, velocity, tempProg, voiceKey);
+    activeVoicesRef.current.set(voiceKey, [voice]);
+
+    setActivePerfPads(prev => ({ ...prev, [padKey]: true }));
+
+    if (deck === 'A') {
+      setDeckAPlaying(true);
+      if (deckATimerRef.current) clearTimeout(deckATimerRef.current);
+      const dur = slot.buffer.duration * (slot.end - slot.start);
+      deckATimerRef.current = setTimeout(() => setDeckAPlaying(false), dur * 1000);
+    } else {
+      setDeckBPlaying(true);
+      if (deckBTimerRef.current) clearTimeout(deckBTimerRef.current);
+      const dur = slot.buffer.duration * (slot.end - slot.start);
+      deckBTimerRef.current = setTimeout(() => setDeckBPlaying(false), dur * 1000);
+    }
+
+    if (shouldRecord && perfRecordActiveRef.current) {
+      const elapsed = ctx.currentTime - perfStartTimeRef.current;
+      const bpm = currentParams.arpBpm || 120;
+      const beatDuration = 60 / bpm;
+      const beat = elapsed / beatDuration;
+      setPerfEvents(prev => [...prev, { beat, deck, type, index, velocity, isNoteOn: true }]);
+    }
+  };
+
+  const togglePerformanceRecord = () => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+    
+    if (perfRecordActive) {
+      setPerfRecordActive(false);
+      showEditorStatus(`Performance Recorded! (${perfEvents.length} events) ⏹️`);
+    } else {
+      // Stop playback first
+      setPerfPlaybackActive(false);
+      if (perfPlaybackTimerRef.current) {
+        clearInterval(perfPlaybackTimerRef.current);
+        perfPlaybackTimerRef.current = null;
+      }
+      setPerfEvents([]);
+      perfStartTimeRef.current = ctx.currentTime;
+      setPerfRecordStartBpm(paramsRef.current.arpBpm || 120);
+      setPerfRecordActive(true);
+      showEditorStatus("Recording Performance... ⏺️");
+    }
+  };
+
+  const togglePerformancePlayback = () => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+
+    if (perfPlaybackActive) {
+      setPerfPlaybackActive(false);
+      if (perfPlaybackTimerRef.current) {
+        clearInterval(perfPlaybackTimerRef.current);
+        perfPlaybackTimerRef.current = null;
+      }
+      // Stop all playing performance voices
+      [...activeVoicesRef.current.keys()].forEach(k => {
+        if (typeof k === 'string' && k.startsWith('perf-')) {
+          stopPerfVoice(k);
+        }
+      });
+      setActivePerfPads({});
+      showEditorStatus("Playback Stopped. ⏹️");
+    } else {
+      if (perfEvents.length === 0) {
+        showEditorStatus("No performance events recorded yet! ⚠️");
+        return;
+      }
+      // Stop recording first
+      setPerfRecordActive(false);
+      setPerfPlaybackActive(true);
+      perfPlayNextEventIdxRef.current = 0;
+      perfPlayStartTimeRef.current = ctx.currentTime;
+      perfPlaybackTimerRef.current = setInterval(runPerfScheduler, 25);
+      showEditorStatus("Playing Performance... ▶️");
+    }
+  };
+
+  const clearPerformance = () => {
+    setPerfEvents([]);
+    showEditorStatus("Performance Cleared! 🗑️");
+  };
+
+  const runPerfScheduler = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const elapsed = now - perfPlayStartTimeRef.current;
+    const bpm = paramsRef.current.arpBpm || 120;
+    const beatDuration = 60 / bpm;
+    const elapsedBeats = elapsed / beatDuration;
+
+    const sorted = [...perfEventsRef.current].sort((a, b) => a.beat - b.beat);
+    let nextIdx = perfPlayNextEventIdxRef.current;
+
+    const lookaheadBeats = 0.1; // 100ms lookahead
+
+    while (nextIdx < sorted.length) {
+      const event = sorted[nextIdx];
+      if (event.beat < elapsedBeats + lookaheadBeats) {
+        const eventTime = perfPlayStartTimeRef.current + event.beat * beatDuration;
+        const delayOffset = Math.max(0, eventTime - now);
+        
+        setTimeout(() => {
+          if (perfPlaybackActiveRef.current) {
+            triggerPerfPadInternal(event.deck, event.type, event.index, event.velocity, event.isNoteOn, false);
+          }
+        }, delayOffset * 1000);
+
+        nextIdx++;
+      } else {
+        break;
+      }
+    }
+
+    perfPlayNextEventIdxRef.current = nextIdx;
+
+    if (nextIdx >= sorted.length && sorted.length > 0) {
+      const lastEvent = sorted[sorted.length - 1];
+      const endBeat = Math.ceil(lastEvent.beat / 4) * 4;
+      if (elapsedBeats >= endBeat) {
+        perfPlayStartTimeRef.current = ctx.currentTime;
+        perfPlayNextEventIdxRef.current = 0;
+      }
+    }
+  };
+
+  const getPlatterAngle = (e, rect) => {
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const px = e.clientX;
+    const py = e.clientY;
+    return Math.atan2(py - cy, px - cx);
+  };
+
+  const handlePlatterMouseDown = (deck, e) => {
+    e.preventDefault();
+    const isA = deck === 'A';
+    const rect = e.currentTarget.getBoundingClientRect();
+    const angle = getPlatterAngle(e, rect);
+    
+    if (isA) {
+      isScratchingA.current = true;
+      scratchStartAngleA.current = angle;
+    } else {
+      isScratchingB.current = true;
+      scratchStartAngleB.current = angle;
+    }
+  };
+
+  const handlePlatterMouseMove = (deck, e) => {
+    const isA = deck === 'A';
+    const isScratching = isA ? isScratchingA.current : isScratchingB.current;
+    if (!isScratching) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const angle = getPlatterAngle(e, rect);
+    const lastAngle = isA ? scratchStartAngleA.current : scratchStartAngleB.current;
+    
+    let delta = angle - lastAngle;
+    if (delta > Math.PI) delta -= 2 * Math.PI;
+    if (delta < -Math.PI) delta += 2 * Math.PI;
+    
+    if (isA) {
+      scratchStartAngleA.current = angle;
+      setPlatterAngleA(prev => (prev + delta * (180 / Math.PI)) % 360);
+    } else {
+      scratchStartAngleB.current = angle;
+      setPlatterAngleB(prev => (prev + delta * (180 / Math.PI)) % 360);
+    }
+    
+    const speed = delta * 20;
+    const playbackRateMultiplier = Math.max(0.08, Math.min(3.0, Math.abs(speed)));
+    
+    if (audioCtxRef.current) {
+      const now = audioCtxRef.current.currentTime;
+      activeVoicesRef.current.forEach((vList, voiceKey) => {
+        if (typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
+          const isVoiceA = voiceKey.includes('perf-a');
+          if ((isA && isVoiceA) || (!isA && !isVoiceA)) {
+            const list = Array.isArray(vList) ? vList : [vList];
+            list.forEach(voice => {
+              const oscs = [voice.oscA, voice.oscA_L, voice.oscA_R, voice.oscB].filter(Boolean);
+              oscs.forEach(osc => {
+                const baseRate = isVoiceA ? (voice.orig_oscA_rate || 1.0) : (voice.orig_oscB_rate || 1.0);
+                osc.playbackRate.setValueAtTime(baseRate * playbackRateMultiplier, now);
+              });
+            });
+          }
+        }
+      });
+    }
+  };
+
+  const handlePlatterMouseUp = (deck) => {
+    const isA = deck === 'A';
+    if (isA) {
+      isScratchingA.current = false;
+    } else {
+      isScratchingB.current = false;
+    }
+    
+    if (audioCtxRef.current) {
+      const now = audioCtxRef.current.currentTime;
+      activeVoicesRef.current.forEach((vList, voiceKey) => {
+        if (typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
+          const isVoiceA = voiceKey.includes('perf-a');
+          if ((isA && isVoiceA) || (!isA && !isVoiceA)) {
+            const list = Array.isArray(vList) ? vList : [vList];
+            list.forEach(voice => {
+              const oscs = [voice.oscA, voice.oscA_L, voice.oscA_R, voice.oscB].filter(Boolean);
+              oscs.forEach(osc => {
+                const baseRate = isVoiceA ? (voice.orig_oscA_rate || 1.0) : (voice.orig_oscB_rate || 1.0);
+                osc.playbackRate.setValueAtTime(baseRate, now);
+              });
+            });
+          }
+        }
+      });
+    }
+  };
+
   const runArpScheduler = () => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
@@ -6225,6 +6749,321 @@ export default function Delta7Synth() {
     });
   };
 
+  const renderPerformanceDeck = () => {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 1fr', height: 'calc(100% - 32px)', background: '#020509', flexGrow: 1 }}>
+        
+        {/* LEFT DECK (DECK A) */}
+        <div className="turntable-deck">
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#00f3ff', letterSpacing: '2px', fontFamily: 'monospace' }}>
+              DECK A &mdash; {getSlotLabel(params.oscAWave)}
+            </span>
+            
+            <div className="vinyl-platter-wrapper">
+              <div 
+                className="vinyl-platter"
+                onMouseDown={(e) => handlePlatterMouseDown('A', e)}
+                onMouseMove={(e) => handlePlatterMouseMove('A', e)}
+                onMouseUp={() => handlePlatterMouseUp('A')}
+                onMouseLeave={() => handlePlatterMouseUp('A')}
+                onTouchStart={(e) => { e.preventDefault(); handlePlatterMouseDown('A', e.touches[0]); }}
+                onTouchMove={(e) => { e.preventDefault(); handlePlatterMouseMove('A', e.touches[0]); }}
+                onTouchEnd={() => handlePlatterMouseUp('A')}
+                style={{ 
+                  transform: `rotate(${platterAngleA}deg)`,
+                  transition: isScratchingA.current ? 'none' : 'transform 0.05s linear'
+                }}
+              >
+                <div className="vinyl-strobe-dot" />
+                <div className="vinyl-label" style={{ background: '#00f3ff' }}>
+                  <span style={{ fontSize: '0.45rem', letterSpacing: '0.5px' }}>OSC A</span>
+                  <span style={{ fontSize: '0.38rem', marginTop: '2px', color: '#000', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', width: '36px', textAlign: 'center' }}>
+                    {sampleSlotsRef.current.find(s => s.id === params.oscAWave)?.name.substring(0, 7) || 'EMPTY'}
+                  </span>
+                </div>
+              </div>
+              <svg 
+                className={`tonearm ${deckAPlaying || [...activeVoicesRef.current.keys()].some(k => typeof k === 'string' && k.startsWith('perf-a')) ? 'active' : ''}`}
+                viewBox="0 0 25 70"
+                style={{
+                  position: 'absolute',
+                  top: '5px',
+                  right: '5px',
+                  width: '25px',
+                  height: '70px',
+                  pointerEvents: 'none',
+                  transformOrigin: '15% 10%'
+                }}
+              >
+                <path d="M 5,5 L 5,20 L 12,45 L 8,62 L 14,64 L 18,48 L 10,22 L 10,5 Z" fill="#aaa" stroke="#888" strokeWidth="0.5" />
+                <rect x="5" y="60" width="8" height="6" fill="#ffe600" rx="1" />
+              </svg>
+            </div>
+          </div>
+
+          {/* 2 Rows of 8 Pads for Deck A */}
+          <div className="performance-pads-grid">
+            {/* Row 1: Slots A1-A8 */}
+            <div className="performance-pads-row">
+              {Array.from({ length: 8 }).map((_, idx) => {
+                const slotId = `a0${idx + 1}`;
+                const slot = sampleSlots.find(s => s.id === slotId);
+                const isLoaded = slot && slot.buffer;
+                const padKey = `A-slot-${idx}`;
+                const isActive = activePerfPads[padKey];
+                return (
+                  <div
+                    key={slotId}
+                    className={`perf-pad ${isLoaded ? 'deck-a-loaded' : ''} ${isActive ? 'deck-a-active' : ''}`}
+                    onMouseDown={() => triggerPerfPadInternal('A', 'slot', idx, 100, true, true)}
+                    onMouseUp={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
+                    onMouseLeave={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
+                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slot', idx, 100, true, true); }}
+                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slot', idx, 100, false, true); }}
+                    title={isLoaded ? slot.name : 'Empty Slot'}
+                  >
+                    <span className="perf-pad-label">A{idx + 1}</span>
+                    <span className="perf-pad-name">{isLoaded ? slot.name.substring(0, 5) : '---'}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Row 2: Slices 1-8 of active slot */}
+            <div className="performance-pads-row">
+              {Array.from({ length: 8 }).map((_, idx) => {
+                const padKey = `A-slice-${idx}`;
+                const isActive = activePerfPads[padKey];
+                return (
+                  <div
+                    key={`slice-a-${idx}`}
+                    className={`perf-pad slice-loaded ${isActive ? 'slice-active' : ''}`}
+                    onMouseDown={() => triggerPerfPadInternal('A', 'slice', idx, 100, true, true)}
+                    onMouseUp={() => triggerPerfPadInternal('A', 'slice', idx, 100, false, true)}
+                    onMouseLeave={() => triggerPerfPadInternal('A', 'slice', idx, 100, false, true)}
+                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slice', idx, 100, true, true); }}
+                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slice', idx, 100, false, true); }}
+                  >
+                    <span className="perf-pad-label">SL{idx + 1}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* CENTER MIXER COLUMN */}
+        <div className="mixer-column">
+          <span style={{ fontSize: '0.52rem', color: '#ffe600', fontWeight: 'bold', fontFamily: 'monospace', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            Mixer
+          </span>
+          
+          {/* EQ Knobs / Vertical sliders */}
+          <div className="mixer-eq-section">
+            {/* EQ Channel A */}
+            <div className="mixer-eq-channel">
+              <span className="mixer-eq-label">HI</span>
+              <input 
+                type="range" min="-1.0" max="0.0" step="0.05" 
+                value={deckAEqHigh} 
+                onChange={(e) => setDeckAEqHigh(parseFloat(e.target.value))}
+                className="mixer-vertical-slider"
+              />
+              <span className="mixer-eq-label">LOW</span>
+              <input 
+                type="range" min="-1.0" max="0.0" step="0.05" 
+                value={deckAEqLow} 
+                onChange={(e) => setDeckAEqLow(parseFloat(e.target.value))}
+                className="mixer-vertical-slider"
+              />
+            </div>
+            
+            {/* EQ Channel B */}
+            <div className="mixer-eq-channel">
+              <span className="mixer-eq-label">HI</span>
+              <input 
+                type="range" min="-1.0" max="0.0" step="0.05" 
+                value={deckBEqHigh} 
+                onChange={(e) => setDeckBEqHigh(parseFloat(e.target.value))}
+                className="mixer-vertical-slider"
+              />
+              <span className="mixer-eq-label">LOW</span>
+              <input 
+                type="range" min="-1.0" max="0.0" step="0.05" 
+                value={deckBEqLow} 
+                onChange={(e) => setDeckBEqLow(parseFloat(e.target.value))}
+                className="mixer-vertical-slider"
+              />
+            </div>
+          </div>
+
+          {/* Master LED VU Meter */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', background: '#000', padding: '4px 3px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }}>
+            <div style={{ display: 'flex', gap: '2px', flexDirection: 'column' }}>
+              {[...Array(10)].map((_, idx) => {
+                const segIdx = 9 - idx;
+                const litL = vuLevelL >= (segIdx + 1) * 10;
+                const color = segIdx > 7 ? '#ff0055' : segIdx > 5 ? '#ffe600' : '#00ff66';
+                return (
+                  <div key={`vu-l-${segIdx}`} style={{ width: '8px', height: '4px', background: litL ? color : '#111', borderRadius: '1px', boxShadow: litL ? `0 0 3px ${color}` : 'none' }} />
+                );
+              })}
+            </div>
+            <div style={{ height: '4px' }} />
+            <div style={{ display: 'flex', gap: '2px', flexDirection: 'column' }}>
+              {[...Array(10)].map((_, idx) => {
+                const segIdx = 9 - idx;
+                const litR = vuLevelR >= (segIdx + 1) * 10;
+                const color = segIdx > 7 ? '#ff0055' : segIdx > 5 ? '#ffe600' : '#00ff66';
+                return (
+                  <div key={`vu-r-${segIdx}`} style={{ width: '8px', height: '4px', background: litR ? color : '#111', borderRadius: '1px', boxShadow: litR ? `0 0 3px ${color}` : 'none' }} />
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Channel volume faders */}
+          <div className="mixer-vol-faders">
+            <div className="mixer-fader-wrapper">
+              <span className="mixer-fader-label">A</span>
+              <input 
+                type="range" min="0.0" max="1.0" step="0.02" 
+                value={deckAVolFader} 
+                onChange={(e) => setDeckAVolFader(parseFloat(e.target.value))}
+                className="mixer-vol-slider"
+              />
+            </div>
+            <div className="mixer-fader-wrapper">
+              <span className="mixer-fader-label">B</span>
+              <input 
+                type="range" min="0.0" max="1.0" step="0.02" 
+                value={deckBVolFader} 
+                onChange={(e) => setDeckBVolFader(parseFloat(e.target.value))}
+                className="mixer-vol-slider"
+              />
+            </div>
+          </div>
+
+          {/* Crossfader */}
+          <div className="crossfader-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 4px' }}>
+              <span className="crossfader-label">A</span>
+              <span className="crossfader-label">B</span>
+            </div>
+            <input 
+              type="range" min="-1.0" max="1.0" step="0.05" 
+              value={crossfaderVal} 
+              onChange={(e) => setCrossfaderVal(parseFloat(e.target.value))}
+              className="crossfader-slider"
+            />
+          </div>
+        </div>
+
+        {/* RIGHT DECK (DECK B) */}
+        <div className="turntable-deck" style={{ borderLeft: 'none' }}>
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#ff00ff', letterSpacing: '2px', fontFamily: 'monospace' }}>
+              DECK B &mdash; {getSlotLabel(params.oscBWave)}
+            </span>
+            
+            <div className="vinyl-platter-wrapper">
+              <div 
+                className="vinyl-platter"
+                onMouseDown={(e) => handlePlatterMouseDown('B', e)}
+                onMouseMove={(e) => handlePlatterMouseMove('B', e)}
+                onMouseUp={() => handlePlatterMouseUp('B')}
+                onMouseLeave={() => handlePlatterMouseUp('B')}
+                onTouchStart={(e) => { e.preventDefault(); handlePlatterMouseDown('B', e.touches[0]); }}
+                onTouchMove={(e) => { e.preventDefault(); handlePlatterMouseMove('B', e.touches[0]); }}
+                onTouchEnd={() => handlePlatterMouseUp('B')}
+                style={{ 
+                  transform: `rotate(${platterAngleB}deg)`,
+                  transition: isScratchingB.current ? 'none' : 'transform 0.05s linear'
+                }}
+              >
+                <div className="vinyl-strobe-dot" />
+                <div className="vinyl-label" style={{ background: '#ff00ff' }}>
+                  <span style={{ fontSize: '0.45rem', letterSpacing: '0.5px', color: '#000' }}>OSC B</span>
+                  <span style={{ fontSize: '0.38rem', marginTop: '2px', color: '#000', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', width: '36px', textAlign: 'center' }}>
+                    {sampleSlotsRef.current.find(s => s.id === params.oscBWave)?.name.substring(0, 7) || 'EMPTY'}
+                  </span>
+                </div>
+              </div>
+              <svg 
+                className={`tonearm ${deckBPlaying || [...activeVoicesRef.current.keys()].some(k => typeof k === 'string' && k.startsWith('perf-b')) ? 'active' : ''}`}
+                viewBox="0 0 25 70"
+                style={{
+                  position: 'absolute',
+                  top: '5px',
+                  right: '5px',
+                  width: '25px',
+                  height: '70px',
+                  pointerEvents: 'none',
+                  transformOrigin: '15% 10%'
+                }}
+              >
+                <path d="M 5,5 L 5,20 L 12,45 L 8,62 L 14,64 L 18,48 L 10,22 L 10,5 Z" fill="#aaa" stroke="#888" strokeWidth="0.5" />
+                <rect x="5" y="60" width="8" height="6" fill="#ffe600" rx="1" />
+              </svg>
+            </div>
+          </div>
+
+          {/* 2 Rows of 8 Pads for Deck B */}
+          <div className="performance-pads-grid">
+            {/* Row 1: Slots B1-B8 */}
+            <div className="performance-pads-row">
+              {Array.from({ length: 8 }).map((_, idx) => {
+                const slotId = `b0${idx + 1}`;
+                const slot = sampleSlots.find(s => s.id === slotId);
+                const isLoaded = slot && slot.buffer;
+                const padKey = `B-slot-${idx}`;
+                const isActive = activePerfPads[padKey];
+                return (
+                  <div
+                    key={slotId}
+                    className={`perf-pad ${isLoaded ? 'deck-b-loaded' : ''} ${isActive ? 'deck-b-active' : ''}`}
+                    onMouseDown={() => triggerPerfPadInternal('B', 'slot', idx, 100, true, true)}
+                    onMouseUp={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
+                    onMouseLeave={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
+                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slot', idx, 100, true, true); }}
+                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slot', idx, 100, false, true); }}
+                    title={isLoaded ? slot.name : 'Empty Slot'}
+                  >
+                    <span className="perf-pad-label">B{idx + 1}</span>
+                    <span className="perf-pad-name">{isLoaded ? slot.name.substring(0, 5) : '---'}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Row 2: Slices 1-8 of active slot */}
+            <div className="performance-pads-row">
+              {Array.from({ length: 8 }).map((_, idx) => {
+                const padKey = `B-slice-${idx}`;
+                const isActive = activePerfPads[padKey];
+                return (
+                  <div
+                    key={`slice-b-${idx}`}
+                    className={`perf-pad slice-loaded ${isActive ? 'slice-active' : ''}`}
+                    onMouseDown={() => triggerPerfPadInternal('B', 'slice', idx, 100, true, true)}
+                    onMouseUp={() => triggerPerfPadInternal('B', 'slice', idx, 100, false, true)}
+                    onMouseLeave={() => triggerPerfPadInternal('B', 'slice', idx, 100, false, true)}
+                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slice', idx, 100, true, true); }}
+                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slice', idx, 100, false, true); }}
+                  >
+                    <span className="perf-pad-label">SL{idx + 1}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    );
+  };
+
   // ==========================================
   // 9. THE HARDWARE & SOFTWARE INTERFACE RENDERING
   // ==========================================
@@ -6660,8 +7499,11 @@ export default function Delta7Synth() {
         </div>
 
         {/* ================= CENTER TOUCHVIEW SCREEN ================= */}
-        <div className="rack-panel-center blue-screen-border">
-          <div className="lcd-bezel-shadow">
+        <div className="rack-panel-center blue-screen-border" style={{ minHeight: '585px', padding: 0 }}>
+          <div className={`screen-flip-container ${performanceViewActive ? 'flipped' : ''}`}>
+            {/* FRONT CARD: NORMAL WORKSTATION */}
+            <div className="screen-front" style={{ padding: '0.5rem' }}>
+              <div className="lcd-bezel-shadow" style={{ height: '100%' }}>
             
             {/* Screen Header (No more menus!) */}
             <div className="screen-header-tabs" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 10px', height: '32px', alignItems: 'center', background: '#000000', borderBottom: '2px solid #00f3ff' }}>
@@ -8578,7 +9420,70 @@ export default function Delta7Synth() {
 
             </div>
           </div>
+        </div> {/* closes screen-front */}
+
+        {/* BACK CARD: PERFORMANCE WORKSTATION */}
+        <div className="screen-back" style={{ padding: '0.5rem' }}>
+          <div className="lcd-bezel-shadow" style={{ height: '100%', border: '1px solid #ffe600', background: 'radial-gradient(circle at center, #0b0f19 0%, #010408 100%)', display: 'flex', flexDirection: 'column' }}>
+            
+            {/* Performance Header */}
+            <div className="screen-header-tabs" style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 10px', height: '32px', alignItems: 'center', background: '#000000', borderBottom: '2px solid #ffe600', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="font-mono" style={{ fontSize: '0.75rem', fontWeight: 'bold', letterSpacing: '1px', color: '#ffe600' }}>
+                  PERFORMANCE DECK
+                </span>
+                {perfPlaybackActive && (
+                  <span className="font-mono" style={{ fontSize: '0.55rem', color: '#00ff66', animation: 'pulse-yellow 1s infinite alternate' }}>
+                    [PLAYBACK ACTIVE]
+                  </span>
+                )}
+                {perfRecordActive && (
+                  <span className="font-mono" style={{ fontSize: '0.55rem', color: '#ff0055', animation: 'pulse-red 0.5s infinite alternate' }}>
+                    [REC ACTIVE: {perfEvents.length} EVTS]
+                  </span>
+                )}
+              </div>
+              
+              {/* Sequencer controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  className={`btn btn-xs ${perfRecordActive ? 'btn-panic' : ''}`}
+                  onClick={togglePerformanceRecord}
+                  style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}
+                >
+                  {perfRecordActive ? '● REC ON' : '● REC'}
+                </button>
+                <button
+                  className={`btn btn-xs ${perfPlaybackActive ? 'active-green' : ''}`}
+                  onClick={togglePerformancePlayback}
+                  style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}
+                >
+                  {perfPlaybackActive ? '■ STOP' : '► PLAY'}
+                </button>
+                <button
+                  className="btn btn-xs"
+                  onClick={clearPerformance}
+                  style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0, borderColor: '#ff0055', color: '#ff0055' }}
+                >
+                  CLEAR
+                </button>
+                <button
+                  className="btn btn-xs"
+                  onClick={() => setPerformanceViewActive(false)}
+                  style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0, borderColor: '#ffe600', color: '#ffe600' }}
+                >
+                  EXIT [TAB]
+                </button>
+              </div>
+            </div>
+
+            {/* Performance View contents */}
+            {renderPerformanceDeck()}
+          </div>
         </div>
+
+      </div> {/* closes screen-flip-container */}
+    </div>
 
         {/* ================= RIGHT SIDE CONTROLS & KAOSS PAD ================= */}
         <div className="rack-panel-right steel-plate">
@@ -9087,8 +9992,327 @@ export default function Delta7Synth() {
       {/* Computer Keyboard Triggers listener */}
       <KeyboardTrigger playVoice={playVoice} stopVoice={stopVoice} />
 
-      {/* ================= STYLING SHEET EMBED ================= */}
       <style>{`
+        /* 3D Card Flip CSS */
+        .rack-panel-center {
+          perspective: 1500px;
+          position: relative;
+        }
+
+        .screen-flip-container {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          min-height: 585px;
+          transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+          transform-style: preserve-3d;
+        }
+
+        .screen-flip-container.flipped {
+          transform: rotateY(180deg);
+        }
+
+        .screen-front, .screen-back {
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 0;
+          width: 100%;
+          height: 100%;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .screen-back {
+          transform: rotateY(180deg);
+        }
+
+        /* Turntable UI Styles */
+        .turntable-deck {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px;
+          background: #02070f;
+          height: 100%;
+          user-select: none;
+        }
+
+        .vinyl-platter-wrapper {
+          position: relative;
+          width: 130px;
+          height: 130px;
+          margin: 6px auto;
+        }
+
+        .vinyl-platter {
+          width: 100%;
+          height: 100%;
+          border-radius: 50%;
+          background: radial-gradient(circle, #222 10%, #111 35%, #050505 70%, #000 100%);
+          border: 3px solid #333;
+          box-shadow: 
+            0 8px 16px rgba(0,0,0,0.6), 
+            inset 0 0 10px rgba(0,0,0,0.8),
+            0 0 4px rgba(0,243,255,0.1);
+          position: relative;
+          cursor: grab;
+          transform-origin: center;
+          background-image: 
+            repeating-radial-gradient(circle, transparent, transparent 2px, rgba(255,255,255,0.03) 3px, transparent 4px),
+            radial-gradient(circle at center, transparent 38%, rgba(255,255,255,0.02) 40%, transparent 42%);
+        }
+
+        .vinyl-platter:active {
+          cursor: grabbing;
+        }
+
+        .vinyl-label {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          font-family: monospace;
+          font-size: 0.5rem;
+          font-weight: bold;
+          color: #000;
+          box-shadow: inset 0 0 4px rgba(0,0,0,0.4);
+          pointer-events: none;
+        }
+
+        .vinyl-strobe-dot {
+          position: absolute;
+          top: 6px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #fff;
+          box-shadow: 0 0 6px #fff;
+          pointer-events: none;
+        }
+
+        .tonearm {
+          position: absolute;
+          top: 5px;
+          right: 5px;
+          width: 25px;
+          height: 70px;
+          pointer-events: none;
+          transform-origin: 15% 10%;
+          transform: rotate(20deg);
+          transition: transform 0.5s ease;
+        }
+
+        .tonearm.active {
+          transform: rotate(32deg);
+        }
+
+        .performance-pads-grid {
+          display: grid;
+          grid-template-rows: repeat(2, 1fr);
+          gap: 6px;
+          width: 100%;
+          padding: 4px;
+        }
+
+        .performance-pads-row {
+          display: grid;
+          grid-template-columns: repeat(8, 1fr);
+          gap: 4px;
+          width: 100%;
+        }
+
+        .perf-pad {
+          aspect-ratio: 1;
+          border-radius: 4px;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(10,15,25,0.7);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-family: monospace;
+          font-weight: bold;
+          user-select: none;
+          transition: all 0.08s ease;
+          padding: 2px;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+
+        .perf-pad.deck-a-loaded {
+          border-color: rgba(0, 243, 255, 0.45);
+          background: rgba(0, 243, 255, 0.08);
+          color: #00f3ff;
+          box-shadow: inset 0 0 6px rgba(0,243,255,0.1);
+        }
+
+        .perf-pad.deck-a-active {
+          background: #00f3ff !important;
+          border-color: #fff !important;
+          color: #000 !important;
+          box-shadow: 0 0 15px #00f3ff, inset 0 0 4px rgba(255,255,255,0.8) !important;
+          transform: scale(0.96);
+        }
+
+        .perf-pad.deck-b-loaded {
+          border-color: rgba(255, 0, 255, 0.45);
+          background: rgba(255, 0, 255, 0.08);
+          color: #ff00ff;
+          box-shadow: inset 0 0 6px rgba(255,0,255,0.1);
+        }
+
+        .perf-pad.deck-b-active {
+          background: #ff00ff !important;
+          border-color: #fff !important;
+          color: #000 !important;
+          box-shadow: 0 0 15px #ff00ff, inset 0 0 4px rgba(255,255,255,0.8) !important;
+          transform: scale(0.96);
+        }
+
+        .perf-pad.slice-loaded {
+          border-color: rgba(255, 230, 0, 0.35);
+          background: rgba(255, 230, 0, 0.05);
+          color: #ffe600;
+        }
+
+        .perf-pad.slice-active {
+          background: #ffe600 !important;
+          border-color: #fff !important;
+          color: #000 !important;
+          box-shadow: 0 0 15px #ffe600, inset 0 0 4px rgba(255,255,255,0.8) !important;
+          transform: scale(0.96);
+        }
+
+        .perf-pad-label {
+          font-size: 0.52rem;
+          line-height: 1;
+        }
+
+        .perf-pad-name {
+          font-size: 0.36rem;
+          color: #fff;
+          opacity: 0.8;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          width: 100%;
+          text-align: center;
+          margin-top: 2px;
+        }
+
+        /* Mixer column styles */
+        .mixer-column {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: space-between;
+          border-left: 1px solid rgba(0, 243, 255, 0.1);
+          border-right: 1px solid rgba(0, 243, 255, 0.1);
+          background: #010408;
+          padding: 8px 6px;
+          height: 100%;
+        }
+
+        .mixer-eq-section {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 6px 12px;
+          width: 100%;
+        }
+
+        .mixer-eq-channel {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .mixer-eq-label {
+          font-size: 0.42rem;
+          color: #88ccee;
+          font-family: monospace;
+          text-transform: uppercase;
+        }
+
+        .mixer-vertical-slider {
+          writing-mode: vertical-lr;
+          direction: rtl;
+          width: 8px;
+          height: 48px;
+          margin: 0;
+          cursor: pointer;
+          accent-color: #ffe600;
+        }
+
+        .mixer-vol-faders {
+          display: flex;
+          justify-content: space-around;
+          width: 100%;
+          margin: 8px 0;
+        }
+
+        .mixer-fader-wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .mixer-fader-label {
+          font-size: 0.5rem;
+          color: #ffe600;
+          font-weight: bold;
+          font-family: monospace;
+        }
+
+        .mixer-vol-slider {
+          writing-mode: vertical-lr;
+          direction: rtl;
+          width: 12px;
+          height: 85px;
+          cursor: pointer;
+          accent-color: #ffe600;
+        }
+
+        .crossfader-section {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          margin-top: 4px;
+        }
+
+        .crossfader-label {
+          font-size: 0.48rem;
+          font-family: monospace;
+          color: #ffe600;
+          letter-spacing: 1px;
+        }
+
+        .crossfader-slider {
+          width: 100%;
+          height: 10px;
+          cursor: pointer;
+          accent-color: #ffe600;
+        }
+
+        @keyframes pulse-red {
+          from { background: rgba(255, 0, 85, 0.2); }
+          to { background: rgba(255, 0, 85, 0.7); }
+        }
+
         .delta7-hardware-chassis {
           background: #040509;
           background-image: 
