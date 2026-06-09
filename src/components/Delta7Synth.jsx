@@ -4061,6 +4061,8 @@ export default function Delta7Synth() {
       } else {
         freqScaleB = warpBaseRateB;
       }
+    }
+
     // Apply Deck Pitch Fader scaling for performance voices
     let pitchFactorA = 1.0;
     let pitchFactorB = 1.0;
@@ -4073,7 +4075,6 @@ export default function Delta7Synth() {
     }
     freqScaleA *= pitchFactorA;
     freqScaleB *= pitchFactorB;
-    }
 
     // --- VCF Dual Filter ---
     const filter1 = ctx.createBiquadFilter();
