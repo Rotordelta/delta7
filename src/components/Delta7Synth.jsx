@@ -675,22 +675,22 @@ export default function Delta7Synth() {
 
   // --- Sampler States & Slots ---
   const [sampleSlots, setSampleSlots] = useState([
-    { id: 'a01', name: 'Bank A Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a02', name: 'Bank A Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a03', name: 'Bank A Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a04', name: 'Bank A Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a05', name: 'Bank A Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a06', name: 'Bank A Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a07', name: 'Bank A Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a08', name: 'Bank A Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b01', name: 'Bank B Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b02', name: 'Bank B Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b03', name: 'Bank B Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b04', name: 'Bank B Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b05', name: 'Bank B Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b06', name: 'Bank B Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b07', name: 'Bank B Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b08', name: 'Bank B Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a01', name: 'Bank A Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a02', name: 'Bank A Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a03', name: 'Bank A Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a04', name: 'Bank A Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a05', name: 'Bank A Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a06', name: 'Bank A Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a07', name: 'Bank A Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a08', name: 'Bank A Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b01', name: 'Bank B Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b02', name: 'Bank B Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b03', name: 'Bank B Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b04', name: 'Bank B Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b05', name: 'Bank B Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b06', name: 'Bank B Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b07', name: 'Bank B Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b08', name: 'Bank B Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
   ]);
   const sampleSlotsRef = useRef(sampleSlots);
   useEffect(() => {
@@ -1580,6 +1580,8 @@ export default function Delta7Synth() {
                 loopOn: saved.loopOn ?? slot.loopOn,
                 reverseOn: saved.reverseOn ?? slot.reverseOn,
                 sliceParams: saved.sliceParams ?? slot.sliceParams,
+                warpOn: saved.warpOn ?? slot.warpOn,
+                warpBeats: saved.warpBeats ?? slot.warpBeats,
               };
             }
             return slot;
@@ -2761,6 +2763,8 @@ export default function Delta7Synth() {
           loopOn: slot.loopOn,
           reverseOn: slot.reverseOn,
           sliceParams: slot.sliceParams,
+          warpOn: slot.warpOn,
+          warpBeats: slot.warpBeats,
           channels: channels,
           sampleRate: sampleRate
         });
@@ -2838,7 +2842,9 @@ export default function Delta7Synth() {
               loopEnd: savedSlot.loopEnd ?? slot.loopEnd,
               loopOn: savedSlot.loopOn ?? slot.loopOn,
               reverseOn: savedSlot.reverseOn ?? slot.reverseOn,
-              sliceParams: savedSlot.sliceParams ?? slot.sliceParams
+              sliceParams: savedSlot.sliceParams ?? slot.sliceParams,
+              warpOn: savedSlot.warpOn ?? slot.warpOn,
+              warpBeats: savedSlot.warpBeats ?? slot.warpBeats
             };
           }
         }
@@ -3770,20 +3776,44 @@ export default function Delta7Synth() {
     const oscBDetune = prog.oscBDetune !== undefined ? prog.oscBDetune : 0;
 
     let freqScaleA = 1.0;
+    let warpBaseRateA = 1.0;
     if (bufferA) {
       if (prog.oscATriggerMode === 'slice') {
-        freqScaleA = Math.pow(2, oscAOctave) * Math.pow(2, oscAPitch / 12) * Math.pow(2, slicePitchA / 12);
+        warpBaseRateA = Math.pow(2, oscAOctave) * Math.pow(2, oscAPitch / 12) * Math.pow(2, slicePitchA / 12);
       } else {
-        freqScaleA = (baseFreq * Math.pow(2, oscAOctave) * Math.pow(2, oscAPitch / 12)) / rootFreqA;
+        const rootNoteA = slotA ? slotA.rootNote : 60;
+        warpBaseRateA = Math.pow(2, (note - rootNoteA + oscAPitch + oscAOctave * 12) / 12) * pbFactor;
+      }
+      
+      if (slotA && slotA.warpOn) {
+        const activeDurationA = bufferA.duration * (slotA.end - slotA.start);
+        const bpm = prog.arpBpm || 120;
+        const targetDuration = (60 / bpm) * (slotA.warpBeats || 4);
+        const warpFactor = activeDurationA / targetDuration;
+        freqScaleA = warpFactor * warpBaseRateA;
+      } else {
+        freqScaleA = warpBaseRateA;
       }
     }
 
     let freqScaleB = 1.0;
+    let warpBaseRateB = 1.0;
     if (bufferB) {
       if (prog.oscBTriggerMode === 'slice') {
-        freqScaleB = Math.pow(2, oscBOctave) * Math.pow(2, oscBPitch / 12) * Math.pow(2, slicePitchB / 12);
+        warpBaseRateB = Math.pow(2, oscBOctave) * Math.pow(2, oscBPitch / 12) * Math.pow(2, slicePitchB / 12);
       } else {
-        freqScaleB = (baseFreq * Math.pow(2, oscBOctave) * Math.pow(2, oscBPitch / 12)) / rootFreqB;
+        const rootNoteB = slotB ? slotB.rootNote : 60;
+        warpBaseRateB = Math.pow(2, (note - rootNoteB + oscBPitch + oscBOctave * 12) / 12) * pbFactor;
+      }
+      
+      if (slotB && slotB.warpOn) {
+        const activeDurationB = bufferB.duration * (slotB.end - slotB.start);
+        const bpm = prog.arpBpm || 120;
+        const targetDuration = (60 / bpm) * (slotB.warpBeats || 4);
+        const warpFactor = activeDurationB / targetDuration;
+        freqScaleB = warpFactor * warpBaseRateB;
+      } else {
+        freqScaleB = warpBaseRateB;
       }
     }
 
@@ -3883,7 +3913,18 @@ export default function Delta7Synth() {
       orig_oscA_R_rate: freqScaleA,
       orig_oscB_rate: freqScaleB,
       orig_oscB_L_rate: freqScaleB,
-      orig_oscB_R_rate: freqScaleB
+      orig_oscB_R_rate: freqScaleB,
+      
+      // Warp fields
+      warpOnA: slotA ? !!slotA.warpOn : false,
+      warpBeatsA: slotA ? (slotA.warpBeats || 4) : 4,
+      activeDurationA: slotA && bufferA ? bufferA.duration * (slotA.end - slotA.start) : 0,
+      warpBaseRateA: warpBaseRateA,
+      
+      warpOnB: slotB ? !!slotB.warpOn : false,
+      warpBeatsB: slotB ? (slotB.warpBeats || 4) : 4,
+      activeDurationB: slotB && bufferB ? bufferB.duration * (slotB.end - slotB.start) : 0,
+      warpBaseRateB: warpBaseRateB
     };
 
     // isSliceGranular must be hoisted outside if(bufferA) — it's used in the panner block after that inner if closes
@@ -5703,6 +5744,64 @@ export default function Delta7Synth() {
     return () => clearInterval(intervalId);
   }, [params.arpBpm]);
 
+  // Update playbackRate of warped active voices in real-time when master tempo changes
+  useEffect(() => {
+    const bpm = params.arpBpm || 120;
+    const now = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
+    
+    activeVoicesRef.current.forEach(vList => {
+      const updateVoiceRates = (v) => {
+        if (!v) return;
+        
+        if (v.warpOnA && v.activeDurationA && v.warpBeatsA) {
+          const targetDuration = (60 / bpm) * v.warpBeatsA;
+          const warpFactor = v.activeDurationA / targetDuration;
+          const finalRate = warpFactor * (v.warpBaseRateA || 1.0);
+          
+          v.orig_oscA_rate = finalRate;
+          v.orig_oscA_L_rate = finalRate;
+          v.orig_oscA_R_rate = finalRate;
+          
+          if (v.oscA && v.oscA.playbackRate) {
+            v.oscA.playbackRate.setValueAtTime(finalRate, now);
+          }
+          if (v.oscA_L && v.oscA_L.playbackRate) {
+            v.oscA_L.playbackRate.setValueAtTime(finalRate, now);
+          }
+          if (v.oscA_R && v.oscA_R.playbackRate) {
+            v.oscA_R.playbackRate.setValueAtTime(finalRate, now);
+          }
+        }
+        
+        if (v.warpOnB && v.activeDurationB && v.warpBeatsB) {
+          const targetDuration = (60 / bpm) * v.warpBeatsB;
+          const warpFactor = v.activeDurationB / targetDuration;
+          const finalRate = warpFactor * (v.warpBaseRateB || 1.0);
+          
+          v.orig_oscB_rate = finalRate;
+          v.orig_oscB_L_rate = finalRate;
+          v.orig_oscB_R_rate = finalRate;
+          
+          if (v.oscB && v.oscB.playbackRate) {
+            v.oscB.playbackRate.setValueAtTime(finalRate, now);
+          }
+          if (v.oscB_L && v.oscB_L.playbackRate) {
+            v.oscB_L.playbackRate.setValueAtTime(finalRate, now);
+          }
+          if (v.oscB_R && v.oscB_R.playbackRate) {
+            v.oscB_R.playbackRate.setValueAtTime(finalRate, now);
+          }
+        }
+      };
+      
+      if (Array.isArray(vList)) {
+        vList.forEach(updateVoiceRates);
+      } else {
+        updateVoiceRates(vList);
+      }
+    });
+  }, [params.arpBpm]);
+
   // MIDI Start (0xFA) / Stop (0xFC) on Arpeggiator On/Off state toggle
   const isMidiArpMountedRef = useRef(false);
   useEffect(() => {
@@ -7057,6 +7156,39 @@ export default function Delta7Synth() {
                         >
                           {isPlayingPreview ? 'STOP PREVIEW' : 'PREVIEW SAMPLE'}
                         </button>
+                      </div>
+
+                      {/* Warp Sync controls */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px', marginTop: '4px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button 
+                            className={`btn btn-xs ${slot.warpOn ? 'active-yellow' : ''}`}
+                            onClick={() => updateSlotParam(selectedEditSlotId, 'warpOn', !slot.warpOn)}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.6rem' }}
+                          >
+                            {slot.warpOn ? 'WARP: ON' : 'WARP: OFF'}
+                          </button>
+                        </div>
+                        {slot.warpOn && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.62rem' }}>
+                            <span style={{ color: '#00f3ff' }}>LOOP LENGTH (BEATS):</span>
+                            <div className="segmented-strip">
+                              {[1, 2, 4, 8, 16, 32].map(beats => (
+                                <button
+                                  key={beats}
+                                  className={`segmented-btn btn-xs ${ (slot.warpBeats || 4) === beats ? 'active' : '' }`}
+                                  onClick={() => updateSlotParam(selectedEditSlotId, 'warpBeats', beats)}
+                                  style={{ padding: '2px 6px', fontSize: '0.55rem' }}
+                                >
+                                  {beats}
+                                </button>
+                              ))}
+                            </div>
+                            <span style={{ color: '#88ccee', fontSize: '0.55rem', fontFamily: 'monospace' }}>
+                              Target Speed: {Math.round(((slot.buffer ? slot.buffer.duration * (slot.end - slot.start) : 0) / ((60 / (params.arpBpm || 120)) * (slot.warpBeats || 4))) * 100)}%
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Slice Editor Sub-Panel */}
@@ -10243,6 +10375,8 @@ export const saveSampleToDb = async (slot) => {
     loopOn: slot.loopOn,
     reverseOn: slot.reverseOn,
     sliceParams: slot.sliceParams,
+    warpOn: slot.warpOn,
+    warpBeats: slot.warpBeats,
     channels: channels,
     sampleRate: slot.buffer.sampleRate
   };
