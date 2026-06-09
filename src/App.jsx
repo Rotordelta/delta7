@@ -6,7 +6,6 @@ export default function App() {
     <div className="standalone-container">
       <header className="standalone-header">
         <h1>Delta7 Workstation</h1>
-        <p>Signature Robert Abel & Associates Vector Glow Visualizer</p>
       </header>
 
       <main className="standalone-main">
