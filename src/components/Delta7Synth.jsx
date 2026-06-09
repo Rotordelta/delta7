@@ -717,6 +717,7 @@ export default function Delta7Synth() {
   const [deckAEqHigh, setDeckAEqHigh] = useState(0.0);
   const [deckBEqLow, setDeckBEqLow] = useState(0.0);
   const [deckBEqMid, setDeckBEqMid] = useState(0.0);
+  const [deckBEqHigh, setDeckBEqHigh] = useState(0.0);
   const [vuLevelL, setVuLevelL] = useState(0);
   const [vuLevelR, setVuLevelR] = useState(0);
   const [deckAPitch, setDeckAPitch] = useState(0.0);
