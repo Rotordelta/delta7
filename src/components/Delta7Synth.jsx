@@ -7184,8 +7184,35 @@ export default function Delta7Synth() {
                                 </button>
                               ))}
                             </div>
-                            <span style={{ color: '#88ccee', fontSize: '0.55rem', fontFamily: 'monospace' }}>
+                            <span style={{ color: '#88ccee', fontSize: '0.55rem', fontFamily: 'monospace', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                               Target Speed: {Math.round(((slot.buffer ? slot.buffer.duration * (slot.end - slot.start) : 0) / ((60 / (params.arpBpm || 120)) * (slot.warpBeats || 4))) * 100)}%
+                              <button
+                                className="btn btn-xs"
+                                disabled={!slot.buffer}
+                                onClick={() => {
+                                  const origDur = slot.buffer ? slot.buffer.duration * (slot.end - slot.start) : 0;
+                                  if (origDur > 0) {
+                                    const beats = slot.warpBeats || 4;
+                                    const calculatedBpm = Math.round(Math.max(40, Math.min(250, (60 * beats) / origDur)));
+                                    setParams(prev => ({ ...prev, arpBpm: calculatedBpm }));
+                                    showEditorStatus(`Synced Master Tempo to Slot BPM: ${calculatedBpm}! ⏱️`);
+                                  }
+                                }}
+                                style={{
+                                  margin: 0,
+                                  padding: '1px 4px',
+                                  fontSize: '0.52rem',
+                                  borderColor: '#ffe600',
+                                  color: '#ffe600',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  lineHeight: '1',
+                                  height: '14px',
+                                  verticalAlign: 'middle'
+                                }}
+                              >
+                                FIT BPM
+                              </button>
                             </span>
                           </div>
                         )}
