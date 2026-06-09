@@ -8242,7 +8242,7 @@ export default function Delta7Synth() {
           flex-direction: column;
           gap: 1rem;
           width: 100%;
-          max-width: 1200px;
+          max-width: 1400px;
           margin: 0 auto;
           user-select: none;
         }
