@@ -37,8 +37,8 @@ const DEFAULT_PARAMS = {
   leslieDrive: 0.25,
   leslieWidth: 0.5,
   leslieCrossover: 800,
-  oscAWave: 's01',
-  oscBWave: 's02',
+  oscAWave: 'a01',
+  oscBWave: 'b01',
   oscBalance: 0.5,
   oscATriggerMode: 'pitch',
   oscBTriggerMode: 'pitch',
@@ -67,14 +67,14 @@ const FACTORY_PROGRAMS = Array.from({ length: 9 }, (_, i) => ({
   name: `A${(i + 1).toString().padStart(3, '0')}: Initialized`,
   category: 'User',
   oscMode: 'double',
-  oscAWave: 's01',
+  oscAWave: 'a01',
   oscAOctave: 0,
   oscAPitch: 0,
   oscADetune: 0,
   oscAPan: 0,
   oscAVol: 0.8,
   oscADelay: 0,
-  oscBWave: 's02',
+  oscBWave: 'b01',
   oscBOctave: 0,
   oscBPitch: 0,
   oscBDetune: 0,
@@ -675,21 +675,29 @@ export default function Delta7Synth() {
 
   // --- Sampler States & Slots ---
   const [sampleSlots, setSampleSlots] = useState([
-    { id: 's01', name: 'User Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 's02', name: 'User Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 's03', name: 'User Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 's04', name: 'User Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 's05', name: 'User Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 's06', name: 'User Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 's07', name: 'User Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 's08', name: 'User Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a01', name: 'Bank A Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a02', name: 'Bank A Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a03', name: 'Bank A Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a04', name: 'Bank A Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a05', name: 'Bank A Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a06', name: 'Bank A Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a07', name: 'Bank A Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a08', name: 'Bank A Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b01', name: 'Bank B Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b02', name: 'Bank B Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b03', name: 'Bank B Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b04', name: 'Bank B Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b05', name: 'Bank B Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b06', name: 'Bank B Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b07', name: 'Bank B Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b08', name: 'Bank B Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
   ]);
   const sampleSlotsRef = useRef(sampleSlots);
   useEffect(() => {
     sampleSlotsRef.current = sampleSlots;
   }, [sampleSlots]);
 
-  const [selectedEditSlotId, setSelectedEditSlotId] = useState('s01'); // Target slot in Editor
+  const [selectedEditSlotId, setSelectedEditSlotId] = useState('a01'); // Target slot in Editor
   const [uiScale, setUiScale] = useState(1.0);
   const [selectedSliceIndex, setSelectedSliceIndex] = useState(0); // Selected slice index for editing
   const [tapTimes, setTapTimes] = useState([]); // Timestamps for tap tempo calculation
@@ -706,12 +714,14 @@ export default function Delta7Synth() {
       setEditorStatus('');
     }, 2500);
   };
+  const [bankAPreset, setBankAPreset] = useState(1);
+  const [bankBPreset, setBankBPreset] = useState(1);
   const [isRecording, setIsRecording] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
   const [recordingInputGain, setRecordingInputGain] = useState(1.0);
   const recordingInputGainRef = useRef(1.0);
   const resamplerGainNodeRef = useRef(null);
-  const recordingTargetSlotIdRef = useRef('s01');
+  const recordingTargetSlotIdRef = useRef('a01');
   const recordingScriptNodeRef = useRef(null);
   const recordedChunksL = useRef([]);
   const recordedChunksR = useRef([]);
@@ -743,6 +753,9 @@ export default function Delta7Synth() {
   }), []);
 
   const getSlotLabel = (slotId) => {
+    if (!slotId) return '';
+    if (slotId.startsWith('a')) return `A${parseInt(slotId.slice(1))}`;
+    if (slotId.startsWith('b')) return `B${parseInt(slotId.slice(1))}`;
     const num = parseInt(slotId.slice(2));
     return `U${num}`;
   };
@@ -1002,7 +1015,7 @@ export default function Delta7Synth() {
     if (updatedSlot) {
       saveSampleToDb(updatedSlot)
         .then(() => {
-          showEditorStatus(`Saved Lossless Resample to ${targetSlotId.toUpperCase().replace('S0', 'U')}! 💾`);
+          showEditorStatus(`Saved Lossless Resample to ${getSlotLabel(targetSlotId)}! 💾`);
         })
         .catch((e) => {
           console.error("Failed to auto-save resampled sample to DB:", e);
@@ -1073,7 +1086,7 @@ export default function Delta7Synth() {
         if (updatedSlot) {
           try {
             await saveSampleToDb(updatedSlot);
-            showEditorStatus(`Saved Rec to ${targetSlotId.toUpperCase().replace('S0', 'U')}! 💾`);
+            showEditorStatus(`Saved Rec to ${getSlotLabel(targetSlotId)}! 💾`);
           } catch (e) {
             console.error("Failed to auto-save recorded sample to DB:", e);
           }
@@ -1428,18 +1441,19 @@ export default function Delta7Synth() {
     if (nameInput === null) return;
     const finalName = nameInput.trim() || slot.name;
     
-    const activeNum = selectedEditSlotId.slice(2);
-    const slotInput = window.prompt("Save to which slot? Enter slot number (1-8):", parseInt(activeNum).toString());
+    const activeLabel = getSlotLabel(selectedEditSlotId);
+    const slotInput = window.prompt("Save to which slot? (e.g. A1-A8, B1-B8):", activeLabel);
     if (slotInput === null) return;
     
-    const cleanedInput = slotInput.replace(/[^0-9]/g, '');
-    const targetNum = parseInt(cleanedInput);
-    if (isNaN(targetNum) || targetNum < 1 || targetNum > 8) {
-      alert("Invalid slot number. Must be between 1 and 8.");
+    const match = slotInput.trim().toUpperCase().match(/^([AB])([1-8])$/);
+    if (!match) {
+      alert("Invalid slot label. Must be e.g. A1-A8 or B1-B8.");
       return;
     }
+    const targetBank = match[1].toLowerCase();
+    const targetIdx = match[2];
+    const targetId = `${targetBank}0${targetIdx}`;
     
-    const targetId = `s0${targetNum}`;
     const targetSlotData = {
       ...slot,
       id: targetId,
@@ -1475,7 +1489,7 @@ export default function Delta7Synth() {
         return next;
       });
       
-      showEditorStatus(`Saved to U${targetNum}! 💾`);
+      showEditorStatus(`Saved to ${slotInput.toUpperCase()}! 💾`);
     } catch (err) {
       console.error(err);
       alert('Failed to save to database. Make sure your browser supports IndexedDB.');
@@ -2660,7 +2674,7 @@ export default function Delta7Synth() {
     return reversed;
   };
 
-  const loadKitPreset = async (kitType) => {
+  const loadKitPreset = async (kitType, bankType) => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
     if (!ctx) return;
@@ -2669,23 +2683,26 @@ export default function Delta7Synth() {
     try {
       const generatedSamples = generateSynthesizedKit(ctx, kitType);
       
-      const nextSlots = sampleSlotsRef.current.map((slot, idx) => {
-        if (idx < generatedSamples.length) {
-          const item = generatedSamples[idx];
-          return {
-            ...slot,
-            name: item.name,
-            buffer: item.buffer,
-            revBuffer: getReversedBuffer(ctx, item.buffer),
-            start: 0.0,
-            end: 1.0,
-            loopStart: 0.0,
-            loopEnd: 1.0,
-            loopOn: false,
-            reverseOn: false,
-            sliceCount: 16,
-            sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false }))
-          };
+      const nextSlots = sampleSlotsRef.current.map((slot) => {
+        if (slot.id.startsWith(bankType)) {
+          const idx = parseInt(slot.id.slice(1)) - 1;
+          if (idx < generatedSamples.length) {
+            const item = generatedSamples[idx];
+            return {
+              ...slot,
+              name: item.name,
+              buffer: item.buffer,
+              revBuffer: getReversedBuffer(ctx, item.buffer),
+              start: 0.0,
+              end: 1.0,
+              loopStart: 0.0,
+              loopEnd: 1.0,
+              loopOn: false,
+              reverseOn: false,
+              sliceCount: 16,
+              sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false }))
+            };
+          }
         }
         return slot;
       });
@@ -2695,13 +2712,152 @@ export default function Delta7Synth() {
 
       // Save to DB
       for (const slot of nextSlots) {
-        await saveSampleToDb(slot);
+        if (slot.id.startsWith(bankType)) {
+          await saveSampleToDb(slot);
+        }
       }
 
-      showEditorStatus(`Loaded ${kitType} Kit to U1-U8! 💾`);
+      showEditorStatus(`Loaded ${kitType} Kit to Bank ${bankType.toUpperCase()}! 💾`);
     } catch (err) {
       console.error("Error loading kit preset:", err);
       showEditorStatus("Failed to generate kit preset.");
+    }
+  };
+
+  const saveBankPreset = async (bankType, presetNum) => {
+    if (!audioCtxRef.current) initAudio();
+    
+    const bankName = prompt(
+      `Enter name for Bank ${bankType.toUpperCase()} Preset ${presetNum}:`,
+      `User ${bankType.toUpperCase()} Preset ${presetNum}`
+    );
+    if (bankName === null) return; // cancelled
+    
+    showEditorStatus(`Saving Bank ${bankType.toUpperCase()} Preset ${presetNum}... ⏳`);
+    try {
+      const slotsToSave = sampleSlotsRef.current.filter(s => s.id.startsWith(bankType));
+      
+      const slotsData = [];
+      for (const slot of slotsToSave) {
+        let channels = null;
+        let sampleRate = null;
+        if (slot.buffer) {
+          channels = [];
+          for (let c = 0; c < slot.buffer.numberOfChannels; c++) {
+            channels.push(slot.buffer.getChannelData(c).slice());
+          }
+          sampleRate = slot.buffer.sampleRate;
+        }
+        slotsData.push({
+          id: slot.id,
+          name: slot.name,
+          rootNote: slot.rootNote,
+          volume: slot.volume,
+          sliceCount: slot.sliceCount,
+          start: slot.start,
+          end: slot.end,
+          loopStart: slot.loopStart,
+          loopEnd: slot.loopEnd,
+          loopOn: slot.loopOn,
+          reverseOn: slot.reverseOn,
+          sliceParams: slot.sliceParams,
+          channels: channels,
+          sampleRate: sampleRate
+        });
+      }
+      
+      const record = {
+        id: `bank_${bankType}_preset_${presetNum}`,
+        bankType,
+        presetNum,
+        name: bankName || `User Bank ${bankType.toUpperCase()} Preset ${presetNum}`,
+        slots: slotsData,
+        timestamp: Date.now()
+      };
+      
+      await saveBankToDb(record);
+      showEditorStatus(`Bank ${bankType.toUpperCase()} Preset ${presetNum} Saved! 💾`);
+    } catch (err) {
+      console.error("Failed to save bank preset:", err);
+      showEditorStatus("Error saving bank preset.");
+    }
+  };
+
+  const loadBankPreset = async (bankType, presetNum) => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    
+    showEditorStatus(`Loading Bank ${bankType.toUpperCase()} Preset ${presetNum}... ⏳`);
+    try {
+      const savedBank = await getSavedBankFromDb(`bank_${bankType}_preset_${presetNum}`);
+      if (!savedBank) {
+        const loadDefault = confirm(
+          `Bank ${bankType.toUpperCase()} Preset ${presetNum} is empty. Would you like to load the factory default kit?`
+        );
+        if (loadDefault) {
+          const defaultKit = bankType === 'a' ? 'DRUMS' : 'AMBIENT';
+          await loadKitPreset(defaultKit, bankType);
+        } else {
+          showEditorStatus("Load cancelled.");
+        }
+        return;
+      }
+      
+      const nextSlots = sampleSlotsRef.current.map(slot => {
+        if (slot.id.startsWith(bankType)) {
+          const savedSlot = savedBank.slots.find(s => s.id === slot.id);
+          if (savedSlot) {
+            let buffer = null;
+            let revBuffer = null;
+            if (savedSlot.channels && savedSlot.channels.length > 0) {
+              const numChannels = savedSlot.channels.length;
+              const length = savedSlot.channels[0].length;
+              const sampleRate = savedSlot.sampleRate || ctx.sampleRate;
+              try {
+                buffer = ctx.createBuffer(numChannels, length, sampleRate);
+                for (let c = 0; c < numChannels; c++) {
+                  buffer.getChannelData(c).set(savedSlot.channels[c]);
+                }
+                revBuffer = getReversedBuffer(ctx, buffer);
+              } catch (err) {
+                console.error("Error recreating buffer for slot:", savedSlot.id, err);
+              }
+            }
+            return {
+              ...slot,
+              name: savedSlot.name,
+              buffer,
+              revBuffer,
+              rootNote: savedSlot.rootNote ?? slot.rootNote,
+              volume: savedSlot.volume ?? slot.volume,
+              sliceCount: savedSlot.sliceCount ?? slot.sliceCount,
+              start: savedSlot.start ?? slot.start,
+              end: savedSlot.end ?? slot.end,
+              loopStart: savedSlot.loopStart ?? slot.loopStart,
+              loopEnd: savedSlot.loopEnd ?? slot.loopEnd,
+              loopOn: savedSlot.loopOn ?? slot.loopOn,
+              reverseOn: savedSlot.reverseOn ?? slot.reverseOn,
+              sliceParams: savedSlot.sliceParams ?? slot.sliceParams
+            };
+          }
+        }
+        return slot;
+      });
+      
+      sampleSlotsRef.current = nextSlots;
+      setSampleSlots(nextSlots);
+      
+      for (const slot of nextSlots) {
+        if (slot.id.startsWith(bankType)) {
+          await saveSampleToDb(slot);
+        }
+      }
+      
+      showEditorStatus(`Loaded Preset: ${savedBank.name}! 💾`);
+    } catch (err) {
+      console.error("Failed to load bank preset:", err);
+      showEditorStatus("Error loading bank preset.");
     }
   };
 
@@ -7335,7 +7491,7 @@ export default function Delta7Synth() {
                           <span style={{ color: '#fff', fontSize: '0.58rem' }}>{(sampleSlots.find(s => s.id === params.oscAWave)?.name || '').slice(0, 10)}</span>
                         </div>
                         <div className="segmented-grid" style={{ marginTop: '2px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
-                          {sampleSlots.map(slot => (
+                          {sampleSlots.filter(s => s.id.startsWith('a')).map(slot => (
                             <button
                               key={slot.id}
                               className={`segmented-btn btn-xs ${params.oscAWave === slot.id ? 'active' : ''}`}
@@ -7430,7 +7586,7 @@ export default function Delta7Synth() {
                           <span style={{ color: '#fff', fontSize: '0.58rem' }}>{(sampleSlots.find(s => s.id === params.oscBWave)?.name || '').slice(0, 10)}</span>
                         </div>
                         <div className="segmented-grid" style={{ marginTop: '2px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
-                          {sampleSlots.map(slot => (
+                          {sampleSlots.filter(s => s.id.startsWith('b')).map(slot => (
                             <button
                               key={slot.id}
                               className={`segmented-btn btn-xs ${params.oscBWave === slot.id ? 'active' : ''}`}
@@ -7563,22 +7719,38 @@ export default function Delta7Synth() {
                       <div style={{ fontSize: '0.62rem', color: '#88ccee', display: 'flex', justifyContent: 'space-between' }}>
                         <span>Target User / Factory Slot:</span>
                       </div>
-                      <div className="segmented-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '2px' }}>
-                        {sampleSlots.map(s => (
-                          <button
-                            key={s.id}
-                            className={`segmented-btn btn-xs ${selectedEditSlotId === s.id ? 'active' : ''}`}
-                            onClick={() => {
-                              setSelectedEditSlotId(s.id);
-                              setParams(prev => ({ ...prev, oscAWave: s.id, oscBWave: s.id }));
-                            }}
-                            style={{ fontSize: '0.52rem', padding: '2px 1px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
-                            title={`${getSlotLabel(s.id)}: ${s.name}`}
-                          >
-                            {getSlotLabel(s.id)}:{s.buffer ? '●' : '○'}
-                          </button>
-                        ))}
-                      </div>
+                        <div className="segmented-grid" style={{ marginTop: '2px', gridTemplateColumns: 'repeat(8, 1fr)', gap: '2px' }}>
+                          {sampleSlots.filter(s => s.id.startsWith('a')).map(s => (
+                            <button
+                              key={s.id}
+                              className={`segmented-btn btn-xs ${selectedEditSlotId === s.id ? 'active' : ''}`}
+                              onClick={() => {
+                                setSelectedEditSlotId(s.id);
+                                setParams(prev => ({ ...prev, oscAWave: s.id }));
+                              }}
+                              style={{ fontSize: '0.48rem', padding: '2px 1px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
+                              title={`${getSlotLabel(s.id)}: ${s.name}`}
+                            >
+                              {getSlotLabel(s.id)}:{s.buffer ? '●' : '○'}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="segmented-grid" style={{ marginTop: '2px', gridTemplateColumns: 'repeat(8, 1fr)', gap: '2px' }}>
+                          {sampleSlots.filter(s => s.id.startsWith('b')).map(s => (
+                            <button
+                              key={s.id}
+                              className={`segmented-btn btn-xs ${selectedEditSlotId === s.id ? 'active' : ''}`}
+                              onClick={() => {
+                                setSelectedEditSlotId(s.id);
+                                setParams(prev => ({ ...prev, oscBWave: s.id }));
+                              }}
+                              style={{ fontSize: '0.48rem', padding: '2px 1px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
+                              title={`${getSlotLabel(s.id)}: ${s.name}`}
+                            >
+                              {getSlotLabel(s.id)}:{s.buffer ? '●' : '○'}
+                            </button>
+                          ))}
+                        </div>
                     </div>
 
                     {/* Source Selector & Input Controls */}
@@ -8458,84 +8630,162 @@ export default function Delta7Synth() {
 
           {/* Sample Kit Banks */}
           <div className="patches-quick-category">
-            <span className="knob-label">Load Sample Kit presets</span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '2px' }}>
-              <button 
-                className="btn btn-xs" 
-                style={{ fontSize: '0.45rem', padding: '3px 2px', borderColor: '#00f3ff', color: '#00f3ff' }}
-                onClick={() => loadKitPreset('DRUMS')}
-              >
-                RETRO DRUMS
-              </button>
-              <button 
-                className="btn btn-xs" 
-                style={{ fontSize: '0.45rem', padding: '3px 2px', borderColor: '#00f3ff', color: '#00f3ff' }}
-                onClick={() => loadKitPreset('WAVES')}
-              >
-                SYNTH WAVES
-              </button>
-              <button 
-                className="btn btn-xs" 
-                style={{ fontSize: '0.45rem', padding: '3px 2px', borderColor: '#ff00ff', color: '#ff00ff' }}
-                onClick={() => loadKitPreset('CHIPTUNE')}
-              >
-                8-BIT ARCADE
-              </button>
-              <button 
-                className="btn btn-xs" 
-                style={{ fontSize: '0.45rem', padding: '3px 2px', borderColor: '#ff00ff', color: '#ff00ff' }}
-                onClick={() => loadKitPreset('AMBIENT')}
-              >
-                AMBIENT CHILL
-              </button>
+            <span className="knob-label">BANK A (OSC 1) PATCH PRESET</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '4px' }}>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {[1, 2, 3, 4].map(num => (
+                  <button
+                    key={num}
+                    className={`segmented-btn btn-xs ${bankAPreset === num ? 'active' : ''}`}
+                    onClick={() => setBankAPreset(num)}
+                    style={{ padding: '2px 5px', fontSize: '0.55rem' }}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                <button 
+                  className="btn btn-xs" 
+                  style={{ fontSize: '0.52rem', padding: '2px 4px', borderColor: '#00f3ff', color: '#00f3ff', margin: 0 }}
+                  onClick={() => loadBankPreset('a', bankAPreset)}
+                >
+                  LOAD
+                </button>
+                <button 
+                  className="btn btn-xs" 
+                  style={{ fontSize: '0.52rem', padding: '2px 4px', borderColor: '#ffe600', color: '#ffe600', margin: 0 }}
+                  onClick={() => saveBankPreset('a', bankAPreset)}
+                >
+                  SAVE
+                </button>
+              </div>
+            </div>
+
+            <span className="knob-label" style={{ color: '#ff00ff', marginTop: '6px', display: 'block' }}>BANK B (OSC 2) PATCH PRESET</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', gap: '4px' }}>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {[1, 2, 3, 4].map(num => (
+                  <button
+                    key={num}
+                    className={`segmented-btn btn-xs ${bankBPreset === num ? 'active' : ''}`}
+                    onClick={() => setBankBPreset(num)}
+                    style={{ padding: '2px 5px', fontSize: '0.55rem' }}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                <button 
+                  className="btn btn-xs" 
+                  style={{ fontSize: '0.52rem', padding: '2px 4px', borderColor: '#ff00ff', color: '#ff00ff', margin: 0 }}
+                  onClick={() => loadBankPreset('b', bankBPreset)}
+                >
+                  LOAD
+                </button>
+                <button 
+                  className="btn btn-xs" 
+                  style={{ fontSize: '0.52rem', padding: '2px 4px', borderColor: '#ffe600', color: '#ffe600', margin: 0 }}
+                  onClick={() => saveBankPreset('b', bankBPreset)}
+                >
+                  SAVE
+                </button>
+              </div>
             </div>
 
             {/* Active Directory List of loaded slot names */}
-            <span className="knob-label">Sample Slot Registry</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '4px', maxHeight: '110px', overflowY: 'auto' }}>
-              {sampleSlots.map((slot) => {
-                const isSelected = slot.id === selectedEditSlotId;
-                return (
-                  <div 
-                    key={slot.id}
-                    onClick={() => {
-                      setSelectedEditSlotId(slot.id);
-                      setParams(prev => ({
-                        ...prev,
-                        oscAWave: slot.id
-                      }));
-                    }}
-                    style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
-                      padding: '2px 6px', 
-                      fontSize: '0.5rem', 
-                      fontFamily: 'monospace',
-                      cursor: 'pointer',
-                      borderRadius: '2px',
-                      background: isSelected ? 'rgba(0, 243, 255, 0.15)' : 'transparent',
-                      border: isSelected ? '1px solid rgba(0, 243, 255, 0.3)' : '1px solid transparent',
-                      color: isSelected ? '#ffe600' : '#88ccee',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <span style={{ fontWeight: 'bold' }}>{getSlotLabel(slot.id)}:</span>
-                    <span style={{ 
-                      textOverflow: 'ellipsis', 
-                      overflow: 'hidden', 
-                      whiteSpace: 'nowrap', 
-                      maxWidth: '120px',
-                      color: slot.buffer ? '#fff' : '#555'
-                    }}>
-                      {slot.buffer ? slot.name : '(Empty)'}
-                    </span>
-                    <span style={{ fontSize: '0.42rem', opacity: 0.6, color: '#00ff66' }}>
-                      {slot.buffer ? `${Math.round(slot.buffer.duration * 10) / 10}s` : ''}
-                    </span>
-                  </div>
-                );
-              })}
+            <span className="knob-label" style={{ marginTop: '8px', display: 'block' }}>Sample Slot Registry</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '4px', maxHeight: '110px', overflowY: 'auto' }}>
+              {/* Bank A Column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#00f3ff', borderBottom: '1px solid rgba(0, 243, 255, 0.2)', paddingBottom: '2px', textAlign: 'center', fontFamily: 'monospace' }}>BANK A</div>
+                {sampleSlots.filter(s => s.id.startsWith('a')).map((slot) => {
+                  const isSelected = slot.id === selectedEditSlotId;
+                  return (
+                    <div 
+                      key={slot.id}
+                      onClick={() => {
+                        setSelectedEditSlotId(slot.id);
+                        setParams(prev => ({
+                          ...prev,
+                          oscAWave: slot.id
+                        }));
+                      }}
+                      style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        padding: '1px 3px', 
+                        fontSize: '0.48rem', 
+                        fontFamily: 'monospace',
+                        cursor: 'pointer',
+                        borderRadius: '2px',
+                        background: isSelected ? 'rgba(0, 243, 255, 0.15)' : 'transparent',
+                        border: isSelected ? '1px solid rgba(0, 243, 255, 0.3)' : '1px solid transparent',
+                        color: isSelected ? '#ffe600' : '#88ccee',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span style={{ fontWeight: 'bold' }}>{getSlotLabel(slot.id)}:</span>
+                      <span style={{ 
+                        textOverflow: 'ellipsis', 
+                        overflow: 'hidden', 
+                        whiteSpace: 'nowrap', 
+                        maxWidth: '55px',
+                        color: slot.buffer ? '#fff' : '#555'
+                      }} title={slot.name}>
+                        {slot.buffer ? slot.name : 'empty'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Bank B Column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#ff00ff', borderBottom: '1px solid rgba(255, 0, 255, 0.2)', paddingBottom: '2px', textAlign: 'center', fontFamily: 'monospace' }}>BANK B</div>
+                {sampleSlots.filter(s => s.id.startsWith('b')).map((slot) => {
+                  const isSelected = slot.id === selectedEditSlotId;
+                  return (
+                    <div 
+                      key={slot.id}
+                      onClick={() => {
+                        setSelectedEditSlotId(slot.id);
+                        setParams(prev => ({
+                          ...prev,
+                          oscBWave: slot.id
+                        }));
+                      }}
+                      style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        padding: '1px 3px', 
+                        fontSize: '0.48rem', 
+                        fontFamily: 'monospace',
+                        cursor: 'pointer',
+                        borderRadius: '2px',
+                        background: isSelected ? 'rgba(255, 0, 255, 0.15)' : 'transparent',
+                        border: isSelected ? '1px solid rgba(255, 0, 255, 0.3)' : '1px solid transparent',
+                        color: isSelected ? '#ffe600' : '#88ccee',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span style={{ fontWeight: 'bold' }}>{getSlotLabel(slot.id)}:</span>
+                      <span style={{ 
+                        textOverflow: 'ellipsis', 
+                        overflow: 'hidden', 
+                        whiteSpace: 'nowrap', 
+                        maxWidth: '55px',
+                        color: slot.buffer ? '#fff' : '#555'
+                      }} title={slot.name}>
+                        {slot.buffer ? slot.name : 'empty'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -9952,11 +10202,14 @@ function KeyboardTrigger({ playVoice, stopVoice }) {
 
 export const openSamplerDB = () => {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('Delta7SamplerDB', 1);
+    const request = indexedDB.open('Delta7SamplerDB', 2);
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('samples')) {
         db.createObjectStore('samples', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('banks')) {
+        db.createObjectStore('banks', { keyPath: 'id' });
       }
     };
     request.onsuccess = (e) => resolve(e.target.result);
@@ -10037,6 +10290,28 @@ export const loadSavedMetadata = async () => {
     console.error("Failed to load saved sampler metadata: ", err);
     return [];
   }
+};
+
+export const saveBankToDb = async (bankRecord) => {
+  const db = await openSamplerDB();
+  const tx = db.transaction('banks', 'readwrite');
+  const store = tx.objectStore('banks');
+  return new Promise((resolve, reject) => {
+    const req = store.put(bankRecord);
+    req.onsuccess = () => resolve();
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const getSavedBankFromDb = async (id) => {
+  const db = await openSamplerDB();
+  const tx = db.transaction('banks', 'readonly');
+  const store = tx.objectStore('banks');
+  return new Promise((resolve, reject) => {
+    const req = store.get(id);
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
 };
 
 export const audioBufferToWav = (buffer) => {
