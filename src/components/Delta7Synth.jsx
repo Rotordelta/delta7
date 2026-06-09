@@ -717,9 +717,21 @@ export default function Delta7Synth() {
   const [deckAEqHigh, setDeckAEqHigh] = useState(0.0);
   const [deckBEqLow, setDeckBEqLow] = useState(0.0);
   const [deckBEqMid, setDeckBEqMid] = useState(0.0);
-  const [deckBEqHigh, setDeckBEqHigh] = useState(0.0);
   const [vuLevelL, setVuLevelL] = useState(0);
   const [vuLevelR, setVuLevelR] = useState(0);
+  const [deckAPitch, setDeckAPitch] = useState(0.0);
+  const [deckBPitch, setDeckBPitch] = useState(0.0);
+  const [deckALoopSize, setDeckALoopSize] = useState(4);
+  const [deckBLoopSize, setDeckBLoopSize] = useState(4);
+  const [deckALoopActive, setDeckALoopActive] = useState(false);
+  const [deckBLoopActive, setDeckBLoopActive] = useState(false);
+  const [deckAKeyLock, setDeckAKeyLock] = useState(true);
+  const [deckBKeyLock, setDeckBKeyLock] = useState(true);
+
+  const deckAPitchRef = useRef(0.0);
+  const deckBPitchRef = useRef(0.0);
+  useEffect(() => { deckAPitchRef.current = deckAPitch; }, [deckAPitch]);
+  useEffect(() => { deckBPitchRef.current = deckBPitch; }, [deckBPitch]);
 
   const perfEventsRef = useRef([]);
   useEffect(() => {
@@ -4049,6 +4061,18 @@ export default function Delta7Synth() {
       } else {
         freqScaleB = warpBaseRateB;
       }
+    // Apply Deck Pitch Fader scaling for performance voices
+    let pitchFactorA = 1.0;
+    let pitchFactorB = 1.0;
+    if (voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
+      if (voiceKey.includes('perf-a')) {
+        pitchFactorA = 1.0 + (deckAPitchRef.current / 100);
+      } else if (voiceKey.includes('perf-b')) {
+        pitchFactorB = 1.0 + (deckBPitchRef.current / 100);
+      }
+    }
+    freqScaleA *= pitchFactorA;
+    freqScaleB *= pitchFactorB;
     }
 
     // --- VCF Dual Filter ---
@@ -4142,6 +4166,8 @@ export default function Delta7Synth() {
       vibratoLfo, vibratoLfoGain, filterLfo, filterLfoGain,
       vca, vcf, baseCutoff, oscAVol: prog.oscAVol, oscBVol: prog.oscBVol,
       granularTimerId: null, releasedRef, trackIdx,
+      base_oscA_rate: freqScaleA / pitchFactorA,
+      base_oscB_rate: freqScaleB / pitchFactorB,
       orig_oscA_rate: freqScaleA,
       orig_oscA_L_rate: freqScaleA,
       orig_oscA_R_rate: freqScaleA,
@@ -6326,6 +6352,46 @@ export default function Delta7Synth() {
     });
   }, [params.arpBpm]);
 
+  // Update playbackRate of performance voices when deck pitch slider is moved in real-time
+  useEffect(() => {
+    if (!audioCtxRef.current) return;
+    const now = audioCtxRef.current.currentTime;
+    
+    activeVoicesRef.current.forEach((vList, voiceKey) => {
+      if (typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
+        const isVoiceA = voiceKey.includes('perf-a');
+        const pitchFactor = 1.0 + ((isVoiceA ? deckAPitch : deckBPitch) / 100);
+        
+        const list = Array.isArray(vList) ? vList : [vList];
+        list.forEach(voice => {
+          if (isVoiceA) {
+            const baseRate = voice.base_oscA_rate || 1.0;
+            const finalRate = baseRate * pitchFactor;
+            voice.orig_oscA_rate = finalRate;
+            voice.orig_oscA_L_rate = finalRate;
+            voice.orig_oscA_R_rate = finalRate;
+            
+            const oscs = [voice.oscA, voice.oscA_L, voice.oscA_R].filter(Boolean);
+            oscs.forEach(osc => {
+              osc.playbackRate.setValueAtTime(finalRate, now);
+            });
+          } else {
+            const baseRate = voice.base_oscB_rate || 1.0;
+            const finalRate = baseRate * pitchFactor;
+            voice.orig_oscB_rate = finalRate;
+            voice.orig_oscB_L_rate = finalRate;
+            voice.orig_oscB_R_rate = finalRate;
+            
+            const oscs = [voice.oscB, voice.oscB_L, voice.oscB_R].filter(Boolean);
+            oscs.forEach(osc => {
+              osc.playbackRate.setValueAtTime(finalRate, now);
+            });
+          }
+        });
+      }
+    });
+  }, [deckAPitch, deckBPitch]);
+
   // MIDI Start (0xFA) / Stop (0xFC) on Arpeggiator On/Off state toggle
   const isMidiArpMountedRef = useRef(false);
   useEffect(() => {
@@ -6800,55 +6866,194 @@ export default function Delta7Synth() {
                 <rect x="5" y="60" width="8" height="6" fill="#ffe600" rx="1" />
               </svg>
             </div>
+
+            {/* 2 Rows of 8 Pads for Deck A */}
+            <div className="performance-pads-grid">
+              {/* Row 1: Slots A1-A8 */}
+              <div className="performance-pads-row">
+                {Array.from({ length: 8 }).map((_, idx) => {
+                  const slotId = `a0${idx + 1}`;
+                  const slot = sampleSlots.find(s => s.id === slotId);
+                  const isLoaded = slot && slot.buffer;
+                  const padKey = `A-slot-${idx}`;
+                  const isActive = activePerfPads[padKey];
+                  return (
+                    <div
+                      key={slotId}
+                      className={`perf-pad ${isLoaded ? 'deck-a-loaded' : ''} ${isActive ? 'deck-a-active' : ''}`}
+                      onMouseDown={() => triggerPerfPadInternal('A', 'slot', idx, 100, true, true)}
+                      onMouseUp={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
+                      onMouseLeave={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
+                      onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slot', idx, 100, true, true); }}
+                      onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slot', idx, 100, false, true); }}
+                      title={isLoaded ? slot.name : 'Empty Slot'}
+                    >
+                      <span className="perf-pad-label">A{idx + 1}</span>
+                      <span className="perf-pad-name">{isLoaded ? slot.name.substring(0, 5) : '---'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Row 2: Slices 1-8 of active slot */}
+              <div className="performance-pads-row">
+                {Array.from({ length: 8 }).map((_, idx) => {
+                  const padKey = `A-slice-${idx}`;
+                  const isActive = activePerfPads[padKey];
+                  return (
+                    <div
+                      key={`slice-a-${idx}`}
+                      className={`perf-pad slice-loaded ${isActive ? 'slice-active' : ''}`}
+                      onMouseDown={() => triggerPerfPadInternal('A', 'slice', idx, 100, true, true)}
+                      onMouseUp={() => triggerPerfPadInternal('A', 'slice', idx, 100, false, true)}
+                      onMouseLeave={() => triggerPerfPadInternal('A', 'slice', idx, 100, false, true)}
+                      onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slice', idx, 100, true, true); }}
+                      onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slice', idx, 100, false, true); }}
+                    >
+                      <span className="perf-pad-label">SL{idx + 1}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {/* 2 Rows of 8 Pads for Deck A */}
-          <div className="performance-pads-grid">
-            {/* Row 1: Slots A1-A8 */}
-            <div className="performance-pads-row">
-              {Array.from({ length: 8 }).map((_, idx) => {
-                const slotId = `a0${idx + 1}`;
-                const slot = sampleSlots.find(s => s.id === slotId);
-                const isLoaded = slot && slot.buffer;
-                const padKey = `A-slot-${idx}`;
-                const isActive = activePerfPads[padKey];
-                return (
-                  <div
-                    key={slotId}
-                    className={`perf-pad ${isLoaded ? 'deck-a-loaded' : ''} ${isActive ? 'deck-a-active' : ''}`}
-                    onMouseDown={() => triggerPerfPadInternal('A', 'slot', idx, 100, true, true)}
-                    onMouseUp={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
-                    onMouseLeave={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
-                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slot', idx, 100, true, true); }}
-                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slot', idx, 100, false, true); }}
-                    title={isLoaded ? slot.name : 'Empty Slot'}
-                  >
-                    <span className="perf-pad-label">A{idx + 1}</span>
-                    <span className="perf-pad-name">{isLoaded ? slot.name.substring(0, 5) : '---'}</span>
-                  </div>
-                );
-              })}
+          {/* LOWER PANEL: Transport, Loops, and Pitch fader */}
+          <div className="deck-lower-controls">
+            <div className="deck-left-panel">
+              {/* Transport controls */}
+              <div className="deck-row">
+                <button 
+                  className="deck-btn deck-btn-sync"
+                  onClick={() => {
+                    const slot = sampleSlots.find(s => s.id === params.oscAWave);
+                    if (slot && slot.buffer) {
+                      const dur = slot.buffer.duration * (slot.end - slot.start);
+                      const beats = slot.warpBeats || 4;
+                      const calculatedBpm = Math.round(Math.max(40, Math.min(250, (60 * beats) / dur)));
+                      setParams(prev => ({ ...prev, arpBpm: calculatedBpm }));
+                      showEditorStatus(`Synced Deck A to ${calculatedBpm} BPM! 🔄`);
+                    } else {
+                      showEditorStatus("Load a sample on Deck A first!");
+                    }
+                  }}
+                >
+                  Sync
+                </button>
+                <button 
+                  className="deck-btn deck-btn-cue"
+                  onClick={() => {
+                    for (let i = 0; i < 8; i++) {
+                      stopPerfVoice(`perf-a-slice-${i}`);
+                      stopPerfVoice(`perf-a-slot-${i}`);
+                    }
+                    setDeckAPlaying(false);
+                    showEditorStatus("Deck A Cued ⏹️");
+                  }}
+                >
+                  Cue
+                </button>
+                <button 
+                  className={`deck-btn deck-btn-play ${deckAPlaying ? 'active' : ''}`}
+                  onClick={() => {
+                    const activeAIdx = sampleSlots.findIndex(s => s.id === params.oscAWave);
+                    const idx = activeAIdx >= 0 ? activeAIdx : 0;
+                    triggerPerfPadInternal('A', 'slot', idx, 100, !deckAPlaying, false);
+                  }}
+                >
+                  {deckAPlaying ? 'Pause' : 'Play'}
+                </button>
+              </div>
+
+              {/* Loop Controls */}
+              <div className="deck-row">
+                <button 
+                  className="deck-btn" 
+                  onClick={() => {
+                    const nextSize = Math.max(1, deckALoopSize / 2);
+                    setDeckALoopSize(nextSize);
+                    const activeSlot = sampleSlots.find(s => s.id === params.oscAWave);
+                    if (activeSlot) {
+                      activeSlot.warpBeats = nextSize;
+                      setSampleSlots([...sampleSlots]);
+                    }
+                  }}
+                >
+                  /2
+                </button>
+                <div className="deck-loop-display">
+                  {deckALoopSize} Beats
+                </div>
+                <button 
+                  className="deck-btn"
+                  onClick={() => {
+                    const nextSize = Math.min(32, deckALoopSize * 2);
+                    setDeckALoopSize(nextSize);
+                    const activeSlot = sampleSlots.find(s => s.id === params.oscAWave);
+                    if (activeSlot) {
+                      activeSlot.warpBeats = nextSize;
+                      setSampleSlots([...sampleSlots]);
+                    }
+                  }}
+                >
+                  x2
+                </button>
+              </div>
+
+              {/* Loop Active and Key Lock */}
+              <div className="deck-row">
+                <button 
+                  className={`deck-btn ${deckALoopActive ? 'deck-btn-play active' : ''}`}
+                  onClick={() => {
+                    const nextActive = !deckALoopActive;
+                    setDeckALoopActive(nextActive);
+                    const activeSlot = sampleSlots.find(s => s.id === params.oscAWave);
+                    if (activeSlot) {
+                      activeSlot.warpOn = nextActive;
+                      setSampleSlots([...sampleSlots]);
+                      showEditorStatus(`Deck A Warp Loop: ${nextActive ? 'ON' : 'OFF'} 🔄`);
+                    }
+                  }}
+                >
+                  Loop
+                </button>
+                <button 
+                  className={`deck-btn ${deckAKeyLock ? 'deck-btn-sync active' : ''}`}
+                  onClick={() => setDeckAKeyLock(prev => !prev)}
+                >
+                  Key Lock
+                </button>
+              </div>
+
+              {/* Pitch Display & Reset */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
+                <span className="deck-readout-label">
+                  Pitch: {deckAPitch >= 0 ? '+' : ''}{deckAPitch.toFixed(2)}%
+                </span>
+                <button 
+                  style={{
+                    background: 'none', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '3px', color: '#ffe600', fontSize: '0.45rem',
+                    padding: '1px 3px', cursor: 'pointer', fontFamily: 'monospace'
+                  }}
+                  onClick={() => setDeckAPitch(0.0)}
+                >
+                  Rst
+                </button>
+              </div>
             </div>
 
-            {/* Row 2: Slices 1-8 of active slot */}
-            <div className="performance-pads-row">
-              {Array.from({ length: 8 }).map((_, idx) => {
-                const padKey = `A-slice-${idx}`;
-                const isActive = activePerfPads[padKey];
-                return (
-                  <div
-                    key={`slice-a-${idx}`}
-                    className={`perf-pad slice-loaded ${isActive ? 'slice-active' : ''}`}
-                    onMouseDown={() => triggerPerfPadInternal('A', 'slice', idx, 100, true, true)}
-                    onMouseUp={() => triggerPerfPadInternal('A', 'slice', idx, 100, false, true)}
-                    onMouseLeave={() => triggerPerfPadInternal('A', 'slice', idx, 100, false, true)}
-                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slice', idx, 100, true, true); }}
-                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slice', idx, 100, false, true); }}
-                  >
-                    <span className="perf-pad-label">SL{idx + 1}</span>
-                  </div>
-                );
-              })}
+            {/* Pitch Fader (Vertical Slider) */}
+            <div className="deck-pitch-section">
+              <span className="deck-readout-label" style={{ fontSize: '0.38rem' }}>Pitch</span>
+              <div className="deck-pitch-slider-wrapper">
+                <input 
+                  type="range" min="-10.0" max="10.0" step="0.1"
+                  value={deckAPitch}
+                  onChange={(e) => setDeckAPitch(parseFloat(e.target.value))}
+                  className="deck-pitch-slider"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -7007,55 +7212,194 @@ export default function Delta7Synth() {
                 <rect x="5" y="60" width="8" height="6" fill="#ffe600" rx="1" />
               </svg>
             </div>
+
+            {/* 2 Rows of 8 Pads for Deck B */}
+            <div className="performance-pads-grid">
+              {/* Row 1: Slots B1-B8 */}
+              <div className="performance-pads-row">
+                {Array.from({ length: 8 }).map((_, idx) => {
+                  const slotId = `b0${idx + 1}`;
+                  const slot = sampleSlots.find(s => s.id === slotId);
+                  const isLoaded = slot && slot.buffer;
+                  const padKey = `B-slot-${idx}`;
+                  const isActive = activePerfPads[padKey];
+                  return (
+                    <div
+                      key={slotId}
+                      className={`perf-pad ${isLoaded ? 'deck-b-loaded' : ''} ${isActive ? 'deck-b-active' : ''}`}
+                      onMouseDown={() => triggerPerfPadInternal('B', 'slot', idx, 100, true, true)}
+                      onMouseUp={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
+                      onMouseLeave={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
+                      onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slot', idx, 100, true, true); }}
+                      onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slot', idx, 100, false, true); }}
+                      title={isLoaded ? slot.name : 'Empty Slot'}
+                    >
+                      <span className="perf-pad-label">B{idx + 1}</span>
+                      <span className="perf-pad-name">{isLoaded ? slot.name.substring(0, 5) : '---'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Row 2: Slices 1-8 of active slot */}
+              <div className="performance-pads-row">
+                {Array.from({ length: 8 }).map((_, idx) => {
+                  const padKey = `B-slice-${idx}`;
+                  const isActive = activePerfPads[padKey];
+                  return (
+                    <div
+                      key={`slice-b-${idx}`}
+                      className={`perf-pad slice-loaded ${isActive ? 'slice-active' : ''}`}
+                      onMouseDown={() => triggerPerfPadInternal('B', 'slice', idx, 100, true, true)}
+                      onMouseUp={() => triggerPerfPadInternal('B', 'slice', idx, 100, false, true)}
+                      onMouseLeave={() => triggerPerfPadInternal('B', 'slice', idx, 100, false, true)}
+                      onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slice', idx, 100, true, true); }}
+                      onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slice', idx, 100, false, true); }}
+                    >
+                      <span className="perf-pad-label">SL{idx + 1}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {/* 2 Rows of 8 Pads for Deck B */}
-          <div className="performance-pads-grid">
-            {/* Row 1: Slots B1-B8 */}
-            <div className="performance-pads-row">
-              {Array.from({ length: 8 }).map((_, idx) => {
-                const slotId = `b0${idx + 1}`;
-                const slot = sampleSlots.find(s => s.id === slotId);
-                const isLoaded = slot && slot.buffer;
-                const padKey = `B-slot-${idx}`;
-                const isActive = activePerfPads[padKey];
-                return (
-                  <div
-                    key={slotId}
-                    className={`perf-pad ${isLoaded ? 'deck-b-loaded' : ''} ${isActive ? 'deck-b-active' : ''}`}
-                    onMouseDown={() => triggerPerfPadInternal('B', 'slot', idx, 100, true, true)}
-                    onMouseUp={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
-                    onMouseLeave={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
-                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slot', idx, 100, true, true); }}
-                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slot', idx, 100, false, true); }}
-                    title={isLoaded ? slot.name : 'Empty Slot'}
-                  >
-                    <span className="perf-pad-label">B{idx + 1}</span>
-                    <span className="perf-pad-name">{isLoaded ? slot.name.substring(0, 5) : '---'}</span>
-                  </div>
-                );
-              })}
+          {/* LOWER PANEL: Transport, Loops, and Pitch fader */}
+          <div className="deck-lower-controls">
+            <div className="deck-left-panel">
+              {/* Transport controls */}
+              <div className="deck-row">
+                <button 
+                  className="deck-btn deck-btn-sync"
+                  onClick={() => {
+                    const slot = sampleSlots.find(s => s.id === params.oscBWave);
+                    if (slot && slot.buffer) {
+                      const dur = slot.buffer.duration * (slot.end - slot.start);
+                      const beats = slot.warpBeats || 4;
+                      const calculatedBpm = Math.round(Math.max(40, Math.min(250, (60 * beats) / dur)));
+                      setParams(prev => ({ ...prev, arpBpm: calculatedBpm }));
+                      showEditorStatus(`Synced Deck B to ${calculatedBpm} BPM! 🔄`);
+                    } else {
+                      showEditorStatus("Load a sample on Deck B first!");
+                    }
+                  }}
+                >
+                  Sync
+                </button>
+                <button 
+                  className="deck-btn deck-btn-cue"
+                  onClick={() => {
+                    for (let i = 0; i < 8; i++) {
+                      stopPerfVoice(`perf-b-slice-${i}`);
+                      stopPerfVoice(`perf-b-slot-${i}`);
+                    }
+                    setDeckBPlaying(false);
+                    showEditorStatus("Deck B Cued ⏹️");
+                  }}
+                >
+                  Cue
+                </button>
+                <button 
+                  className={`deck-btn deck-btn-play ${deckBPlaying ? 'active' : ''}`}
+                  onClick={() => {
+                    const activeBIdx = sampleSlots.findIndex(s => s.id === params.oscBWave);
+                    const idx = activeBIdx >= 0 ? activeBIdx : 0;
+                    triggerPerfPadInternal('B', 'slot', idx, 100, !deckBPlaying, false);
+                  }}
+                >
+                  {deckBPlaying ? 'Pause' : 'Play'}
+                </button>
+              </div>
+
+              {/* Loop Controls */}
+              <div className="deck-row">
+                <button 
+                  className="deck-btn" 
+                  onClick={() => {
+                    const nextSize = Math.max(1, deckBLoopSize / 2);
+                    setDeckBLoopSize(nextSize);
+                    const activeSlot = sampleSlots.find(s => s.id === params.oscBWave);
+                    if (activeSlot) {
+                      activeSlot.warpBeats = nextSize;
+                      setSampleSlots([...sampleSlots]);
+                    }
+                  }}
+                >
+                  /2
+                </button>
+                <div className="deck-loop-display">
+                  {deckBLoopSize} Beats
+                </div>
+                <button 
+                  className="deck-btn"
+                  onClick={() => {
+                    const nextSize = Math.min(32, deckBLoopSize * 2);
+                    setDeckBLoopSize(nextSize);
+                    const activeSlot = sampleSlots.find(s => s.id === params.oscBWave);
+                    if (activeSlot) {
+                      activeSlot.warpBeats = nextSize;
+                      setSampleSlots([...sampleSlots]);
+                    }
+                  }}
+                >
+                  x2
+                </button>
+              </div>
+
+              {/* Loop Active and Key Lock */}
+              <div className="deck-row">
+                <button 
+                  className={`deck-btn ${deckBLoopActive ? 'deck-btn-play active' : ''}`}
+                  onClick={() => {
+                    const nextActive = !deckBLoopActive;
+                    setDeckBLoopActive(nextActive);
+                    const activeSlot = sampleSlots.find(s => s.id === params.oscBWave);
+                    if (activeSlot) {
+                      activeSlot.warpOn = nextActive;
+                      setSampleSlots([...sampleSlots]);
+                      showEditorStatus(`Deck B Warp Loop: ${nextActive ? 'ON' : 'OFF'} 🔄`);
+                    }
+                  }}
+                >
+                  Loop
+                </button>
+                <button 
+                  className={`deck-btn ${deckBKeyLock ? 'deck-btn-sync active' : ''}`}
+                  onClick={() => setDeckBKeyLock(prev => !prev)}
+                >
+                  Key Lock
+                </button>
+              </div>
+
+              {/* Pitch Display & Reset */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
+                <span className="deck-readout-label">
+                  Pitch: {deckBPitch >= 0 ? '+' : ''}{deckBPitch.toFixed(2)}%
+                </span>
+                <button 
+                  style={{
+                    background: 'none', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '3px', color: '#ffe600', fontSize: '0.45rem',
+                    padding: '1px 3px', cursor: 'pointer', fontFamily: 'monospace'
+                  }}
+                  onClick={() => setDeckBPitch(0.0)}
+                >
+                  Rst
+                </button>
+              </div>
             </div>
 
-            {/* Row 2: Slices 1-8 of active slot */}
-            <div className="performance-pads-row">
-              {Array.from({ length: 8 }).map((_, idx) => {
-                const padKey = `B-slice-${idx}`;
-                const isActive = activePerfPads[padKey];
-                return (
-                  <div
-                    key={`slice-b-${idx}`}
-                    className={`perf-pad slice-loaded ${isActive ? 'slice-active' : ''}`}
-                    onMouseDown={() => triggerPerfPadInternal('B', 'slice', idx, 100, true, true)}
-                    onMouseUp={() => triggerPerfPadInternal('B', 'slice', idx, 100, false, true)}
-                    onMouseLeave={() => triggerPerfPadInternal('B', 'slice', idx, 100, false, true)}
-                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slice', idx, 100, true, true); }}
-                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slice', idx, 100, false, true); }}
-                  >
-                    <span className="perf-pad-label">SL{idx + 1}</span>
-                  </div>
-                );
-              })}
+            {/* Pitch Fader (Vertical Slider) */}
+            <div className="deck-pitch-section">
+              <span className="deck-readout-label" style={{ fontSize: '0.38rem' }}>Pitch</span>
+              <div className="deck-pitch-slider-wrapper">
+                <input 
+                  type="range" min="-10.0" max="10.0" step="0.1"
+                  value={deckBPitch}
+                  onChange={(e) => setDeckBPitch(parseFloat(e.target.value))}
+                  className="deck-pitch-slider"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -11518,6 +11862,137 @@ export default function Delta7Synth() {
           text-align: center;
           font-family: var(--font-mono);
           text-shadow: 0 0 2px rgba(0, 243, 255, 0.4);
+        }
+
+        /* Deck Lower Controls Panel Styles */
+        .deck-lower-controls {
+          width: 100%;
+          display: grid;
+          grid-template-columns: 1fr 52px;
+          gap: 8px;
+          padding: 8px;
+          background: rgba(0, 0, 0, 0.25);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+          margin-top: auto;
+          box-sizing: border-box;
+        }
+
+        .deck-left-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .deck-pitch-section {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          background: rgba(0, 0, 0, 0.35);
+          padding: 4px 2px;
+          border-radius: 4px;
+          border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .deck-pitch-slider-wrapper {
+          height: 120px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .deck-pitch-slider {
+          writing-mode: vertical-lr;
+          direction: rtl;
+          width: 16px;
+          height: 110px;
+          cursor: pointer;
+          accent-color: #ffe600;
+        }
+
+        .deck-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          justify-content: space-between;
+        }
+
+        .deck-btn {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 24px;
+          border-radius: 4px;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          font-family: monospace;
+          font-size: 0.55rem;
+          font-weight: bold;
+          text-transform: uppercase;
+          cursor: pointer;
+          background: rgba(10, 15, 25, 0.8);
+          color: #888;
+          transition: all 0.1s ease;
+          user-select: none;
+        }
+
+        .deck-btn:active {
+          transform: scale(0.95);
+        }
+
+        .deck-btn-sync {
+          border-color: #00f3ff;
+          color: #00f3ff;
+        }
+        .deck-btn-sync.active {
+          background: #00f3ff;
+          color: #000;
+          box-shadow: 0 0 8px #00f3ff;
+        }
+
+        .deck-btn-cue {
+          border-color: #ffaa00;
+          color: #ffaa00;
+        }
+        .deck-btn-cue.active {
+          background: #ffaa00;
+          color: #000;
+          box-shadow: 0 0 8px #ffaa00;
+        }
+
+        .deck-btn-play {
+          border-color: #00ff66;
+          color: #00ff66;
+        }
+        .deck-btn-play.active {
+          background: #00ff66;
+          color: #000;
+          box-shadow: 0 0 8px #00ff66;
+        }
+
+        .deck-loop-display {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 22px;
+          background: #000;
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 3px;
+          font-family: monospace;
+          font-size: 0.55rem;
+          color: #00ff66;
+          text-shadow: 0 0 3px #00ff66;
+        }
+
+        .deck-readout-label {
+          font-family: monospace;
+          font-size: 0.45rem;
+          color: #aaa;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
       `}</style>
 
