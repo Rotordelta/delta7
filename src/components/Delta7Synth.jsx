@@ -125,6 +125,368 @@ const ROTOR_PRESETS = [
   { name: 'Vocal Horn Crossover', params: { leslieSpeed: 'Slow', leslieDrive: 0.25, leslieWidth: 0.6, leslieCrossover: 1400 } }
 ];
 
+// Helper to synthesize sample kits on-the-fly
+const generateSynthesizedKit = (ctx, kitType) => {
+  const sampleRate = ctx.sampleRate;
+  const createBuffer = (seconds) => ctx.createBuffer(1, Math.round(seconds * sampleRate), sampleRate);
+  const kit = [];
+
+  if (kitType === 'DRUMS') {
+    // 1. Kick
+    const kick = createBuffer(0.3);
+    const kData = kick.getChannelData(0);
+    for (let i = 0; i < kData.length; i++) {
+      const t = i / sampleRate;
+      const freq = 150 * Math.exp(-t * 40) + 45;
+      const env = Math.exp(-t * 15);
+      kData[i] = Math.sin(2 * Math.PI * freq * t) * env;
+    }
+    kit.push({ name: 'Synth Kick', buffer: kick });
+
+    // 2. Snare
+    const snare = createBuffer(0.25);
+    const sData = snare.getChannelData(0);
+    for (let i = 0; i < sData.length; i++) {
+      const t = i / sampleRate;
+      const noise = Math.random() * 2 - 1;
+      const noiseEnv = Math.exp(-t * 20);
+      const tone = Math.sin(2 * Math.PI * 180 * t) * Math.exp(-t * 40);
+      sData[i] = (noise * noiseEnv * 0.7 + tone * 0.3) * Math.exp(-t * 5);
+    }
+    kit.push({ name: 'Synth Snare', buffer: snare });
+
+    // 3. Closed Hat
+    const hat = createBuffer(0.08);
+    const hData = hat.getChannelData(0);
+    let lastNoise = 0;
+    for (let i = 0; i < hData.length; i++) {
+      const t = i / sampleRate;
+      const noise = Math.random() * 2 - 1;
+      const filtered = noise - lastNoise;
+      lastNoise = noise;
+      const env = Math.exp(-t * 70);
+      hData[i] = filtered * env * 0.5;
+    }
+    kit.push({ name: 'Synth Hat', buffer: hat });
+
+    // 4. Open Hat
+    const oHat = createBuffer(0.35);
+    const ohData = oHat.getChannelData(0);
+    let lastNoiseO = 0;
+    for (let i = 0; i < ohData.length; i++) {
+      const t = i / sampleRate;
+      const noise = Math.random() * 2 - 1;
+      const filtered = noise - lastNoiseO;
+      lastNoiseO = noise;
+      const env = Math.exp(-t * 12);
+      ohData[i] = filtered * env * 0.4;
+    }
+    kit.push({ name: 'Open Hat', buffer: oHat });
+
+    // 5. Synth Tom
+    const tom = createBuffer(0.4);
+    const tData = tom.getChannelData(0);
+    for (let i = 0; i < tData.length; i++) {
+      const t = i / sampleRate;
+      const freq = 120 * Math.exp(-t * 10) + 60;
+      const env = Math.exp(-t * 8);
+      tData[i] = Math.sin(2 * Math.PI * freq * t) * env;
+    }
+    kit.push({ name: 'Synth Tom', buffer: tom });
+
+    // 6. Cowbell
+    const bell = createBuffer(0.25);
+    const bData = bell.getChannelData(0);
+    for (let i = 0; i < bData.length; i++) {
+      const t = i / sampleRate;
+      const f1 = 800;
+      const f2 = 540;
+      const s1 = Math.sin(2 * Math.PI * f1 * t) > 0 ? 1 : -1;
+      const s2 = Math.sin(2 * Math.PI * f2 * t) > 0 ? 1 : -1;
+      const env = Math.exp(-t * 15);
+      bData[i] = (s1 + s2) * 0.3 * env;
+    }
+    kit.push({ name: 'Cowbell', buffer: bell });
+
+    // 7. Clap
+    const clap = createBuffer(0.3);
+    const cData = clap.getChannelData(0);
+    for (let i = 0; i < cData.length; i++) {
+      const t = i / sampleRate;
+      let env = 0;
+      if (t < 0.01) env = Math.exp(-t * 200);
+      else if (t < 0.02) env = Math.exp(-(t - 0.01) * 200);
+      else if (t < 0.03) env = Math.exp(-(t - 0.02) * 200);
+      else env = Math.exp(-(t - 0.03) * 15);
+      cData[i] = (Math.random() * 2 - 1) * env * 0.5;
+    }
+    kit.push({ name: 'Hand Clap', buffer: clap });
+
+    // 8. Sub Bass
+    const sub = createBuffer(0.6);
+    const subData = sub.getChannelData(0);
+    for (let i = 0; i < subData.length; i++) {
+      const t = i / sampleRate;
+      const freq = 55;
+      const env = Math.exp(-t * 3) * (1 - Math.exp(-t * 50));
+      subData[i] = Math.sin(2 * Math.PI * freq * t) * env * 0.8;
+    }
+    kit.push({ name: 'Sub Bass 55Hz', buffer: sub });
+  } 
+  else if (kitType === 'WAVES') {
+    const addWave = (name, lengthSec, func) => {
+      const buf = createBuffer(lengthSec);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = func(i / sampleRate);
+      }
+      kit.push({ name, buffer: buf });
+    };
+
+    addWave('Classic Saw', 0.5, (t) => {
+      const f = 220;
+      return (2 * (t * f - Math.floor(0.5 + t * f))) * 0.5;
+    });
+    addWave('Hollow Square', 0.5, (t) => {
+      const f = 220;
+      return (Math.sin(2 * Math.PI * f * t) >= 0 ? 0.4 : -0.4);
+    });
+    addWave('Pure Sine', 0.5, (t) => {
+      return Math.sin(2 * Math.PI * 220 * t) * 0.6;
+    });
+    addWave('Bright Triangle', 0.5, (t) => {
+      const f = 220;
+      return (Math.abs((t * f) % 1 - 0.5) * 4 - 1) * 0.6;
+    });
+    addWave('Pulse 20%', 0.5, (t) => {
+      const f = 220;
+      return (((t * f) % 1) < 0.20 ? 0.4 : -0.1);
+    });
+    addWave('Digital Organ', 0.5, (t) => {
+      const f = 220;
+      return (Math.sin(2 * Math.PI * f * t) + 
+              0.5 * Math.sin(2 * Math.PI * f * 2 * t) + 
+              0.25 * Math.sin(2 * Math.PI * f * 3 * t)) * 0.4;
+    });
+    addWave('Vocal Ahh', 0.5, (t) => {
+      const f = 220;
+      let val = 0;
+      for (let h = 1; h <= 12; h++) {
+        const freq = f * h;
+        const amp1 = 1 / (1 + Math.pow((freq - 800) / 150, 2));
+        const amp2 = 0.5 / (1 + Math.pow((freq - 1200) / 200, 2));
+        val += Math.sin(2 * Math.PI * freq * t) * (amp1 + amp2);
+      }
+      return val * 0.15;
+    });
+    addWave('White Noise', 0.5, () => (Math.random() * 2 - 1) * 0.25);
+  }
+  else if (kitType === 'CHIPTUNE') {
+    // 1. Laser
+    const laser = createBuffer(0.4);
+    const lData = laser.getChannelData(0);
+    for (let i = 0; i < lData.length; i++) {
+      const t = i / sampleRate;
+      const freq = 1200 * Math.exp(-t * 12) + 100;
+      const val = Math.sin(2 * Math.PI * freq * t) >= 0 ? 0.3 : -0.3;
+      lData[i] = val * Math.exp(-t * 6);
+    }
+    kit.push({ name: 'Arcade Laser', buffer: laser });
+
+    // 2. Coin
+    const coin = createBuffer(0.35);
+    const coData = coin.getChannelData(0);
+    for (let i = 0; i < coData.length; i++) {
+      const t = i / sampleRate;
+      const freq = t < 0.08 ? 987.77 : 1318.51;
+      const val = Math.sin(2 * Math.PI * freq * t) >= 0 ? 0.3 : -0.3;
+      coData[i] = val * Math.exp(-t * 8);
+    }
+    kit.push({ name: 'Coin Blip', buffer: coin });
+
+    // 3. Power Up
+    const pup = createBuffer(0.5);
+    const pData = pup.getChannelData(0);
+    for (let i = 0; i < pData.length; i++) {
+      const t = i / sampleRate;
+      const freq = 150 + t * 1500;
+      const val = Math.sin(2 * Math.PI * freq * t) >= 0 ? 0.25 : -0.25;
+      pData[i] = val * Math.exp(-t * 4);
+    }
+    kit.push({ name: 'Power Up', buffer: pup });
+
+    // 4. Power Down
+    const pdown = createBuffer(0.5);
+    const pdData = pdown.getChannelData(0);
+    for (let i = 0; i < pdData.length; i++) {
+      const t = i / sampleRate;
+      const freq = 800 - t * 700;
+      const val = Math.sin(2 * Math.PI * freq * t) >= 0 ? 0.25 : -0.25;
+      pdData[i] = val * Math.exp(-t * 4);
+    }
+    kit.push({ name: 'Power Down', buffer: pdown });
+
+    // 5. Jump
+    const jump = createBuffer(0.25);
+    const jData = jump.getChannelData(0);
+    for (let i = 0; i < jData.length; i++) {
+      const t = i / sampleRate;
+      const freq = 100 + Math.pow(t * 12, 2) * 50;
+      const val = Math.sin(2 * Math.PI * freq * t) >= 0 ? 0.25 : -0.25;
+      jData[i] = val * Math.exp(-t * 12);
+    }
+    kit.push({ name: 'Arcade Jump', buffer: jump });
+
+    // 6. Explosion
+    const exp = createBuffer(0.6);
+    const eData = exp.getChannelData(0);
+    for (let i = 0; i < eData.length; i++) {
+      const t = i / sampleRate;
+      const noise = Math.random() * 2 - 1;
+      const freq = 100 * Math.exp(-t * 6) + 30;
+      const tone = Math.sin(2 * Math.PI * freq * t) >= 0 ? 0.4 : -0.4;
+      eData[i] = (noise * 0.6 + tone * 0.4) * Math.exp(-t * 5);
+    }
+    kit.push({ name: 'Explosion', buffer: exp });
+
+    // 7. Hit Hurt
+    const hit = createBuffer(0.18);
+    const hiData = hit.getChannelData(0);
+    for (let i = 0; i < hiData.length; i++) {
+      const t = i / sampleRate;
+      const freq = 300 * Math.exp(-t * 25) + 80;
+      const val = Math.sin(2 * Math.PI * freq * t) >= 0 ? 0.3 : -0.3;
+      hiData[i] = val * Math.exp(-t * 15);
+    }
+    kit.push({ name: 'Hit Hurt', buffer: hit });
+
+    // 8. 8-Bit Melody
+    const mel = createBuffer(0.8);
+    const mData = mel.getChannelData(0);
+    for (let i = 0; i < mData.length; i++) {
+      const t = i / sampleRate;
+      let freq = 261.63;
+      if (t > 0.6) freq = 523.25;
+      else if (t > 0.4) freq = 392.00;
+      else if (t > 0.2) freq = 329.63;
+      const val = Math.sin(2 * Math.PI * freq * t) >= 0 ? 0.25 : -0.25;
+      mData[i] = val * Math.exp(-t * 1.5);
+    }
+    kit.push({ name: 'Blip Arp', buffer: mel });
+  }
+  else if (kitType === 'AMBIENT') {
+    // 1. Vinyl Crackle
+    const vinyl = createBuffer(1.0);
+    const vData = vinyl.getChannelData(0);
+    for (let i = 0; i < vData.length; i++) {
+      const r = Math.random();
+      let pop = 0;
+      if (r > 0.9992) pop = (Math.random() * 2 - 1) * 0.7;
+      const rumble = Math.sin(2 * Math.PI * (Math.random() * 10 + 20) * (i / sampleRate)) * 0.03;
+      vData[i] = (rumble + pop) * 0.6;
+    }
+    kit.push({ name: 'Vinyl Dust & Pop', buffer: vinyl });
+
+    // 2. Synth Pad
+    const pad = createBuffer(1.2);
+    const pData = pad.getChannelData(0);
+    for (let i = 0; i < pData.length; i++) {
+      const t = i / sampleRate;
+      const f1 = 130.81;
+      const f2 = 164.81;
+      const f3 = 196.00;
+      const f4 = 246.94;
+      const env = Math.sin(Math.PI * t / 1.2) * 0.35;
+      pData[i] = (Math.sin(2 * Math.PI * f1 * t) + Math.sin(2 * Math.PI * f2 * t) + Math.sin(2 * Math.PI * f3 * t) + Math.sin(2 * Math.PI * f4 * t)) * env;
+    }
+    kit.push({ name: 'Ambient Pad', buffer: pad });
+
+    // 3. FM E-Piano
+    const ep = createBuffer(0.9);
+    const epData = ep.getChannelData(0);
+    for (let i = 0; i < epData.length; i++) {
+      const t = i / sampleRate;
+      const carrier = 440;
+      const modulator = 440 * 2.5;
+      const index = 5.0 * Math.exp(-t * 4);
+      const modVal = Math.sin(2 * Math.PI * modulator * t) * index;
+      const env = Math.exp(-t * 2.2);
+      epData[i] = Math.sin(2 * Math.PI * carrier * t + modVal) * env * 0.4;
+    }
+    kit.push({ name: 'FM E-Piano A4', buffer: ep });
+
+    // 4. Tape Lofi Sine
+    const sine = createBuffer(0.8);
+    const sData = sine.getChannelData(0);
+    for (let i = 0; i < sData.length; i++) {
+      const t = i / sampleRate;
+      const vibrato = Math.sin(2 * Math.PI * 6 * t) * 2;
+      const freq = 329.63 + vibrato;
+      const env = Math.exp(-t * 1.5) * (1 - Math.exp(-t * 30));
+      sData[i] = Math.sin(2 * Math.PI * freq * t) * env * 0.6;
+    }
+    kit.push({ name: 'Lofi Tape Sine', buffer: sine });
+
+    // 5. Wooden Block
+    const wood = createBuffer(0.18);
+    const wData = wood.getChannelData(0);
+    for (let i = 0; i < wData.length; i++) {
+      const t = i / sampleRate;
+      const freq = 600 * Math.exp(-t * 20);
+      const env = Math.exp(-t * 35);
+      wData[i] = Math.sin(2 * Math.PI * freq * t) * env * 0.65;
+    }
+    kit.push({ name: 'Wood Block', buffer: wood });
+
+    // 6. FM Bell
+    const bell = createBuffer(0.7);
+    const bData = bell.getChannelData(0);
+    for (let i = 0; i < bData.length; i++) {
+      const t = i / sampleRate;
+      const carrier = 880;
+      const modulator = 880 * 3.5;
+      const index = 8.0 * Math.exp(-t * 12);
+      const modVal = Math.sin(2 * Math.PI * modulator * t) * index;
+      const env = Math.exp(-t * 3.5);
+      bData[i] = Math.sin(2 * Math.PI * carrier * t + modVal) * env * 0.45;
+    }
+    kit.push({ name: 'FM Bell A5', buffer: bell });
+
+    // 7. Drone
+    const drone = createBuffer(1.2);
+    const dData = drone.getChannelData(0);
+    for (let i = 0; i < dData.length; i++) {
+      const t = i / sampleRate;
+      const f1 = 65.41;
+      const f2 = 65.80;
+      const env = Math.sin(Math.PI * t / 1.2) * 0.45;
+      dData[i] = (Math.sin(2 * Math.PI * f1 * t) + Math.sin(2 * Math.PI * f2 * t)) * env;
+    }
+    kit.push({ name: 'Low Detuned Drone', buffer: drone });
+
+    // 8. Chime
+    const chime = createBuffer(0.9);
+    const chData = chime.getChannelData(0);
+    for (let i = 0; i < chData.length; i++) {
+      const t = i / sampleRate;
+      const f1 = 1200;
+      const f2 = 1750;
+      const f3 = 2400;
+      const env = Math.exp(-t * 6);
+      chData[i] = (Math.sin(2 * Math.PI * f1 * t) * 0.4 + Math.sin(2 * Math.PI * f2 * t) * 0.3 + Math.sin(2 * Math.PI * f3 * t) * 0.2) * env;
+    }
+    kit.push({ name: 'Chime Bell', buffer: chime });
+  }
+
+  return kit.map(item => {
+    const mono = item.buffer;
+    const stereo = ctx.createBuffer(2, mono.length, mono.sampleRate);
+    stereo.getChannelData(0).set(mono.getChannelData(0));
+    stereo.getChannelData(1).set(mono.getChannelData(0));
+    return { name: item.name, buffer: stereo };
+  });
+};
+
 // MIDI Pitch to Frequency
 const getFreq = (note) => 440 * Math.pow(2, (note - 69) / 12);
 
@@ -2296,6 +2658,51 @@ export default function Delta7Synth() {
       }
     }
     return reversed;
+  };
+
+  const loadKitPreset = async (kitType) => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    
+    showEditorStatus(`Generating ${kitType} Kit... ⏳`);
+    try {
+      const generatedSamples = generateSynthesizedKit(ctx, kitType);
+      
+      const nextSlots = sampleSlotsRef.current.map((slot, idx) => {
+        if (idx < generatedSamples.length) {
+          const item = generatedSamples[idx];
+          return {
+            ...slot,
+            name: item.name,
+            buffer: item.buffer,
+            revBuffer: getReversedBuffer(ctx, item.buffer),
+            start: 0.0,
+            end: 1.0,
+            loopStart: 0.0,
+            loopEnd: 1.0,
+            loopOn: false,
+            reverseOn: false,
+            sliceCount: 16,
+            sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false }))
+          };
+        }
+        return slot;
+      });
+
+      sampleSlotsRef.current = nextSlots;
+      setSampleSlots(nextSlots);
+
+      // Save to DB
+      for (const slot of nextSlots) {
+        await saveSampleToDb(slot);
+      }
+
+      showEditorStatus(`Loaded ${kitType} Kit to U1-U8! 💾`);
+    } catch (err) {
+      console.error("Error loading kit preset:", err);
+      showEditorStatus("Failed to generate kit preset.");
+    }
   };
 
   const connectIFXSlot = (ctx, slotNum, type, mix) => {
@@ -8049,37 +8456,86 @@ export default function Delta7Synth() {
             </div>
           </div>
 
-          {/* Patches Selection Keys */}
+          {/* Sample Kit Banks */}
           <div className="patches-quick-category">
-            <span className="knob-label">Program Select category</span>
-            <div className="patches-grid-buttons font-mono">
-              {FACTORY_PROGRAMS.map((prog, idx) => (
-                <button 
-                  key={prog.id}
-                  className={`patch-select-key ${currentMode === 'PROG' && selectedProgIndex === idx ? 'key-selected' : ''}`}
-                  onClick={() => {
-                    toggleMode('PROG');
-                    handleSelectProgram(idx);
-                  }}
-                >
-                  {prog.name.slice(0, 4)}
-                </button>
-              ))}
+            <span className="knob-label">Load Sample Kit presets</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '2px' }}>
+              <button 
+                className="btn btn-xs" 
+                style={{ fontSize: '0.45rem', padding: '3px 2px', borderColor: '#00f3ff', color: '#00f3ff' }}
+                onClick={() => loadKitPreset('DRUMS')}
+              >
+                RETRO DRUMS
+              </button>
+              <button 
+                className="btn btn-xs" 
+                style={{ fontSize: '0.45rem', padding: '3px 2px', borderColor: '#00f3ff', color: '#00f3ff' }}
+                onClick={() => loadKitPreset('WAVES')}
+              >
+                SYNTH WAVES
+              </button>
+              <button 
+                className="btn btn-xs" 
+                style={{ fontSize: '0.45rem', padding: '3px 2px', borderColor: '#ff00ff', color: '#ff00ff' }}
+                onClick={() => loadKitPreset('CHIPTUNE')}
+              >
+                8-BIT ARCADE
+              </button>
+              <button 
+                className="btn btn-xs" 
+                style={{ fontSize: '0.45rem', padding: '3px 2px', borderColor: '#ff00ff', color: '#ff00ff' }}
+                onClick={() => loadKitPreset('AMBIENT')}
+              >
+                AMBIENT CHILL
+              </button>
             </div>
-            
-            <div className="combi-select-buttons font-mono">
-              {FACTORY_COMBIS.map((combi, idx) => (
-                <button 
-                  key={combi.id}
-                  className={`patch-select-key combi-key ${currentMode === 'COMBI' && selectedCombiIndex === idx ? 'key-selected-combi' : ''}`}
-                  onClick={() => {
-                    toggleMode('COMBI');
-                    handleSelectCombi(idx);
-                  }}
-                >
-                  {combi.name.slice(0, 4)}
-                </button>
-              ))}
+
+            {/* Active Directory List of loaded slot names */}
+            <span className="knob-label">Sample Slot Registry</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '4px', maxHeight: '110px', overflowY: 'auto' }}>
+              {sampleSlots.map((slot) => {
+                const isSelected = slot.id === selectedEditSlotId;
+                return (
+                  <div 
+                    key={slot.id}
+                    onClick={() => {
+                      setSelectedEditSlotId(slot.id);
+                      setParams(prev => ({
+                        ...prev,
+                        oscAWave: slot.id
+                      }));
+                    }}
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      padding: '2px 6px', 
+                      fontSize: '0.5rem', 
+                      fontFamily: 'monospace',
+                      cursor: 'pointer',
+                      borderRadius: '2px',
+                      background: isSelected ? 'rgba(0, 243, 255, 0.15)' : 'transparent',
+                      border: isSelected ? '1px solid rgba(0, 243, 255, 0.3)' : '1px solid transparent',
+                      color: isSelected ? '#ffe600' : '#88ccee',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span style={{ fontWeight: 'bold' }}>{getSlotLabel(slot.id)}:</span>
+                    <span style={{ 
+                      textOverflow: 'ellipsis', 
+                      overflow: 'hidden', 
+                      whiteSpace: 'nowrap', 
+                      maxWidth: '120px',
+                      color: slot.buffer ? '#fff' : '#555'
+                    }}>
+                      {slot.buffer ? slot.name : '(Empty)'}
+                    </span>
+                    <span style={{ fontSize: '0.42rem', opacity: 0.6, color: '#00ff66' }}>
+                      {slot.buffer ? `${Math.round(slot.buffer.duration * 10) / 10}s` : ''}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
