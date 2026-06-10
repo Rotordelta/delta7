@@ -7068,7 +7068,7 @@ export default function Delta7Synth() {
                 }}
               >
                 {/* Vector Vinyl Disc inside the rotating div */}
-                <svg width="200" height="200" viewBox="0 0 200 200" style={{ display: 'block', pointerEvents: 'none' }}>
+                <svg width="250" height="250" viewBox="0 0 250 250" style={{ display: 'block', pointerEvents: 'none' }}>
                   <defs>
                     <radialGradient id="vinylGradA" cx="50%" cy="50%" r="50%">
                       <stop offset="0%" stopColor="#2c2c2c" />
@@ -7079,40 +7079,40 @@ export default function Delta7Synth() {
                     </radialGradient>
                   </defs>
                   {/* Black Vinyl Grooves Background */}
-                  <circle cx="100" cy="100" r="98" fill="url(#vinylGradA)" stroke="#333" strokeWidth="2.5" />
+                  <circle cx="125" cy="125" r="123" fill="url(#vinylGradA)" stroke="#333" strokeWidth="2.5" />
                   {/* Groove lines details */}
-                  <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                  <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                  <circle cx="100" cy="100" r="55" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="125" cy="125" r="110" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="125" cy="125" r="95" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="125" cy="125" r="80" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
                   
                   {/* Strobe/Marker line */}
-                  <line x1="100" y1="2" x2="100" y2="12" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" />
+                  <line x1="125" y1="2" x2="125" y2="15" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
               </div>
 
               {/* 8 Concentric Playhead Rings & Central display (Stationary Overlay) */}
               <svg 
-                width="200" 
-                height="200" 
-                viewBox="0 0 200 200" 
+                width="250" 
+                height="250" 
+                viewBox="0 0 250 250" 
                 style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }}
               >
                 {ringColors.map((color, idx) => {
-                  const r = 90 - idx * 7.2;
+                  const r = 115 - idx * 9;
                   return (
                     <g key={idx}>
                       {/* Dashed track circle */}
                       <circle
                         ref={(el) => { if (el) ringTracksRefA.current[idx] = el; }}
-                        cx="100"
-                        cy="100"
+                        cx="125"
+                        cy="125"
                         r={r}
                         fill="none"
                         stroke={color}
                         strokeWidth="2.2"
                         strokeDasharray="4, 5"
                         style={{
-                          transformOrigin: '100px 100px',
+                          transformOrigin: '125px 125px',
                           opacity: 0.18,
                           transition: 'opacity 0.2s ease'
                         }}
@@ -7120,15 +7120,15 @@ export default function Delta7Synth() {
                       {/* Bright glowing playhead dot */}
                       <circle
                         ref={(el) => { if (el) ringDotsRefA.current[idx] = el; }}
-                        cx="100"
-                        cy={100 - r}
+                        cx="125"
+                        cy={125 - r}
                         r="3.5"
                         fill="#ffffff"
                         stroke={color}
                         strokeWidth="1.5"
                         style={{
                           opacity: 0,
-                          transformOrigin: '100px 100px',
+                          transformOrigin: '125px 125px',
                           filter: `drop-shadow(0 0 5px ${color})`,
                           transition: 'opacity 0.1s ease'
                         }}
@@ -7138,12 +7138,12 @@ export default function Delta7Synth() {
                 })}
 
                 {/* Center Display Hub (Stationary) */}
-                <circle cx="100" cy="100" r="32" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
-                <circle cx="100" cy="100" r="28" fill="#040810" />
+                <circle cx="125" cy="125" r="38" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
+                <circle cx="125" cy="125" r="34" fill="#040810" />
                 
                 <text 
-                  x="100" 
-                  y="92" 
+                  x="125" 
+                  y="117" 
                   textAnchor="middle" 
                   fill="#00f3ff" 
                   fontSize="8" 
@@ -7154,8 +7154,8 @@ export default function Delta7Synth() {
                   OSC A
                 </text>
                 <text 
-                  x="100" 
-                  y="108" 
+                  x="125" 
+                  y="133" 
                   textAnchor="middle" 
                   fill="#ffffff" 
                   fontSize="7" 
@@ -7174,8 +7174,8 @@ export default function Delta7Synth() {
                   position: 'absolute',
                   top: '8px',
                   right: '8px',
-                  width: '32px',
-                  height: '90px',
+                  width: '40px',
+                  height: '115px',
                   pointerEvents: 'none',
                   transformOrigin: '15% 10%',
                   zIndex: 4
@@ -7538,7 +7538,7 @@ export default function Delta7Synth() {
                 }}
               >
                 {/* Vector Vinyl Disc inside the rotating div */}
-                <svg width="200" height="200" viewBox="0 0 200 200" style={{ display: 'block', pointerEvents: 'none' }}>
+                <svg width="250" height="250" viewBox="0 0 250 250" style={{ display: 'block', pointerEvents: 'none' }}>
                   <defs>
                     <radialGradient id="vinylGradB" cx="50%" cy="50%" r="50%">
                       <stop offset="0%" stopColor="#2c2c2c" />
@@ -7549,40 +7549,40 @@ export default function Delta7Synth() {
                     </radialGradient>
                   </defs>
                   {/* Black Vinyl Grooves Background */}
-                  <circle cx="100" cy="100" r="98" fill="url(#vinylGradB)" stroke="#333" strokeWidth="2.5" />
+                  <circle cx="125" cy="125" r="123" fill="url(#vinylGradB)" stroke="#333" strokeWidth="2.5" />
                   {/* Groove lines details */}
-                  <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                  <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                  <circle cx="100" cy="100" r="55" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="125" cy="125" r="110" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="125" cy="125" r="95" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="125" cy="125" r="80" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
                   
                   {/* Strobe/Marker line */}
-                  <line x1="100" y1="2" x2="100" y2="12" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" />
+                  <line x1="125" y1="2" x2="125" y2="15" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
               </div>
 
               {/* 8 Concentric Playhead Rings & Central display (Stationary Overlay) */}
               <svg 
-                width="200" 
-                height="200" 
-                viewBox="0 0 200 200" 
+                width="250" 
+                height="250" 
+                viewBox="0 0 250 250" 
                 style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }}
               >
                 {ringColors.map((color, idx) => {
-                  const r = 90 - idx * 7.2;
+                  const r = 115 - idx * 9;
                   return (
                     <g key={idx}>
                       {/* Dashed track circle */}
                       <circle
                         ref={(el) => { if (el) ringTracksRefB.current[idx] = el; }}
-                        cx="100"
-                        cy="100"
+                        cx="125"
+                        cy="125"
                         r={r}
                         fill="none"
                         stroke={color}
                         strokeWidth="2.2"
                         strokeDasharray="4, 5"
                         style={{
-                          transformOrigin: '100px 100px',
+                          transformOrigin: '125px 125px',
                           opacity: 0.18,
                           transition: 'opacity 0.2s ease'
                         }}
@@ -7590,15 +7590,15 @@ export default function Delta7Synth() {
                       {/* Bright glowing playhead dot */}
                       <circle
                         ref={(el) => { if (el) ringDotsRefB.current[idx] = el; }}
-                        cx="100"
-                        cy={100 - r}
+                        cx="125"
+                        cy={125 - r}
                         r="3.5"
                         fill="#ffffff"
                         stroke={color}
                         strokeWidth="1.5"
                         style={{
                           opacity: 0,
-                          transformOrigin: '100px 100px',
+                          transformOrigin: '125px 125px',
                           filter: `drop-shadow(0 0 5px ${color})`,
                           transition: 'opacity 0.1s ease'
                         }}
@@ -7608,12 +7608,12 @@ export default function Delta7Synth() {
                 })}
 
                 {/* Center Display Hub (Stationary) */}
-                <circle cx="100" cy="100" r="32" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
-                <circle cx="100" cy="100" r="28" fill="#040810" />
+                <circle cx="125" cy="125" r="38" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
+                <circle cx="125" cy="125" r="34" fill="#040810" />
                 
                 <text 
-                  x="100" 
-                  y="92" 
+                  x="125" 
+                  y="117" 
                   textAnchor="middle" 
                   fill="#ff00ff" 
                   fontSize="8" 
@@ -7624,8 +7624,8 @@ export default function Delta7Synth() {
                   OSC B
                 </text>
                 <text 
-                  x="100" 
-                  y="108" 
+                  x="125" 
+                  y="133" 
                   textAnchor="middle" 
                   fill="#ffffff" 
                   fontSize="7" 
@@ -7644,8 +7644,8 @@ export default function Delta7Synth() {
                   position: 'absolute',
                   top: '8px',
                   right: '8px',
-                  width: '32px',
-                  height: '90px',
+                  width: '40px',
+                  height: '115px',
                   pointerEvents: 'none',
                   transformOrigin: '15% 10%',
                   zIndex: 4
@@ -11016,8 +11016,8 @@ export default function Delta7Synth() {
 
         .vinyl-platter-wrapper {
           position: relative;
-          width: 200px;
-          height: 200px;
+          width: 250px;
+          height: 250px;
           margin: 6px auto;
         }
 
