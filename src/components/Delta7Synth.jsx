@@ -739,6 +739,12 @@ export default function Delta7Synth() {
   const deckAPlayingRef = useRef(false);
   const deckBPlayingRef = useRef(false);
   const crossfaderValRef = useRef(0.0);
+  const [deckASoloActive, setDeckASoloActive] = useState(false);
+  const [deckBSoloActive, setDeckBSoloActive] = useState(false);
+  const deckASoloActiveRef = useRef(false);
+  const deckBSoloActiveRef = useRef(false);
+  useEffect(() => { deckASoloActiveRef.current = deckASoloActive; }, [deckASoloActive]);
+  useEffect(() => { deckBSoloActiveRef.current = deckBSoloActive; }, [deckBSoloActive]);
   const [padMenuState, setPadMenuState] = useState({ visible: false, x: 0, y: 0, deck: 'A', index: 0 });
   const platterAngleARef = useRef(0);
   const platterAngleBRef = useRef(0);
@@ -6766,6 +6772,55 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     stopPerfVoice(voiceKey);
 
+    // Solo Mode logic: Cut out all other pads on the active deck
+    if (deck === 'A' && deckASoloActiveRef.current) {
+      for (let i = 0; i < 8; i++) {
+        if (type !== 'slot' || i !== index) {
+          stopPerfVoice(`perf-a-slot-${i}`);
+        }
+        if (type !== 'slice' || i !== index) {
+          stopPerfVoice(`perf-a-slice-${i}`);
+        }
+      }
+      setActivePerfPads(prev => {
+        const next = { ...prev };
+        for (let i = 0; i < 8; i++) {
+          if (type !== 'slot' || i !== index) {
+            delete next[`A-slot-${i}`];
+            delete next[`A-slot-${i}-pending`];
+          }
+          if (type !== 'slice' || i !== index) {
+            delete next[`A-slice-${i}`];
+            delete next[`A-slice-${i}-pending`];
+          }
+        }
+        return next;
+      });
+    } else if (deck === 'B' && deckBSoloActiveRef.current) {
+      for (let i = 0; i < 8; i++) {
+        if (type !== 'slot' || i !== index) {
+          stopPerfVoice(`perf-b-slot-${i}`);
+        }
+        if (type !== 'slice' || i !== index) {
+          stopPerfVoice(`perf-b-slice-${i}`);
+        }
+      }
+      setActivePerfPads(prev => {
+        const next = { ...prev };
+        for (let i = 0; i < 8; i++) {
+          if (type !== 'slot' || i !== index) {
+            delete next[`B-slot-${i}`];
+            delete next[`B-slot-${i}-pending`];
+          }
+          if (type !== 'slice' || i !== index) {
+            delete next[`B-slice-${i}`];
+            delete next[`B-slice-${i}-pending`];
+          }
+        }
+        return next;
+      });
+    }
+
     const currentParams = paramsRef.current;
     let slotId = '';
     
@@ -8828,21 +8883,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             {/* Transport controls */}
             <div className="deck-row" style={{ width: '100%', marginTop: '6px', padding: '0 4px' }}>
               <button 
-                className="deck-btn deck-btn-sync"
+                className={`deck-btn deck-btn-sync ${deckASoloActive ? 'active' : ''}`}
                 onClick={() => {
-                  const slot = sampleSlots.find(s => s.id === params.oscAWave);
-                  if (slot && slot.buffer) {
-                    const dur = slot.buffer.duration * (slot.end - slot.start);
-                    const beats = slot.warpBeats || 4;
-                    const calculatedBpm = Math.round(Math.max(40, Math.min(250, (60 * beats) / dur)));
-                    setParams(prev => ({ ...prev, arpBpm: calculatedBpm }));
-                    showEditorStatus(`Synced Deck A to ${calculatedBpm} BPM! 🔄`);
-                  } else {
-                    showEditorStatus("Load a sample on Deck A first!");
-                  }
+                  const nextSolo = !deckASoloActive;
+                  setDeckASoloActive(nextSolo);
+                  showEditorStatus(`Deck A Solo Mode: ${nextSolo ? 'ON' : 'OFF'} 🎧`);
                 }}
+                title="Solo Deck A (Only one pad plays at a time)"
               >
-                Sync
+                Solo
               </button>
               <button 
                 className="deck-btn deck-btn-cue"
@@ -9749,21 +9798,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             {/* Transport controls */}
             <div className="deck-row" style={{ width: '100%', marginTop: '6px', padding: '0 4px' }}>
               <button 
-                className="deck-btn deck-btn-sync"
+                className={`deck-btn deck-btn-sync ${deckBSoloActive ? 'active' : ''}`}
                 onClick={() => {
-                  const slot = sampleSlots.find(s => s.id === params.oscBWave);
-                  if (slot && slot.buffer) {
-                    const dur = slot.buffer.duration * (slot.end - slot.start);
-                    const beats = slot.warpBeats || 4;
-                    const calculatedBpm = Math.round(Math.max(40, Math.min(250, (60 * beats) / dur)));
-                    setParams(prev => ({ ...prev, arpBpm: calculatedBpm }));
-                    showEditorStatus(`Synced Deck B to ${calculatedBpm} BPM! 🔄`);
-                  } else {
-                    showEditorStatus("Load a sample on Deck B first!");
-                  }
+                  const nextSolo = !deckBSoloActive;
+                  setDeckBSoloActive(nextSolo);
+                  showEditorStatus(`Deck B Solo Mode: ${nextSolo ? 'ON' : 'OFF'} 🎧`);
                 }}
+                title="Solo Deck B (Only one pad plays at a time)"
               >
-                Sync
+                Solo
               </button>
               <button 
                 className="deck-btn deck-btn-cue"
