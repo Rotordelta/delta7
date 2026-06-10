@@ -718,8 +718,15 @@ export default function Delta7Synth() {
   const [activePerfPads, setActivePerfPads] = useState({});
   const [deckAPlaying, setDeckAPlaying] = useState(false);
   const [deckBPlaying, setDeckBPlaying] = useState(false);
-  const [platterAngleA, setPlatterAngleA] = useState(0);
-  const [platterAngleB, setPlatterAngleB] = useState(0);
+  const platterAngleARef = useRef(0);
+  const platterAngleBRef = useRef(0);
+  const platterRefA = useRef(null);
+  const platterRefB = useRef(null);
+  const ringTracksRefA = useRef([]);
+  const ringDotsRefA = useRef([]);
+  const ringTracksRefB = useRef([]);
+  const ringDotsRefB = useRef([]);
+  const timelinePlayheadRef = useRef(null);
   const [deckAVolFader, setDeckAVolFader] = useState(0.8);
   const [deckBVolFader, setDeckBVolFader] = useState(0.8);
   const [crossfaderVal, setCrossfaderVal] = useState(0.0);
@@ -936,22 +943,31 @@ export default function Delta7Synth() {
       
       // Platter spin increment
       if (getIsDeckActive('A') && !isScratchingA.current) {
-        setPlatterAngleA(prev => (prev + delta * 180) % 360);
+        platterAngleARef.current = (platterAngleARef.current + delta * 180) % 360;
+        if (platterRefA.current) {
+          platterRefA.current.style.transform = `rotate(${platterAngleARef.current}deg)`;
+        }
       }
       if (getIsDeckActive('B') && !isScratchingB.current) {
-        setPlatterAngleB(prev => (prev + delta * 180) % 360);
+        platterAngleBRef.current = (platterAngleBRef.current + delta * 180) % 360;
+        if (platterRefB.current) {
+          platterRefB.current.style.transform = `rotate(${platterAngleBRef.current}deg)`;
+        }
       }
 
       // Concentric rings & timeline beat
       const ctx = audioCtxRef.current;
       if (ctx) {
         // Timeline beat & auto-scroll
+        let currentBeat = 0;
         if (perfPlaybackActiveRef.current && perfPlayStartTimeRef.current > 0) {
           const elapsed = ctx.currentTime - perfPlayStartTimeRef.current;
           const bpm = paramsRef.current.arpBpm || 120;
           const beatDuration = 60 / bpm;
-          const currentBeat = elapsed / beatDuration;
-          setCurrentPerfPlayBeat(currentBeat);
+          currentBeat = elapsed / beatDuration;
+          if (timelinePlayheadRef.current) {
+            timelinePlayheadRef.current.style.left = `${currentBeat * 30}px`;
+          }
           if (timelineScrollRef.current) {
             const playheadPx = currentBeat * 30;
             const halfWidth = timelineScrollRef.current.clientWidth / 2;
@@ -961,8 +977,10 @@ export default function Delta7Synth() {
           const elapsed = ctx.currentTime - perfStartTimeRef.current;
           const bpm = paramsRef.current.arpBpm || 120;
           const beatDuration = 60 / bpm;
-          const currentBeat = elapsed / beatDuration;
-          setCurrentPerfPlayBeat(currentBeat);
+          currentBeat = elapsed / beatDuration;
+          if (timelinePlayheadRef.current) {
+            timelinePlayheadRef.current.style.left = `${currentBeat * 30}px`;
+          }
           if (timelineScrollRef.current) {
             const playheadPx = currentBeat * 30;
             const halfWidth = timelineScrollRef.current.clientWidth / 2;
@@ -998,14 +1016,44 @@ export default function Delta7Synth() {
           return (pos / duration) * 360;
         };
 
-        const nextAnglesA = new Array(8);
-        const nextAnglesB = new Array(8);
+        // Mutate concentric playhead rings and satellite dots directly in the DOM
         for (let i = 0; i < 8; i++) {
-          nextAnglesA[i] = getRingAngle('A', i);
-          nextAnglesB[i] = getRingAngle('B', i);
+          const angleA = getRingAngle('A', i);
+          const voiceKeyA = `perf-a-slot-${i}`;
+          const voicesA = activeVoicesRef.current.get(voiceKeyA);
+          const isActiveA = voicesA && voicesA.length > 0;
+          
+          const trackA = ringTracksRefA.current[i];
+          const dotA = ringDotsRefA.current[i];
+          
+          if (trackA) {
+            trackA.style.transform = `rotate(${angleA}deg)`;
+            trackA.style.opacity = isActiveA ? '0.9' : '0.18';
+            trackA.style.filter = isActiveA ? `drop-shadow(0 0 3px ${ringColors[i]})` : 'none';
+          }
+          if (dotA) {
+            dotA.style.transform = `rotate(${angleA}deg)`;
+            dotA.style.opacity = isActiveA ? '1' : '0';
+          }
+
+          const angleB = getRingAngle('B', i);
+          const voiceKeyB = `perf-b-slot-${i}`;
+          const voicesB = activeVoicesRef.current.get(voiceKeyB);
+          const isActiveB = voicesB && voicesB.length > 0;
+          
+          const trackB = ringTracksRefB.current[i];
+          const dotB = ringDotsRefB.current[i];
+          
+          if (trackB) {
+            trackB.style.transform = `rotate(${angleB}deg)`;
+            trackB.style.opacity = isActiveB ? '0.9' : '0.18';
+            trackB.style.filter = isActiveB ? `drop-shadow(0 0 3px ${ringColors[i]})` : 'none';
+          }
+          if (dotB) {
+            dotB.style.transform = `rotate(${angleB}deg)`;
+            dotB.style.opacity = isActiveB ? '1' : '0';
+          }
         }
-        setRingAnglesA(nextAnglesA);
-        setRingAnglesB(nextAnglesB);
       }
 
       // VU Meter values
@@ -7005,6 +7053,7 @@ export default function Delta7Synth() {
             
             <div className="vinyl-platter-wrapper">
               <div 
+                ref={platterRefA}
                 className="vinyl-platter"
                 onMouseDown={(e) => handlePlatterMouseDown('A', e)}
                 onMouseMove={(e) => handlePlatterMouseMove('A', e)}
@@ -7014,7 +7063,7 @@ export default function Delta7Synth() {
                 onTouchMove={(e) => { e.preventDefault(); handlePlatterMouseMove('A', e.touches[0]); }}
                 onTouchEnd={() => handlePlatterMouseUp('A')}
                 style={{ 
-                  transform: `rotate(${platterAngleA}deg)`,
+                  transform: `rotate(${platterAngleARef.current}deg)`,
                   transition: 'none'
                 }}
               >
@@ -7050,28 +7099,41 @@ export default function Delta7Synth() {
               >
                 {ringColors.map((color, idx) => {
                   const r = 90 - idx * 7.2;
-                  const angle = ringAnglesA[idx] || 0;
-                  const voiceKey = `perf-a-slot-${idx}`;
-                  const voices = activeVoicesRef.current.get(voiceKey);
-                  const isActive = voices && voices.length > 0;
                   return (
-                    <circle
-                      key={idx}
-                      cx="100"
-                      cy="100"
-                      r={r}
-                      fill="none"
-                      stroke={color}
-                      strokeWidth="2.2"
-                      strokeDasharray="4, 5"
-                      style={{
-                        transform: `rotate(${angle}deg)`,
-                        transformOrigin: '100px 100px',
-                        opacity: isActive ? 1.0 : 0.18,
-                        filter: isActive ? `drop-shadow(0 0 4px ${color})` : 'none',
-                        transition: 'opacity 0.2s ease, filter 0.2s ease'
-                      }}
-                    />
+                    <g key={idx}>
+                      {/* Dashed track circle */}
+                      <circle
+                        ref={(el) => { if (el) ringTracksRefA.current[idx] = el; }}
+                        cx="100"
+                        cy="100"
+                        r={r}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth="2.2"
+                        strokeDasharray="4, 5"
+                        style={{
+                          transformOrigin: '100px 100px',
+                          opacity: 0.18,
+                          transition: 'opacity 0.2s ease'
+                        }}
+                      />
+                      {/* Bright glowing playhead dot */}
+                      <circle
+                        ref={(el) => { if (el) ringDotsRefA.current[idx] = el; }}
+                        cx="100"
+                        cy={100 - r}
+                        r="3.5"
+                        fill="#ffffff"
+                        stroke={color}
+                        strokeWidth="1.5"
+                        style={{
+                          opacity: 0,
+                          transformOrigin: '100px 100px',
+                          filter: `drop-shadow(0 0 5px ${color})`,
+                          transition: 'opacity 0.1s ease'
+                        }}
+                      />
+                    </g>
                   );
                 })}
 
@@ -7461,6 +7523,7 @@ export default function Delta7Synth() {
             
             <div className="vinyl-platter-wrapper">
               <div 
+                ref={platterRefB}
                 className="vinyl-platter"
                 onMouseDown={(e) => handlePlatterMouseDown('B', e)}
                 onMouseMove={(e) => handlePlatterMouseMove('B', e)}
@@ -7470,7 +7533,7 @@ export default function Delta7Synth() {
                 onTouchMove={(e) => { e.preventDefault(); handlePlatterMouseMove('B', e.touches[0]); }}
                 onTouchEnd={() => handlePlatterMouseUp('B')}
                 style={{ 
-                  transform: `rotate(${platterAngleB}deg)`,
+                  transform: `rotate(${platterAngleBRef.current}deg)`,
                   transition: 'none'
                 }}
               >
@@ -7506,28 +7569,41 @@ export default function Delta7Synth() {
               >
                 {ringColors.map((color, idx) => {
                   const r = 90 - idx * 7.2;
-                  const angle = ringAnglesB[idx] || 0;
-                  const voiceKey = `perf-b-slot-${idx}`;
-                  const voices = activeVoicesRef.current.get(voiceKey);
-                  const isActive = voices && voices.length > 0;
                   return (
-                    <circle
-                      key={idx}
-                      cx="100"
-                      cy="100"
-                      r={r}
-                      fill="none"
-                      stroke={color}
-                      strokeWidth="2.2"
-                      strokeDasharray="4, 5"
-                      style={{
-                        transform: `rotate(${angle}deg)`,
-                        transformOrigin: '100px 100px',
-                        opacity: isActive ? 1.0 : 0.18,
-                        filter: isActive ? `drop-shadow(0 0 4px ${color})` : 'none',
-                        transition: 'opacity 0.2s ease, filter 0.2s ease'
-                      }}
-                    />
+                    <g key={idx}>
+                      {/* Dashed track circle */}
+                      <circle
+                        ref={(el) => { if (el) ringTracksRefB.current[idx] = el; }}
+                        cx="100"
+                        cy="100"
+                        r={r}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth="2.2"
+                        strokeDasharray="4, 5"
+                        style={{
+                          transformOrigin: '100px 100px',
+                          opacity: 0.18,
+                          transition: 'opacity 0.2s ease'
+                        }}
+                      />
+                      {/* Bright glowing playhead dot */}
+                      <circle
+                        ref={(el) => { if (el) ringDotsRefB.current[idx] = el; }}
+                        cx="100"
+                        cy={100 - r}
+                        r="3.5"
+                        fill="#ffffff"
+                        stroke={color}
+                        strokeWidth="1.5"
+                        style={{
+                          opacity: 0,
+                          transformOrigin: '100px 100px',
+                          filter: `drop-shadow(0 0 5px ${color})`,
+                          transition: 'opacity 0.1s ease'
+                        }}
+                      />
+                    </g>
                   );
                 })}
 
@@ -7885,10 +7961,10 @@ export default function Delta7Synth() {
               ref={timelineScrollRef}
               className="perf-timeline-scroll-container"
             >
-              <div className="perf-timeline-grid-canvas" style={{ width: `${Math.max(64, currentPerfPlayBeat + 16) * 30}px` }}>
+              <div className="perf-timeline-grid-canvas" style={{ width: '3840px' }}>
                 
                 {/* Vertical Beat Grid Lines */}
-                {Array.from({ length: Math.ceil(Math.max(64, currentPerfPlayBeat + 16)) }).map((_, beatIdx) => {
+                {Array.from({ length: 128 }).map((_, beatIdx) => {
                   const isMajor = beatIdx % 4 === 0;
                   return (
                     <div
@@ -7950,8 +8026,9 @@ export default function Delta7Synth() {
 
                 {/* Playhead line */}
                 <div 
+                  ref={timelinePlayheadRef}
                   className="perf-timeline-playhead"
-                  style={{ left: `${currentPerfPlayBeat * 30}px` }}
+                  style={{ left: '0px' }}
                 />
 
               </div>
