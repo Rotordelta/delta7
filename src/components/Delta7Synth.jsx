@@ -935,6 +935,25 @@ export default function Delta7Synth() {
       }
     };
     
+    const getIsDeckReverse = (deck) => {
+      const prefix = `perf-${deck.toLowerCase()}`;
+      for (const [key, voices] of activeVoicesRef.current.entries()) {
+        if (typeof key === 'string' && key.startsWith(prefix) && voices && voices.length > 0) {
+          const v = voices[0];
+          if (deck === 'A' && v.isReverseA) return true;
+          if (deck === 'B' && v.isReverseB) return true;
+        }
+      }
+      if (deck === 'A') {
+        const slotA = sampleSlotsRef.current.find(s => s.id === paramsRef.current.oscAWave);
+        if (slotA && slotA.reverseOn) return true;
+      } else {
+        const slotB = sampleSlotsRef.current.find(s => s.id === paramsRef.current.oscBWave);
+        if (slotB && slotB.reverseOn) return true;
+      }
+      return false;
+    };
+
     const tickLoop = () => {
       animId = requestAnimationFrame(tickLoop);
       const tNow = performance.now();
@@ -943,13 +962,15 @@ export default function Delta7Synth() {
       
       // Platter spin increment
       if (getIsDeckActive('A') && !isScratchingA.current) {
-        platterAngleARef.current = (platterAngleARef.current + delta * 180) % 360;
+        const dir = getIsDeckReverse('A') ? -1 : 1;
+        platterAngleARef.current = (platterAngleARef.current + dir * delta * 180 + 360) % 360;
         if (platterRefA.current) {
           platterRefA.current.style.transform = `rotate(${platterAngleARef.current}deg)`;
         }
       }
       if (getIsDeckActive('B') && !isScratchingB.current) {
-        platterAngleBRef.current = (platterAngleBRef.current + delta * 180) % 360;
+        const dir = getIsDeckReverse('B') ? -1 : 1;
+        platterAngleBRef.current = (platterAngleBRef.current + dir * delta * 180 + 360) % 360;
         if (platterRefB.current) {
           platterRefB.current.style.transform = `rotate(${platterAngleBRef.current}deg)`;
         }
@@ -1004,6 +1025,7 @@ export default function Delta7Synth() {
           const duration = isA ? voice.activeDurationA : voice.activeDurationB;
           const rate = isA ? (voice.orig_oscA_rate || 1.0) : (voice.orig_oscB_rate || 1.0);
           const isLoop = isA ? voice.isLoopA : voice.isLoopB;
+          const isReverse = isA ? voice.isReverseA : voice.isReverseB;
           
           if (duration <= 0) return 0;
           
@@ -1013,7 +1035,8 @@ export default function Delta7Synth() {
           } else {
             if (pos >= duration) return 0;
           }
-          return (pos / duration) * 360;
+          const progress = pos / duration;
+          return (isReverse ? (1.0 - progress) : progress) * 360;
         };
 
         // Mutate concentric playhead rings and satellite dots directly in the DOM
@@ -4324,7 +4347,10 @@ export default function Delta7Synth() {
       warpOnB: slotB ? !!slotB.warpOn : false,
       warpBeatsB: slotB ? (slotB.warpBeats || 4) : 4,
       activeDurationB: slotB && bufferB ? bufferB.duration * (slotB.end - slotB.start) : 0,
-      warpBaseRateB: warpBaseRateB
+      warpBaseRateB: warpBaseRateB,
+
+      isReverseA: isReverseA,
+      isReverseB: isReverseB
     };
 
     // isSliceGranular must be hoisted outside if(bufferA) — it's used in the panner block after that inner if closes
