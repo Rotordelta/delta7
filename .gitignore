@@ -24,3 +24,6 @@ dist/
 *.njsproj
 *.sln
 *.sw?
+
+# Electron builds
+dist_electron/
