@@ -9909,7 +9909,7 @@ export default function Delta7Synth() {
 
                 {/* ================= ROW 3: MODULATION ENVELOPES & FX MIX ================= */}
                 {/* ================= ROW 3: MODULATION ENVELOPES & FX MIX ================= */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.9fr 0.9fr', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.05fr', gap: '8px' }}>
                   
                   {/* Left Column: Filter & Amp Envelopes */}
                   <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px' }}>
@@ -9971,13 +9971,16 @@ export default function Delta7Synth() {
                     </div>
                   </div>
 
-                  {/* Middle Column: LFO, ARP & Global FX Mixer Controls */}
+                  {/* Right Column: LFO, ARP, STUTTER & GLOBAL FX */}
                   <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <h4 style={{ color: '#00f3ff', margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>LFO, ARP & GLOBAL FX</h4>
+                    <h4 style={{ color: '#00f3ff', margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>LFO, ARP, STUTTER & GLOBAL FX</h4>
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.6rem' }}>
-                      {/* LFO & ARP */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1.05fr 0.9fr', gap: '6px', fontSize: '0.55rem' }}>
+                      {/* Sub-column 1: LFO & Arpeggiator */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ color: '#ffe600', fontWeight: 'bold', fontSize: '0.55rem', borderBottom: '1px solid rgba(255,230,0,0.15)', paddingBottom: '2px', marginBottom: '2px' }}>
+                          LFO & ARPEGGIATOR
+                        </div>
                         {/* LFO */}
                         <div className="flex-row-sub">
                           <label>LFO Rate:</label>
@@ -9987,7 +9990,7 @@ export default function Delta7Synth() {
                             onChange={(e) => setParams(prev => ({ ...prev, lfo1Rate: parseFloat(e.target.value) }))} 
                             style={{ width: '45px', height: '8px' }}
                           />
-                          <span className="font-mono text-cyan" style={{ fontSize: '0.52rem', width: '20px', textAlign: 'right' }}>{Math.round(params.lfo1Rate)}H</span>
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.48rem', width: '20px', textAlign: 'right' }}>{Math.round(params.lfo1Rate)}H</span>
                         </div>
                         <div className="flex-row-sub" style={{ alignItems: 'center' }}>
                           <label>LFO Tgt:</label>
@@ -9997,7 +10000,7 @@ export default function Delta7Synth() {
                                 key={t}
                                 className={`segmented-btn btn-xs ${params.lfo1Target === t ? 'active' : ''}`}
                                 onClick={() => setParams(prev => ({ ...prev, lfo1Target: t }))}
-                                style={{ fontSize: '0.48rem', padding: '0px 2px' }}
+                                style={{ fontSize: '0.42rem', padding: '0px 2px' }}
                               >
                                 {t.slice(0, 3).toUpperCase()}
                               </button>
@@ -10011,7 +10014,7 @@ export default function Delta7Synth() {
                           <button
                             className={`segmented-btn btn-xs ${params.arpOn ? 'active' : ''}`}
                             onClick={() => setParams(prev => ({ ...prev, arpOn: !prev.arpOn }))}
-                            style={{ padding: '0px 3px', fontSize: '0.48rem', flexShrink: 0 }}
+                            style={{ padding: '0px 3px', fontSize: '0.45rem', flexShrink: 0 }}
                           >
                             {params.arpOn ? 'ON' : 'OFF'}
                           </button>
@@ -10019,82 +10022,28 @@ export default function Delta7Synth() {
                             type="range" min="40" max="250" step="1"
                             value={params.arpBpm || 120} 
                             onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseInt(e.target.value) || 120 }))} 
-                            style={{ flexGrow: 1, height: '8px', minWidth: '30px' }}
+                            style={{ flexGrow: 1, height: '8px', minWidth: '25px' }}
                           />
-                          <input 
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={params.arpBpm} 
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '');
-                              if (val === '') {
-                                setParams(prev => ({ ...prev, arpBpm: '' }));
-                              } else {
-                                const parsed = parseInt(val, 10);
-                                setParams(prev => ({ ...prev, arpBpm: Math.min(250, parsed) }));
-                              }
-                            }}
-                            onBlur={() => {
-                              const parsed = parseInt(params.arpBpm, 10);
-                              if (isNaN(parsed) || parsed < 40) {
-                                setParams(prev => ({ ...prev, arpBpm: 40 }));
-                              } else if (parsed > 250) {
-                                setParams(prev => ({ ...prev, arpBpm: 250 }));
-                              }
-                            }}
-                            style={{ 
-                              width: '22px', 
-                              background: '#000', 
-                              border: '1px solid rgba(0, 243, 255, 0.4)', 
-                              color: '#00f3ff', 
-                              fontFamily: 'monospace', 
-                              fontSize: '0.48rem', 
-                              textAlign: 'center', 
-                              borderRadius: '2px', 
-                              padding: '0px',
-                              outline: 'none',
-                              flexShrink: 0
-                            }}
-                          />
-                          <span className="font-mono text-cyan" style={{ fontSize: '0.48rem', flexShrink: 0 }}>B</span>
-                          <button
-                            className="segmented-btn btn-xs"
-                            onClick={handleTapTempo}
-                            style={{ 
-                              padding: '0px 3px', 
-                              fontSize: '0.45rem', 
-                              height: '11px', 
-                              border: '1px solid rgba(255, 0, 255, 0.6)', 
-                              color: '#ff00ff', 
-                              background: 'transparent', 
-                              cursor: 'pointer', 
-                              borderRadius: '2px',
-                              flexShrink: 0,
-                              textShadow: '0 0 2px rgba(255, 0, 255, 0.5)'
-                            }}
-                          >
-                            TAP
-                          </button>
                         </div>
+                        
                         {/* Arpeggiator Parameters (Pattern, Div, Gate) */}
-                        <div className="flex-row-sub" style={{ alignItems: 'center', marginTop: '2px', gap: '3px', fontSize: '0.5rem' }}>
-                          <span style={{ color: '#00f3ff', opacity: 0.8 }}>Pattern:</span>
+                        <div className="flex-row-sub" style={{ alignItems: 'center', gap: '3px', fontSize: '0.5rem' }}>
+                          <span style={{ color: '#00f3ff', opacity: 0.8 }}>Ptn:</span>
                           <select
                             value={params.arpPattern || 'UP'}
                             onChange={(e) => setParams(prev => ({ ...prev, arpPattern: e.target.value }))}
-                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.48rem', padding: '0px 1px', borderRadius: '2px', width: '38px', outline: 'none' }}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.45rem', padding: '0px 1px', borderRadius: '2px', width: '36px', outline: 'none' }}
                           >
                             <option value="UP">UP</option>
-                            <option value="DOWN">DOWN</option>
-                            <option value="RANDOM">RAND</option>
+                            <option value="DOWN">DN</option>
+                            <option value="RANDOM">RND</option>
                           </select>
                           
                           <span style={{ color: '#00f3ff', opacity: 0.8, marginLeft: '2px' }}>Div:</span>
                           <select
                             value={params.arpDivision || 8}
                             onChange={(e) => setParams(prev => ({ ...prev, arpDivision: parseInt(e.target.value) || 8 }))}
-                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.48rem', padding: '0px 1px', borderRadius: '2px', width: '30px', outline: 'none' }}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.45rem', padding: '0px 1px', borderRadius: '2px', width: '28px', outline: 'none' }}
                           >
                             <option value="4">1/4</option>
                             <option value="8">1/8</option>
@@ -10103,67 +10052,118 @@ export default function Delta7Synth() {
                             <option value="24">1/24</option>
                             <option value="32">1/32</option>
                           </select>
-
-                          <span style={{ color: '#00f3ff', opacity: 0.8, marginLeft: '2px' }}>Gate:</span>
+                        </div>
+                        <div className="flex-row-sub" style={{ alignItems: 'center', gap: '3px', fontSize: '0.5rem' }}>
+                          <span style={{ color: '#00f3ff', opacity: 0.8 }}>Gate:</span>
                           <input 
                             type="range" min="0.1" max="1.0" step="0.05"
                             value={params.arpGate !== undefined ? params.arpGate : 0.8} 
                             onChange={(e) => setParams(prev => ({ ...prev, arpGate: parseFloat(e.target.value) }))} 
-                            style={{ flexGrow: 1, height: '8px', minWidth: '20px' }}
-                            title={`Gate: ${(params.arpGate !== undefined ? params.arpGate : 0.8).toFixed(2)}`}
+                            style={{ flexGrow: 1, height: '8px' }}
                           />
                           <span style={{ fontFamily: 'monospace', fontSize: '0.45rem', width: '15px', textAlign: 'right', color: '#00f3ff' }}>
                             {Math.round((params.arpGate !== undefined ? params.arpGate : 0.8) * 100)}%
                           </span>
                         </div>
+                      </div>
 
-                        {/* Metronome / Click Track */}
-                        <div className="flex-row-sub" style={{ alignItems: 'center', marginTop: '2px', borderTop: '1px dashed rgba(255, 0, 255, 0.15)', paddingTop: '2px', gap: '3px', fontSize: '0.5rem' }}>
-                          <label style={{ width: '20px', flexShrink: 0, color: '#ff00ff' }}>Click:</label>
+                      {/* Sub-column 2: Stutter & Movement */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ color: '#ff00ff', fontWeight: 'bold', fontSize: '0.55rem', borderBottom: '1px solid rgba(255,0,255,0.15)', paddingBottom: '2px', marginBottom: '2px' }}>
+                          STUTTER & MOVEMENT
+                        </div>
+                        
+                        <div className="flex-row-sub" style={{ justifyContent: 'space-between', marginBottom: '1px' }}>
                           <button
-                            className={`segmented-btn btn-xs ${metronomeOn ? 'active' : ''}`}
-                            onClick={() => {
-                              if (metronomeOn) {
-                                stopMetronome();
-                                setMetronomeOn(false);
-                              } else {
-                                setMetronomeOn(true);
-                                startMetronome();
-                              }
-                            }}
-                            style={{ padding: '0px 3px', fontSize: '0.48rem', flexShrink: 0, borderColor: '#ff00ff', color: '#ff00ff' }}
+                            className={`btn btn-xs ${params.stutterOn ? 'active-pink' : ''}`}
+                            onClick={() => setParams(prev => ({ ...prev, stutterOn: !prev.stutterOn }))}
+                            style={{ flexGrow: 1, fontWeight: 'bold', fontSize: '0.52rem', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', margin: 0, padding: 0 }}
                           >
-                            {metronomeOn ? 'ON' : 'OFF'}
+                            <span style={{ display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', background: params.stutterOn ? '#ff0055' : '#888', boxShadow: params.stutterOn ? '0 0 3px #ff0055' : 'none' }} />
+                            STUTTER
                           </button>
-                          
-                          <span style={{ color: '#ff00ff', opacity: 0.8, marginLeft: '4px' }}>Vol:</span>
-                          <input 
-                            type="range" min="0.0" max="1.0" step="0.05"
-                            value={metronomeVolume} 
-                            onChange={(e) => {
-                              const v = parseFloat(e.target.value);
-                              setMetronomeVolume(v);
-                              metronomeVolumeRef.current = v;
-                            }} 
-                            style={{ flexGrow: 1, height: '8px', minWidth: '30px', accentColor: '#ff00ff' }}
+                        </div>
+
+                        <div className="flex-row-sub">
+                          <label>Rate:</label>
+                          <select
+                            value={params.stutterRate}
+                            onChange={(e) => setParams(prev => ({ ...prev, stutterRate: e.target.value }))}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.45rem', padding: '0px 1px', borderRadius: '2px', width: '40px', outline: 'none' }}
+                          >
+                            {['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'].map(r => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex-row-sub">
+                          <label>Gate:</label>
+                          <input
+                            type="range" min="0.1" max="1.0" step="0.05"
+                            value={params.stutterGate}
+                            onChange={(e) => setParams(prev => ({ ...prev, stutterGate: parseFloat(e.target.value) }))}
+                            style={{ width: '40px', height: '8px' }}
                           />
-                          <span style={{ fontFamily: 'monospace', fontSize: '0.45rem', width: '22px', textAlign: 'right', color: '#ff00ff' }}>
-                            {Math.round(metronomeVolume * 100)}%
-                          </span>
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.45rem', width: '15px', textAlign: 'right' }}>{Math.round(params.stutterGate * 100)}%</span>
+                        </div>
+
+                        <div className="flex-row-sub">
+                          <label>Sweep:</label>
+                          <div className="segmented-strip" style={{ display: 'inline-flex' }}>
+                            {['None', 'Up', 'Down'].map(dir => (
+                              <button
+                                key={dir}
+                                className={`segmented-btn btn-xs ${params.stutterSweepDir === dir ? 'active' : ''}`}
+                                onClick={() => setParams(prev => ({ ...prev, stutterSweepDir: dir }))}
+                                style={{ fontSize: '0.42rem', padding: '0px 2px', height: '11px', lineHeight: '9px' }}
+                              >
+                                {dir.toUpperCase()}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex-row-sub">
+                          <label>Time:</label>
+                          <input
+                            type="range" min="0.2" max="4.0" step="0.2"
+                            value={params.stutterSweepTime}
+                            onChange={(e) => setParams(prev => ({ ...prev, stutterSweepTime: parseFloat(e.target.value) }))}
+                            style={{ width: '40px', height: '8px' }}
+                          />
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.45rem', width: '15px', textAlign: 'right' }}>{params.stutterSweepTime}s</span>
+                        </div>
+
+                        <div className="flex-row-sub">
+                          <label>Pan:</label>
+                          <select
+                            value={params.stutterPanMode || 'None'}
+                            onChange={(e) => setParams(prev => ({ ...prev, stutterPanMode: e.target.value }))}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.48rem', padding: '0px 1px', borderRadius: '2px', width: '40px', outline: 'none' }}
+                          >
+                            <option value="None">None</option>
+                            <option value="Alternating">Alt L-R</option>
+                            <option value="LCR">L-C-R</option>
+                            <option value="Sine">Sweep</option>
+                          </select>
                         </div>
                       </div>
 
-                      {/* FX Parameters */}
+                      {/* Sub-column 3: Global FX Mixer */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ color: '#00f3ff', fontWeight: 'bold', fontSize: '0.55rem', borderBottom: '1px solid rgba(0,243,255,0.15)', paddingBottom: '2px', marginBottom: '2px' }}>
+                          GLOBAL FX
+                        </div>
                         <div className="flex-row-sub" style={{ justifyContent: 'space-between' }}>
                           <span style={{ color: '#ffe600' }}>IFX1:</span>
                           <select
                             value={params.ifx1Type}
                             onChange={(e) => setParams(prev => ({ ...prev, ifx1Type: e.target.value }))}
-                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.55rem', padding: '1px', borderRadius: '3px', width: '75px' }}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.48rem', padding: '0px 1px', borderRadius: '2px', width: '50px', outline: 'none' }}
                           >
                             {['Bypass', 'Chorus', 'Phaser', 'Autowah', 'Overdrive', 'Rotary Speaker', 'Flanger', 'Ring Modulator'].map(type => (
-                              <option key={type} value={type}>{type}</option>
+                              <option key={type} value={type}>{type.split(' ')[0]}</option>
                             ))}
                           </select>
                         </div>
@@ -10173,20 +10173,20 @@ export default function Delta7Synth() {
                             type="range" min="0" max="1" step="0.05"
                             value={params.ifx1Mix} 
                             onChange={(e) => setParams(prev => ({ ...prev, ifx1Mix: parseFloat(e.target.value) }))} 
-                            style={{ width: '45px', height: '8px' }}
+                            style={{ width: '35px', height: '8px' }}
                           />
-                          <span className="font-mono text-cyan" style={{ fontSize: '0.52rem', width: '20px', textAlign: 'right' }}>{Math.round(params.ifx1Mix * 100)}%</span>
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.45rem', width: '15px', textAlign: 'right' }}>{Math.round(params.ifx1Mix * 100)}%</span>
                         </div>
 
-                        <div className="flex-row-sub" style={{ justifyContent: 'space-between', marginTop: '1px' }}>
-                          <span style={{ color: '#ff00ff' }}>IFX2:</span>
+                        <div className="flex-row-sub" style={{ justifyContent: 'space-between', marginTop: '2px' }}>
+                          <span style={{ color: '#ffe600' }}>IFX2:</span>
                           <select
                             value={params.ifx2Type}
                             onChange={(e) => setParams(prev => ({ ...prev, ifx2Type: e.target.value }))}
-                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.55rem', padding: '1px', borderRadius: '3px', width: '75px' }}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.48rem', padding: '0px 1px', borderRadius: '2px', width: '50px', outline: 'none' }}
                           >
                             {['Bypass', 'Chorus', 'Phaser', 'Autowah', 'Overdrive', 'Rotary Speaker', 'Flanger', 'Ring Modulator'].map(type => (
-                              <option key={type} value={type}>{type}</option>
+                              <option key={type} value={type}>{type.split(' ')[0]}</option>
                             ))}
                           </select>
                         </div>
@@ -10196,27 +10196,27 @@ export default function Delta7Synth() {
                             type="range" min="0" max="1" step="0.05"
                             value={params.ifx2Mix} 
                             onChange={(e) => setParams(prev => ({ ...prev, ifx2Mix: parseFloat(e.target.value) }))} 
-                            style={{ width: '45px', height: '8px' }}
+                            style={{ width: '35px', height: '8px' }}
                           />
-                          <span className="font-mono text-cyan" style={{ fontSize: '0.52rem', width: '20px', textAlign: 'right' }}>{Math.round(params.ifx2Mix * 100)}%</span>
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.45rem', width: '15px', textAlign: 'right' }}>{Math.round(params.ifx2Mix * 100)}%</span>
                         </div>
 
-                        <div className="flex-row-sub" style={{ marginTop: '1px' }}>
+                        <div className="flex-row-sub" style={{ marginTop: '2px', borderTop: '1px dashed rgba(255, 230, 0, 0.1)', paddingTop: '2px' }}>
                           <label>Reverb:</label>
                           <input 
                             type="range" min="0" max="0.8" step="0.05"
                             value={params.reverbMix} 
                             onChange={(e) => setParams(prev => ({ ...prev, reverbMix: parseFloat(e.target.value) }))} 
-                            style={{ width: '45px', height: '8px' }}
+                            style={{ width: '35px', height: '8px' }}
                           />
-                          <span className="font-mono text-cyan" style={{ fontSize: '0.52rem', width: '20px', textAlign: 'right' }}>{Math.round(params.reverbMix * 100)}%</span>
+                          <span className="font-mono text-cyan" style={{ fontSize: '0.45rem', width: '15px', textAlign: 'right' }}>{Math.round(params.reverbMix * 100)}%</span>
                         </div>
                       </div>
                     </div>
 
                     {/* MIDI active device selection in footer */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.58rem', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '3px', marginTop: '3px' }}>
-                      <span style={{ color: '#ffe600' }}>MIDI IN:</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.52rem', borderTop: '1px dashed rgba(0, 243, 255, 0.12)', paddingTop: '4px', marginTop: '4px' }}>
+                      <span style={{ color: '#ffe600', fontWeight: 'bold' }}>MIDI IN:</span>
                       <select 
                         value={selectedMidiDevice} 
                         onChange={(e) => {
@@ -10225,216 +10225,13 @@ export default function Delta7Synth() {
                           if (dev) setupMidiListeners(dev);
                         }}
                         disabled={midiDevices.length === 0}
-                        style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.55rem', padding: '1px', borderRadius: '3px', width: '120px' }}
+                        style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '150px' }}
                       >
                         {midiDevices.map((d) => (
-                          <option key={d.id} value={d.id}>{d.name.slice(0, 22)}</option>
+                          <option key={d.id} value={d.id}>{d.name.slice(0, 25)}</option>
                         ))}
                         {midiDevices.length === 0 && <option>No Devices Found</option>}
                       </select>
-                    </div>
-                  </div>
-
-                  {/* Column 3: Stutter Edit & MIDI CC Learn Matrix */}
-                  <div className="box-section-sub" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(0, 243, 255, 0.15)', padding: '6px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <h4 style={{ color: '#ff00ff', margin: '0 0 4px 0', fontSize: '0.72rem', fontWeight: 'bold', letterSpacing: '0.5px' }}>STUTTER & MOVEMENT</h4>
-                    
-                    {/* Stutter Controls */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '4px 8px', fontSize: '0.55rem', marginBottom: '4px' }}>
-                      <div className="flex-row-sub" style={{ gridColumn: 'span 2', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <button
-                          className={`btn btn-xs ${params.stutterOn ? 'active-pink' : ''}`}
-                          onClick={() => setParams(prev => ({ ...prev, stutterOn: !prev.stutterOn }))}
-                          style={{ flexGrow: 1, fontWeight: 'bold', fontSize: '0.58rem', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                        >
-                          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: params.stutterOn ? '#ff0055' : '#888', boxShadow: params.stutterOn ? '0 0 4px #ff0055' : 'none' }} />
-                          STUTTER EFFECT
-                        </button>
-                      </div>
-
-                      <div className="flex-row-sub">
-                        <label>Rate:</label>
-                        <select
-                          value={params.stutterRate}
-                          onChange={(e) => setParams(prev => ({ ...prev, stutterRate: e.target.value }))}
-                          style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '50px' }}
-                        >
-                          {['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'].map(r => (
-                            <option key={r} value={r}>{r}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="flex-row-sub">
-                        <label>Gate:</label>
-                        <input
-                          type="range" min="0.1" max="1.0" step="0.05"
-                          value={params.stutterGate}
-                          onChange={(e) => setParams(prev => ({ ...prev, stutterGate: parseFloat(e.target.value) }))}
-                          style={{ width: '40px', height: '8px' }}
-                        />
-                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '18px', textAlign: 'right' }}>{Math.round(params.stutterGate * 100)}%</span>
-                      </div>
-
-                      <div className="flex-row-sub">
-                        <label>Sweep:</label>
-                        <div className="segmented-strip" style={{ display: 'inline-flex' }}>
-                          {['None', 'Up', 'Down'].map(dir => (
-                            <button
-                              key={dir}
-                              className={`segmented-btn btn-xs ${params.stutterSweepDir === dir ? 'active' : ''}`}
-                              onClick={() => setParams(prev => ({ ...prev, stutterSweepDir: dir }))}
-                              style={{ fontSize: '0.45rem', padding: '0px 2px', height: '12px', lineHeight: '10px' }}
-                            >
-                              {dir.toUpperCase()}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex-row-sub">
-                        <label>Time:</label>
-                        <input
-                          type="range" min="0.2" max="4.0" step="0.2"
-                          value={params.stutterSweepTime}
-                          onChange={(e) => setParams(prev => ({ ...prev, stutterSweepTime: parseFloat(e.target.value) }))}
-                          style={{ width: '40px', height: '8px' }}
-                        />
-                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '18px', textAlign: 'right' }}>{params.stutterSweepTime}s</span>
-                      </div>
-
-                      <div className="flex-row-sub">
-                        <label>Pattern:</label>
-                        <select
-                          value={params.stutterPattern || 'None'}
-                          onChange={(e) => setParams(prev => ({ ...prev, stutterPattern: e.target.value }))}
-                          style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '50px' }}
-                        >
-                          <option value="None">None</option>
-                          <option value="Swing">Swing</option>
-                          <option value="BouncingBall">Bounce</option>
-                          <option value="RandomSkip">Glitch</option>
-                        </select>
-                      </div>
-
-                      <div className="flex-row-sub">
-                        <label>Pan:</label>
-                        <select
-                          value={params.stutterPanMode || 'None'}
-                          onChange={(e) => setParams(prev => ({ ...prev, stutterPanMode: e.target.value }))}
-                          style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '50px' }}
-                        >
-                          <option value="None">None</option>
-                          <option value="Alternating">Alt L-R</option>
-                          <option value="LCR">L-C-R</option>
-                          <option value="Sine">Auto-Sweep</option>
-                        </select>
-                      </div>
-
-                      <div className="flex-row-sub">
-                        <label>Jitter:</label>
-                        <input
-                          type="range" min="0.0" max="1.0" step="0.1"
-                          value={params.stutterJitter}
-                          onChange={(e) => setParams(prev => ({ ...prev, stutterJitter: parseFloat(e.target.value) }))}
-                          style={{ width: '40px', height: '8px' }}
-                        />
-                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '18px', textAlign: 'right' }}>{Math.round(params.stutterJitter * 100)}%</span>
-                      </div>
-
-                      <div className="flex-row-sub">
-                        <label>Pitch Swp:</label>
-                        <input
-                          type="range" min="-12" max="12" step="1"
-                          value={params.stutterPitchSweep}
-                          onChange={(e) => setParams(prev => ({ ...prev, stutterPitchSweep: parseInt(e.target.value) }))}
-                          style={{ width: '40px', height: '8px' }}
-                        />
-                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '18px', textAlign: 'right' }}>{params.stutterPitchSweep > 0 ? `+${params.stutterPitchSweep}` : params.stutterPitchSweep}</span>
-                      </div>
-
-                      <div className="flex-row-sub" style={{ gridColumn: 'span 2', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <label style={{ color: '#ff00ff', fontSize: '0.52rem', width: '45px' }}>Flt Sweep:</label>
-                        <input
-                          type="range" min="-8000" max="8000" step="500"
-                          value={params.stutterFilterSweep || 0}
-                          onChange={(e) => setParams(prev => ({ ...prev, stutterFilterSweep: parseInt(e.target.value) }))}
-                          style={{ flexGrow: 1, height: '8px' }}
-                        />
-                        <span className="font-mono text-cyan" style={{ fontSize: '0.5rem', width: '38px', textAlign: 'right' }}>{(params.stutterFilterSweep || 0) > 0 ? `+${params.stutterFilterSweep}` : params.stutterFilterSweep}Hz</span>
-                      </div>
-                    </div>
-
-                    {/* MIDI CC Learn Matrix Grid Panel */}
-                    <div style={{ borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '3px', marginTop: '2px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                        <span style={{ color: '#00f3ff', fontSize: '0.55rem', fontWeight: 'bold' }}>MIDI CC LEARN MATRIX</span>
-                        <button
-                          className="btn btn-xs"
-                          onClick={() => {
-                            setMidiMappings({});
-                            localStorage.removeItem('delta7_midi_mappings');
-                          }}
-                          style={{ fontSize: '0.45rem', padding: '0px 3px', height: '12px', lineHeight: '10px' }}
-                        >
-                          CLEAR ALL
-                        </button>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2px' }}>
-                        {[
-                          { name: 'Cutoff', key: 'cutoff' },
-                          { name: 'Reso', key: 'resonance' },
-                          { name: 'OscA Vol', key: 'oscAVol' },
-                          { name: 'OscB Vol', key: 'oscBVol' },
-                          { name: 'LFO Rate', key: 'lfo1Rate' },
-                          { name: 'IFX Mix', key: 'ifxMix' },
-                          { name: 'EQ Low', key: 'eqLow' },
-                          { name: 'EQ Mid', key: 'eqMid' },
-                          { name: 'EQ High', key: 'eqHigh' },
-                          { name: 'Kaoss X', key: 'kaossX' },
-                          { name: 'Kaoss Y', key: 'kaossY' },
-                          { name: 'Master', key: 'masterVolume' },
-                          { name: 'Echo Time', key: 'spaceEchoTime' },
-                          { name: 'Echo Fb', key: 'spaceEchoFeedback' },
-                          { name: 'Echo Wow', key: 'spaceEchoWow' },
-                          { name: 'Echo Sat', key: 'spaceEchoSaturation' },
-                          { name: 'Echo Spring', key: 'spaceEchoSpring' },
-                          { name: 'Rotr Drv', key: 'leslieDrive' },
-                          { name: 'Rotr Wid', key: 'leslieWidth' },
-                          { name: 'Rotr Crs', key: 'leslieCrossover' },
-                          { name: 'Stut On', key: 'stutterOn' },
-                          { name: 'Stut Rate', key: 'stutterRate' },
-                          { name: 'Stut Gate', key: 'stutterGate' },
-                          { name: 'Stut Swp', key: 'stutterSweepTime' }
-                        ].map(item => {
-                          const isLearning = midiLearnParam === item.key;
-                          const ccVal = midiMappings[item.key];
-                          return (
-                            <button
-                              key={item.key}
-                              onClick={() => setMidiLearnParam(isLearning ? null : item.key)}
-                              className={`btn btn-xs ${isLearning ? 'active-pink' : ccVal !== undefined ? 'active-cyan' : ''}`}
-                              style={{
-                                fontSize: '0.48rem',
-                                padding: '2px 0',
-                                textAlign: 'center',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minHeight: '22px',
-                                border: isLearning ? '1px solid #ff0055' : ccVal !== undefined ? '1px solid #00f3ff' : '1px solid rgba(255,255,255,0.08)',
-                                background: isLearning ? 'rgba(255, 0, 85, 0.15)' : ccVal !== undefined ? 'rgba(0, 243, 255, 0.05)' : 'rgba(0,0,0,0.2)'
-                              }}
-                            >
-                              <span style={{ color: '#fff', fontSize: '0.46rem' }}>{item.name}</span>
-                              <span style={{ color: isLearning ? '#ff0055' : ccVal !== undefined ? '#00f3ff' : '#888', fontSize: '0.42rem', fontWeight: 'bold' }}>
-                                {isLearning ? 'LEARN' : ccVal !== undefined ? `CC ${ccVal}` : '---'}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -10974,6 +10771,81 @@ export default function Delta7Synth() {
                 <span style={{ fontFamily: 'monospace', fontSize: '0.52rem', width: '24px', textAlign: 'right', color: '#ff00ff' }}>
                   {Math.round(metronomeVolume * 100)}%
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* MIDI CC Learn Matrix Grid Panel */}
+          <div className="patches-quick-category" style={{ marginTop: '8px' }}>
+            <span className="knob-label">MIDI CC Learn Matrix</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                <span style={{ color: '#00f3ff', fontSize: '0.52rem', fontWeight: 'bold' }}>CC ASSIGNMENTS</span>
+                <button
+                  className="btn btn-xs"
+                  onClick={() => {
+                    setMidiMappings({});
+                    localStorage.removeItem('delta7_midi_mappings');
+                  }}
+                  style={{ fontSize: '0.45rem', padding: '0px 4px', height: '12px', lineHeight: '10px' }}
+                >
+                  CLEAR ALL
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2.5px' }}>
+                {[
+                  { name: 'Cutoff', key: 'cutoff' },
+                  { name: 'Reso', key: 'resonance' },
+                  { name: 'OscA Vol', key: 'oscAVol' },
+                  { name: 'OscB Vol', key: 'oscBVol' },
+                  { name: 'LFO Rate', key: 'lfo1Rate' },
+                  { name: 'IFX Mix', key: 'ifxMix' },
+                  { name: 'EQ Low', key: 'eqLow' },
+                  { name: 'EQ Mid', key: 'eqMid' },
+                  { name: 'EQ High', key: 'eqHigh' },
+                  { name: 'Kaoss X', key: 'kaossX' },
+                  { name: 'Kaoss Y', key: 'kaossY' },
+                  { name: 'Master', key: 'masterVolume' },
+                  { name: 'Echo Time', key: 'spaceEchoTime' },
+                  { name: 'Echo Fb', key: 'spaceEchoFeedback' },
+                  { name: 'Echo Wow', key: 'spaceEchoWow' },
+                  { name: 'Echo Sat', key: 'spaceEchoSaturation' },
+                  { name: 'Echo Spring', key: 'spaceEchoSpring' },
+                  { name: 'Rotr Drv', key: 'leslieDrive' },
+                  { name: 'Rotr Wid', key: 'leslieWidth' },
+                  { name: 'Rotr Crs', key: 'leslieCrossover' },
+                  { name: 'Stut On', key: 'stutterOn' },
+                  { name: 'Stut Rate', key: 'stutterRate' },
+                  { name: 'Stut Gate', key: 'stutterGate' },
+                  { name: 'Stut Swp', key: 'stutterSweepTime' }
+                ].map(item => {
+                  const isLearning = midiLearnParam === item.key;
+                  const ccVal = midiMappings[item.key];
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => setMidiLearnParam(isLearning ? null : item.key)}
+                      className={`btn btn-xs ${isLearning ? 'active-pink' : ccVal !== undefined ? 'active-cyan' : ''}`}
+                      style={{
+                        fontSize: '0.45rem',
+                        padding: '1.5px 0',
+                        textAlign: 'center',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: '20px',
+                        border: isLearning ? '1px solid #ff0055' : ccVal !== undefined ? '1px solid #00f3ff' : '1px solid rgba(255,255,255,0.08)',
+                        background: isLearning ? 'rgba(255, 0, 85, 0.15)' : ccVal !== undefined ? 'rgba(0, 243, 255, 0.05)' : 'rgba(0,0,0,0.2)'
+                      }}
+                    >
+                      <span style={{ color: '#fff', fontSize: '0.44rem' }}>{item.name}</span>
+                      <span style={{ color: isLearning ? '#ff0055' : ccVal !== undefined ? '#00f3ff' : '#888', fontSize: '0.4rem', fontWeight: 'bold' }}>
+                        {isLearning ? 'LEARN' : ccVal !== undefined ? `CC ${ccVal}` : '---'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
