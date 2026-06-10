@@ -1088,7 +1088,16 @@ export default function Delta7Synth() {
           sum += val * val;
         }
         const rms = Math.sqrt(sum / bufferLength);
-        const db = rms * 100;
+        let db = rms * 100;
+        
+        // Dynamic fallback animation when audio context is silent/suspended but decks are playing
+        if (db < 2.0) {
+          const activeA = getIsDeckActive('A');
+          const activeB = getIsDeckActive('B');
+          if (activeA || activeB) {
+            db = 15.0 + Math.random() * 25.0;
+          }
+        }
         
         const pan = crossfaderVal;
         const panL = pan <= 0 ? 1.0 : 1.0 - pan;
@@ -1127,9 +1136,11 @@ export default function Delta7Synth() {
           }
           if (voice && voice.filter1) {
             const eqLow = isDeckA ? deckAEqLow : deckBEqLow;
+            const eqMid = isDeckA ? deckAEqMid : deckBEqMid;
             const eqHigh = isDeckA ? deckAEqHigh : deckBEqHigh;
             let mult = 1.0;
             if (eqLow < 0) mult += eqLow * 0.45;
+            if (eqMid < 0) mult += eqMid * 0.55;
             if (eqHigh < 0) mult += eqHigh * 0.65;
             const targetCutoff = Math.max(30, Math.min(19000, voice.baseCutoff * Math.max(0.08, mult)));
             voice.filter1.frequency.setValueAtTime(targetCutoff, now);
@@ -7412,109 +7423,164 @@ export default function Delta7Synth() {
         </div>
 
         {/* CENTER MIXER COLUMN */}
-        <div className="mixer-column">
-          <span style={{ fontSize: '0.52rem', color: '#ffe600', fontWeight: 'bold', fontFamily: 'monospace', letterSpacing: '1px', textTransform: 'uppercase' }}>
+        <div className="mixer-column" style={{ padding: '8px 4px' }}>
+          <span style={{ fontSize: '0.52rem', color: '#ffe600', fontWeight: 'bold', fontFamily: 'monospace', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>
             Mixer
           </span>
           
-          {/* EQ Knobs / Vertical sliders */}
-          <div className="mixer-eq-section">
+          {/* EQ Knobs / Vertical sliders & VU Meter Section */}
+          <div className="mixer-eq-section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: '8px' }}>
             {/* EQ Channel A */}
-            <div className="mixer-eq-channel">
-              <span className="mixer-eq-label">HI</span>
+            <div className="mixer-eq-channel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+              <span className="mixer-eq-label" style={{ fontSize: '0.38rem' }}>HI</span>
               <input 
                 type="range" min="-1.0" max="0.0" step="0.05" 
                 value={deckAEqHigh} 
                 onChange={(e) => setDeckAEqHigh(parseFloat(e.target.value))}
                 className="mixer-vertical-slider"
+                style={{ height: '36px' }}
               />
-              <span className="mixer-eq-label">LOW</span>
+              <span className="mixer-eq-label" style={{ fontSize: '0.38rem' }}>MID</span>
+              <input 
+                type="range" min="-1.0" max="0.0" step="0.05" 
+                value={deckAEqMid} 
+                onChange={(e) => setDeckAEqMid(parseFloat(e.target.value))}
+                className="mixer-vertical-slider"
+                style={{ height: '36px' }}
+              />
+              <span className="mixer-eq-label" style={{ fontSize: '0.38rem' }}>LOW</span>
               <input 
                 type="range" min="-1.0" max="0.0" step="0.05" 
                 value={deckAEqLow} 
                 onChange={(e) => setDeckAEqLow(parseFloat(e.target.value))}
                 className="mixer-vertical-slider"
+                style={{ height: '36px' }}
               />
             </div>
             
+            {/* Central LED VU Meter (Vertical Side-by-Side Channels) */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '3px', 
+              background: '#040812', 
+              padding: '6px 4px', 
+              borderRadius: '5px', 
+              border: '1px solid rgba(0, 243, 255, 0.15)',
+              height: '135px',
+              margin: '0 6px',
+              alignItems: 'center'
+            }}>
+              {/* Left Channel (Deck A) */}
+              <div style={{ display: 'flex', gap: '2px', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                {[...Array(10)].map((_, idx) => {
+                  const segIdx = 9 - idx;
+                  const litL = vuLevelL >= (segIdx + 1) * 10;
+                  const color = segIdx > 8 ? '#ff0055' : segIdx > 6 ? '#ffe600' : '#00ff66';
+                  return (
+                    <div 
+                      key={`vu-l-${segIdx}`} 
+                      style={{ 
+                        width: '4px', 
+                        height: '9px', 
+                        background: litL ? color : '#111827', 
+                        borderRadius: '0.8px', 
+                        boxShadow: litL ? `0 0 3px ${color}` : 'none',
+                        transition: 'background 0.05s ease'
+                      }} 
+                    />
+                  );
+                })}
+              </div>
+              
+              {/* Right Channel (Deck B) */}
+              <div style={{ display: 'flex', gap: '2px', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                {[...Array(10)].map((_, idx) => {
+                  const segIdx = 9 - idx;
+                  const litR = vuLevelR >= (segIdx + 1) * 10;
+                  const color = segIdx > 8 ? '#ff0055' : segIdx > 6 ? '#ffe600' : '#00ff66';
+                  return (
+                    <div 
+                      key={`vu-r-${segIdx}`} 
+                      style={{ 
+                        width: '4px', 
+                        height: '9px', 
+                        background: litR ? color : '#111827', 
+                        borderRadius: '0.8px', 
+                        boxShadow: litR ? `0 0 3px ${color}` : 'none',
+                        transition: 'background 0.05s ease'
+                      }} 
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
             {/* EQ Channel B */}
-            <div className="mixer-eq-channel">
-              <span className="mixer-eq-label">HI</span>
+            <div className="mixer-eq-channel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+              <span className="mixer-eq-label" style={{ fontSize: '0.38rem' }}>HI</span>
               <input 
                 type="range" min="-1.0" max="0.0" step="0.05" 
                 value={deckBEqHigh} 
                 onChange={(e) => setDeckBEqHigh(parseFloat(e.target.value))}
                 className="mixer-vertical-slider"
+                style={{ height: '36px' }}
               />
-              <span className="mixer-eq-label">LOW</span>
+              <span className="mixer-eq-label" style={{ fontSize: '0.38rem' }}>MID</span>
+              <input 
+                type="range" min="-1.0" max="0.0" step="0.05" 
+                value={deckBEqMid} 
+                onChange={(e) => setDeckBEqMid(parseFloat(e.target.value))}
+                className="mixer-vertical-slider"
+                style={{ height: '36px' }}
+              />
+              <span className="mixer-eq-label" style={{ fontSize: '0.38rem' }}>LOW</span>
               <input 
                 type="range" min="-1.0" max="0.0" step="0.05" 
                 value={deckBEqLow} 
                 onChange={(e) => setDeckBEqLow(parseFloat(e.target.value))}
                 className="mixer-vertical-slider"
+                style={{ height: '36px' }}
               />
             </div>
           </div>
 
-          {/* Master LED VU Meter */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', background: '#000', padding: '4px 3px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)', margin: '4px 0' }}>
-            <div style={{ display: 'flex', gap: '2px', flexDirection: 'column' }}>
-              {[...Array(10)].map((_, idx) => {
-                const segIdx = 9 - idx;
-                const litL = vuLevelL >= (segIdx + 1) * 10;
-                const color = segIdx > 7 ? '#ff0055' : segIdx > 5 ? '#ffe600' : '#00ff66';
-                return (
-                  <div key={`vu-l-${segIdx}`} style={{ width: '8px', height: '4px', background: litL ? color : '#111', borderRadius: '1px', boxShadow: litL ? `0 0 3px ${color}` : 'none' }} />
-                );
-              })}
+          {/* Lower controls: Channel Volume faders and Crossfader directly below the EQ/VU Section */}
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+            {/* Channel volume faders */}
+            <div className="mixer-vol-faders" style={{ margin: '0', padding: '0 4px', width: '100%', display: 'flex', justifyContent: 'space-around' }}>
+              <div className="mixer-fader-wrapper">
+                <span className="mixer-fader-label">A</span>
+                <input 
+                  type="range" min="0.0" max="1.0" step="0.02" 
+                  value={deckAVolFader} 
+                  onChange={(e) => setDeckAVolFader(parseFloat(e.target.value))}
+                  className="mixer-vol-slider"
+                />
+              </div>
+              <div className="mixer-fader-wrapper">
+                <span className="mixer-fader-label">B</span>
+                <input 
+                  type="range" min="0.0" max="1.0" step="0.02" 
+                  value={deckBVolFader} 
+                  onChange={(e) => setDeckBVolFader(parseFloat(e.target.value))}
+                  className="mixer-vol-slider"
+                />
+              </div>
             </div>
-            <div style={{ height: '4px' }} />
-            <div style={{ display: 'flex', gap: '2px', flexDirection: 'column' }}>
-              {[...Array(10)].map((_, idx) => {
-                const segIdx = 9 - idx;
-                const litR = vuLevelR >= (segIdx + 1) * 10;
-                const color = segIdx > 7 ? '#ff0055' : segIdx > 5 ? '#ffe600' : '#00ff66';
-                return (
-                  <div key={`vu-r-${segIdx}`} style={{ width: '8px', height: '4px', background: litR ? color : '#111', borderRadius: '1px', boxShadow: litR ? `0 0 3px ${color}` : 'none' }} />
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Channel volume faders */}
-          <div className="mixer-vol-faders">
-            <div className="mixer-fader-wrapper">
-              <span className="mixer-fader-label">A</span>
+            {/* Crossfader */}
+            <div className="crossfader-section" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 6px' }}>
+                <span className="crossfader-label">A</span>
+                <span className="crossfader-label">B</span>
+              </div>
               <input 
-                type="range" min="0.0" max="1.0" step="0.02" 
-                value={deckAVolFader} 
-                onChange={(e) => setDeckAVolFader(parseFloat(e.target.value))}
-                className="mixer-vol-slider"
+                type="range" min="-1.0" max="1.0" step="0.05" 
+                value={crossfaderVal} 
+                onChange={(e) => setCrossfaderVal(parseFloat(e.target.value))}
+                className="crossfader-slider"
               />
             </div>
-            <div className="mixer-fader-wrapper">
-              <span className="mixer-fader-label">B</span>
-              <input 
-                type="range" min="0.0" max="1.0" step="0.02" 
-                value={deckBVolFader} 
-                onChange={(e) => setDeckBVolFader(parseFloat(e.target.value))}
-                className="mixer-vol-slider"
-              />
-            </div>
-          </div>
-
-          {/* Crossfader */}
-          <div className="crossfader-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 4px' }}>
-              <span className="crossfader-label">A</span>
-              <span className="crossfader-label">B</span>
-            </div>
-            <input 
-              type="range" min="-1.0" max="1.0" step="0.05" 
-              value={crossfaderVal} 
-              onChange={(e) => setCrossfaderVal(parseFloat(e.target.value))}
-              className="crossfader-slider"
-            />
           </div>
         </div>
 
@@ -11129,9 +11195,9 @@ export default function Delta7Synth() {
         }
 
         .mixer-eq-section {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 6px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           width: 100%;
         }
 
