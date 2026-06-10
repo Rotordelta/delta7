@@ -41,3 +41,9 @@ body {
   background: #00f3ff;
   box-shadow: 0 0 10px #00f3ff;
 }
+
+/* Performance ring active state - toggled by tickLoop via classList (not inline style) */
+/* Avoids 16 GPU drop-shadow invalidations per frame (Issue 9) */
+.ring-active {
+  filter: drop-shadow(0 0 3px currentColor);
+}
