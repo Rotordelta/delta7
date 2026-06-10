@@ -7188,25 +7188,6 @@ export default function Delta7Synth() {
                   {sampleSlotsRef.current.find(s => s.id === params.oscAWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
                 </text>
               </svg>
-
-              {/* Tonearm */}
-              <svg 
-                className={`tonearm ${deckAPlaying || [...activeVoicesRef.current.keys()].some(k => typeof k === 'string' && k.startsWith('perf-a')) ? 'active' : ''}`}
-                viewBox="0 0 25 70"
-                style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  width: '40px',
-                  height: '115px',
-                  pointerEvents: 'none',
-                  transformOrigin: '15% 10%',
-                  zIndex: 4
-                }}
-              >
-                <path d="M 5,5 L 5,20 L 12,45 L 8,62 L 14,64 L 18,48 L 10,22 L 10,5 Z" fill="#aaa" stroke="#888" strokeWidth="0.5" />
-                <rect x="5" y="60" width="8" height="6" fill="#ffe600" rx="1" />
-              </svg>
             </div>
 
             {/* 2 Rows of 8 Pads for Deck A */}
@@ -7654,25 +7635,6 @@ export default function Delta7Synth() {
                 >
                   {sampleSlotsRef.current.find(s => s.id === params.oscBWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
                 </text>
-              </svg>
-
-              {/* Tonearm */}
-              <svg 
-                className={`tonearm ${deckBPlaying || [...activeVoicesRef.current.keys()].some(k => typeof k === 'string' && k.startsWith('perf-b')) ? 'active' : ''}`}
-                viewBox="0 0 25 70"
-                style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  width: '40px',
-                  height: '115px',
-                  pointerEvents: 'none',
-                  transformOrigin: '15% 10%',
-                  zIndex: 4
-                }}
-              >
-                <path d="M 5,5 L 5,20 L 12,45 L 8,62 L 14,64 L 18,48 L 10,22 L 10,5 Z" fill="#aaa" stroke="#888" strokeWidth="0.5" />
-                <rect x="5" y="60" width="8" height="6" fill="#ffe600" rx="1" />
               </svg>
             </div>
 
@@ -11058,14 +11020,6 @@ export default function Delta7Synth() {
           cursor: grabbing;
         }
 
-        .tonearm {
-          transform: rotate(20deg);
-          transition: transform 0.5s ease;
-        }
-
-        .tonearm.active {
-          transform: rotate(32deg);
-        }
 
         .performance-pads-grid {
           display: grid;
