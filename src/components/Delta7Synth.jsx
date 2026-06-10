@@ -7239,6 +7239,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     const held = heldNotesRef.current;
+    const isOscASlice = paramsRef.current.oscATriggerMode === 'slice';
+    const isOscBSlice = paramsRef.current.oscMode === 'double' && paramsRef.current.oscBTriggerMode === 'slice';
+    const isSliceMode = isOscASlice || isOscBSlice;
+    console.log("[Leo Debug] handleArpTick stepIndex:", stepIndex, "held:", held, "isSliceMode:", isSliceMode);
     if (held.length === 0) {
       stopArpeggiator();
       return;
@@ -7253,10 +7257,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const stepDuration = (60 / bpm) * (4 / division);
     
     let noteToPlay = 60;
-    const isSliceMode = paramsRef.current.oscATriggerMode === 'slice';
     
     if (isSliceMode && held.length === 1) {
-      const activeSlotId = paramsRef.current.oscAWave || 'a01';
+      const activeSlotId = isOscASlice ? (paramsRef.current.oscAWave || 'a01') : (paramsRef.current.oscBWave || 'b01');
       const activeSlot = sampleSlotsRef.current.find(s => s.id === activeSlotId) || sampleSlotsRef.current[0];
       const sliceCount = activeSlot ? activeSlot.sliceCount || 16 : 16;
       
