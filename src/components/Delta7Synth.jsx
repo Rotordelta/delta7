@@ -490,6 +490,17 @@ const generateSynthesizedKit = (ctx, kitType) => {
 // MIDI Pitch to Frequency
 const getFreq = (note) => 440 * Math.pow(2, (note - 69) / 12);
 
+const ringColors = [
+  '#ff0055', // Neon Pink/Red
+  '#ff5500', // Neon Orange
+  '#ffcc00', // Neon Yellow
+  '#00ff66', // Neon Green
+  '#00f3ff', // Neon Cyan
+  '#0066ff', // Neon Blue
+  '#9900ff', // Neon Purple
+  '#ff00ff'  // Neon Magenta
+];
+
 // ==========================================
 // 2. MAIN COMPONENT DECLARATION
 // ==========================================
@@ -729,6 +740,17 @@ export default function Delta7Synth() {
   const [deckAKeyLock, setDeckAKeyLock] = useState(true);
   const [deckBKeyLock, setDeckBKeyLock] = useState(true);
 
+  const [ringAnglesA, setRingAnglesA] = useState(new Array(8).fill(0));
+  const [ringAnglesB, setRingAnglesB] = useState(new Array(8).fill(0));
+  const [currentPerfPlayBeat, setCurrentPerfPlayBeat] = useState(0);
+  const [perfQuantizeMode, setPerfQuantizeMode] = useState('None');
+  const [perfTimeSignature, setPerfTimeSignature] = useState('4/4');
+
+  const perfQuantizeModeRef = useRef('None');
+  const perfTimeSignatureRef = useRef('4/4');
+  useEffect(() => { perfQuantizeModeRef.current = perfQuantizeMode; }, [perfQuantizeMode]);
+  useEffect(() => { perfTimeSignatureRef.current = perfTimeSignature; }, [perfTimeSignature]);
+
   const deckAPitchRef = useRef(0.0);
   const deckBPitchRef = useRef(0.0);
   useEffect(() => { deckAPitchRef.current = deckAPitch; }, [deckAPitch]);
@@ -738,6 +760,8 @@ export default function Delta7Synth() {
   useEffect(() => {
     perfEventsRef.current = perfEvents;
   }, [perfEvents]);
+
+  const timelineScrollRef = useRef(null);
 
   const perfRecordActiveRef = useRef(false);
   useEffect(() => {
@@ -916,6 +940,72 @@ export default function Delta7Synth() {
       }
       if (getIsDeckActive('B') && !isScratchingB.current) {
         setPlatterAngleB(prev => (prev + delta * 180) % 360);
+      }
+
+      // Concentric rings & timeline beat
+      const ctx = audioCtxRef.current;
+      if (ctx) {
+        // Timeline beat & auto-scroll
+        if (perfPlaybackActiveRef.current && perfPlayStartTimeRef.current > 0) {
+          const elapsed = ctx.currentTime - perfPlayStartTimeRef.current;
+          const bpm = paramsRef.current.arpBpm || 120;
+          const beatDuration = 60 / bpm;
+          const currentBeat = elapsed / beatDuration;
+          setCurrentPerfPlayBeat(currentBeat);
+          if (timelineScrollRef.current) {
+            const playheadPx = currentBeat * 30;
+            const halfWidth = timelineScrollRef.current.clientWidth / 2;
+            timelineScrollRef.current.scrollLeft = playheadPx - halfWidth;
+          }
+        } else if (perfRecordActiveRef.current && perfStartTimeRef.current > 0) {
+          const elapsed = ctx.currentTime - perfStartTimeRef.current;
+          const bpm = paramsRef.current.arpBpm || 120;
+          const beatDuration = 60 / bpm;
+          const currentBeat = elapsed / beatDuration;
+          setCurrentPerfPlayBeat(currentBeat);
+          if (timelineScrollRef.current) {
+            const playheadPx = currentBeat * 30;
+            const halfWidth = timelineScrollRef.current.clientWidth / 2;
+            timelineScrollRef.current.scrollLeft = playheadPx - halfWidth;
+          }
+        }
+
+        // Concentric Rings calculation
+        const getRingAngle = (deck, slotIdx) => {
+          const voiceKey = `perf-${deck.toLowerCase()}-slot-${slotIdx}`;
+          const voices = activeVoicesRef.current.get(voiceKey);
+          if (!voices || voices.length === 0) return 0;
+          
+          const voice = voices[0];
+          if (!voice) return 0;
+          
+          const elapsed = ctx.currentTime - voice.startTime;
+          if (elapsed < 0) return 0;
+          
+          const isA = deck === 'A';
+          const duration = isA ? voice.activeDurationA : voice.activeDurationB;
+          const rate = isA ? (voice.orig_oscA_rate || 1.0) : (voice.orig_oscB_rate || 1.0);
+          const isLoop = isA ? voice.isLoopA : voice.isLoopB;
+          
+          if (duration <= 0) return 0;
+          
+          let pos = elapsed * rate;
+          if (isLoop) {
+            pos = pos % duration;
+          } else {
+            if (pos >= duration) return 0;
+          }
+          return (pos / duration) * 360;
+        };
+
+        const nextAnglesA = new Array(8);
+        const nextAnglesB = new Array(8);
+        for (let i = 0; i < 8; i++) {
+          nextAnglesA[i] = getRingAngle('A', i);
+          nextAnglesB[i] = getRingAngle('B', i);
+        }
+        setRingAnglesA(nextAnglesA);
+        setRingAnglesB(nextAnglesB);
       }
 
       // VU Meter values
@@ -5143,6 +5233,20 @@ export default function Delta7Synth() {
     }
   };
 
+  const toggleSlotLoop = (slotId, e) => {
+    if (e) e.stopPropagation();
+    setSampleSlots(prev => prev.map(s => {
+      if (s.id === slotId) {
+        const nextLoop = !s.loopOn;
+        const updated = { ...s, loopOn: nextLoop };
+        saveSampleToDb(updated).catch(err => console.error("Failed to auto-save loop setting to IndexedDB:", err));
+        showEditorStatus(`${getSlotLabel(slotId)} Play Mode: ${nextLoop ? 'LOOP' : 'ONE-SHOT'} 🔄`);
+        return updated;
+      }
+      return s;
+    }));
+  };
+
   const triggerPerfPadInternal = (deck, type, index, velocity, isNoteOn, shouldRecord = false) => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
@@ -5156,6 +5260,7 @@ export default function Delta7Synth() {
       setActivePerfPads(prev => {
         const next = { ...prev };
         delete next[padKey];
+        delete next[`${padKey}-pending`];
         return next;
       });
       
@@ -5198,29 +5303,70 @@ export default function Delta7Synth() {
       oscBVol: deck === 'B' ? currentParams.oscBVol : 0
     };
 
-    const voice = playProgramVoice(ctx, triggerNote, velocity, tempProg, voiceKey);
-    activeVoicesRef.current.set(voiceKey, [voice]);
+    let delayOffset = 0;
+    let targetBeat = 0;
+    const bpm = currentParams.arpBpm || 120;
+    const beatDuration = 60 / bpm;
 
-    setActivePerfPads(prev => ({ ...prev, [padKey]: true }));
+    if (isNoteOn && shouldRecord && perfQuantizeModeRef.current !== 'None') {
+      let refTime = perfStartTimeRef.current > 0 ? perfStartTimeRef.current : 0;
+      if (refTime === 0 && perfPlayStartTimeRef.current > 0) {
+        refTime = perfPlayStartTimeRef.current;
+      }
+      
+      const elapsed = ctx.currentTime - refTime;
+      const currentBeat = elapsed / beatDuration;
+      
+      let gridSize = 1.0;
+      if (perfQuantizeModeRef.current === '1/16') gridSize = 0.25;
+      else if (perfQuantizeModeRef.current === '1') gridSize = 1.0;
+      else if (perfQuantizeModeRef.current === '4') gridSize = 4.0;
 
-    if (deck === 'A') {
-      setDeckAPlaying(true);
-      if (deckATimerRef.current) clearTimeout(deckATimerRef.current);
-      const dur = slot.buffer.duration * (slot.end - slot.start);
-      deckATimerRef.current = setTimeout(() => setDeckAPlaying(false), dur * 1000);
+      const nextGridBeat = Math.ceil(currentBeat / gridSize) * gridSize;
+      targetBeat = nextGridBeat;
+      delayOffset = (nextGridBeat - currentBeat) * beatDuration;
     } else {
-      setDeckBPlaying(true);
-      if (deckBTimerRef.current) clearTimeout(deckBTimerRef.current);
-      const dur = slot.buffer.duration * (slot.end - slot.start);
-      deckBTimerRef.current = setTimeout(() => setDeckBPlaying(false), dur * 1000);
+      if (perfStartTimeRef.current > 0) {
+        targetBeat = (ctx.currentTime - perfStartTimeRef.current) / beatDuration;
+      } else if (perfPlayStartTimeRef.current > 0) {
+        targetBeat = (ctx.currentTime - perfPlayStartTimeRef.current) / beatDuration;
+      }
+    }
+
+    const startVoiceTrigger = () => {
+      const voice = playProgramVoice(ctx, triggerNote, velocity, tempProg, voiceKey, 0);
+      activeVoicesRef.current.set(voiceKey, [voice]);
+      setActivePerfPads(prev => ({ ...prev, [padKey]: true }));
+
+      if (deck === 'A') {
+        setDeckAPlaying(true);
+        if (deckATimerRef.current) clearTimeout(deckATimerRef.current);
+        const dur = slot.buffer.duration * (slot.end - slot.start);
+        deckATimerRef.current = setTimeout(() => setDeckAPlaying(false), dur * 1000);
+      } else {
+        setDeckBPlaying(true);
+        if (deckBTimerRef.current) clearTimeout(deckBTimerRef.current);
+        const dur = slot.buffer.duration * (slot.end - slot.start);
+        deckBTimerRef.current = setTimeout(() => setDeckBPlaying(false), dur * 1000);
+      }
+    };
+
+    if (delayOffset > 0.03) {
+      setActivePerfPads(prev => ({ ...prev, [`${padKey}-pending`]: true }));
+      setTimeout(() => {
+        setActivePerfPads(prev => {
+          const next = { ...prev };
+          delete next[`${padKey}-pending`];
+          return next;
+        });
+        startVoiceTrigger();
+      }, delayOffset * 1000);
+    } else {
+      startVoiceTrigger();
     }
 
     if (shouldRecord && perfRecordActiveRef.current) {
-      const elapsed = ctx.currentTime - perfStartTimeRef.current;
-      const bpm = currentParams.arpBpm || 120;
-      const beatDuration = 60 / bpm;
-      const beat = elapsed / beatDuration;
-      setPerfEvents(prev => [...prev, { beat, deck, type, index, velocity, isNoteOn: true }]);
+      setPerfEvents(prev => [...prev, { beat: targetBeat, deck, type, index, velocity, isNoteOn: true }]);
     }
   };
 
@@ -6818,8 +6964,37 @@ export default function Delta7Synth() {
   };
 
   const renderPerformanceDeck = () => {
+    const getPillsForLane = (deck, index) => {
+      const pills = [];
+      const events = perfEvents.filter(e => e.deck === deck && e.type === 'slot' && e.index === index);
+      const sorted = [...events].sort((a, b) => a.beat - b.beat);
+      
+      let activePill = null;
+      sorted.forEach(e => {
+        if (e.isNoteOn) {
+          if (activePill) {
+            activePill.end = e.beat;
+            pills.push(activePill);
+          }
+          activePill = { start: e.beat, end: e.beat + 1.0 };
+        } else {
+          if (activePill) {
+            activePill.end = e.beat;
+            pills.push(activePill);
+            activePill = null;
+          }
+        }
+      });
+      if (activePill) {
+        pills.push(activePill);
+      }
+      return pills;
+    };
+
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 1fr', height: 'calc(100% - 32px)', background: '#020509', flexGrow: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 32px)', background: '#020509', flexGrow: 1, minHeight: 0 }}>
+        {/* TOP ROW: DECKS & MIXER */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 1fr', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
         
         {/* LEFT DECK (DECK A) */}
         <div className="turntable-deck">
@@ -6844,6 +7019,37 @@ export default function Delta7Synth() {
                 }}
               >
                 <div className="vinyl-strobe-dot" />
+                
+                {/* 8 Concentric Playhead Rings */}
+                <svg width="130" height="130" viewBox="0 0 130 130" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+                  {ringColors.map((color, idx) => {
+                    const r = 58 - idx * 4.2;
+                    const angle = ringAnglesA[idx] || 0;
+                    const voiceKey = `perf-a-slot-${idx}`;
+                    const voices = activeVoicesRef.current.get(voiceKey);
+                    const isActive = voices && voices.length > 0;
+                    return (
+                      <circle
+                        key={idx}
+                        cx="65"
+                        cy="65"
+                        r={r}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth="1.8"
+                        strokeDasharray="4, 5"
+                        style={{
+                          transform: `rotate(${angle}deg)`,
+                          transformOrigin: '65px 65px',
+                          opacity: isActive ? 1.0 : 0.15,
+                          filter: isActive ? `drop-shadow(0 0 3px ${color})` : 'none',
+                          transition: 'opacity 0.25s ease, filter 0.25s ease'
+                        }}
+                      />
+                    );
+                  })}
+                </svg>
+
                 <div className="vinyl-label" style={{ background: '#00f3ff' }}>
                   <span style={{ fontSize: '0.45rem', letterSpacing: '0.5px' }}>OSC A</span>
                   <span style={{ fontSize: '0.38rem', marginTop: '2px', color: '#000', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', width: '36px', textAlign: 'center' }}>
@@ -6879,10 +7085,11 @@ export default function Delta7Synth() {
                   const isLoaded = slot && slot.buffer;
                   const padKey = `A-slot-${idx}`;
                   const isActive = activePerfPads[padKey];
+                  const isPending = activePerfPads[`${padKey}-pending`];
                   return (
                     <div
                       key={slotId}
-                      className={`perf-pad ${isLoaded ? 'deck-a-loaded' : ''} ${isActive ? 'deck-a-active' : ''}`}
+                      className={`perf-pad ${isLoaded ? 'deck-a-loaded' : ''} ${isActive ? 'deck-a-active' : ''} ${isPending ? 'pending' : ''}`}
                       onMouseDown={() => triggerPerfPadInternal('A', 'slot', idx, 100, true, true)}
                       onMouseUp={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
                       onMouseLeave={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
@@ -6892,6 +7099,35 @@ export default function Delta7Synth() {
                     >
                       <span className="perf-pad-label">A{idx + 1}</span>
                       <span className="perf-pad-name">{isLoaded ? slot.name.substring(0, 5) : '---'}</span>
+                      {isLoaded && (
+                        <button
+                          className="perf-pad-loop-badge"
+                          style={{
+                            position: 'absolute',
+                            bottom: '2px',
+                            right: '2px',
+                            background: slot.loopOn ? 'rgba(0, 243, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                            border: `1px solid ${slot.loopOn ? '#00f3ff' : 'rgba(255,255,255,0.2)'}`,
+                            borderRadius: '2px',
+                            color: slot.loopOn ? '#00f3ff' : '#aaa',
+                            fontSize: '0.36rem',
+                            padding: '1px 2px',
+                            lineHeight: 1,
+                            cursor: 'pointer',
+                            zIndex: 5
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSlotLoop(slotId, e);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onMouseUp={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
+                        >
+                          {slot.loopOn ? 'LOOP' : '1-SHOT'}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -7190,6 +7426,37 @@ export default function Delta7Synth() {
                 }}
               >
                 <div className="vinyl-strobe-dot" />
+                
+                {/* 8 Concentric Playhead Rings */}
+                <svg width="130" height="130" viewBox="0 0 130 130" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
+                  {ringColors.map((color, idx) => {
+                    const r = 58 - idx * 4.2;
+                    const angle = ringAnglesB[idx] || 0;
+                    const voiceKey = `perf-b-slot-${idx}`;
+                    const voices = activeVoicesRef.current.get(voiceKey);
+                    const isActive = voices && voices.length > 0;
+                    return (
+                      <circle
+                        key={idx}
+                        cx="65"
+                        cy="65"
+                        r={r}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth="1.8"
+                        strokeDasharray="4, 5"
+                        style={{
+                          transform: `rotate(${angle}deg)`,
+                          transformOrigin: '65px 65px',
+                          opacity: isActive ? 1.0 : 0.15,
+                          filter: isActive ? `drop-shadow(0 0 3px ${color})` : 'none',
+                          transition: 'opacity 0.25s ease, filter 0.25s ease'
+                        }}
+                      />
+                    );
+                  })}
+                </svg>
+
                 <div className="vinyl-label" style={{ background: '#ff00ff' }}>
                   <span style={{ fontSize: '0.45rem', letterSpacing: '0.5px', color: '#000' }}>OSC B</span>
                   <span style={{ fontSize: '0.38rem', marginTop: '2px', color: '#000', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', width: '36px', textAlign: 'center' }}>
@@ -7225,10 +7492,11 @@ export default function Delta7Synth() {
                   const isLoaded = slot && slot.buffer;
                   const padKey = `B-slot-${idx}`;
                   const isActive = activePerfPads[padKey];
+                  const isPending = activePerfPads[`${padKey}-pending`];
                   return (
                     <div
                       key={slotId}
-                      className={`perf-pad ${isLoaded ? 'deck-b-loaded' : ''} ${isActive ? 'deck-b-active' : ''}`}
+                      className={`perf-pad ${isLoaded ? 'deck-b-loaded' : ''} ${isActive ? 'deck-b-active' : ''} ${isPending ? 'pending' : ''}`}
                       onMouseDown={() => triggerPerfPadInternal('B', 'slot', idx, 100, true, true)}
                       onMouseUp={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
                       onMouseLeave={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
@@ -7238,6 +7506,35 @@ export default function Delta7Synth() {
                     >
                       <span className="perf-pad-label">B{idx + 1}</span>
                       <span className="perf-pad-name">{isLoaded ? slot.name.substring(0, 5) : '---'}</span>
+                      {isLoaded && (
+                        <button
+                          className="perf-pad-loop-badge"
+                          style={{
+                            position: 'absolute',
+                            bottom: '2px',
+                            right: '2px',
+                            background: slot.loopOn ? 'rgba(255, 0, 255, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                            border: `1px solid ${slot.loopOn ? '#ff00ff' : 'rgba(255,255,255,0.2)'}`,
+                            borderRadius: '2px',
+                            color: slot.loopOn ? '#ff00ff' : '#aaa',
+                            fontSize: '0.36rem',
+                            padding: '1px 2px',
+                            lineHeight: 1,
+                            cursor: 'pointer',
+                            zIndex: 5
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSlotLoop(slotId, e);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onMouseUp={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
+                        >
+                          {slot.loopOn ? 'LOOP' : '1-SHOT'}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -7405,7 +7702,164 @@ export default function Delta7Synth() {
             </div>
           </div>
         </div>
+      </div>
 
+        {/* BOTTOM ROW: PERFORMANCE TIMELINE PANEL */}
+        <div className="perf-timeline-panel">
+          {/* Timeline Header */}
+          <div className="perf-timeline-header">
+            <div className="perf-timeline-title">16-LANE HIGHWAY SCROLLING SEQUENCER</div>
+            <div className="perf-timeline-controls">
+              <button
+                className={`deck-btn ${params.metronomeOn ? 'active' : ''}`}
+                style={{ height: '14px', fontSize: '0.45rem', padding: '1px 4px', background: params.metronomeOn ? '#ffe600' : 'rgba(255,255,255,0.05)', color: params.metronomeOn ? '#000' : '#aaa' }}
+                onClick={() => setParams(prev => ({ ...prev, metronomeOn: !prev.metronomeOn }))}
+              >
+                METRONOME: {params.metronomeOn ? 'ON' : 'OFF'}
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '0.4rem', color: '#888', fontFamily: 'monospace' }}>QUANTIZE:</span>
+                <select
+                  value={perfQuantizeMode}
+                  onChange={(e) => setPerfQuantizeMode(e.target.value)}
+                  style={{
+                    background: '#0a101d', border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '2px', color: '#00f3ff', fontSize: '0.42rem',
+                    padding: '1px 2px', outline: 'none', cursor: 'pointer', fontFamily: 'monospace'
+                  }}
+                >
+                  <option value="None">None</option>
+                  <option value="1/16">1/16 Beat</option>
+                  <option value="1">1 Beat</option>
+                  <option value="4">4 Beats</option>
+                </select>
+              </div>
+
+              <button
+                className="deck-btn"
+                style={{ height: '14px', fontSize: '0.45rem', padding: '1px 4px', background: 'rgba(255,0,0,0.15)', color: '#ff4444', border: '1px solid #ff4444' }}
+                onClick={() => {
+                  setPerfEvents([]);
+                  setCurrentPerfPlayBeat(0);
+                  showEditorStatus("Performance Sequence Cleared 🗑️");
+                }}
+              >
+                Clear
+              </button>
+
+              <button
+                className={`deck-btn ${perfRecordActive ? 'active' : ''}`}
+                style={{ height: '14px', fontSize: '0.45rem', padding: '1px 4px', background: perfRecordActive ? '#ff3333' : 'rgba(255,255,255,0.05)', color: perfRecordActive ? '#fff' : '#aaa' }}
+                onClick={togglePerformanceRecord}
+              >
+                {perfRecordActive ? '🔴 REC...' : '🔴 Record'}
+              </button>
+
+              <button
+                className={`deck-btn ${perfPlaybackActive ? 'active' : ''}`}
+                style={{ height: '14px', fontSize: '0.45rem', padding: '1px 4px', background: perfPlaybackActive ? '#00f3ff' : 'rgba(255,255,255,0.05)', color: perfPlaybackActive ? '#000' : '#aaa' }}
+                onClick={togglePerformancePlayback}
+              >
+                {perfPlaybackActive ? '▶️ PLAYING' : '▶️ Play'}
+              </button>
+            </div>
+          </div>
+
+          {/* Timeline Body */}
+          <div className="perf-timeline-body">
+            {/* Fixed Labels Column */}
+            <div className="perf-timeline-labels">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div key={`lbl-a-${idx}`} className="perf-lane-label label-deck-a">
+                  A{idx + 1}
+                </div>
+              ))}
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div key={`lbl-b-${idx}`} className="perf-lane-label label-deck-b">
+                  B{idx + 1}
+                </div>
+              ))}
+            </div>
+
+            {/* Horizontal Scrollable Area */}
+            <div 
+              ref={timelineScrollRef}
+              className="perf-timeline-scroll-container"
+            >
+              <div className="perf-timeline-grid-canvas" style={{ width: `${Math.max(64, currentPerfPlayBeat + 16) * 30}px` }}>
+                
+                {/* Vertical Beat Grid Lines */}
+                {Array.from({ length: Math.ceil(Math.max(64, currentPerfPlayBeat + 16)) }).map((_, beatIdx) => {
+                  const isMajor = beatIdx % 4 === 0;
+                  return (
+                    <div
+                      key={`grid-line-${beatIdx}`}
+                      className={`perf-timeline-grid-line ${isMajor ? 'major' : 'minor'}`}
+                      style={{ left: `${beatIdx * 30}px` }}
+                    >
+                      {isMajor && <span className="beat-number">{beatIdx + 1}</span>}
+                    </div>
+                  );
+                })}
+
+                {/* 16 Lanes */}
+                {/* Deck A Lanes */}
+                {Array.from({ length: 8 }).map((_, laneIdx) => {
+                  const pills = getPillsForLane('A', laneIdx);
+                  const color = ringColors[laneIdx];
+                  return (
+                    <div key={`lane-a-${laneIdx}`} className="perf-timeline-lane">
+                      {pills.map((pill, pIdx) => (
+                        <div
+                          key={`pill-a-${laneIdx}-${pIdx}`}
+                          className="perf-timeline-pill"
+                          style={{
+                            left: `${pill.start * 30}px`,
+                            width: `${Math.max(8, (pill.end - pill.start) * 30)}px`,
+                            background: color,
+                            boxShadow: `0 0 5px ${color}`,
+                            borderColor: color
+                          }}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+
+                {/* Deck B Lanes */}
+                {Array.from({ length: 8 }).map((_, laneIdx) => {
+                  const pills = getPillsForLane('B', laneIdx);
+                  const color = ringColors[laneIdx];
+                  return (
+                    <div key={`lane-b-${laneIdx}`} className="perf-timeline-lane">
+                      {pills.map((pill, pIdx) => (
+                        <div
+                          key={`pill-b-${laneIdx}-${pIdx}`}
+                          className="perf-timeline-pill"
+                          style={{
+                            left: `${pill.start * 30}px`,
+                            width: `${Math.max(8, (pill.end - pill.start) * 30)}px`,
+                            background: color,
+                            boxShadow: `0 0 5px ${color}`,
+                            borderColor: color
+                          }}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+
+                {/* Playhead line */}
+                <div 
+                  className="perf-timeline-playhead"
+                  style={{ left: `${currentPerfPlayBeat * 30}px` }}
+                />
+
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -11995,6 +12449,142 @@ export default function Delta7Synth() {
           color: #aaa;
           text-transform: uppercase;
           letter-spacing: 0.5px;
+        }
+
+        /* Performance Timeline Panel Styles */
+        .perf-timeline-panel {
+          display: flex;
+          flex-direction: column;
+          background: #020509;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 2px;
+          height: 120px;
+          box-sizing: border-box;
+        }
+        .perf-timeline-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 2px 4px;
+          background: rgba(255, 255, 255, 0.02);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          margin-bottom: 2px;
+        }
+        .perf-timeline-title {
+          font-size: 0.45rem;
+          font-weight: bold;
+          color: #ff00ff;
+          letter-spacing: 1px;
+          font-family: monospace;
+        }
+        .perf-timeline-controls {
+          display: flex;
+          gap: 6px;
+          align-items: center;
+        }
+        .perf-timeline-body {
+          display: flex;
+          flex: 1;
+          min-height: 0;
+          position: relative;
+        }
+        .perf-timeline-labels {
+          width: 25px;
+          display: flex;
+          flex-direction: column;
+          background: rgba(0, 0, 0, 0.3);
+          border-right: 1px solid rgba(255, 255, 255, 0.1);
+          user-select: none;
+          box-sizing: border-box;
+          padding-top: 12px;
+        }
+        .perf-lane-label {
+          height: 5.5px;
+          font-size: 0.35rem;
+          line-height: 5.5px;
+          font-family: monospace;
+          text-align: center;
+          font-weight: bold;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+          box-sizing: border-box;
+        }
+        .perf-lane-label.label-deck-a {
+          color: #00f3ff;
+        }
+        .perf-lane-label.label-deck-b {
+          color: #ff00ff;
+        }
+        .perf-timeline-scroll-container {
+          flex: 1;
+          overflow-x: auto;
+          overflow-y: hidden;
+          position: relative;
+          background: rgba(0, 0, 0, 0.2);
+        }
+        .perf-timeline-scroll-container::-webkit-scrollbar {
+          height: 4px;
+        }
+        .perf-timeline-scroll-container::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 2px;
+        }
+        .perf-timeline-grid-canvas {
+          height: 100%;
+          position: relative;
+          box-sizing: border-box;
+          padding-top: 12px;
+        }
+        .perf-timeline-grid-line {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 1px;
+          pointer-events: none;
+        }
+        .perf-timeline-grid-line.minor {
+          border-left: 1px dashed rgba(255, 255, 255, 0.04);
+        }
+        .perf-timeline-grid-line.major {
+          border-left: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .beat-number {
+          position: absolute;
+          top: 1px;
+          left: 2px;
+          font-size: 0.32rem;
+          color: rgba(255, 255, 255, 0.35);
+          font-family: monospace;
+        }
+        .perf-timeline-lane {
+          height: 5.5px;
+          position: relative;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+          box-sizing: border-box;
+        }
+        .perf-timeline-pill {
+          position: absolute;
+          top: 1px;
+          height: 3.5px;
+          border-radius: 1.5px;
+          opacity: 0.85;
+        }
+        .perf-timeline-playhead {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 1.5px;
+          background: #ffe600;
+          box-shadow: 0 0 6px #ffe600;
+          z-index: 10;
+          pointer-events: none;
+        }
+
+        .perf-pad.pending {
+          animation: perf-pad-blink 0.3s infinite alternate;
+        }
+        @keyframes perf-pad-blink {
+          from { opacity: 0.4; filter: brightness(0.6); }
+          to { opacity: 1.0; filter: brightness(1.4) drop-shadow(0 0 5px currentColor); }
         }
       `}</style>
 
