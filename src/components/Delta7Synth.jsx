@@ -7110,9 +7110,6 @@ export default function Delta7Synth() {
                   <circle cx="125" cy="125" r="110" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
                   <circle cx="125" cy="125" r="95" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
                   <circle cx="125" cy="125" r="80" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                  
-                  {/* Strobe/Marker line */}
-                  <line x1="125" y1="2" x2="125" y2="15" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
               </div>
 
@@ -7580,9 +7577,6 @@ export default function Delta7Synth() {
                   <circle cx="125" cy="125" r="110" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
                   <circle cx="125" cy="125" r="95" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
                   <circle cx="125" cy="125" r="80" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-                  
-                  {/* Strobe/Marker line */}
-                  <line x1="125" y1="2" x2="125" y2="15" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
               </div>
 
