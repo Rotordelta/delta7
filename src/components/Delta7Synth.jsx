@@ -1410,6 +1410,73 @@ export default function Delta7Synth() {
       }
       window.removeEventListener('click', handleGesture);
       window.removeEventListener('keydown', handleGesture);
+
+      // Robust cleanup of Web Audio nodes and AudioContext closure to prevent leaks on component unmount
+      if (audioCtxRef.current) {
+        // Stop any active scheduled worklet clocks
+        if (schedulerNodeRef.current) {
+          try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' }); } catch {}
+          try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_ARP' }); } catch {}
+          try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_METRONOME' }); } catch {}
+          try { schedulerNodeRef.current.disconnect(); } catch {}
+          schedulerNodeRef.current = null;
+        }
+        
+        // Stop and disconnect all currently active voice node sub-graphs
+        activeVoicesRef.current.forEach(voices => {
+          voices.forEach(voice => {
+            const sources = [
+              voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
+              voice.driftLfo, voice.vibratoLfo, voice.filterLfo
+            ];
+            sources.forEach(src => {
+              if (src) { try { src.stop(); } catch {} }
+            });
+
+            const nodes = [
+              voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
+              voice.driftLfo, voice.vibratoLfo, voice.filterLfo,
+              voice.gainA, voice.gainB, voice.gainA_L, voice.gainA_R, voice.subGain, voice.noiseGain,
+              voice.vibratoLfoGain, voice.filterLfoGain, voice.filter1, voice.filter2,
+              voice.eqLowNode, voice.eqMidNode, voice.eqHighNode, voice.sendGainNode, voice.voiceOutGain
+            ];
+            nodes.forEach(node => {
+              if (node && typeof node.disconnect === 'function') {
+                try { node.disconnect(); } catch {}
+              }
+            });
+          });
+        });
+        activeVoicesRef.current.clear();
+        
+        // Disconnect global rack nodes to free memory
+        const globalNodes = [
+          analyserRef.current, masterGainRef.current, preampNodeRef.current,
+          ifx1InputRef.current, ifx1OutputRef.current, ifx2InputRef.current, ifx2OutputRef.current,
+          delayInputRef.current, delayOutputRef.current, leslieInputRef.current, leslieOutputRef.current,
+          dubSirenOscRef.current, dubSirenGainRef.current, formantInputRef.current, formantMixGainRef.current,
+          formantDryGainRef.current, formantF1Ref.current, formantF2Ref.current, formantF3Ref.current
+        ];
+        globalNodes.forEach(node => {
+          if (node && typeof node.disconnect === 'function') {
+            try { node.disconnect(); } catch {}
+          }
+        });
+        
+        if (dubSirenOscRef.current) {
+          try { dubSirenOscRef.current.stop(); } catch {}
+        }
+
+        // Close the AudioContext to release hardware device channels
+        try {
+          audioCtxRef.current.close().then(() => {
+            console.log("[Leo Audit] AudioContext closed successfully to prevent hardware device leaks.");
+          });
+        } catch (err) {
+          console.warn("Error closing AudioContext on unmount:", err);
+        }
+        audioCtxRef.current = null;
+      }
     };
   }, []);
 
@@ -6646,15 +6713,32 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       
       setTimeout(() => {
         try {
-          if (oscA) oscA.stop();
-          if (oscB) oscB.stop();
-          if (oscA_L) oscA_L.stop();
-          if (oscA_R) oscA_R.stop();
-          if (subOsc) subOsc.stop();
-          if (noiseSource) noiseSource.stop();
-          if (driftLfo) driftLfo.stop();
-          if (lfo1) lfo1.stop();
-          if (lfo2) lfo2.stop();
+          if (oscA) { try { oscA.stop(); } catch {} }
+          if (oscB) { try { oscB.stop(); } catch {} }
+          if (oscA_L) { try { oscA_L.stop(); } catch {} }
+          if (oscA_R) { try { oscA_R.stop(); } catch {} }
+          if (subOsc) { try { subOsc.stop(); } catch {} }
+          if (noiseSource) { try { noiseSource.stop(); } catch {} }
+          if (driftLfo) { try { driftLfo.stop(); } catch {} }
+          if (lfo1) { try { lfo1.stop(); } catch {} }
+          if (lfo2) { try { lfo2.stop(); } catch {} }
+
+          // Explicitly disconnect all voice-level nodes to release audio thread memory
+          const nodesToDisconnect = [
+            oscA, oscB, oscA_L, oscA_R, subOsc, noiseSource, driftLfo, lfo1, lfo2,
+            voice.gainA, voice.gainB, voice.gainA_L, voice.gainA_R, voice.subGain, voice.noiseGain,
+            voice.vibratoLfoGain, voice.filterLfoGain,
+            voice.filter1, voice.filter2,
+            voice.eqLowNode, voice.eqMidNode, voice.eqHighNode,
+            voice.sendGainNode,
+            voice.voiceOutGain
+          ];
+
+          nodesToDisconnect.forEach(node => {
+            if (node && typeof node.disconnect === 'function') {
+              try { node.disconnect(); } catch {}
+            }
+          });
         } catch {}
       }, (releaseTime + 0.1) * 1000);
     } catch (err) {
