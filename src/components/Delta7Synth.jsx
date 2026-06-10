@@ -728,6 +728,7 @@ export default function Delta7Synth() {
   const [uiScale, setUiScale] = useState(1.0);
   const [performanceViewActive, setPerformanceViewActive] = useState(false);
   const [perfRecordActive, setPerfRecordActive] = useState(false);
+  const [perfIsDubbing, setPerfIsDubbing] = useState(false);
   const [perfPlaybackActive, setPerfPlaybackActive] = useState(false);
   const [perfEvents, setPerfEvents] = useState([]);
   const [perfRecordStartBpm, setPerfRecordStartBpm] = useState(120);
@@ -747,7 +748,11 @@ export default function Delta7Synth() {
   const ringDotsRefA = useRef([]);
   const ringTracksRefB = useRef([]);
   const ringDotsRefB = useRef([]);
-  const timelinePlayheadRef = useRef(null);
+  const seqTimerDisplayRef = useRef(null);
+  const seqCurrentBeatRef = useRef(0.0);
+  const seqStartBeatOffsetRef = useRef(0.0);
+  const highwayEventsRefA = useRef(null);
+  const highwayEventsRefB = useRef(null);
   // VU meter DOM refs — updated directly in tickLoop to avoid React re-renders (Issue 1)
   const vuLevelLRef = useRef(0);
   const vuLevelRRef = useRef(0);
@@ -1092,28 +1097,30 @@ export default function Delta7Synth() {
           const elapsed = ctx.currentTime - perfPlayStartTimeRef.current;
           const bpm = paramsRef.current.arpBpm || 120;
           const beatDuration = 60 / bpm;
-          currentBeat = elapsed / beatDuration;
-          if (timelinePlayheadRef.current) {
-            timelinePlayheadRef.current.style.left = `${currentBeat * 30}px`;
-          }
-          if (timelineScrollRef.current) {
-            const playheadPx = currentBeat * 30;
-            const halfWidth = timelineScrollRef.current.clientWidth / 2;
-            timelineScrollRef.current.scrollLeft = playheadPx - halfWidth;
-          }
+          currentBeat = elapsed / beatDuration + seqStartBeatOffsetRef.current;
+          seqCurrentBeatRef.current = currentBeat;
         } else if (perfRecordActiveRef.current && perfStartTimeRef.current > 0) {
           const elapsed = ctx.currentTime - perfStartTimeRef.current;
           const bpm = paramsRef.current.arpBpm || 120;
           const beatDuration = 60 / bpm;
           currentBeat = elapsed / beatDuration;
-          if (timelinePlayheadRef.current) {
-            timelinePlayheadRef.current.style.left = `${currentBeat * 30}px`;
-          }
-          if (timelineScrollRef.current) {
-            const playheadPx = currentBeat * 30;
-            const halfWidth = timelineScrollRef.current.clientWidth / 2;
-            timelineScrollRef.current.scrollLeft = playheadPx - halfWidth;
-          }
+          seqCurrentBeatRef.current = currentBeat;
+        } else {
+          currentBeat = seqCurrentBeatRef.current;
+        }
+
+        // Update timer display DOM element
+        if (seqTimerDisplayRef.current) {
+          seqTimerDisplayRef.current.innerText = currentBeat.toFixed(1);
+        }
+
+        // Translate Guitar Hero highways downwards (GPU transform)
+        const translatePx = currentBeat * 60;
+        if (highwayEventsRefA.current) {
+          highwayEventsRefA.current.style.transform = `translateY(${translatePx}px)`;
+        }
+        if (highwayEventsRefB.current) {
+          highwayEventsRefB.current.style.transform = `translateY(${translatePx}px)`;
         }
 
         // Concentric Rings calculation
@@ -4038,8 +4045,13 @@ export default function Delta7Synth() {
             case 'START_PLAYBACK':
               this.playbackActive = true;
               this.playbackStartTime = msg.startTime;
+              this.playbackStartBeatOffset = msg.startBeatOffset || 0.0;
               this.playbackNextEventIdx = 0;
               this.sortedEvents = msg.sortedEvents || [];
+              while (this.playbackNextEventIdx < this.sortedEvents.length && 
+                     this.sortedEvents[this.playbackNextEventIdx].beat < this.playbackStartBeatOffset) {
+                this.playbackNextEventIdx++;
+              }
               break;
               
             case 'STOP_PLAYBACK':
@@ -4135,13 +4147,13 @@ export default function Delta7Synth() {
           // 3. Performance playback events
           if (this.playbackActive && this.sortedEvents.length > 0) {
             const elapsed = now - this.playbackStartTime;
-            const elapsedBeats = elapsed / beatDuration;
+            const elapsedBeats = elapsed / beatDuration + this.playbackStartBeatOffset;
             const lookaheadBeats = lookahead / beatDuration;
             
             while (this.playbackNextEventIdx < this.sortedEvents.length) {
               const event = this.sortedEvents[this.playbackNextEventIdx];
               if (event.beat < elapsedBeats + lookaheadBeats) {
-                const eventTime = this.playbackStartTime + event.beat * beatDuration;
+                const eventTime = this.playbackStartTime + (event.beat - this.playbackStartBeatOffset) * beatDuration;
                 this.port.postMessage({
                   type: 'PLAYBACK_EVENT',
                   event: event,
@@ -4159,6 +4171,7 @@ export default function Delta7Synth() {
               const endBeat = Math.ceil(lastEvent.beat / 4) * 4;
               if (elapsedBeats >= endBeat) {
                 this.playbackStartTime = now;
+                this.playbackStartBeatOffset = 0.0;
                 this.playbackNextEventIdx = 0;
               }
             }
@@ -6822,9 +6835,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
   };
 
-  const togglePerformanceRecord = () => {
+  const togglePerformanceRecord = (isDub = false) => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
+    if (!ctx) return;
     
     if (perfRecordActive) {
       // Issue 5: flush ref to state now that recording is done — one single setState call
@@ -6833,34 +6847,111 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       // Issue 4: pre-sort once here so runPerfScheduler never sorts again
       sortedPerfEventsRef.current = [...recorded].sort((a, b) => a.beat - b.beat);
       setPerfRecordActive(false);
+
+      const elapsed = ctx.currentTime - perfStartTimeRef.current;
+      const bpm = paramsRef.current.arpBpm || 120;
+      const beatDuration = 60 / bpm;
+      seqCurrentBeatRef.current = elapsed / beatDuration;
+      seqStartBeatOffsetRef.current = seqCurrentBeatRef.current;
+
       if (schedulerNodeRef.current) {
         schedulerNodeRef.current.port.postMessage({
           type: 'SET_PARAMS',
           perfRecordActive: false
         });
       }
-      showEditorStatus(`Performance Recorded! (${recorded.length} events) ⏹️`);
-    } else {
-      // Stop playback first
-      setPerfPlaybackActive(false);
-      if (schedulerNodeRef.current) {
-        schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
+
+      if (perfIsDubbing) {
+        // Exiting dubbing transitions smoothly to standard playback
+        setPerfPlaybackActive(true);
+        perfPlayStartTimeRef.current = perfStartTimeRef.current;
+        seqStartBeatOffsetRef.current = 0.0;
+        showEditorStatus(`Overdub Complete! Seamlessly Playing... ▶️`);
+      } else {
+        setPerfPlaybackActive(false);
+        if (schedulerNodeRef.current) {
+          schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
+        }
+        showEditorStatus(`Performance Recorded! (${recorded.length} events) ⏹️`);
       }
-      // Clear both state and ref
-      perfEventsRef.current = [];
-      sortedPerfEventsRef.current = [];
-      setPerfEvents([]);
-      perfStartTimeRef.current = ctx.currentTime;
-      setPerfRecordStartBpm(paramsRef.current.arpBpm || 120);
+      setPerfIsDubbing(false);
+    } else {
+      const bpm = paramsRef.current.arpBpm || 120;
+      const beatDuration = 60 / bpm;
+
+      if (perfPlaybackActive) {
+        if (isDub) {
+          // Live Overdub Punch-In: engage recording on the fly while staying aligned
+          setPerfRecordActive(true);
+          setPerfIsDubbing(true);
+          perfStartTimeRef.current = perfPlayStartTimeRef.current;
+          
+          if (schedulerNodeRef.current) {
+            schedulerNodeRef.current.port.postMessage({
+              type: 'SET_PARAMS',
+              perfStartTime: perfPlayStartTimeRef.current,
+              perfRecordActive: true
+            });
+          }
+          showEditorStatus("Overdub engaged on the fly! 🎙️");
+          return;
+        } else {
+          // Clean Record from active playback: halt playback first
+          setPerfPlaybackActive(false);
+          if (schedulerNodeRef.current) {
+            schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
+          }
+        }
+      }
+
+      if (!isDub) {
+        // Clean recording: wipe previous events
+        perfEventsRef.current = [];
+        sortedPerfEventsRef.current = [];
+        setPerfEvents([]);
+        seqCurrentBeatRef.current = 0.0;
+        seqStartBeatOffsetRef.current = 0.0;
+      }
+
+      // Calculate start time relative to current playhead so we align grids
+      const startBeat = seqCurrentBeatRef.current;
+      const startTime = ctx.currentTime - (startBeat * beatDuration);
+      perfStartTimeRef.current = startTime;
+      
+      setPerfRecordStartBpm(bpm);
       setPerfRecordActive(true);
+      setPerfIsDubbing(isDub);
+
       if (schedulerNodeRef.current) {
         schedulerNodeRef.current.port.postMessage({
           type: 'SET_PARAMS',
-          perfStartTime: ctx.currentTime,
+          perfStartTime: startTime,
           perfRecordActive: true
         });
       }
-      showEditorStatus("Recording Performance... ⏺️");
+
+      if (isDub) {
+        // Start playing back existing events immediately during dub
+        setPerfPlaybackActive(true);
+        perfPlayStartTimeRef.current = startTime;
+        seqStartBeatOffsetRef.current = 0.0;
+
+        if (schedulerNodeRef.current) {
+          schedulerNodeRef.current.port.postMessage({
+            type: 'START_PLAYBACK',
+            startTime: startTime,
+            startBeatOffset: 0.0,
+            sortedEvents: sortedPerfEventsRef.current
+          });
+        }
+        showEditorStatus("Overdubbing Performance... 🎙️");
+      } else {
+        setPerfPlaybackActive(false);
+        if (schedulerNodeRef.current) {
+          schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
+        }
+        showEditorStatus("Recording Performance (Clean)... ⏺️");
+      }
     }
   };
 
@@ -6870,6 +6961,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     if (perfPlaybackActive) {
       setPerfPlaybackActive(false);
+
+      const elapsed = ctx.currentTime - perfPlayStartTimeRef.current;
+      const bpm = paramsRef.current.arpBpm || 120;
+      const beatDuration = 60 / bpm;
+      seqCurrentBeatRef.current = elapsed / beatDuration + seqStartBeatOffsetRef.current;
+      seqStartBeatOffsetRef.current = seqCurrentBeatRef.current;
+
       if (schedulerNodeRef.current) {
         schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
       }
@@ -6890,15 +6988,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       }
       // Stop recording first
       setPerfRecordActive(false);
+      setPerfIsDubbing(false);
       setPerfPlaybackActive(true);
       
       const startTime = ctx.currentTime;
       perfPlayStartTimeRef.current = startTime;
+      seqStartBeatOffsetRef.current = seqCurrentBeatRef.current;
       
       if (schedulerNodeRef.current) {
         schedulerNodeRef.current.port.postMessage({
           type: 'START_PLAYBACK',
           startTime,
+          startBeatOffset: seqStartBeatOffsetRef.current,
           sortedEvents: sortedPerfEventsRef.current
         });
       }
@@ -6906,8 +7007,48 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
   };
 
+  const stopPerformancePlayback = () => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+
+    // Finalize recording if active
+    if (perfRecordActive) {
+      const recorded = [...perfEventsRef.current];
+      setPerfEvents(recorded);
+      sortedPerfEventsRef.current = [...recorded].sort((a, b) => a.beat - b.beat);
+    }
+
+    setPerfPlaybackActive(false);
+    setPerfRecordActive(false);
+    setPerfIsDubbing(false);
+    seqCurrentBeatRef.current = 0.0;
+    seqStartBeatOffsetRef.current = 0.0;
+
+    if (schedulerNodeRef.current) {
+      schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
+      schedulerNodeRef.current.port.postMessage({
+        type: 'SET_PARAMS',
+        perfRecordActive: false
+      });
+    }
+
+    // Stop all playing performance voices
+    for (const k of activeVoicesRef.current.keys()) {
+      if (typeof k === 'string' && k.startsWith('perf-')) stopPerfVoice(k);
+    }
+    setActivePerfPads({});
+    showEditorStatus("Playback Stopped and Reset. ⏹️");
+  };
+
   const clearPerformance = () => {
     setPerfEvents([]);
+    perfEventsRef.current = [];
+    sortedPerfEventsRef.current = [];
+    seqCurrentBeatRef.current = 0.0;
+    seqStartBeatOffsetRef.current = 0.0;
+    if (schedulerNodeRef.current) {
+      schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
+    }
     showEditorStatus("Performance Cleared! 🗑️");
   };
 
@@ -8727,6 +8868,73 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 {deckAPlaying ? 'Pause' : 'Play'}
               </button>
             </div>
+
+            {/* Vertical Highway for Deck A (sitting below Cue Play Sync row) */}
+            <div className="vertical-highway deck-a-highway">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div 
+                  key={`line-a-${idx}`} 
+                  className="highway-lane-line" 
+                  style={{ left: `${(idx + 0.5) * 31}px` }} 
+                />
+              ))}
+              <div className="highway-playhead-line" />
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div 
+                  key={`target-a-${idx}`} 
+                  className="highway-target-circle" 
+                  style={{ 
+                    left: `${idx * 31 + 11.5}px`, 
+                    borderColor: ringColors[idx],
+                    background: activePerfPads[`A-slot-${idx}`] ? ringColors[idx] : 'transparent',
+                    boxShadow: activePerfPads[`A-slot-${idx}`] ? `0 0 6px ${ringColors[idx]}` : 'none'
+                  }} 
+                />
+              ))}
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div 
+                  key={`lbl-a-${idx}`} 
+                  className="highway-label" 
+                  style={{ left: `${idx * 31 + 9.5}px`, color: ringColors[idx] }}
+                >
+                  A{idx + 1}
+                </div>
+              ))}
+              <div 
+                ref={highwayEventsRefA} 
+                className="highway-events-container"
+              >
+                {Array.from({ length: 8 }).map((_, laneIdx) => {
+                  const pills = getPillsForLane('A', laneIdx);
+                  const color = ringColors[laneIdx];
+                  return (
+                    <div key={`hw-lane-a-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
+                      {pills.map((pill, pIdx) => {
+                        const startY = - (pill.start * 60);
+                        const endY = - (pill.end * 60);
+                        const height = startY - endY;
+                        return (
+                          <div
+                            key={`hw-pill-a-${laneIdx}-${pIdx}`}
+                            style={{
+                              position: 'absolute',
+                              left: '11.5px',
+                              width: '8px',
+                              bottom: `${startY}px`,
+                              height: `${Math.max(6, height)}px`,
+                              background: color,
+                              borderRadius: '4px',
+                              boxShadow: `0 0 6px ${color}`,
+                              border: `1.5px solid ${color}`
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* LOWER PANEL: Transport, Loops, and Pitch fader */}
@@ -9581,6 +9789,73 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 {deckBPlaying ? 'Pause' : 'Play'}
               </button>
             </div>
+
+            {/* Vertical Highway for Deck B (sitting below Cue Play Sync row) */}
+            <div className="vertical-highway deck-b-highway">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div 
+                  key={`line-b-${idx}`} 
+                  className="highway-lane-line" 
+                  style={{ left: `${(idx + 0.5) * 31}px` }} 
+                />
+              ))}
+              <div className="highway-playhead-line" />
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div 
+                  key={`target-b-${idx}`} 
+                  className="highway-target-circle" 
+                  style={{ 
+                    left: `${idx * 31 + 11.5}px`, 
+                    borderColor: ringColors[idx],
+                    background: activePerfPads[`B-slot-${idx}`] ? ringColors[idx] : 'transparent',
+                    boxShadow: activePerfPads[`B-slot-${idx}`] ? `0 0 6px ${ringColors[idx]}` : 'none'
+                  }} 
+                />
+              ))}
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div 
+                  key={`lbl-b-${idx}`} 
+                  className="highway-label" 
+                  style={{ left: `${idx * 31 + 9.5}px`, color: ringColors[idx] }}
+                >
+                  B{idx + 1}
+                </div>
+              ))}
+              <div 
+                ref={highwayEventsRefB} 
+                className="highway-events-container"
+              >
+                {Array.from({ length: 8 }).map((_, laneIdx) => {
+                  const pills = getPillsForLane('B', laneIdx);
+                  const color = ringColors[laneIdx];
+                  return (
+                    <div key={`hw-lane-b-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
+                      {pills.map((pill, pIdx) => {
+                        const startY = - (pill.start * 60);
+                        const endY = - (pill.end * 60);
+                        const height = startY - endY;
+                        return (
+                          <div
+                            key={`hw-pill-b-${laneIdx}-${pIdx}`}
+                            style={{
+                              position: 'absolute',
+                              left: '11.5px',
+                              width: '8px',
+                              bottom: `${startY}px`,
+                              height: `${Math.max(6, height)}px`,
+                              background: color,
+                              borderRadius: '4px',
+                              boxShadow: `0 0 6px ${color}`,
+                              border: `1.5px solid ${color}`
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* LOWER PANEL: Transport, Loops, and Pitch fader */}
@@ -9680,20 +9955,146 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         </div>
       </div>
 
-        {/* BOTTOM ROW: PERFORMANCE TIMELINE PANEL */}
-        <div className="perf-timeline-panel">
-          {/* Timeline Header */}
-          <div className="perf-timeline-header">
-            <div className="perf-timeline-title">16-LANE HIGHWAY SCROLLING SEQUENCER</div>
-            <div className="perf-timeline-controls">
-              <button
-                className={`deck-btn ${params.metronomeOn ? 'active' : ''}`}
-                style={{ height: '14px', fontSize: '0.45rem', padding: '1px 4px', background: params.metronomeOn ? '#ffe600' : 'rgba(255,255,255,0.05)', color: params.metronomeOn ? '#000' : '#aaa' }}
-                onClick={() => setParams(prev => ({ ...prev, metronomeOn: !prev.metronomeOn }))}
-              >
-                METRONOME: {params.metronomeOn ? 'ON' : 'OFF'}
-              </button>
+        {/* BOTTOM ROW: PERFORMANCE SEQUENCER DIGITAL CONTROL PANEL */}
+        <div className="perf-timeline-panel" style={{ padding: '8px 12px', background: 'rgba(5, 10, 20, 0.9)', borderTop: '1px solid rgba(0, 243, 255, 0.25)', borderRadius: '0 0 8px 8px' }}>
+          <div className="perf-timeline-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <div className="perf-timeline-title" style={{ fontSize: '0.62rem', letterSpacing: '1px', color: '#ffe600', fontWeight: 'bold', fontFamily: 'monospace' }}>
+              16-LANE VERTICAL HIGHWAY PERFORMANCE SEQUENCER
+            </div>
+            <div className="perf-timeline-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              
+              {/* Digital Beat Timer display */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', borderRadius: '3px', padding: '2px 6px', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: '0.48rem', color: '#888' }}>BEAT:</span>
+                <span ref={seqTimerDisplayRef} style={{ fontSize: '0.68rem', color: '#00f3ff', fontWeight: 'bold', minWidth: '40px', display: 'inline-block', textAlign: 'right' }}>0.0</span>
+              </div>
 
+              {/* Tape-style DAW Transport Controls */}
+              <div className="transport-strip" style={{ display: 'flex', gap: '3px', background: 'rgba(0, 0, 0, 0.4)', padding: '2px 4px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.2)' }}>
+                {/* Rewind */}
+                <button
+                  className="deck-btn"
+                  onClick={() => {
+                    const nextBeat = Math.max(0.0, seqCurrentBeatRef.current - 4.0);
+                    seqCurrentBeatRef.current = nextBeat;
+                    seqStartBeatOffsetRef.current = nextBeat;
+                    if (perfPlaybackActiveRef.current) {
+                      const ctx = audioCtxRef.current;
+                      if (ctx) {
+                        perfPlayStartTimeRef.current = ctx.currentTime;
+                        if (schedulerNodeRef.current) {
+                          schedulerNodeRef.current.port.postMessage({
+                            type: 'START_PLAYBACK',
+                            startTime: ctx.currentTime,
+                            startBeatOffset: nextBeat,
+                            sortedEvents: sortedPerfEventsRef.current
+                          });
+                        }
+                      }
+                    }
+                    showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) ⏪`);
+                  }}
+                  style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#00f3ff', background: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.3)' }}
+                  title="Rewind 4 beats"
+                >
+                  ⏪
+                </button>
+
+                {/* Stop */}
+                <button
+                  className="deck-btn"
+                  onClick={stopPerformancePlayback}
+                  style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#ff4444', background: 'rgba(255, 68, 68, 0.05)', border: '1px solid rgba(255, 68, 68, 0.3)' }}
+                  title="Stop and Reset"
+                >
+                  ■ Stop
+                </button>
+
+                {/* Play / Pause */}
+                <button
+                  className={`deck-btn ${perfPlaybackActive ? 'active' : ''}`}
+                  onClick={togglePerformancePlayback}
+                  style={{ 
+                    height: '18px', 
+                    padding: '1px 6px', 
+                    fontSize: '0.55rem', 
+                    color: perfPlaybackActive ? '#000' : '#00f3ff', 
+                    background: perfPlaybackActive ? '#00f3ff' : 'rgba(0, 243, 255, 0.05)', 
+                    border: '1px solid rgba(0, 243, 255, 0.3)',
+                    boxShadow: perfPlaybackActive ? '0 0 8px #00f3ff' : 'none'
+                  }}
+                  title={perfPlaybackActive ? "Pause" : "Play"}
+                >
+                  {perfPlaybackActive ? '⏸ Pause' : '▶ Play'}
+                </button>
+
+                {/* Forward */}
+                <button
+                  className="deck-btn"
+                  onClick={() => {
+                    const nextBeat = seqCurrentBeatRef.current + 4.0;
+                    seqCurrentBeatRef.current = nextBeat;
+                    seqStartBeatOffsetRef.current = nextBeat;
+                    if (perfPlaybackActiveRef.current) {
+                      const ctx = audioCtxRef.current;
+                      if (ctx) {
+                        perfPlayStartTimeRef.current = ctx.currentTime;
+                        if (schedulerNodeRef.current) {
+                          schedulerNodeRef.current.port.postMessage({
+                            type: 'START_PLAYBACK',
+                            startTime: ctx.currentTime,
+                            startBeatOffset: nextBeat,
+                            sortedEvents: sortedPerfEventsRef.current
+                          });
+                        }
+                      }
+                    }
+                    showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) ⏩`);
+                  }}
+                  style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#00f3ff', background: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.3)' }}
+                  title="Forward 4 beats"
+                >
+                  ⏩
+                </button>
+
+                {/* Record */}
+                <button
+                  className={`deck-btn ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
+                  onClick={() => togglePerformanceRecord(false)}
+                  style={{ 
+                    height: '18px', 
+                    padding: '1px 6px', 
+                    fontSize: '0.55rem', 
+                    color: perfRecordActive && !perfIsDubbing ? '#fff' : '#ff3333', 
+                    background: perfRecordActive && !perfIsDubbing ? '#ff3333' : 'rgba(255, 51, 51, 0.05)', 
+                    border: '1px solid rgba(255, 51, 51, 0.3)',
+                    boxShadow: perfRecordActive && !perfIsDubbing ? '0 0 8px #ff3333' : 'none'
+                  }}
+                  title={perfRecordActive && !perfIsDubbing ? "Stop Recording" : "Clean Record (clears sequence)"}
+                >
+                  {perfRecordActive && !perfIsDubbing ? '● REC...' : '● Record'}
+                </button>
+
+                {/* Dub */}
+                <button
+                  className={`deck-btn ${perfRecordActive && perfIsDubbing ? 'active' : ''}`}
+                  onClick={() => togglePerformanceRecord(true)}
+                  style={{ 
+                    height: '18px', 
+                    padding: '1px 6px', 
+                    fontSize: '0.55rem', 
+                    color: perfRecordActive && perfIsDubbing ? '#fff' : '#ff00ff', 
+                    background: perfRecordActive && perfIsDubbing ? '#ff00ff' : 'rgba(255, 0, 255, 0.05)', 
+                    border: '1px solid rgba(255, 0, 255, 0.3)',
+                    boxShadow: perfRecordActive && perfIsDubbing ? '0 0 8px #ff00ff' : 'none'
+                  }}
+                  title={perfRecordActive && perfIsDubbing ? "Stop Dubbing" : "Overdub (layers notes on top)"}
+                >
+                  {perfRecordActive && perfIsDubbing ? '● DUBBING' : '● Dub'}
+                </button>
+              </div>
+
+              {/* Quantize options */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <span style={{ fontSize: '0.4rem', color: '#888', fontFamily: 'monospace' }}>QUANTIZE:</span>
                 <select
@@ -9712,128 +10113,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </select>
               </div>
 
+              {/* Clear performance */}
               <button
                 className="deck-btn"
-                style={{ height: '14px', fontSize: '0.45rem', padding: '1px 4px', background: 'rgba(255,0,0,0.15)', color: '#ff4444', border: '1px solid #ff4444' }}
-                onClick={() => {
-                  setPerfEvents([]);
-                  setCurrentPerfPlayBeat(0);
-                  showEditorStatus("Performance Sequence Cleared 🗑️");
-                }}
+                style={{ height: '18px', fontSize: '0.48rem', padding: '1px 5px', background: 'rgba(255,0,0,0.15)', color: '#ff4444', border: '1px solid #ff4444' }}
+                onClick={clearPerformance}
               >
                 Clear
               </button>
 
-              <button
-                className={`deck-btn ${perfRecordActive ? 'active' : ''}`}
-                style={{ height: '14px', fontSize: '0.45rem', padding: '1px 4px', background: perfRecordActive ? '#ff3333' : 'rgba(255,255,255,0.05)', color: perfRecordActive ? '#fff' : '#aaa' }}
-                onClick={togglePerformanceRecord}
-              >
-                {perfRecordActive ? '🔴 REC...' : '🔴 Record'}
-              </button>
-
-              <button
-                className={`deck-btn ${perfPlaybackActive ? 'active' : ''}`}
-                style={{ height: '14px', fontSize: '0.45rem', padding: '1px 4px', background: perfPlaybackActive ? '#00f3ff' : 'rgba(255,255,255,0.05)', color: perfPlaybackActive ? '#000' : '#aaa' }}
-                onClick={togglePerformancePlayback}
-              >
-                {perfPlaybackActive ? '▶️ PLAYING' : '▶️ Play'}
-              </button>
-            </div>
-          </div>
-
-          {/* Timeline Body */}
-          <div className="perf-timeline-body">
-            {/* Fixed Labels Column */}
-            <div className="perf-timeline-labels">
-              {Array.from({ length: 8 }).map((_, idx) => (
-                <div key={`lbl-a-${idx}`} className="perf-lane-label label-deck-a">
-                  A{idx + 1}
-                </div>
-              ))}
-              {Array.from({ length: 8 }).map((_, idx) => (
-                <div key={`lbl-b-${idx}`} className="perf-lane-label label-deck-b">
-                  B{idx + 1}
-                </div>
-              ))}
-            </div>
-
-            {/* Horizontal Scrollable Area */}
-            <div 
-              ref={timelineScrollRef}
-              className="perf-timeline-scroll-container"
-            >
-              <div className="perf-timeline-grid-canvas" style={{ width: '3840px' }}>
-                
-                {/* Vertical Beat Grid Lines */}
-                {Array.from({ length: 128 }).map((_, beatIdx) => {
-                  const isMajor = beatIdx % 4 === 0;
-                  return (
-                    <div
-                      key={`grid-line-${beatIdx}`}
-                      className={`perf-timeline-grid-line ${isMajor ? 'major' : 'minor'}`}
-                      style={{ left: `${beatIdx * 30}px` }}
-                    >
-                      {isMajor && <span className="beat-number">{beatIdx + 1}</span>}
-                    </div>
-                  );
-                })}
-
-                {/* 16 Lanes */}
-                {/* Deck A Lanes */}
-                {Array.from({ length: 8 }).map((_, laneIdx) => {
-                  const pills = getPillsForLane('A', laneIdx);
-                  const color = ringColors[laneIdx];
-                  return (
-                    <div key={`lane-a-${laneIdx}`} className="perf-timeline-lane">
-                      {pills.map((pill, pIdx) => (
-                        <div
-                          key={`pill-a-${laneIdx}-${pIdx}`}
-                          className="perf-timeline-pill"
-                          style={{
-                            left: `${pill.start * 30}px`,
-                            width: `${Math.max(8, (pill.end - pill.start) * 30)}px`,
-                            background: color,
-                            boxShadow: `0 0 5px ${color}`,
-                            borderColor: color
-                          }}
-                        />
-                      ))}
-                    </div>
-                  );
-                })}
-
-                {/* Deck B Lanes */}
-                {Array.from({ length: 8 }).map((_, laneIdx) => {
-                  const pills = getPillsForLane('B', laneIdx);
-                  const color = ringColors[laneIdx];
-                  return (
-                    <div key={`lane-b-${laneIdx}`} className="perf-timeline-lane">
-                      {pills.map((pill, pIdx) => (
-                        <div
-                          key={`pill-b-${laneIdx}-${pIdx}`}
-                          className="perf-timeline-pill"
-                          style={{
-                            left: `${pill.start * 30}px`,
-                            width: `${Math.max(8, (pill.end - pill.start) * 30)}px`,
-                            background: color,
-                            boxShadow: `0 0 5px ${color}`,
-                            borderColor: color
-                          }}
-                        />
-                      ))}
-                    </div>
-                  );
-                })}
-
-                {/* Playhead line */}
-                <div 
-                  ref={timelinePlayheadRef}
-                  className="perf-timeline-playhead"
-                  style={{ left: '0px' }}
-                />
-
-              </div>
             </div>
           </div>
         </div>
@@ -12053,23 +12341,51 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               {/* Sequencer controls */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
-                  className={`btn btn-xs ${perfRecordActive ? 'btn-panic' : ''}`}
-                  onClick={togglePerformanceRecord}
+                  className={`btn btn-xs ${perfRecordActive && !perfIsDubbing ? 'btn-panic' : ''}`}
+                  onClick={() => togglePerformanceRecord(false)}
                   style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}
+                  title="Clean Record (clears sequence)"
                 >
-                  {perfRecordActive ? '● REC ON' : '● REC'}
+                  {perfRecordActive && !perfIsDubbing ? '● REC ON' : '● REC'}
+                </button>
+                <button
+                  className="btn btn-xs"
+                  onClick={() => togglePerformanceRecord(true)}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '0.55rem',
+                    fontWeight: 'bold',
+                    margin: 0,
+                    borderColor: perfRecordActive && perfIsDubbing ? '#ff00ff' : 'rgba(255, 0, 255, 0.4)',
+                    color: perfRecordActive && perfIsDubbing ? '#fff' : '#ff00ff',
+                    background: perfRecordActive && perfIsDubbing ? '#ff00ff' : 'transparent',
+                    boxShadow: perfRecordActive && perfIsDubbing ? '0 0 6px #ff00ff' : 'none'
+                  }}
+                  title="Overdub (layers notes on top)"
+                >
+                  {perfRecordActive && perfIsDubbing ? '● DUB ON' : '● DUB'}
                 </button>
                 <button
                   className={`btn btn-xs ${perfPlaybackActive ? 'active-green' : ''}`}
                   onClick={togglePerformancePlayback}
                   style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}
+                  title="Play/Pause"
                 >
-                  {perfPlaybackActive ? '■ STOP' : '► PLAY'}
+                  {perfPlaybackActive ? '⏸ PAUSE' : '► PLAY'}
+                </button>
+                <button
+                  className="btn btn-xs"
+                  onClick={stopPerformancePlayback}
+                  style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0, borderColor: '#ff4444', color: '#ff4444' }}
+                  title="Stop & Reset"
+                >
+                  ■ STOP
                 </button>
                 <button
                   className="btn btn-xs"
                   onClick={clearPerformance}
                   style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0, borderColor: '#ff0055', color: '#ff0055' }}
+                  title="Clear Performance"
                 >
                   CLEAR
                 </button>
@@ -12732,6 +13048,79 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           background: #02070f;
           height: 100%;
           user-select: none;
+        }
+
+        /* Guitar Hero Vertical Sequencer Highway Styles */
+        .vertical-highway {
+          position: relative;
+          width: 250px;
+          height: 180px;
+          background: rgba(4, 8, 16, 0.78);
+          border-radius: 6px;
+          overflow: hidden;
+          box-shadow: inset 0 0 10px rgba(0,0,0,0.85);
+          user-select: none;
+          flex-shrink: 0;
+          margin: 6px auto;
+        }
+        .deck-a-highway {
+          border: 1px solid rgba(0, 243, 255, 0.25);
+          box-shadow: 0 0 8px rgba(0, 243, 255, 0.12), inset 0 0 10px rgba(0,0,0,0.85);
+        }
+        .deck-b-highway {
+          border: 1px solid rgba(255, 0, 255, 0.25);
+          box-shadow: 0 0 8px rgba(255, 0, 255, 0.12), inset 0 0 10px rgba(0,0,0,0.85);
+        }
+        .highway-lane-line {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 0;
+          border-right: 1px dashed rgba(255,255,255,0.06);
+          pointer-events: none;
+        }
+        .highway-playhead-line {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 35px;
+          height: 0;
+          border-bottom: 2px solid #ffe600;
+          box-shadow: 0 0 6px #ffe600;
+          z-index: 5;
+          pointer-events: none;
+        }
+        .highway-target-circle {
+          position: absolute;
+          bottom: 31px;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          border-width: 1.5px;
+          border-style: solid;
+          background: transparent;
+          z-index: 4;
+          pointer-events: none;
+          transition: background 0.08s, box-shadow 0.08s;
+        }
+        .highway-label {
+          position: absolute;
+          bottom: 6px;
+          font-size: 0.38rem;
+          font-weight: bold;
+          font-family: monospace;
+          text-align: center;
+          width: 12px;
+          z-index: 4;
+          pointer-events: none;
+        }
+        .highway-events-container {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 35px;
+          transform: translateY(0px);
+          pointer-events: none;
         }
 
         .vinyl-platter-wrapper {
