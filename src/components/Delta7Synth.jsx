@@ -11332,7 +11332,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                     ...paramsRef.current,
                                     oscMode: 'single',
                                     oscAWave: selectedEditSlotId,
-                                    oscATriggerMode: 'slice'
+                                    oscATriggerMode: 'slice',
+                                    oscAVol: 1.0,
+                                    oscBVol: 0.0,
+                                    oscBalance: 0.0,
+                                    filterType: 'bypass'
                                   };
                                   const voice = playProgramVoice(ctx, previewNote, 100, tempProg, `${previewNote}-prog`);
                                   activeVoicesRef.current.set(previewNote, [voice]);
@@ -11362,7 +11366,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                     ...paramsRef.current,
                                     oscMode: 'single',
                                     oscAWave: selectedEditSlotId,
-                                    oscATriggerMode: 'slice'
+                                    oscATriggerMode: 'slice',
+                                    oscAVol: 1.0,
+                                    oscBVol: 0.0,
+                                    oscBalance: 0.0,
+                                    filterType: 'bypass'
                                   };
                                   const voice = playProgramVoice(ctx, previewNote, 100, tempProg, `${previewNote}-prog`);
                                   activeVoicesRef.current.set(previewNote, [voice]);
