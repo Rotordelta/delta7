@@ -779,6 +779,11 @@ export default function Delta7Synth() {
   useEffect(() => { deckBPlayingRef.current = deckBPlaying; }, [deckBPlaying]);
   useEffect(() => { crossfaderValRef.current = crossfaderVal; }, [crossfaderVal]);
 
+  const deckAVolFaderRef = useRef(0.8);
+  const deckBVolFaderRef = useRef(0.8);
+  useEffect(() => { deckAVolFaderRef.current = deckAVolFader; }, [deckAVolFader]);
+  useEffect(() => { deckBVolFaderRef.current = deckBVolFader; }, [deckBVolFader]);
+
   // Playback timeout tracker to cancel stale timers on stop (Issue 6)
   const perfPlaybackTimersRef = useRef([]);
   // Pre-sorted events array — populated once when recording stops (Issue 4)
@@ -1210,8 +1215,8 @@ export default function Delta7Synth() {
         }
         
         const pan = crossfaderValRef.current;
-        const panL = pan <= 0 ? 1.0 : 1.0 - pan;
-        const panR = pan >= 0 ? 1.0 : 1.0 + pan;
+        const panL = pan <= 0 ? 1.0 : Math.cos(pan * Math.PI / 2);
+        const panR = pan >= 0 ? 1.0 : Math.cos(-pan * Math.PI / 2);
 
         const newL = Math.max(0, Math.min(100, Math.round(db * 2.2 * panL * 0.25 + vuLevelLRef.current * 0.75)));
         const newR = Math.max(0, Math.min(100, Math.round(db * 2.2 * panR * 0.25 + vuLevelRRef.current * 0.75)));
@@ -1262,14 +1267,16 @@ export default function Delta7Synth() {
       if (typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
         const isDeckA = voiceKey.includes('perf-a');
         const faderVol = isDeckA ? deckAVolFader : deckBVolFader;
-        // Equal-power crossfader: cos/sin curve so full-right = deck A silent, full-left = deck B silent
-        // crossfaderVal range: -1 (full A) to +1 (full B)
-        // Map to angle 0..PI/2: centre = PI/4 (both at 0.707, -3dB)
-        const cfAngle = ((crossfaderVal + 1) / 2) * (Math.PI / 2);
-        const cfGain = isDeckA
-          ? Math.cos(cfAngle)   // Deck A: 1.0 → 0.707 → 0.0 as crossfader moves right
-          : Math.sin(cfAngle);  // Deck B: 0.0 → 0.707 → 1.0 as crossfader moves right
-        
+        let cfGain = 1.0;
+        if (isDeckA) {
+          if (crossfaderVal > 0) {
+            cfGain = Math.cos(crossfaderVal * Math.PI / 2);
+          }
+        } else {
+          if (crossfaderVal < 0) {
+            cfGain = Math.cos(crossfaderVal * Math.PI / 2);
+          }
+        }
         const finalGain = faderVol * cfGain;
         const list = Array.isArray(vList) ? vList : [vList];
         
@@ -6089,7 +6096,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
 
     const voiceOutGain = ctx.createGain();
-    voiceOutGain.gain.setValueAtTime(1.0, now);
+    let initialVolume = 1.0;
+    if (voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
+      const isDeckA = voiceKey.includes('perf-a');
+      const faderVol = isDeckA ? deckAVolFaderRef.current : deckBVolFaderRef.current;
+      const x = crossfaderValRef.current;
+      let cfGain = 1.0;
+      if (isDeckA) {
+        if (x > 0) {
+          cfGain = Math.cos(x * Math.PI / 2);
+        }
+      } else {
+        if (x < 0) {
+          cfGain = Math.cos(x * Math.PI / 2);
+        }
+      }
+      initialVolume = faderVol * cfGain;
+    }
+    voiceOutGain.gain.setValueAtTime(initialVolume, now);
 
     const stutterGateNode = ctx.createGain();
     stutterGateNode.gain.setValueAtTime(1.0, now);
