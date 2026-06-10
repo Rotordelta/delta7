@@ -7015,59 +7015,108 @@ export default function Delta7Synth() {
                 onTouchEnd={() => handlePlatterMouseUp('A')}
                 style={{ 
                   transform: `rotate(${platterAngleA}deg)`,
-                  transition: isScratchingA.current ? 'none' : 'transform 0.05s linear'
+                  transition: 'none'
                 }}
               >
-                <div className="vinyl-strobe-dot" />
-                
-                {/* 8 Concentric Playhead Rings */}
-                <svg width="130" height="130" viewBox="0 0 130 130" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
-                  {ringColors.map((color, idx) => {
-                    const r = 58 - idx * 4.2;
-                    const angle = ringAnglesA[idx] || 0;
-                    const voiceKey = `perf-a-slot-${idx}`;
-                    const voices = activeVoicesRef.current.get(voiceKey);
-                    const isActive = voices && voices.length > 0;
-                    return (
-                      <circle
-                        key={idx}
-                        cx="65"
-                        cy="65"
-                        r={r}
-                        fill="none"
-                        stroke={color}
-                        strokeWidth="1.8"
-                        strokeDasharray="4, 5"
-                        style={{
-                          transform: `rotate(${angle}deg)`,
-                          transformOrigin: '65px 65px',
-                          opacity: isActive ? 1.0 : 0.15,
-                          filter: isActive ? `drop-shadow(0 0 3px ${color})` : 'none',
-                          transition: 'opacity 0.25s ease, filter 0.25s ease'
-                        }}
-                      />
-                    );
-                  })}
+                {/* Vector Vinyl Disc inside the rotating div */}
+                <svg width="200" height="200" viewBox="0 0 200 200" style={{ display: 'block', pointerEvents: 'none' }}>
+                  <defs>
+                    <radialGradient id="vinylGradA" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor="#2c2c2c" />
+                      <stop offset="25%" stopColor="#181818" />
+                      <stop offset="60%" stopColor="#080808" />
+                      <stop offset="90%" stopColor="#020202" />
+                      <stop offset="100%" stopColor="#000000" />
+                    </radialGradient>
+                  </defs>
+                  {/* Black Vinyl Grooves Background */}
+                  <circle cx="100" cy="100" r="98" fill="url(#vinylGradA)" stroke="#333" strokeWidth="2.5" />
+                  {/* Groove lines details */}
+                  <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="100" cy="100" r="55" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  
+                  {/* Strobe/Marker line */}
+                  <line x1="100" y1="2" x2="100" y2="12" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
-
-                <div className="vinyl-label" style={{ background: '#00f3ff' }}>
-                  <span style={{ fontSize: '0.45rem', letterSpacing: '0.5px' }}>OSC A</span>
-                  <span style={{ fontSize: '0.38rem', marginTop: '2px', color: '#000', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', width: '36px', textAlign: 'center' }}>
-                    {sampleSlotsRef.current.find(s => s.id === params.oscAWave)?.name.substring(0, 7) || 'EMPTY'}
-                  </span>
-                </div>
               </div>
+
+              {/* 8 Concentric Playhead Rings & Central display (Stationary Overlay) */}
+              <svg 
+                width="200" 
+                height="200" 
+                viewBox="0 0 200 200" 
+                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }}
+              >
+                {ringColors.map((color, idx) => {
+                  const r = 90 - idx * 7.2;
+                  const angle = ringAnglesA[idx] || 0;
+                  const voiceKey = `perf-a-slot-${idx}`;
+                  const voices = activeVoicesRef.current.get(voiceKey);
+                  const isActive = voices && voices.length > 0;
+                  return (
+                    <circle
+                      key={idx}
+                      cx="100"
+                      cy="100"
+                      r={r}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth="2.2"
+                      strokeDasharray="4, 5"
+                      style={{
+                        transform: `rotate(${angle}deg)`,
+                        transformOrigin: '100px 100px',
+                        opacity: isActive ? 1.0 : 0.18,
+                        filter: isActive ? `drop-shadow(0 0 4px ${color})` : 'none',
+                        transition: 'opacity 0.2s ease, filter 0.2s ease'
+                      }}
+                    />
+                  );
+                })}
+
+                {/* Center Display Hub (Stationary) */}
+                <circle cx="100" cy="100" r="32" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
+                <circle cx="100" cy="100" r="28" fill="#040810" />
+                
+                <text 
+                  x="100" 
+                  y="92" 
+                  textAnchor="middle" 
+                  fill="#00f3ff" 
+                  fontSize="8" 
+                  fontWeight="bold" 
+                  fontFamily="monospace"
+                  letterSpacing="0.5px"
+                >
+                  OSC A
+                </text>
+                <text 
+                  x="100" 
+                  y="108" 
+                  textAnchor="middle" 
+                  fill="#ffffff" 
+                  fontSize="7" 
+                  fontFamily="monospace"
+                  opacity="0.85"
+                >
+                  {sampleSlotsRef.current.find(s => s.id === params.oscAWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
+                </text>
+              </svg>
+
+              {/* Tonearm */}
               <svg 
                 className={`tonearm ${deckAPlaying || [...activeVoicesRef.current.keys()].some(k => typeof k === 'string' && k.startsWith('perf-a')) ? 'active' : ''}`}
                 viewBox="0 0 25 70"
                 style={{
                   position: 'absolute',
-                  top: '5px',
-                  right: '5px',
-                  width: '25px',
-                  height: '70px',
+                  top: '8px',
+                  right: '8px',
+                  width: '32px',
+                  height: '90px',
                   pointerEvents: 'none',
-                  transformOrigin: '15% 10%'
+                  transformOrigin: '15% 10%',
+                  zIndex: 4
                 }}
               >
                 <path d="M 5,5 L 5,20 L 12,45 L 8,62 L 14,64 L 18,48 L 10,22 L 10,5 Z" fill="#aaa" stroke="#888" strokeWidth="0.5" />
@@ -7422,59 +7471,108 @@ export default function Delta7Synth() {
                 onTouchEnd={() => handlePlatterMouseUp('B')}
                 style={{ 
                   transform: `rotate(${platterAngleB}deg)`,
-                  transition: isScratchingB.current ? 'none' : 'transform 0.05s linear'
+                  transition: 'none'
                 }}
               >
-                <div className="vinyl-strobe-dot" />
-                
-                {/* 8 Concentric Playhead Rings */}
-                <svg width="130" height="130" viewBox="0 0 130 130" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
-                  {ringColors.map((color, idx) => {
-                    const r = 58 - idx * 4.2;
-                    const angle = ringAnglesB[idx] || 0;
-                    const voiceKey = `perf-b-slot-${idx}`;
-                    const voices = activeVoicesRef.current.get(voiceKey);
-                    const isActive = voices && voices.length > 0;
-                    return (
-                      <circle
-                        key={idx}
-                        cx="65"
-                        cy="65"
-                        r={r}
-                        fill="none"
-                        stroke={color}
-                        strokeWidth="1.8"
-                        strokeDasharray="4, 5"
-                        style={{
-                          transform: `rotate(${angle}deg)`,
-                          transformOrigin: '65px 65px',
-                          opacity: isActive ? 1.0 : 0.15,
-                          filter: isActive ? `drop-shadow(0 0 3px ${color})` : 'none',
-                          transition: 'opacity 0.25s ease, filter 0.25s ease'
-                        }}
-                      />
-                    );
-                  })}
+                {/* Vector Vinyl Disc inside the rotating div */}
+                <svg width="200" height="200" viewBox="0 0 200 200" style={{ display: 'block', pointerEvents: 'none' }}>
+                  <defs>
+                    <radialGradient id="vinylGradB" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor="#2c2c2c" />
+                      <stop offset="25%" stopColor="#181818" />
+                      <stop offset="60%" stopColor="#080808" />
+                      <stop offset="90%" stopColor="#020202" />
+                      <stop offset="100%" stopColor="#000000" />
+                    </radialGradient>
+                  </defs>
+                  {/* Black Vinyl Grooves Background */}
+                  <circle cx="100" cy="100" r="98" fill="url(#vinylGradB)" stroke="#333" strokeWidth="2.5" />
+                  {/* Groove lines details */}
+                  <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  <circle cx="100" cy="100" r="55" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                  
+                  {/* Strobe/Marker line */}
+                  <line x1="100" y1="2" x2="100" y2="12" stroke="#ffe600" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
-
-                <div className="vinyl-label" style={{ background: '#ff00ff' }}>
-                  <span style={{ fontSize: '0.45rem', letterSpacing: '0.5px', color: '#000' }}>OSC B</span>
-                  <span style={{ fontSize: '0.38rem', marginTop: '2px', color: '#000', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', width: '36px', textAlign: 'center' }}>
-                    {sampleSlotsRef.current.find(s => s.id === params.oscBWave)?.name.substring(0, 7) || 'EMPTY'}
-                  </span>
-                </div>
               </div>
+
+              {/* 8 Concentric Playhead Rings & Central display (Stationary Overlay) */}
+              <svg 
+                width="200" 
+                height="200" 
+                viewBox="0 0 200 200" 
+                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }}
+              >
+                {ringColors.map((color, idx) => {
+                  const r = 90 - idx * 7.2;
+                  const angle = ringAnglesB[idx] || 0;
+                  const voiceKey = `perf-b-slot-${idx}`;
+                  const voices = activeVoicesRef.current.get(voiceKey);
+                  const isActive = voices && voices.length > 0;
+                  return (
+                    <circle
+                      key={idx}
+                      cx="100"
+                      cy="100"
+                      r={r}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth="2.2"
+                      strokeDasharray="4, 5"
+                      style={{
+                        transform: `rotate(${angle}deg)`,
+                        transformOrigin: '100px 100px',
+                        opacity: isActive ? 1.0 : 0.18,
+                        filter: isActive ? `drop-shadow(0 0 4px ${color})` : 'none',
+                        transition: 'opacity 0.2s ease, filter 0.2s ease'
+                      }}
+                    />
+                  );
+                })}
+
+                {/* Center Display Hub (Stationary) */}
+                <circle cx="100" cy="100" r="32" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
+                <circle cx="100" cy="100" r="28" fill="#040810" />
+                
+                <text 
+                  x="100" 
+                  y="92" 
+                  textAnchor="middle" 
+                  fill="#ff00ff" 
+                  fontSize="8" 
+                  fontWeight="bold" 
+                  fontFamily="monospace"
+                  letterSpacing="0.5px"
+                >
+                  OSC B
+                </text>
+                <text 
+                  x="100" 
+                  y="108" 
+                  textAnchor="middle" 
+                  fill="#ffffff" 
+                  fontSize="7" 
+                  fontFamily="monospace"
+                  opacity="0.85"
+                >
+                  {sampleSlotsRef.current.find(s => s.id === params.oscBWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
+                </text>
+              </svg>
+
+              {/* Tonearm */}
               <svg 
                 className={`tonearm ${deckBPlaying || [...activeVoicesRef.current.keys()].some(k => typeof k === 'string' && k.startsWith('perf-b')) ? 'active' : ''}`}
                 viewBox="0 0 25 70"
                 style={{
                   position: 'absolute',
-                  top: '5px',
-                  right: '5px',
-                  width: '25px',
-                  height: '70px',
+                  top: '8px',
+                  right: '8px',
+                  width: '32px',
+                  height: '90px',
                   pointerEvents: 'none',
-                  transformOrigin: '15% 10%'
+                  transformOrigin: '15% 10%',
+                  zIndex: 4
                 }}
               >
                 <path d="M 5,5 L 5,20 L 12,45 L 8,62 L 14,64 L 18,48 L 10,22 L 10,5 Z" fill="#aaa" stroke="#888" strokeWidth="0.5" />
@@ -10841,8 +10939,8 @@ export default function Delta7Synth() {
 
         .vinyl-platter-wrapper {
           position: relative;
-          width: 130px;
-          height: 130px;
+          width: 200px;
+          height: 200px;
           margin: 6px auto;
         }
 
@@ -10850,65 +10948,20 @@ export default function Delta7Synth() {
           width: 100%;
           height: 100%;
           border-radius: 50%;
-          background: radial-gradient(circle, #222 10%, #111 35%, #050505 70%, #000 100%);
-          border: 3px solid #333;
+          position: relative;
+          cursor: grab;
+          transform-origin: center;
           box-shadow: 
             0 8px 16px rgba(0,0,0,0.6), 
             inset 0 0 10px rgba(0,0,0,0.8),
             0 0 4px rgba(0,243,255,0.1);
-          position: relative;
-          cursor: grab;
-          transform-origin: center;
-          background-image: 
-            repeating-radial-gradient(circle, transparent, transparent 2px, rgba(255,255,255,0.03) 3px, transparent 4px),
-            radial-gradient(circle at center, transparent 38%, rgba(255,255,255,0.02) 40%, transparent 42%);
         }
 
         .vinyl-platter:active {
           cursor: grabbing;
         }
 
-        .vinyl-label {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          width: 42px;
-          height: 42px;
-          border-radius: 50%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          font-family: monospace;
-          font-size: 0.5rem;
-          font-weight: bold;
-          color: #000;
-          box-shadow: inset 0 0 4px rgba(0,0,0,0.4);
-          pointer-events: none;
-        }
-
-        .vinyl-strobe-dot {
-          position: absolute;
-          top: 6px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: #fff;
-          box-shadow: 0 0 6px #fff;
-          pointer-events: none;
-        }
-
         .tonearm {
-          position: absolute;
-          top: 5px;
-          right: 5px;
-          width: 25px;
-          height: 70px;
-          pointer-events: none;
-          transform-origin: 15% 10%;
           transform: rotate(20deg);
           transition: transform 0.5s ease;
         }
