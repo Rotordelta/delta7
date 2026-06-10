@@ -4364,6 +4364,62 @@ export default function Delta7Synth() {
     }
   };
 
+  const clearBank = async (bankType) => {
+    const confirmClear = confirm(`Are you sure you want to clear all samples in BANK ${bankType.toUpperCase()}? This will wipe the samples from the workstation, stop active playback, and clear database records.`);
+    if (!confirmClear) return;
+
+    // Stop active voices for this bank
+    for (const k of activeVoicesRef.current.keys()) {
+      if (typeof k === 'string' && k.startsWith(`perf-${bankType.toLowerCase()}`)) {
+        stopPerfVoice(k);
+      }
+    }
+
+    const nextSlots = sampleSlotsRef.current.map(slot => {
+      if (slot.id.startsWith(bankType.toLowerCase())) {
+        return {
+          ...slot,
+          name: 'EMPTY',
+          buffer: null,
+          revBuffer: null,
+          rootNote: 60,
+          volume: 0.8,
+          sliceCount: 16,
+          start: 0,
+          end: 1.0,
+          loopStart: 0,
+          loopEnd: 1.0,
+          loopOn: false,
+          reverseOn: false,
+          warpOn: false,
+          warpBeats: 4,
+          pan: 0.0,
+          fxType: 'None',
+          fxSend: 0.0,
+          routeToXyPad: true,
+          tuning: 0,
+          sliceParams: Array.from({ length: 16 }, (_, i) => ({ start: i / 16, end: (i + 1) / 16, decay: 0.5, sustain: false }))
+        };
+      }
+      return slot;
+    });
+
+    sampleSlotsRef.current = nextSlots;
+    setSampleSlots(nextSlots);
+
+    // Delete database records
+    try {
+      const bankSlots = sampleSlotsRef.current.filter(s => s.id.startsWith(bankType.toLowerCase()));
+      for (const slot of bankSlots) {
+        await deleteSampleFromDb(slot.id);
+      }
+      showEditorStatus(`Bank ${bankType.toUpperCase()} Cleared! 🗑️`);
+    } catch (err) {
+      console.error("Failed to clear database records for bank:", err);
+      showEditorStatus("Error clearing bank database.");
+    }
+  };
+
   const loadBankPreset = async (bankType, presetNum) => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
@@ -12273,6 +12329,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 >
                   SAVE
                 </button>
+                <button 
+                  className="btn btn-xs" 
+                  style={{ fontSize: '0.52rem', padding: '2px 4px', borderColor: '#ff4444', color: '#ff4444', margin: 0 }}
+                  onClick={() => clearBank('a')}
+                >
+                  CLEAR
+                </button>
               </div>
             </div>
 
@@ -12304,6 +12367,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   onClick={() => saveBankPreset('b', bankBPreset)}
                 >
                   SAVE
+                </button>
+                <button 
+                  className="btn btn-xs" 
+                  style={{ fontSize: '0.52rem', padding: '2px 4px', borderColor: '#ff4444', color: '#ff4444', margin: 0 }}
+                  onClick={() => clearBank('b')}
+                >
+                  CLEAR
                 </button>
               </div>
             </div>
