@@ -514,7 +514,17 @@ export default function Delta7Synth() {
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState('');
   const [midiActivity, setMidiActivity] = useState(false);
-  const [activeNotes, setActiveNotes] = useState(new Set()); // Onscreen keyboard highlights
+  // Zero-waste: activeNotes is ref-only — no re-renders from note on/off events
+  const activeNotesRef = useRef(new Set());
+  const activeNotesDirtyRef = useRef(false);
+  const setActiveNotes = (updater) => {
+    if (typeof updater === 'function') {
+      activeNotesRef.current = updater(activeNotesRef.current);
+    } else {
+      activeNotesRef.current = updater;
+    }
+    activeNotesDirtyRef.current = true;
+  };
 
   // Workspace selections
   const [currentMode, setCurrentMode] = useState('PROG'); // PROG, COMBI
@@ -749,20 +759,31 @@ export default function Delta7Synth() {
 
   useEffect(() => { perfCountInActiveRef.current = perfCountInActive; }, [perfCountInActive]);
   useEffect(() => { perfCountInRemainingRef.current = perfCountInRemaining; }, [perfCountInRemaining]);
-  const [activePerfPads, setActivePerfPadsState] = useState({});
+  // Zero-waste: activePerfPads is ref-only — no useState re-renders from audio triggers
   const activePerfPadsRef = useRef({});
+  const perfPadsDirtyRef = useRef(false); // dirty flag for batched rAF visual sync
+  // Zero-waste: direct mutation helpers — no spread allocation per trigger
   const setActivePerfPads = (updater) => {
-    setActivePerfPadsState(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      activePerfPadsRef.current = next;
-      return next;
-    });
+    const prev = activePerfPadsRef.current;
+    const next = typeof updater === 'function' ? updater(prev) : updater;
+    activePerfPadsRef.current = next;
+    perfPadsDirtyRef.current = true;
   };
-  const [deckAPlaying, setDeckAPlaying] = useState(false);
-  const [deckBPlaying, setDeckBPlaying] = useState(false);
-  // Refs to avoid tickLoop teardown on every state change (Issues 2, 8)
+  // Mutation shorthand: setPerfPad('A-slot-0', true) — zero allocation
+  const setPerfPad = (key, val) => {
+    if (val) {
+      activePerfPadsRef.current[key] = true;
+    } else {
+      delete activePerfPadsRef.current[key];
+    }
+    perfPadsDirtyRef.current = true;
+  };
+  // Zero-waste: deckPlaying is ref-only — no useState, no re-renders
   const deckAPlayingRef = useRef(false);
   const deckBPlayingRef = useRef(false);
+  const deckPlayingDirtyRef = useRef(false); // dirty flag for batched rAF visual sync
+  const setDeckAPlaying = (val) => { deckAPlayingRef.current = val; deckPlayingDirtyRef.current = true; };
+  const setDeckBPlaying = (val) => { deckBPlayingRef.current = val; deckPlayingDirtyRef.current = true; };
   const crossfaderValRef = useRef(0.0);
   const [deckASoloActive, setDeckASoloActive] = useState(false);
   const [deckBSoloActive, setDeckBSoloActive] = useState(false);
@@ -784,6 +805,15 @@ export default function Delta7Synth() {
   const seqStartBeatOffsetRef = useRef(0.0);
   const highwayEventsRefA = useRef(null);
   const highwayEventsRefB = useRef(null);
+  // Zero-waste: DOM refs for batched rAF visual sync (no React re-renders)
+  const deckAPlayBtnRef = useRef(null);
+  const deckBPlayBtnRef = useRef(null);
+  const padDomRefsA = useRef([]); // DOM elements for deck A pad active indicators
+  const padDomRefsB = useRef([]); // DOM elements for deck B pad active indicators
+  const pianoKeyRefsArr = useRef([]); // DOM elements for piano key active indicators
+  const deckALastPlaying = useRef(false); // tracks last synced value to avoid redundant DOM writes
+  const deckBLastPlaying = useRef(false);
+  const perfTempProgRef = useRef({}); // Zero-waste: pre-allocated staging object for triggerPerfPadDSP
   // VU meter DOM refs — updated directly in tickLoop to avoid React re-renders (Issue 1)
   const vuLevelLRef = useRef(0);
   const vuLevelRRef = useRef(0);
@@ -798,9 +828,7 @@ export default function Delta7Synth() {
   const [deckBEqLow, setDeckBEqLow] = useState(0.0);
   const [deckBEqMid, setDeckBEqMid] = useState(0.0);
   const [deckBEqHigh, setDeckBEqHigh] = useState(0.0);
-  // Keep vuLevelL/R state only for initial render; live updates go through refs (Issue 1)
-  const [vuLevelL] = useState(0);
-  const [vuLevelR] = useState(0);
+  // VU levels: refs only (vuLevelLRef/vuLevelRRef) — dead useState removed
   const [deckAPitch, setDeckAPitch] = useState(0.0);
   const [deckBPitch, setDeckBPitch] = useState(0.0);
   const [deckALoopSize, setDeckALoopSize] = useState(4);
@@ -810,9 +838,7 @@ export default function Delta7Synth() {
   const [deckAKeyLock, setDeckAKeyLock] = useState(true);
   const [deckBKeyLock, setDeckBKeyLock] = useState(true);
 
-  // Sync state → refs for tickLoop so the loop never needs to restart (Issue 2)
-  useEffect(() => { deckAPlayingRef.current = deckAPlaying; }, [deckAPlaying]);
-  useEffect(() => { deckBPlayingRef.current = deckBPlaying; }, [deckBPlaying]);
+  // deckAPlaying/deckBPlaying are now ref-only — sync effects removed
   useEffect(() => { crossfaderValRef.current = crossfaderVal; }, [crossfaderVal]);
 
   const deckAVolFaderRef = useRef(0.8);
@@ -829,9 +855,7 @@ export default function Delta7Synth() {
   const masterSyncActiveRef = useRef(false);
   useEffect(() => { masterSyncActiveRef.current = masterSyncActive; }, [masterSyncActive]);
 
-  const [ringAnglesA, setRingAnglesA] = useState(new Array(8).fill(0));
-  const [ringAnglesB, setRingAnglesB] = useState(new Array(8).fill(0));
-  const [currentPerfPlayBeat, setCurrentPerfPlayBeat] = useState(0);
+  // Dead state removed: ringAnglesA, ringAnglesB, currentPerfPlayBeat — rings use direct DOM mutation in rAF loop
   const [perfQuantizeMode, setPerfQuantizeMode] = useState('None');
   const [perfTimeSignature, setPerfTimeSignature] = useState('4/4');
 
@@ -1279,14 +1303,72 @@ export default function Delta7Synth() {
           }
         }
       }
+
+      // === Zero-waste batched visual sync (replaces per-trigger setState re-renders) ===
+      // Deck play buttons: update active class + text via DOM, dirty-checked
+      if (deckPlayingDirtyRef.current) {
+        deckPlayingDirtyRef.current = false;
+        const deckA = deckAPlayingRef.current;
+        const deckB = deckBPlayingRef.current;
+        if (deckA !== deckALastPlaying.current) {
+          deckALastPlaying.current = deckA;
+          if (deckAPlayBtnRef.current) {
+            deckAPlayBtnRef.current.classList.toggle('active', deckA);
+            deckAPlayBtnRef.current.textContent = deckA ? 'Pause' : 'Play';
+          }
+        }
+        if (deckB !== deckBLastPlaying.current) {
+          deckBLastPlaying.current = deckB;
+          if (deckBPlayBtnRef.current) {
+            deckBPlayBtnRef.current.classList.toggle('active', deckB);
+            deckBPlayBtnRef.current.textContent = deckB ? 'Pause' : 'Play';
+          }
+        }
+      }
+
+      // Pad active indicators: update data-active attribute for CSS, dirty-checked
+      if (perfPadsDirtyRef.current) {
+        perfPadsDirtyRef.current = false;
+        const pads = activePerfPadsRef.current;
+        for (let pi = 0; pi < 8; pi++) {
+          const elA = padDomRefsA.current[pi];
+          if (elA) {
+            const isActiveA = !!pads[`A-slot-${pi}`];
+            const isPendingA = !!pads[`A-slot-${pi}-pending`];
+            elA.setAttribute('data-active', isActiveA ? 'true' : 'false');
+            elA.setAttribute('data-pending', isPendingA ? 'true' : 'false');
+          }
+          const elB = padDomRefsB.current[pi];
+          if (elB) {
+            const isActiveB = !!pads[`B-slot-${pi}`];
+            const isPendingB = !!pads[`B-slot-${pi}-pending`];
+            elB.setAttribute('data-active', isActiveB ? 'true' : 'false');
+            elB.setAttribute('data-pending', isPendingB ? 'true' : 'false');
+          }
+        }
+      }
+
+      // Piano key highlights: toggle key-triggered class, dirty-checked
+      if (activeNotesDirtyRef.current) {
+        activeNotesDirtyRef.current = false;
+        const notes = activeNotesRef.current;
+        const keys = pianoKeyRefsArr.current;
+        for (let ki = 0; ki < keys.length; ki++) {
+          const el = keys[ki];
+          if (el) {
+            const midi = 48 + ki; // baseNote + index
+            el.classList.toggle('key-triggered', notes.has(midi));
+          }
+        }
+      }
     };
     
     tickLoop();
     return () => {
       cancelAnimationFrame(animId);
     };
-  // Issue 2: deps trimmed to only performanceViewActive — crossfaderVal, deckAPlaying, deckBPlaying
-  // are now read via refs inside the loop so the loop never tears down on those changes
+  // Zero-waste: all audio-rate visuals (deckPlaying, activePerfPads, activeNotes) are ref-only
+  // and synced to DOM via the batched rAF loop above — no React re-renders from audio triggers
   }, [performanceViewActive]);
 
   // Real-time Mixer Fader & EQ voice modulator
@@ -6696,6 +6778,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     voiceObj.voiceOutGain = voiceOutGain;
     voiceObj.stutterGateNode = stutterGateNode;
     voiceObj.stutterPannerNode = stutterPannerNode;
+    voiceObj.padPannerNode = padPannerNode;
     voiceObj.filter1 = filter1;
     voiceObj.filter2 = filter2;
     voiceObj.baseCutoff = baseCutoff;
@@ -6876,22 +6959,35 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           if (lfo1) { try { lfo1.stop(); } catch {} }
           if (lfo2) { try { lfo2.stop(); } catch {} }
 
-          // Explicitly disconnect all voice-level nodes to release audio thread memory
-          const nodesToDisconnect = [
-            oscA, oscB, oscA_L, oscA_R, subOsc, noiseSource, driftLfo, lfo1, lfo2,
-            voice.gainA, voice.gainB, voice.gainA_L, voice.gainA_R, voice.subGain, voice.noiseGain,
-            voice.vibratoLfoGain, voice.filterLfoGain,
-            voice.filter1, voice.filter2,
-            voice.eqLowNode, voice.eqMidNode, voice.eqHighNode,
-            voice.sendGainNode,
-            voice.voiceOutGain
-          ];
-
-          nodesToDisconnect.forEach(node => {
-            if (node && typeof node.disconnect === 'function') {
-              try { node.disconnect(); } catch {}
-            }
-          });
+          // Zero-allocation disconnect: flat inline calls instead of array + forEach
+          if (oscA) { try { oscA.disconnect(); } catch {} }
+          if (oscB) { try { oscB.disconnect(); } catch {} }
+          if (oscA_L) { try { oscA_L.disconnect(); } catch {} }
+          if (oscA_R) { try { oscA_R.disconnect(); } catch {} }
+          if (subOsc) { try { subOsc.disconnect(); } catch {} }
+          if (noiseSource) { try { noiseSource.disconnect(); } catch {} }
+          if (driftLfo) { try { driftLfo.disconnect(); } catch {} }
+          if (lfo1) { try { lfo1.disconnect(); } catch {} }
+          if (lfo2) { try { lfo2.disconnect(); } catch {} }
+          if (voice.gainA) { try { voice.gainA.disconnect(); } catch {} }
+          if (voice.gainB) { try { voice.gainB.disconnect(); } catch {} }
+          if (voice.gainA_L) { try { voice.gainA_L.disconnect(); } catch {} }
+          if (voice.gainA_R) { try { voice.gainA_R.disconnect(); } catch {} }
+          if (voice.subGain) { try { voice.subGain.disconnect(); } catch {} }
+          if (voice.noiseGain) { try { voice.noiseGain.disconnect(); } catch {} }
+          if (voice.vibratoLfoGain) { try { voice.vibratoLfoGain.disconnect(); } catch {} }
+          if (voice.filterLfoGain) { try { voice.filterLfoGain.disconnect(); } catch {} }
+          if (voice.filter1) { try { voice.filter1.disconnect(); } catch {} }
+          if (voice.filter2) { try { voice.filter2.disconnect(); } catch {} }
+          if (voice.eqLowNode) { try { voice.eqLowNode.disconnect(); } catch {} }
+          if (voice.eqMidNode) { try { voice.eqMidNode.disconnect(); } catch {} }
+          if (voice.eqHighNode) { try { voice.eqHighNode.disconnect(); } catch {} }
+          if (voice.sendGainNode) { try { voice.sendGainNode.disconnect(); } catch {} }
+          if (voice.voiceOutGain) { try { voice.voiceOutGain.disconnect(); } catch {} }
+          // Previously leaked nodes — now properly disconnected
+          if (voice.stutterGateNode) { try { voice.stutterGateNode.disconnect(); } catch {} }
+          if (voice.stutterPannerNode) { try { voice.stutterPannerNode.disconnect(); } catch {} }
+          if (voice.padPannerNode) { try { voice.padPannerNode.disconnect(); } catch {} }
         } catch {}
       }, (releaseTime + 0.1) * 1000);
     } catch (err) {
@@ -7093,12 +7189,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             }
           });
         }
-        setActivePerfPads(prev => {
-          const next = { ...prev };
-          delete next[padKey];
-          delete next[`${padKey}-pending`];
-          return next;
-        });
+        setPerfPad(padKey, false);
+        setPerfPad(`${padKey}-pending`, false);
         if (shouldRecord && perfRecordActiveRef.current) {
           perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
         }
@@ -7107,12 +7199,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
       // Hold and Free modes stop playback on release
       stopPerfVoice(voiceKey);
-      setActivePerfPads(prev => {
-        const next = { ...prev };
-        delete next[padKey];
-        delete next[`${padKey}-pending`];
-        return next;
-      });
+      setPerfPad(padKey, false);
+      setPerfPad(`${padKey}-pending`, false);
       
       if (shouldRecord && perfRecordActiveRef.current) {
         perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
@@ -7127,12 +7215,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       if (isAlreadyActive) {
         // Stop it
         stopPerfVoice(voiceKey);
-        setActivePerfPads(prev => {
-          const next = { ...prev };
-          delete next[padKey];
-          delete next[`${padKey}-pending`];
-          return next;
-        });
+        setPerfPad(padKey, false);
+        setPerfPad(`${padKey}-pending`, false);
         if (shouldRecord && perfRecordActiveRef.current) {
           perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
         }
@@ -7173,7 +7257,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             }
           });
           
-          setActivePerfPads(prev => ({ ...prev, [padKey]: true }));
+          setPerfPad(padKey, true);
           
           if (deck === 'A') {
             setDeckAPlaying(true);
@@ -7212,20 +7296,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           stopPerfVoice(`perf-a-slice-${i}`);
         }
       }
-      setActivePerfPads(prev => {
-        const next = { ...prev };
-        for (let i = 0; i < 8; i++) {
-          if (type !== 'slot' || i !== index) {
-            delete next[`A-slot-${i}`];
-            delete next[`A-slot-${i}-pending`];
-          }
-          if (type !== 'slice' || i !== index) {
-            delete next[`A-slice-${i}`];
-            delete next[`A-slice-${i}-pending`];
-          }
+      for (let i = 0; i < 8; i++) {
+        if (type !== 'slot' || i !== index) {
+          setPerfPad(`A-slot-${i}`, false);
+          setPerfPad(`A-slot-${i}-pending`, false);
         }
-        return next;
-      });
+        if (type !== 'slice' || i !== index) {
+          setPerfPad(`A-slice-${i}`, false);
+          setPerfPad(`A-slice-${i}-pending`, false);
+        }
+      }
     } else if (deck === 'B' && deckBSoloActiveRef.current) {
       for (let i = 0; i < 8; i++) {
         if (type !== 'slot' || i !== index) {
@@ -7235,28 +7315,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           stopPerfVoice(`perf-b-slice-${i}`);
         }
       }
-      setActivePerfPads(prev => {
-        const next = { ...prev };
-        for (let i = 0; i < 8; i++) {
-          if (type !== 'slot' || i !== index) {
-            delete next[`B-slot-${i}`];
-            delete next[`B-slot-${i}-pending`];
-          }
-          if (type !== 'slice' || i !== index) {
-            delete next[`B-slice-${i}`];
-            delete next[`B-slice-${i}-pending`];
-          }
+      for (let i = 0; i < 8; i++) {
+        if (type !== 'slot' || i !== index) {
+          setPerfPad(`B-slot-${i}`, false);
+          setPerfPad(`B-slot-${i}-pending`, false);
         }
-        return next;
-      });
+        if (type !== 'slice' || i !== index) {
+          setPerfPad(`B-slice-${i}`, false);
+          setPerfPad(`B-slice-${i}-pending`, false);
+        }
+      }
     }
 
     const rootNote = slot.rootNote || 60;
     const triggerNote = type === 'slot' ? rootNote : rootNote + index;
 
     // Use double mode but mute opposite channel to mix separately
-    const tempProg = {
-      ...currentParams,
+    // Zero-waste: reuse staging object instead of spread-allocating per trigger
+    const tempProg = Object.assign(perfTempProgRef.current, currentParams, {
       oscMode: 'double',
       oscAWave: deck === 'A' ? slotId : currentParams.oscAWave,
       oscBWave: deck === 'B' ? slotId : currentParams.oscBWave,
@@ -7267,7 +7343,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       perfPadPan: slot ? (slot.pan !== undefined ? slot.pan : 0) : 0,
       perfPadFxType: slot ? (slot.fxType || 'None') : 'None',
       perfPadFxSend: slot ? (slot.fxSend !== undefined ? slot.fxSend : 0) : 0
-    };
+    });
 
     // Flux mode logic: calculate fluxOffset
     if (triggerMode === 'flux') {
@@ -7290,7 +7366,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const startVoiceTrigger = () => {
       const voice = playProgramVoice(ctx, triggerNote, velocity, tempProg, voiceKey, delayOffset);
       activeVoicesRef.current.set(voiceKey, [voice]);
-      setActivePerfPads(prev => ({ ...prev, [padKey]: true }));
+      setPerfPad(padKey, true);
 
       const dur = slot.buffer.duration * (slot.end - slot.start);
 
@@ -7307,24 +7383,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       // Auto clear pad active state for non-looping free/latch triggers once they finish playing
       if (!slot.loopOn && (triggerMode === 'free' || triggerMode === 'latch')) {
         setTimeout(() => {
-          setActivePerfPads(prev => {
-            const next = { ...prev };
-            delete next[padKey];
-            delete next[`${padKey}-pending`];
-            return next;
-          });
+          setPerfPad(padKey, false);
+          setPerfPad(`${padKey}-pending`, false);
         }, dur * 1000);
       }
     };
 
     if (delayOffset > 0.03) {
-      setActivePerfPads(prev => ({ ...prev, [`${padKey}-pending`]: true }));
+      setPerfPad(`${padKey}-pending`, true);
       setTimeout(() => {
-        setActivePerfPads(prev => {
-          const next = { ...prev };
-          delete next[`${padKey}-pending`];
-          return next;
-        });
+        setPerfPad(`${padKey}-pending`, false);
         startVoiceTrigger();
       }, delayOffset * 1000 - 15);
     } else {
@@ -9488,27 +9556,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 const slotId = `a0${idx + 1}`;
                 const slot = sampleSlots.find(s => s.id === slotId);
                 const isLoaded = slot && slot.buffer;
-                const padKey = `A-slot-${idx}`;
-                const isActive = activePerfPads[padKey];
-                const isPending = activePerfPads[`${padKey}-pending`];
                 
                 const fxType = slot?.fxType || 'None';
                 const fxSend = slot?.fxSend !== undefined ? slot.fxSend : 0.0;
                 const pan = slot?.pan !== undefined ? slot.pan : 0.0;
 
                 const ringColor = ringColors[idx];
-                const padStyle = isLoaded ? {
-                  borderColor: isActive ? '#ffffff' : `${ringColor}73`,
-                  background: isActive ? ringColor : `${ringColor}14`,
-                  color: isActive ? '#000000' : ringColor,
-                  boxShadow: isActive ? `0 0 15px ${ringColor}, inset 0 0 4px rgba(255,255,255,0.8)` : `inset 0 0 6px ${ringColor}1a`,
-                } : {};
 
                 return (
                   <div
                     key={slotId}
-                    className={`perf-pad ${isActive ? 'active' : ''} ${isPending ? 'pending' : ''}`}
-                    style={padStyle}
+                    className="perf-pad"
+                    ref={(el) => { if (el) padDomRefsA.current[idx] = el; }}
+                    data-active="false"
+                    data-pending="false"
+                    data-loaded={isLoaded ? 'true' : 'false'}
+                    style={{ '--pad-color': ringColor }}
                     onMouseDown={() => triggerPerfPadInternal('A', 'slot', idx, 100, true, true)}
                     onMouseUp={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
                     onMouseLeave={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
@@ -9681,14 +9744,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 Cue
               </button>
               <button 
-                className={`deck-btn deck-btn-play ${deckAPlaying ? 'active' : ''}`}
+                className="deck-btn deck-btn-play"
+                ref={deckAPlayBtnRef}
                 onClick={() => {
-                  const activeAIdx = sampleSlots.findIndex(s => s.id === params.oscAWave);
+                  const activeAIdx = sampleSlotsRef.current.findIndex(s => s.id === paramsRef.current.oscAWave);
                   const idx = activeAIdx >= 0 ? activeAIdx : 0;
-                  triggerPerfPadInternal('A', 'slot', idx, 100, !deckAPlaying, false);
+                  triggerPerfPadInternal('A', 'slot', idx, 100, !deckAPlayingRef.current, false);
                 }}
               >
-                {deckAPlaying ? 'Pause' : 'Play'}
+                Play
               </button>
             </div>
 
@@ -9983,8 +10047,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ 
                     left: `${idx * 31 + 11.5}px`, 
                     borderColor: ringColors[idx],
-                    background: activePerfPads[`A-slot-${idx}`] ? ringColors[idx] : 'transparent',
-                    boxShadow: activePerfPads[`A-slot-${idx}`] ? `0 0 6px ${ringColors[idx]}` : 'none'
+                    background: activePerfPadsRef.current[`A-slot-${idx}`] ? ringColors[idx] : 'transparent',
+                    boxShadow: activePerfPadsRef.current[`A-slot-${idx}`] ? `0 0 6px ${ringColors[idx]}` : 'none'
                   }} 
                 />
               ))}
@@ -10688,27 +10752,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 const slotId = `b0${idx + 1}`;
                 const slot = sampleSlots.find(s => s.id === slotId);
                 const isLoaded = slot && slot.buffer;
-                const padKey = `B-slot-${idx}`;
-                const isActive = activePerfPads[padKey];
-                const isPending = activePerfPads[`${padKey}-pending`];
                 
                 const fxType = slot?.fxType || 'None';
                 const fxSend = slot?.fxSend !== undefined ? slot.fxSend : 0.0;
                 const pan = slot?.pan !== undefined ? slot.pan : 0.0;
 
                 const ringColor = ringColors[idx];
-                const padStyle = isLoaded ? {
-                  borderColor: isActive ? '#ffffff' : `${ringColor}73`,
-                  background: isActive ? ringColor : `${ringColor}14`,
-                  color: isActive ? '#000000' : ringColor,
-                  boxShadow: isActive ? `0 0 15px ${ringColor}, inset 0 0 4px rgba(255,255,255,0.8)` : `inset 0 0 6px ${ringColor}1a`,
-                } : {};
 
                 return (
                   <div
                     key={slotId}
-                    className={`perf-pad ${isActive ? 'active' : ''} ${isPending ? 'pending' : ''}`}
-                    style={padStyle}
+                    className="perf-pad"
+                    ref={(el) => { if (el) padDomRefsB.current[idx] = el; }}
+                    data-active="false"
+                    data-pending="false"
+                    data-loaded={isLoaded ? 'true' : 'false'}
+                    style={{ '--pad-color': ringColor }}
                     onMouseDown={() => triggerPerfPadInternal('B', 'slot', idx, 100, true, true)}
                     onMouseUp={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
                     onMouseLeave={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
@@ -10881,14 +10940,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 Cue
               </button>
               <button 
-                className={`deck-btn deck-btn-play ${deckBPlaying ? 'active' : ''}`}
+                className="deck-btn deck-btn-play"
+                ref={deckBPlayBtnRef}
                 onClick={() => {
-                  const activeBIdx = sampleSlots.findIndex(s => s.id === params.oscBWave);
+                  const activeBIdx = sampleSlotsRef.current.findIndex(s => s.id === paramsRef.current.oscBWave);
                   const idx = activeBIdx >= 0 ? activeBIdx : 0;
-                  triggerPerfPadInternal('B', 'slot', idx, 100, !deckBPlaying, false);
+                  triggerPerfPadInternal('B', 'slot', idx, 100, !deckBPlayingRef.current, false);
                 }}
               >
-                {deckBPlaying ? 'Pause' : 'Play'}
+                Play
               </button>
             </div>
 
@@ -11183,8 +11243,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ 
                     left: `${idx * 31 + 11.5}px`, 
                     borderColor: ringColors[idx],
-                    background: activePerfPads[`B-slot-${idx}`] ? ringColors[idx] : 'transparent',
-                    boxShadow: activePerfPads[`B-slot-${idx}`] ? `0 0 6px ${ringColors[idx]}` : 'none'
+                    background: activePerfPadsRef.current[`B-slot-${idx}`] ? ringColors[idx] : 'transparent',
+                    boxShadow: activePerfPadsRef.current[`B-slot-${idx}`] ? `0 0 6px ${ringColors[idx]}` : 'none'
                   }} 
                 />
               ))}
@@ -14385,11 +14445,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             return (
               <button
                 key={midiNote}
-                className={`piano-key ${isBlack ? 'black-key' : 'white-key'} ${activeNotes.has(midiNote) ? 'key-triggered' : ''}`}
+                className={`piano-key ${isBlack ? 'black-key' : 'white-key'}`}
+                ref={(el) => { if (el) { if (!pianoKeyRefsArr.current) pianoKeyRefsArr.current = []; pianoKeyRefsArr.current[i] = el; } }}
+                data-midi={midiNote}
                 onMouseDown={() => playVoice(midiNote, 100)}
                 onMouseUp={() => stopVoice(midiNote)}
                 onMouseLeave={() => {
-                  if (activeNotes.has(midiNote)) stopVoice(midiNote);
+                  if (activeNotesRef.current.has(midiNote)) stopVoice(midiNote);
                 }}
               >
                 {midiNote % 12 === 0 && <span className="label-key-c font-mono">C{3 + i/12}</span>}
@@ -14642,8 +14704,28 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
         }
 
-        .perf-pad.active {
+        .perf-pad.active,
+        .perf-pad[data-active="true"] {
           transform: scale(0.96);
+        }
+
+        /* Zero-waste pad styling via data attributes + CSS custom properties (--pad-color) */
+        .perf-pad[data-loaded="true"] {
+          border-color: color-mix(in srgb, var(--pad-color, #fff) 45%, transparent);
+          background: color-mix(in srgb, var(--pad-color, #fff) 8%, transparent);
+          color: var(--pad-color, #fff);
+          box-shadow: inset 0 0 6px color-mix(in srgb, var(--pad-color, #fff) 10%, transparent);
+        }
+
+        .perf-pad[data-active="true"][data-loaded="true"] {
+          border-color: #ffffff;
+          background: var(--pad-color, #fff);
+          color: #000000;
+          box-shadow: 0 0 15px var(--pad-color, #fff), inset 0 0 4px rgba(255,255,255,0.8);
+        }
+
+        .perf-pad[data-pending="true"] {
+          animation: pad-pending-pulse 0.5s ease-in-out infinite;
         }
 
         .perf-pad.slice-loaded {
