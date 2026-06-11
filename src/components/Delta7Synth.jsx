@@ -4125,6 +4125,7 @@ export default function Delta7Synth() {
               this.metronomePlaying = true;
               this.metronomeBeatIndex = 0;
               this.metronomeNextTime = msg.startTime;
+              this.perfStartTime = msg.startTime;
               break;
               
             case 'STOP_METRONOME':
@@ -4145,6 +4146,7 @@ export default function Delta7Synth() {
               this.playbackActive = true;
               this.playbackStartTime = msg.startTime;
               this.playbackStartBeatOffset = msg.startBeatOffset || 0.0;
+              this.perfStartTime = msg.startTime - this.playbackStartBeatOffset * (60 / this.bpm);
               this.playbackNextEventIdx = 0;
               this.sortedEvents = msg.sortedEvents || [];
               while (this.playbackNextEventIdx < this.sortedEvents.length && 
@@ -4180,7 +4182,8 @@ export default function Delta7Synth() {
           const now = currentTime;
           const beatDuration = 60 / this.bpm;
           const quantGrid = msg.forceQuantizeGrid || (msg.isNoteOn && this.perfRecordActive ? this.quantizeMode : 'None');
-          const shouldQuantize = quantGrid !== 'None';
+          const isTimelineRunning = this.playbackActive || this.perfRecordActive || this.metronomePlaying;
+          const shouldQuantize = quantGrid !== 'None' && isTimelineRunning && this.perfStartTime > 0;
           
           let targetTime = now;
           let targetBeat = 0;
@@ -6978,6 +6981,61 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') ctx.resume();
 
+    const currentParams = paramsRef.current;
+    let slotId = '';
+    if (type === 'slot') {
+      slotId = (deck === 'A' ? 'a0' : 'b0') + (index + 1);
+    } else {
+      slotId = deck === 'A' ? currentParams.oscAWave : currentParams.oscBWave;
+    }
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    const triggerMode = slot ? (slot.triggerMode || 'hold') : 'hold';
+
+    // 1. Latch Mode Routing
+    if (triggerMode === 'latch') {
+      if (!isNoteOn) return; // ignore release completely
+      const padKey = `${deck}-${type}-${index}`;
+      const isAlreadyActive = activePerfPadsRef.current[padKey] || activePerfPadsRef.current[`${padKey}-pending`];
+      
+      if (schedulerNodeRef.current) {
+        schedulerNodeRef.current.port.postMessage({
+          type: 'LIVE_TRIGGER',
+          deck,
+          index,
+          velocity,
+          isNoteOn: true,
+          isNoteKey: false,
+          shouldRecord,
+          note: type,
+          forceQuantizeGrid: isAlreadyActive ? 'None' : 'Bar' // Stop instantly, start on Bar boundary
+        });
+      } else {
+        triggerPerfPadDSP(deck, type, index, velocity, true, shouldRecord, ctx.currentTime, 0);
+      }
+      return;
+    }
+
+    // 2. Free Mode Routing
+    if (triggerMode === 'free') {
+      if (schedulerNodeRef.current) {
+        schedulerNodeRef.current.port.postMessage({
+          type: 'LIVE_TRIGGER',
+          deck,
+          index,
+          velocity,
+          isNoteOn,
+          isNoteKey: false,
+          shouldRecord,
+          note: type,
+          forceQuantizeGrid: isNoteOn ? 'Bar' : 'None' // Start on Bar boundary, release instantly
+        });
+      } else {
+        triggerPerfPadDSP(deck, type, index, velocity, isNoteOn, shouldRecord, ctx.currentTime, 0);
+      }
+      return;
+    }
+
+    // 3. Hold and Flux Modes Routing (Default instant trigger)
     if (schedulerNodeRef.current) {
       schedulerNodeRef.current.port.postMessage({
         type: 'LIVE_TRIGGER',
@@ -6987,7 +7045,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         isNoteOn,
         isNoteKey: false,
         shouldRecord,
-        note: type // store the type ('slot' or 'slice') inside note
+        note: type,
+        forceQuantizeGrid: 'None'
       });
     } else {
       // Fallback
@@ -7017,12 +7076,36 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     // 1. Handle Key Release (Note Off)
     if (!isNoteOn) {
-      if (triggerMode === 'latch' || triggerMode === 'free') {
-        // Latch and Free modes ignore key release
+      if (triggerMode === 'latch') {
+        // Latch mode ignores key release
         return;
       }
 
-      // Hold and Flux modes stop playback on release
+      if (triggerMode === 'flux') {
+        // Flux mode: mute instead of stopping the voice
+        const voices = activeVoicesRef.current.get(voiceKey);
+        if (voices) {
+          voices.forEach(voice => {
+            if (voice.voiceOutGain) {
+              voice.voiceOutGain.gain.cancelScheduledValues(now);
+              voice.voiceOutGain.gain.setValueAtTime(voice.voiceOutGain.gain.value, now);
+              voice.voiceOutGain.gain.setTargetAtTime(0, now, 0.015); // quick 15ms fade out
+            }
+          });
+        }
+        setActivePerfPads(prev => {
+          const next = { ...prev };
+          delete next[padKey];
+          delete next[`${padKey}-pending`];
+          return next;
+        });
+        if (shouldRecord && perfRecordActiveRef.current) {
+          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+        }
+        return;
+      }
+
+      // Hold and Free modes stop playback on release
       stopPerfVoice(voiceKey);
       setActivePerfPads(prev => {
         const next = { ...prev };
@@ -7057,7 +7140,66 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       }
     }
 
-    // Stop previous voice instance
+    // Flux mode: unmute if voice is already active and not finished
+    if (triggerMode === 'flux') {
+      const voices = activeVoicesRef.current.get(voiceKey);
+      if (voices && voices.length > 0) {
+        const voice = voices[0];
+        const elapsed = now - voice.startTime;
+        const dur = slot.buffer.duration * (slot.end - slot.start);
+        const voiceFreqScale = voice.freqScaleA || voice.freqScaleB || 1.0;
+        const isFinished = !slot.loopOn && (elapsed >= (dur / voiceFreqScale));
+        
+        if (!isFinished) {
+          const isDeckA = deck === 'A';
+          const faderVol = isDeckA ? deckAVolFaderRef.current : deckBVolFaderRef.current;
+          const x = crossfaderValRef.current;
+          let cfGain = 1.0;
+          if (isDeckA) {
+            if (x > 0) {
+              cfGain = Math.cos(x * Math.PI / 2);
+            }
+          } else {
+            if (x < 0) {
+              cfGain = Math.cos(x * Math.PI / 2);
+            }
+          }
+          const targetVol = faderVol * cfGain;
+          voices.forEach(v => {
+            if (v.voiceOutGain) {
+              v.voiceOutGain.gain.cancelScheduledValues(now);
+              v.voiceOutGain.gain.setValueAtTime(v.voiceOutGain.gain.value, now);
+              v.voiceOutGain.gain.setTargetAtTime(targetVol, now, 0.015); // quick 15ms fade in
+            }
+          });
+          
+          setActivePerfPads(prev => ({ ...prev, [padKey]: true }));
+          
+          if (deck === 'A') {
+            setDeckAPlaying(true);
+            const remainingDur = (dur / voiceFreqScale) - elapsed;
+            if (remainingDur > 0 && !slot.loopOn) {
+              if (deckATimerRef.current) clearTimeout(deckATimerRef.current);
+              deckATimerRef.current = setTimeout(() => setDeckAPlaying(false), remainingDur * 1000);
+            }
+          } else {
+            setDeckBPlaying(true);
+            const remainingDur = (dur / voiceFreqScale) - elapsed;
+            if (remainingDur > 0 && !slot.loopOn) {
+              if (deckBTimerRef.current) clearTimeout(deckBTimerRef.current);
+              deckBTimerRef.current = setTimeout(() => setDeckBPlaying(false), remainingDur * 1000);
+            }
+          }
+          
+          if (shouldRecord && perfRecordActiveRef.current) {
+            perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true });
+          }
+          return;
+        }
+      }
+    }
+
+    // Stop previous voice instance (only runs if starting fresh or if previous is finished)
     stopPerfVoice(voiceKey);
 
     // Solo Mode logic: Cut out all other pads on the active deck
