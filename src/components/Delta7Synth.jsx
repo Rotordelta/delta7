@@ -7179,10 +7179,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     return { deck: pad.dataset.deck, idx: parseInt(pad.dataset.idx, 10) };
   };
   const handlePadGridMouseDown = useCallback((e) => {
+    if (e.button !== 0) return; // Only trigger on left-click
     const d = getPadData(e); if (!d) return;
     triggerPerfPadInternal(d.deck, 'slot', d.idx, 100, true, true);
   }, []);
   const handlePadGridMouseUp = useCallback((e) => {
+    if (e.button !== 0) return; // Only trigger release on left-click release
     const d = getPadData(e); if (!d) return;
     triggerPerfPadInternal(d.deck, 'slot', d.idx, 100, false, true);
   }, []);
@@ -7192,6 +7194,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (!pad) return;
     const related = e.relatedTarget;
     if (related && pad.contains(related)) return;
+    // Only trigger release on mouse leave if left button is currently pressed
+    if ((e.buttons & 1) === 0) return;
     const deck = pad.dataset.deck;
     const idx = parseInt(pad.dataset.idx, 10);
     triggerPerfPadInternal(deck, 'slot', idx, 100, false, true);
