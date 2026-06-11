@@ -7154,6 +7154,48 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
   };
 
+  // ── Event-delegated pad grid handlers ──────────────────────────
+  // Single set of handlers on the grid container — reads data-deck/data-idx
+  // from closest .perf-pad. Eliminates 96+ closures per render.
+  const getPadData = (e) => {
+    const pad = e.target.closest('.perf-pad[data-deck]');
+    if (!pad) return null;
+    return { deck: pad.dataset.deck, idx: parseInt(pad.dataset.idx, 10) };
+  };
+  const handlePadGridMouseDown = useCallback((e) => {
+    const d = getPadData(e); if (!d) return;
+    triggerPerfPadInternal(d.deck, 'slot', d.idx, 100, true, true);
+  }, []);
+  const handlePadGridMouseUp = useCallback((e) => {
+    const d = getPadData(e); if (!d) return;
+    triggerPerfPadInternal(d.deck, 'slot', d.idx, 100, false, true);
+  }, []);
+  const handlePadGridMouseLeave = useCallback((e) => {
+    // Only fire if leaving a pad, not moving between children
+    const pad = e.target.closest('.perf-pad[data-deck]');
+    if (!pad) return;
+    const related = e.relatedTarget;
+    if (related && pad.contains(related)) return;
+    const deck = pad.dataset.deck;
+    const idx = parseInt(pad.dataset.idx, 10);
+    triggerPerfPadInternal(deck, 'slot', idx, 100, false, true);
+  }, []);
+  const handlePadGridTouchStart = useCallback((e) => {
+    const d = getPadData(e); if (!d) return;
+    e.preventDefault();
+    triggerPerfPadInternal(d.deck, 'slot', d.idx, 100, true, true);
+  }, []);
+  const handlePadGridTouchEnd = useCallback((e) => {
+    const d = getPadData(e); if (!d) return;
+    e.preventDefault();
+    triggerPerfPadInternal(d.deck, 'slot', d.idx, 100, false, true);
+  }, []);
+  const handlePadGridContextMenu = useCallback((e) => {
+    const d = getPadData(e); if (!d) return;
+    e.preventDefault();
+    handlePadRightClick(e, d.deck, d.idx);
+  }, []);
+
   const triggerPerfPadDSP = (deck, type, index, velocity, isNoteOn, shouldRecord, targetTime, targetBeat) => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
@@ -9555,7 +9597,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* 2 Rows of 4 Pads (2x4 Grid) for Deck A */}
-            <div className="performance-pads-grid-2x4">
+            <div className="performance-pads-grid-2x4"
+              onMouseDown={handlePadGridMouseDown}
+              onMouseUp={handlePadGridMouseUp}
+              onMouseLeave={handlePadGridMouseLeave}
+              onTouchStart={handlePadGridTouchStart}
+              onTouchEnd={handlePadGridTouchEnd}
+              onContextMenu={handlePadGridContextMenu}
+            >
               {Array.from({ length: 8 }).map((_, idx) => {
                 const slotId = `a0${idx + 1}`;
                 const slot = sampleSlots.find(s => s.id === slotId);
@@ -9572,16 +9621,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     key={slotId}
                     className="perf-pad"
                     ref={(el) => { if (el) padDomRefsA.current[idx] = el; }}
+                    data-deck="A"
+                    data-idx={idx}
                     data-active="false"
                     data-pending="false"
                     data-loaded={isLoaded ? 'true' : 'false'}
                     style={{ '--pad-color': ringColor }}
-                    onMouseDown={() => triggerPerfPadInternal('A', 'slot', idx, 100, true, true)}
-                    onMouseUp={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
-                    onMouseLeave={() => triggerPerfPadInternal('A', 'slot', idx, 100, false, true)}
-                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slot', idx, 100, true, true); }}
-                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('A', 'slot', idx, 100, false, true); }}
-                    onContextMenu={(e) => handlePadRightClick(e, 'A', idx)}
                     title={isLoaded ? `${slot.name} (Right-click to route)` : 'Empty Slot'}
                   >
                     <span className="perf-pad-label">A{idx + 1}</span>
@@ -10698,7 +10743,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* 2 Rows of 4 Pads (2x4 Grid) for Deck B */}
-            <div className="performance-pads-grid-2x4">
+            <div className="performance-pads-grid-2x4"
+              onMouseDown={handlePadGridMouseDown}
+              onMouseUp={handlePadGridMouseUp}
+              onMouseLeave={handlePadGridMouseLeave}
+              onTouchStart={handlePadGridTouchStart}
+              onTouchEnd={handlePadGridTouchEnd}
+              onContextMenu={handlePadGridContextMenu}
+            >
               {Array.from({ length: 8 }).map((_, idx) => {
                 const slotId = `b0${idx + 1}`;
                 const slot = sampleSlots.find(s => s.id === slotId);
@@ -10715,16 +10767,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     key={slotId}
                     className="perf-pad"
                     ref={(el) => { if (el) padDomRefsB.current[idx] = el; }}
+                    data-deck="B"
+                    data-idx={idx}
                     data-active="false"
                     data-pending="false"
                     data-loaded={isLoaded ? 'true' : 'false'}
                     style={{ '--pad-color': ringColor }}
-                    onMouseDown={() => triggerPerfPadInternal('B', 'slot', idx, 100, true, true)}
-                    onMouseUp={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
-                    onMouseLeave={() => triggerPerfPadInternal('B', 'slot', idx, 100, false, true)}
-                    onTouchStart={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slot', idx, 100, true, true); }}
-                    onTouchEnd={(e) => { e.preventDefault(); triggerPerfPadInternal('B', 'slot', idx, 100, false, true); }}
-                    onContextMenu={(e) => handlePadRightClick(e, 'B', idx)}
                     title={isLoaded ? `${slot.name} (Right-click to route)` : 'Empty Slot'}
                   >
                     <span className="perf-pad-label">B{idx + 1}</span>
