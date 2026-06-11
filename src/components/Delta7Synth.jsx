@@ -8919,7 +8919,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const y = e.clientY - rect.top;
     
     const laneIdx = Math.max(0, Math.min(7, Math.floor(x / 31.25))); // 250px wide / 8 lanes = 31.25px per lane
-    const playheadY = 280 - 35; // 280 height, playhead at bottom 35
+    const playheadY = 400 - 35; // 400 height, playhead at bottom 35
     const distY = playheadY - y;
     const beatOffset = distY / highwayZoom;
     let clickedBeat = seqCurrentBeatRef.current + beatOffset;
@@ -9002,7 +9002,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const playheadY = 280 - 35;
+    const playheadY = 400 - 35;
     const distY = playheadY - y;
     const beatOffset = distY / highwayZoom;
     let hoverBeat = seqCurrentBeatRef.current + beatOffset;
@@ -9550,6 +9550,65 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 ref={highwayEventsRefA} 
                 className="highway-events-container"
               >
+                {/* Horizontal Grid lines (Tronesque Cyan) */}
+                {Array.from({ length: 256 }).map((_, b) => {
+                  const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
+                  const isBarStart = b % beatsPerBar === 0;
+                  const barNum = Math.floor(b / beatsPerBar) + 1;
+                  const beatInBar = (b % beatsPerBar) + 1;
+                  const startY = - (b * highwayZoom);
+                  
+                  return (
+                    <div 
+                      key={`grid-line-a-${b}`}
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        bottom: `${startY}px`,
+                        height: 0,
+                        borderBottom: isBarStart 
+                          ? '1px solid rgba(0, 243, 255, 0.45)' 
+                          : '1px dashed rgba(0, 243, 255, 0.18)',
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      {/* Bar/Beat labels on the left and right sides */}
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: '4px',
+                          bottom: '2px',
+                          fontSize: '0.36rem',
+                          fontFamily: 'monospace',
+                          color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                          textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                          fontWeight: isBarStart ? 'bold' : 'normal',
+                          lineHeight: 1,
+                          userSelect: 'none'
+                        }}
+                      >
+                        {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                      </span>
+                      <span
+                        style={{
+                          position: 'absolute',
+                          right: '4px',
+                          bottom: '2px',
+                          fontSize: '0.36rem',
+                          fontFamily: 'monospace',
+                          color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                          textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                          fontWeight: isBarStart ? 'bold' : 'normal',
+                          lineHeight: 1,
+                          userSelect: 'none'
+                        }}
+                      >
+                        {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                      </span>
+                    </div>
+                  );
+                })}
                 {Array.from({ length: 8 }).map((_, laneIdx) => {
                   const pills = getPillsForLane('A', laneIdx);
                   const color = ringColors[laneIdx];
@@ -10514,6 +10573,65 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 ref={highwayEventsRefB} 
                 className="highway-events-container"
               >
+                {/* Horizontal Grid lines (Tronesque Cyan) */}
+                {Array.from({ length: 256 }).map((_, b) => {
+                  const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
+                  const isBarStart = b % beatsPerBar === 0;
+                  const barNum = Math.floor(b / beatsPerBar) + 1;
+                  const beatInBar = (b % beatsPerBar) + 1;
+                  const startY = - (b * highwayZoom);
+                  
+                  return (
+                    <div 
+                      key={`grid-line-b-${b}`}
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        bottom: `${startY}px`,
+                        height: 0,
+                        borderBottom: isBarStart 
+                          ? '1px solid rgba(0, 243, 255, 0.45)' 
+                          : '1px dashed rgba(0, 243, 255, 0.18)',
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      {/* Bar/Beat labels on the left and right sides */}
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: '4px',
+                          bottom: '2px',
+                          fontSize: '0.36rem',
+                          fontFamily: 'monospace',
+                          color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                          textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                          fontWeight: isBarStart ? 'bold' : 'normal',
+                          lineHeight: 1,
+                          userSelect: 'none'
+                        }}
+                      >
+                        {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                      </span>
+                      <span
+                        style={{
+                          position: 'absolute',
+                          right: '4px',
+                          bottom: '2px',
+                          fontSize: '0.36rem',
+                          fontFamily: 'monospace',
+                          color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                          textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                          fontWeight: isBarStart ? 'bold' : 'normal',
+                          lineHeight: 1,
+                          userSelect: 'none'
+                        }}
+                      >
+                        {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                      </span>
+                    </div>
+                  );
+                })}
                 {Array.from({ length: 8 }).map((_, laneIdx) => {
                   const pills = getPillsForLane('B', laneIdx);
                   const color = ringColors[laneIdx];
@@ -13713,7 +13831,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         .vertical-highway {
           position: relative;
           width: 250px;
-          height: 180px;
+          height: 400px;
           background: rgba(4, 8, 16, 0.78);
           border-radius: 6px;
           overflow: hidden;
@@ -13735,7 +13853,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           top: 0;
           bottom: 0;
           width: 0;
-          border-right: 1px dashed rgba(255,255,255,0.06);
+          border-right: 1px dashed rgba(0, 243, 255, 0.25);
           pointer-events: none;
         }
         .highway-playhead-line {
