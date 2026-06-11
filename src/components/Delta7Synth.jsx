@@ -811,6 +811,50 @@ export default function Delta7Synth() {
   const ringDotsRefA = useRef([]);
   const ringTracksRefB = useRef([]);
   const ringDotsRefB = useRef([]);
+  const ringsContainerRefA = useRef(null);
+  const ringsContainerRefB = useRef(null);
+
+  useEffect(() => {
+    const createRings = (container, tracksRef, dotsRef) => {
+      if (!container) return;
+      container.innerHTML = '';
+      
+      ringColors.forEach((color, idx) => {
+        const r = 115 - idx * 9;
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        
+        const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        track.setAttribute('cx', '125');
+        track.setAttribute('cy', '125');
+        track.setAttribute('r', String(r));
+        track.setAttribute('fill', 'none');
+        track.setAttribute('stroke', color);
+        track.setAttribute('stroke-width', '2.2');
+        track.setAttribute('stroke-dasharray', '4, 5');
+        track.setAttribute('class', 'ring-track-static');
+        g.appendChild(track);
+        tracksRef.current[idx] = track;
+        
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', '125');
+        dot.setAttribute('cy', String(125 - r));
+        dot.setAttribute('r', '3.5');
+        dot.setAttribute('fill', '#ffffff');
+        dot.setAttribute('stroke', color);
+        dot.setAttribute('stroke-width', '1.5');
+        dot.setAttribute('class', 'ring-dot-static');
+        dot.style.filter = `drop-shadow(0 0 5px ${color})`;
+        g.appendChild(dot);
+        dotsRef.current[idx] = dot;
+        
+        container.appendChild(g);
+      });
+    };
+
+    createRings(ringsContainerRefA.current, ringTracksRefA, ringDotsRefA);
+    createRings(ringsContainerRefB.current, ringTracksRefB, ringDotsRefB);
+  }, []);
+
   const seqTimerDisplayRef = useRef(null);
   const seqCurrentBeatRef = useRef(0.0);
   const seqStartBeatOffsetRef = useRef(0.0);
@@ -9581,41 +9625,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 viewBox="0 0 250 250" 
                 style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }}
               >
-                {ringColors.map((color, idx) => {
-                  const r = 115 - idx * 9;
-                  return (
-                    <g key={idx}>
-                      {/* Dashed track circle */}
-                      <circle
-                        ref={(el) => { if (el) ringTracksRefA.current[idx] = el; }}
-                        cx="125"
-                        cy="125"
-                        r={r}
-                        fill="none"
-                        stroke={color}
-                        strokeWidth="2.2"
-                        strokeDasharray="4, 5"
-                        className="ring-track-static"
-                      />
-                      {/* Bright glowing playhead dot */}
-                      <circle
-                        ref={(el) => { 
-                          if (el) {
-                            ringDotsRefA.current[idx] = el;
-                            el.style.filter = `drop-shadow(0 0 5px ${color})`;
-                          }
-                        }}
-                        cx="125"
-                        cy={125 - r}
-                        r="3.5"
-                        fill="#ffffff"
-                        stroke={color}
-                        strokeWidth="1.5"
-                        className="ring-dot-static"
-                      />
-                    </g>
-                  );
-                })}
+                {/* Dynamically created rings container */}
+                <g ref={ringsContainerRefA} />
 
                 {/* Center Display Hub (Stationary) */}
                 <circle cx="125" cy="125" r="38" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
@@ -10710,41 +10721,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 viewBox="0 0 250 250" 
                 style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }}
               >
-                {ringColors.map((color, idx) => {
-                  const r = 115 - idx * 9;
-                  return (
-                    <g key={idx}>
-                      {/* Dashed track circle */}
-                      <circle
-                        ref={(el) => { if (el) ringTracksRefB.current[idx] = el; }}
-                        cx="125"
-                        cy="125"
-                        r={r}
-                        fill="none"
-                        stroke={color}
-                        strokeWidth="2.2"
-                        strokeDasharray="4, 5"
-                        className="ring-track-static"
-                      />
-                      {/* Bright glowing playhead dot */}
-                      <circle
-                        ref={(el) => { 
-                          if (el) {
-                            ringDotsRefB.current[idx] = el;
-                            el.style.filter = `drop-shadow(0 0 5px ${color})`;
-                          }
-                        }}
-                        cx="125"
-                        cy={125 - r}
-                        r="3.5"
-                        fill="#ffffff"
-                        stroke={color}
-                        strokeWidth="1.5"
-                        className="ring-dot-static"
-                      />
-                    </g>
-                  );
-                })}
+                {/* Dynamically created rings container */}
+                <g ref={ringsContainerRefB} />
 
                 {/* Center Display Hub (Stationary) */}
                 <circle cx="125" cy="125" r="38" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
