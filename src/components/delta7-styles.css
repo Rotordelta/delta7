@@ -137,12 +137,44 @@
             0 8px 16px rgba(0,0,0,0.6), 
             inset 0 0 10px rgba(0,0,0,0.8),
             0 0 4px rgba(0,243,255,0.1);
+          will-change: transform;
+          transform: translate3d(0, 0, 0) rotate(0deg);
+          backface-visibility: hidden;
+          transition: none;
         }
 
         .vinyl-platter:active {
           cursor: grabbing;
         }
 
+        /* GPU-Accelerated Concentric playhead rings */
+        .ring-track-gpu {
+          position: absolute;
+          border-radius: 50%;
+          box-sizing: border-box;
+          border: 1.8px dashed;
+          transform-origin: center;
+          will-change: transform;
+          transform: translate3d(0, 0, 0) rotate(0deg);
+          opacity: 0.18;
+          transition: opacity 0.2s ease;
+          backface-visibility: hidden;
+        }
+
+        .ring-dot-gpu {
+          position: absolute;
+          width: 7px;
+          height: 7px;
+          background: #ffffff;
+          border-radius: 50%;
+          border: 1.5px solid;
+          top: -4.5px;
+          left: calc(50% - 3.5px);
+          will-change: opacity;
+          opacity: 0;
+          transition: opacity 0.1s ease;
+          backface-visibility: hidden;
+        }
 
         .performance-pads-grid {
           display: grid;

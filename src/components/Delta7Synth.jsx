@@ -821,38 +821,32 @@ export default function Delta7Synth() {
       
       ringColors.forEach((color, idx) => {
         const r = 115 - idx * 9;
-        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         
-        const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        track.setAttribute('cx', '125');
-        track.setAttribute('cy', '125');
-        track.setAttribute('r', String(r));
-        track.setAttribute('fill', 'none');
-        track.setAttribute('stroke', color);
-        track.setAttribute('stroke-width', '2.2');
-        track.setAttribute('stroke-dasharray', '4, 5');
-        track.setAttribute('class', 'ring-track-static');
-        g.appendChild(track);
+        const track = document.createElement('div');
+        track.className = 'ring-track-gpu';
+        track.style.width = `${r * 2}px`;
+        track.style.height = `${r * 2}px`;
+        track.style.left = `${125 - r}px`;
+        track.style.top = `${125 - r}px`;
+        track.style.borderColor = color;
+        
+        const dot = document.createElement('div');
+        dot.className = 'ring-dot-gpu';
+        dot.style.borderColor = color;
+        dot.style.boxShadow = `0 0 8px ${color}, inset 0 0 4px ${color}`;
+        track.appendChild(dot);
+        
+        container.appendChild(track);
         tracksRef.current[idx] = track;
-        
-        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        dot.setAttribute('cx', '125');
-        dot.setAttribute('cy', String(125 - r));
-        dot.setAttribute('r', '3.5');
-        dot.setAttribute('fill', '#ffffff');
-        dot.setAttribute('stroke', color);
-        dot.setAttribute('stroke-width', '1.5');
-        dot.setAttribute('class', 'ring-dot-static');
-        dot.style.filter = `drop-shadow(0 0 5px ${color})`;
-        g.appendChild(dot);
         dotsRef.current[idx] = dot;
-        
-        container.appendChild(g);
       });
     };
 
     createRings(ringsContainerRefA.current, ringTracksRefA, ringDotsRefA);
     createRings(ringsContainerRefB.current, ringTracksRefB, ringDotsRefB);
+    
+    if (platterRefA.current) platterRefA.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+    if (platterRefB.current) platterRefB.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
   }, []);
 
   const seqTimerDisplayRef = useRef(null);
@@ -1187,14 +1181,14 @@ export default function Delta7Synth() {
         const dir = getIsDeckReverse('A') ? -1 : 1;
         platterAngleARef.current = (platterAngleARef.current + dir * delta * 180 + 360) % 360;
         if (platterRefA.current) {
-          platterRefA.current.style.transform = `rotate(${platterAngleARef.current}deg)`;
+          platterRefA.current.style.transform = `translate3d(0, 0, 0) rotate(${platterAngleARef.current}deg)`;
         }
       }
       if (getIsDeckActive('B') && !isScratchingB.current) {
         const dir = getIsDeckReverse('B') ? -1 : 1;
         platterAngleBRef.current = (platterAngleBRef.current + dir * delta * 180 + 360) % 360;
         if (platterRefB.current) {
-          platterRefB.current.style.transform = `rotate(${platterAngleBRef.current}deg)`;
+          platterRefB.current.style.transform = `translate3d(0, 0, 0) rotate(${platterAngleBRef.current}deg)`;
         }
       }
 
@@ -1274,17 +1268,10 @@ export default function Delta7Synth() {
           const dotA = ringDotsRefA.current[i];
           
           if (trackA) {
-            trackA.style.transform = `rotate(${angleA}deg)`;
+            trackA.style.transform = `translate3d(0, 0, 0) rotate(${angleA}deg)`;
             trackA.style.opacity = isActiveA ? '0.9' : '0.18';
-            // Issue 9: toggle class instead of setting filter string every frame
-            if (isActiveA) {
-              if (!trackA._wasActive) { trackA.classList.add('ring-active'); trackA._wasActive = true; }
-            } else {
-              if (trackA._wasActive) { trackA.classList.remove('ring-active'); trackA._wasActive = false; }
-            }
           }
           if (dotA) {
-            dotA.style.transform = `rotate(${angleA}deg)`;
             dotA.style.opacity = isActiveA ? '1' : '0';
           }
 
@@ -1297,17 +1284,10 @@ export default function Delta7Synth() {
           const dotB = ringDotsRefB.current[i];
           
           if (trackB) {
-            trackB.style.transform = `rotate(${angleB}deg)`;
+            trackB.style.transform = `translate3d(0, 0, 0) rotate(${angleB}deg)`;
             trackB.style.opacity = isActiveB ? '0.9' : '0.18';
-            // Issue 9: toggle class instead of setting filter string every frame
-            if (isActiveB) {
-              if (!trackB._wasActive) { trackB.classList.add('ring-active'); trackB._wasActive = true; }
-            } else {
-              if (trackB._wasActive) { trackB.classList.remove('ring-active'); trackB._wasActive = false; }
-            }
           }
           if (dotB) {
-            dotB.style.transform = `rotate(${angleB}deg)`;
             dotB.style.opacity = isActiveB ? '1' : '0';
           }
         }
@@ -9593,10 +9573,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 onTouchStart={(e) => { e.preventDefault(); handlePlatterMouseDown('A', e.touches[0]); }}
                 onTouchMove={(e) => { e.preventDefault(); handlePlatterMouseMove('A', e.touches[0]); }}
                 onTouchEnd={() => handlePlatterMouseUp('A')}
-                style={{ 
-                  transform: `rotate(${platterAngleARef.current}deg)`,
-                  transition: 'none'
-                }}
               >
                 {/* Vector Vinyl Disc inside the rotating div */}
                 <svg width="250" height="250" viewBox="0 0 250 250" style={{ display: 'block', pointerEvents: 'none' }}>
@@ -9618,16 +9594,19 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </svg>
               </div>
 
-              {/* 8 Concentric Playhead Rings & Central display (Stationary Overlay) */}
+              {/* GPU-Accelerated Concentric Playhead Rings Container */}
+              <div 
+                ref={ringsContainerRefA} 
+                style={{ position: 'absolute', top: 0, left: 0, width: '250px', height: '250px', pointerEvents: 'none', zIndex: 3 }}
+              />
+
+              {/* Central display Hub SVG (Stationary Overlay) */}
               <svg 
                 width="250" 
                 height="250" 
                 viewBox="0 0 250 250" 
-                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }}
+                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 4 }}
               >
-                {/* Dynamically created rings container */}
-                <g ref={ringsContainerRefA} />
-
                 {/* Center Display Hub (Stationary) */}
                 <circle cx="125" cy="125" r="38" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
                 <circle cx="125" cy="125" r="34" fill="#040810" />
@@ -10689,10 +10668,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 onTouchStart={(e) => { e.preventDefault(); handlePlatterMouseDown('B', e.touches[0]); }}
                 onTouchMove={(e) => { e.preventDefault(); handlePlatterMouseMove('B', e.touches[0]); }}
                 onTouchEnd={() => handlePlatterMouseUp('B')}
-                style={{ 
-                  transform: `rotate(${platterAngleBRef.current}deg)`,
-                  transition: 'none'
-                }}
               >
                 {/* Vector Vinyl Disc inside the rotating div */}
                 <svg width="250" height="250" viewBox="0 0 250 250" style={{ display: 'block', pointerEvents: 'none' }}>
@@ -10714,16 +10689,19 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </svg>
               </div>
 
-              {/* 8 Concentric Playhead Rings & Central display (Stationary Overlay) */}
+              {/* GPU-Accelerated Concentric Playhead Rings Container */}
+              <div 
+                ref={ringsContainerRefB} 
+                style={{ position: 'absolute', top: 0, left: 0, width: '250px', height: '250px', pointerEvents: 'none', zIndex: 3 }}
+              />
+
+              {/* Central display Hub SVG (Stationary Overlay) */}
               <svg 
                 width="250" 
                 height="250" 
                 viewBox="0 0 250 250" 
-                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }}
+                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 4 }}
               >
-                {/* Dynamically created rings container */}
-                <g ref={ringsContainerRefB} />
-
                 {/* Center Display Hub (Stationary) */}
                 <circle cx="125" cy="125" r="38" fill="#0c1220" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
                 <circle cx="125" cy="125" r="34" fill="#040810" />
