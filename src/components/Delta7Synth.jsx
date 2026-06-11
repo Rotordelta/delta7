@@ -733,6 +733,12 @@ export default function Delta7Synth() {
     sampleSlotsRef.current = sampleSlots;
   }, [sampleSlots]);
 
+  // O(1) slot lookups — replaces sampleSlots.find() in render loops
+  const slotMap = useMemo(() => {
+    const m = new Map();
+    for (const s of sampleSlots) m.set(s.id, s);
+    return m;
+  }, [sampleSlots]);
 
 
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('a01'); // Target slot in Editor
@@ -9626,7 +9632,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   fontFamily="monospace"
                   opacity="0.85"
                 >
-                  {sampleSlotsRef.current.find(s => s.id === params.oscAWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
+                  {slotMap.get(params.oscAWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
                 </text>
               </svg>
             </div>
@@ -9642,7 +9648,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             >
               {Array.from({ length: 8 }).map((_, idx) => {
                 const slotId = `a0${idx + 1}`;
-                const slot = sampleSlots.find(s => s.id === slotId);
+                const slot = slotMap.get(slotId);
                 const isLoaded = slot && slot.buffer;
                 
                 const fxType = slot?.fxType || 'None';
@@ -10759,7 +10765,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   fontFamily="monospace"
                   opacity="0.85"
                 >
-                  {sampleSlotsRef.current.find(s => s.id === params.oscBWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
+                  {slotMap.get(params.oscBWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
                 </text>
               </svg>
             </div>
@@ -10775,7 +10781,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             >
               {Array.from({ length: 8 }).map((_, idx) => {
                 const slotId = `b0${idx + 1}`;
-                const slot = sampleSlots.find(s => s.id === slotId);
+                const slot = slotMap.get(slotId);
                 const isLoaded = slot && slot.buffer;
                 
                 const fxType = slot?.fxType || 'None';
@@ -11998,7 +12004,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 
                 {/* ================= ROW 1: WAVEFORM EDITOR ================= */}
                 {(() => {
-                  const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+                  const slot = slotMap.get(selectedEditSlotId);
                   if (!slot) return null;
                   return (
                     <div className="box-section-sub" style={{ background: 'rgba(0, 243, 255, 0.02)', border: '1px solid rgba(0, 243, 255, 0.2)', padding: '6px 10px' }}>
@@ -14420,7 +14426,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       {padMenuState.visible && (() => {
         const prefix = padMenuState.deck === 'A' ? 'a0' : 'b0';
         const slotId = prefix + (padMenuState.index + 1);
-        const slot = sampleSlots.find(s => s.id === slotId);
+        const slot = slotMap.get(slotId);
         if (!slot) return null;
 
         const fxType = slot.fxType || 'None';
