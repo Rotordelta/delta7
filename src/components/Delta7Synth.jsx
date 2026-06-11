@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Knob from './Knob.jsx';
+import './delta7-styles.css';
 
 // ==========================================
 // 1. FACTORY PRESETS & WAVEFORMS
@@ -514,7 +515,7 @@ export default function Delta7Synth() {
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState('');
   const [midiActivity, setMidiActivity] = useState(false);
-  // Zero-waste: activeNotes is ref-only — no re-renders from note on/off events
+  // Zero-waste: activeNotes is ref-only â€” no re-renders from note on/off events
   const activeNotesRef = useRef(new Set());
   const activeNotesDirtyRef = useRef(false);
   const setActiveNotes = (updater) => {
@@ -759,17 +760,17 @@ export default function Delta7Synth() {
 
   useEffect(() => { perfCountInActiveRef.current = perfCountInActive; }, [perfCountInActive]);
   useEffect(() => { perfCountInRemainingRef.current = perfCountInRemaining; }, [perfCountInRemaining]);
-  // Zero-waste: activePerfPads is ref-only — no useState re-renders from audio triggers
+  // Zero-waste: activePerfPads is ref-only â€” no useState re-renders from audio triggers
   const activePerfPadsRef = useRef({});
   const perfPadsDirtyRef = useRef(false); // dirty flag for batched rAF visual sync
-  // Zero-waste: direct mutation helpers — no spread allocation per trigger
+  // Zero-waste: direct mutation helpers â€” no spread allocation per trigger
   const setActivePerfPads = (updater) => {
     const prev = activePerfPadsRef.current;
     const next = typeof updater === 'function' ? updater(prev) : updater;
     activePerfPadsRef.current = next;
     perfPadsDirtyRef.current = true;
   };
-  // Mutation shorthand: setPerfPad('A-slot-0', true) — zero allocation
+  // Mutation shorthand: setPerfPad('A-slot-0', true) â€” zero allocation
   const setPerfPad = (key, val) => {
     if (val) {
       activePerfPadsRef.current[key] = true;
@@ -778,7 +779,7 @@ export default function Delta7Synth() {
     }
     perfPadsDirtyRef.current = true;
   };
-  // Zero-waste: deckPlaying is ref-only — no useState, no re-renders
+  // Zero-waste: deckPlaying is ref-only â€” no useState, no re-renders
   const deckAPlayingRef = useRef(false);
   const deckBPlayingRef = useRef(false);
   const deckPlayingDirtyRef = useRef(false); // dirty flag for batched rAF visual sync
@@ -814,7 +815,7 @@ export default function Delta7Synth() {
   const deckALastPlaying = useRef(false); // tracks last synced value to avoid redundant DOM writes
   const deckBLastPlaying = useRef(false);
   const perfTempProgRef = useRef({}); // Zero-waste: pre-allocated staging object for triggerPerfPadDSP
-  // VU meter DOM refs — updated directly in tickLoop to avoid React re-renders (Issue 1)
+  // VU meter DOM refs â€” updated directly in tickLoop to avoid React re-renders (Issue 1)
   const vuLevelLRef = useRef(0);
   const vuLevelRRef = useRef(0);
   const vuSegLRefsArr = useRef([]);
@@ -828,7 +829,7 @@ export default function Delta7Synth() {
   const [deckBEqLow, setDeckBEqLow] = useState(0.0);
   const [deckBEqMid, setDeckBEqMid] = useState(0.0);
   const [deckBEqHigh, setDeckBEqHigh] = useState(0.0);
-  // VU levels: refs only (vuLevelLRef/vuLevelRRef) — dead useState removed
+  // VU levels: refs only (vuLevelLRef/vuLevelRRef) â€” dead useState removed
   const [deckAPitch, setDeckAPitch] = useState(0.0);
   const [deckBPitch, setDeckBPitch] = useState(0.0);
   const [deckALoopSize, setDeckALoopSize] = useState(4);
@@ -838,7 +839,7 @@ export default function Delta7Synth() {
   const [deckAKeyLock, setDeckAKeyLock] = useState(true);
   const [deckBKeyLock, setDeckBKeyLock] = useState(true);
 
-  // deckAPlaying/deckBPlaying are now ref-only — sync effects removed
+  // deckAPlaying/deckBPlaying are now ref-only â€” sync effects removed
   useEffect(() => { crossfaderValRef.current = crossfaderVal; }, [crossfaderVal]);
 
   const deckAVolFaderRef = useRef(0.8);
@@ -848,14 +849,14 @@ export default function Delta7Synth() {
 
   // Playback timeout tracker to cancel stale timers on stop (Issue 6)
   const perfPlaybackTimersRef = useRef([]);
-  // Pre-sorted events array — populated once when recording stops (Issue 4)
+  // Pre-sorted events array â€” populated once when recording stops (Issue 4)
   const sortedPerfEventsRef = useRef([]);
 
   const [masterSyncActive, setMasterSyncActive] = useState(false);
   const masterSyncActiveRef = useRef(false);
   useEffect(() => { masterSyncActiveRef.current = masterSyncActive; }, [masterSyncActive]);
 
-  // Dead state removed: ringAnglesA, ringAnglesB, currentPerfPlayBeat — rings use direct DOM mutation in rAF loop
+  // Dead state removed: ringAnglesA, ringAnglesB, currentPerfPlayBeat â€” rings use direct DOM mutation in rAF loop
   const [perfQuantizeMode, setPerfQuantizeMode] = useState('None');
   const [perfTimeSignature, setPerfTimeSignature] = useState('4/4');
 
@@ -1088,7 +1089,7 @@ export default function Delta7Synth() {
     const bufferLength = 32;
     const dataArray = new Uint8Array(bufferLength);
     
-    // Issue 8: replaced Map spread with early-exit for...of — eliminates 240 array allocations/sec
+    // Issue 8: replaced Map spread with early-exit for...of â€” eliminates 240 array allocations/sec
     const getIsDeckActive = (deck) => {
       if (deck === 'A') {
         if (deckAPlayingRef.current) return true;
@@ -1258,7 +1259,7 @@ export default function Delta7Synth() {
         }
       }
 
-      // Issue 1: VU Meter — direct DOM mutation, NO setState, zero React re-renders
+      // Issue 1: VU Meter â€” direct DOM mutation, NO setState, zero React re-renders
       if (analyserRef.current) {
         analyserRef.current.getByteTimeDomainData(dataArray);
         let sum = 0;
@@ -1368,7 +1369,7 @@ export default function Delta7Synth() {
       cancelAnimationFrame(animId);
     };
   // Zero-waste: all audio-rate visuals (deckPlaying, activePerfPads, activeNotes) are ref-only
-  // and synced to DOM via the batched rAF loop above — no React re-renders from audio triggers
+  // and synced to DOM via the batched rAF loop above â€” no React re-renders from audio triggers
   }, [performanceViewActive]);
 
   // Real-time Mixer Fader & EQ voice modulator
@@ -1608,13 +1609,13 @@ export default function Delta7Synth() {
             liveRecPendingStartRef.current = false;
             setIsLiveRecording(true);
             setLiveRecPendingStart(false);
-            showEditorStatus("Live Recording Started! 🔴");
+            showEditorStatus("Live Recording Started! ðŸ”´");
           } else {
             isRecordingRef.current = true;
             manualRecPendingStartRef.current = false;
             setIsRecording(true);
             setManualRecPendingStart(false);
-            showEditorStatus("Recording Started... ⏺️");
+            showEditorStatus("Recording Started... âºï¸");
           }
         } else if (msg.type === 'STOPPED') {
           if (isLiveRecordingRef.current) {
@@ -1695,7 +1696,7 @@ export default function Delta7Synth() {
           setTimeout(() => {
             setIsRecording(true);
             setManualRecPendingStart(false);
-            showEditorStatus("Recording Started... ⏺️");
+            showEditorStatus("Recording Started... âºï¸");
           }, 0);
           return;
         }
@@ -1759,7 +1760,7 @@ export default function Delta7Synth() {
           setTimeout(() => {
             setIsLiveRecording(true);
             setLiveRecPendingStart(false);
-            showEditorStatus("Live Recording Started! 🔴");
+            showEditorStatus("Live Recording Started! ðŸ”´");
           }, 0);
           return;
         }
@@ -1807,14 +1808,14 @@ export default function Delta7Synth() {
     if (ctx.state === 'suspended') ctx.resume();
     
     if (!streamRef.current) {
-      showEditorStatus("Arming mic/instrument input... 🎤");
+      showEditorStatus("Arming mic/instrument input... ðŸŽ¤");
       armMicrophone()
         .then(() => {
           triggerLiveLoopRecInternal();
         })
         .catch(err => {
           console.error("Arming microphone failed:", err);
-          showEditorStatus("Failed to arm input source! ❌");
+          showEditorStatus("Failed to arm input source! âŒ");
         });
     } else {
       triggerLiveLoopRecInternal();
@@ -1844,7 +1845,7 @@ export default function Delta7Synth() {
       liveRecStartTimeRef.current = nextBeatTime;
       liveRecPendingStartRef.current = true;
       setLiveRecPendingStart(true);
-      showEditorStatus("Armed: Waiting for next beat... ⏳");
+      showEditorStatus("Armed: Waiting for next beat... â³");
       
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({
@@ -1859,7 +1860,7 @@ export default function Delta7Synth() {
       setLiveRecPendingStart(false);
       isLiveRecordingRef.current = true;
       setIsLiveRecording(true);
-      showEditorStatus("Live Recording Started! 🔴");
+      showEditorStatus("Live Recording Started! ðŸ”´");
       
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({
@@ -1924,7 +1925,7 @@ export default function Delta7Synth() {
     if (updatedSlot) {
       saveSampleToDb(updatedSlot)
         .then(() => {
-          showEditorStatus(`Live Loop Saved to ${getSlotLabel(targetSlotId)}! 💾`);
+          showEditorStatus(`Live Loop Saved to ${getSlotLabel(targetSlotId)}! ðŸ’¾`);
         })
         .catch((e) => {
           console.error("Failed to save live loop to DB:", e);
@@ -1938,7 +1939,7 @@ export default function Delta7Synth() {
       liveRecPendingStartRef.current = false;
       setIsLiveRecording(false);
       setLiveRecPendingStart(false);
-      showEditorStatus("Live Recording Cancelled ⏹️");
+      showEditorStatus("Live Recording Cancelled â¹ï¸");
       if (recordingWorkletNodeRef.current) {
         recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
       }
@@ -1964,7 +1965,7 @@ export default function Delta7Synth() {
       } else {
         liveRecPendingStartRef.current = false;
         setLiveRecPendingStart(false);
-        showEditorStatus("Live Recording Aborted ⏹️");
+        showEditorStatus("Live Recording Aborted â¹ï¸");
       }
     }
   };
@@ -1979,7 +1980,7 @@ export default function Delta7Synth() {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devices.filter(device => device.kind === 'audioinput');
         setAudioDevices(audioInputs);
-        // Read ref not state — avoids stale closure resetting selection on hot-plug
+        // Read ref not state â€” avoids stale closure resetting selection on hot-plug
         if (audioInputs.length > 0 && !selectedAudioDeviceRef.current) {
           const defaultDevice = audioInputs.find(d => d.deviceId === 'default') || audioInputs[0];
           setSelectedAudioDevice(defaultDevice.deviceId);
@@ -2245,7 +2246,7 @@ export default function Delta7Synth() {
     if (updatedSlot) {
       saveSampleToDb(updatedSlot)
         .then(() => {
-          showEditorStatus(`Saved Lossless Resample to ${getSlotLabel(targetSlotId)}! 💾`);
+          showEditorStatus(`Saved Lossless Resample to ${getSlotLabel(targetSlotId)}! ðŸ’¾`);
         })
         .catch((e) => {
           console.error("Failed to auto-save resampled sample to DB:", e);
@@ -2273,7 +2274,7 @@ export default function Delta7Synth() {
       manualRecStartTimeRef.current = nextBeatTime;
       manualRecPendingStartRef.current = true;
       setManualRecPendingStart(true);
-      showEditorStatus("Record Armed: starting on next beat... ⏳");
+      showEditorStatus("Record Armed: starting on next beat... â³");
       
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({
@@ -2283,7 +2284,7 @@ export default function Delta7Synth() {
       }
     } else {
       if (!streamRef.current && recordingInputMode !== 'resample') {
-        showEditorStatus("Arming input first... 🎤");
+        showEditorStatus("Arming input first... ðŸŽ¤");
         const armFunc = recordingInputMode === 'mic' ? armMicrophone : armMonitor;
         armFunc()
           .then(() => {
@@ -2291,7 +2292,7 @@ export default function Delta7Synth() {
             recordedChunksR.current = [];
             isRecordingRef.current = true;
             setIsRecording(true);
-            showEditorStatus("Recording Started... ⏺️");
+            showEditorStatus("Recording Started... âºï¸");
             
             if (useWorklet) {
               recordingWorkletNodeRef.current.port.postMessage({ type: 'START' });
@@ -2307,7 +2308,7 @@ export default function Delta7Synth() {
       recordedChunksR.current = [];
       isRecordingRef.current = true;
       setIsRecording(true);
-      showEditorStatus("Recording Started... ⏺️");
+      showEditorStatus("Recording Started... âºï¸");
       
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({ type: 'START' });
@@ -2328,7 +2329,7 @@ export default function Delta7Synth() {
       manualRecStopTimeRef.current = nextBeatTime;
       manualRecPendingStopRef.current = true;
       setManualRecPendingStop(true);
-      showEditorStatus("Record Stop Armed: stopping on next beat... ⏳");
+      showEditorStatus("Record Stop Armed: stopping on next beat... â³");
       
       const bpm = paramsRef.current.arpBpm || 120;
       const beatDuration = 60 / bpm;
@@ -2478,7 +2479,7 @@ export default function Delta7Synth() {
  
       setIsArmed(true);
       startMicMonitor();
-      showEditorStatus(`Resampler armed for ${prefix.toUpperCase()}${slotNum}! ⏺️`);
+      showEditorStatus(`Resampler armed for ${prefix.toUpperCase()}${slotNum}! âºï¸`);
     } catch (err) {
       console.error("Error arming resampler:", err);
       alert("Resampler arming failed.");
@@ -2665,7 +2666,7 @@ export default function Delta7Synth() {
             }
             return s;
           }));
-          showEditorStatus(`Cleared ${bankLabel}${targetNum} from DB! 🗑️`);
+          showEditorStatus(`Cleared ${bankLabel}${targetNum} from DB! ðŸ—‘ï¸`);
         } catch (err) {
           console.error(err);
           alert('Failed to clear database record.');
@@ -2726,7 +2727,7 @@ export default function Delta7Synth() {
         return next;
       });
       
-      showEditorStatus(`Saved to ${slotInput.toUpperCase()}! 💾`);
+      showEditorStatus(`Saved to ${slotInput.toUpperCase()}! ðŸ’¾`);
     } catch (err) {
       console.error(err);
       alert('Failed to save to database. Make sure your browser supports IndexedDB.');
@@ -2752,7 +2753,7 @@ export default function Delta7Synth() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      showEditorStatus('Exported WAV! 📥');
+      showEditorStatus('Exported WAV! ðŸ“¥');
     } catch (err) {
       console.error(err);
       alert('Failed to export sample as WAV.');
@@ -3015,7 +3016,7 @@ export default function Delta7Synth() {
     const ctx = canvas.getContext('2d');
     
     const drawWaveform = () => {
-      // Issue 12: skip RAF when performance view is active — sampler canvas is not visible
+      // Issue 12: skip RAF when performance view is active â€” sampler canvas is not visible
       if (performanceViewActive) {
         samplerCanvasAnimIdRef.current = requestAnimationFrame(drawWaveform);
         return;
@@ -3799,7 +3800,7 @@ export default function Delta7Synth() {
     formantDryGain.gain.setValueAtTime(1.0, now);
     formantDryGainRef.current = formantDryGain;
 
-    // Issue 3: replaced ScriptProcessor bitcrusher with AudioWorklet — runs OFF main thread
+    // Issue 3: replaced ScriptProcessor bitcrusher with AudioWorklet â€” runs OFF main thread
     const bitcrusherInput = ctx.createGain();
     const bitcrusherOutput = ctx.createGain();
 
@@ -4445,9 +4446,9 @@ export default function Delta7Synth() {
                     sortedEvents: sortedPerfEventsRef.current
                   });
                 }
-                showEditorStatus("Overdub recording started! 🎙️");
+                showEditorStatus("Overdub recording started! ðŸŽ™ï¸");
               } else {
-                showEditorStatus("Recording started! 🎙️");
+                showEditorStatus("Recording started! ðŸŽ™ï¸");
               }
               
               if (!paramsRef.current.metronomeOn) {
@@ -4522,7 +4523,7 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     
-    showEditorStatus(`Generating ${kitType} Kit... ⏳`);
+    showEditorStatus(`Generating ${kitType} Kit... â³`);
     try {
       const generatedSamples = generateSynthesizedKit(ctx, kitType);
       
@@ -4560,7 +4561,7 @@ export default function Delta7Synth() {
         }
       }
 
-      showEditorStatus(`Loaded ${kitType} Kit to Bank ${bankType.toUpperCase()}! 💾`);
+      showEditorStatus(`Loaded ${kitType} Kit to Bank ${bankType.toUpperCase()}! ðŸ’¾`);
     } catch (err) {
       console.error("Error loading kit preset:", err);
       showEditorStatus("Failed to generate kit preset.");
@@ -4576,7 +4577,7 @@ export default function Delta7Synth() {
     );
     if (bankName === null) return; // cancelled
     
-    showEditorStatus(`Saving Bank ${bankType.toUpperCase()} Preset ${presetNum}... ⏳`);
+    showEditorStatus(`Saving Bank ${bankType.toUpperCase()} Preset ${presetNum}... â³`);
     try {
       const slotsToSave = sampleSlotsRef.current.filter(s => s.id.startsWith(bankType));
       
@@ -4627,7 +4628,7 @@ export default function Delta7Synth() {
       };
       
       await saveBankToDb(record);
-      showEditorStatus(`Bank ${bankType.toUpperCase()} Preset ${presetNum} Saved! 💾`);
+      showEditorStatus(`Bank ${bankType.toUpperCase()} Preset ${presetNum} Saved! ðŸ’¾`);
     } catch (err) {
       console.error("Failed to save bank preset:", err);
       showEditorStatus("Error saving bank preset.");
@@ -4683,7 +4684,7 @@ export default function Delta7Synth() {
       for (const slot of bankSlots) {
         await deleteSampleFromDb(slot.id);
       }
-      showEditorStatus(`Bank ${bankType.toUpperCase()} Cleared! 🗑️`);
+      showEditorStatus(`Bank ${bankType.toUpperCase()} Cleared! ðŸ—‘ï¸`);
     } catch (err) {
       console.error("Failed to clear database records for bank:", err);
       showEditorStatus("Error clearing bank database.");
@@ -4695,7 +4696,7 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     
-    showEditorStatus(`Loading Bank ${bankType.toUpperCase()} Preset ${presetNum}... ⏳`);
+    showEditorStatus(`Loading Bank ${bankType.toUpperCase()} Preset ${presetNum}... â³`);
     try {
       const savedBank = await getSavedBankFromDb(`bank_${bankType}_preset_${presetNum}`);
       if (!savedBank) {
@@ -4769,7 +4770,7 @@ export default function Delta7Synth() {
         }
       }
       
-      showEditorStatus(`Loaded Preset: ${savedBank.name}! 💾`);
+      showEditorStatus(`Loaded Preset: ${savedBank.name}! ðŸ’¾`);
     } catch (err) {
       console.error("Failed to load bank preset:", err);
       showEditorStatus("Error loading bank preset.");
@@ -5875,7 +5876,7 @@ export default function Delta7Synth() {
       isReverseB: isReverseB
     };
 
-    // isSliceGranular must be hoisted outside if(bufferA) — it's used in the panner block after that inner if closes
+    // isSliceGranular must be hoisted outside if(bufferA) â€” it's used in the panner block after that inner if closes
     const isSliceGranular = !prog.granularActive && (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0);
     const isWarpedGranularA = !!(slotA && bufferA && (slotA.warpOn || masterSyncActiveRef.current) && (slotA.tuning || 0) !== 0 && prog.oscATriggerMode !== 'slice');
     const isWarpedGranularB = !!(slotB && bufferB && (slotB.warpOn || masterSyncActiveRef.current) && (slotB.tuning || 0) !== 0 && prog.oscBTriggerMode !== 'slice');
@@ -5951,7 +5952,7 @@ export default function Delta7Synth() {
 
           if (nextGrainTime < ctxNow + lookahead) {
             const drift = (ctxNow + lookahead) - nextGrainTime;
-            // Playhead speed: for slice stretch, 1/(1+stretch) — stretch=0 → 1.0 (normal), stretch=1 → 0.5 (half speed = 2× longer)
+            // Playhead speed: for slice stretch, 1/(1+stretch) â€” stretch=0 â†’ 1.0 (normal), stretch=1 â†’ 0.5 (half speed = 2Ã— longer)
             const playheadSpeed = isSliceGranular ? (1.0 / Math.max(0.05, 1.0 + sliceStretchA)) : (isWarpedGranularA ? freqScaleA : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0));
             playhead += drift * playheadSpeed;
             nextGrainTime = ctxNow + lookahead;
@@ -6324,7 +6325,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
             const clampedStartOffset = Math.max(0, Math.min(currentBuf.duration - 0.005, grainStart));
 
-            // Grain playback rate = pitch-only (base 1.0) — tempo controlled by playhead speed
+            // Grain playback rate = pitch-only (base 1.0) â€” tempo controlled by playhead speed
             let grainPlaybackRateB = 1.0;
             if (isSliceGranularB) {
               grainPlaybackRateB = Math.pow(2, (slicePitchB + oscBPitch + oscBOctave * 12) / 12) * Math.pow(2, oscBDetune / 1200);
@@ -6580,7 +6581,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         let att = sliceEnvA.attack;
         let dec = sliceEnvA.decay;
         // Only clamp attack/decay to dPlayA for standard (non-stretched) slice playback.
-        // When granular time-stretch is active the grain windows handle their own decay —
+        // When granular time-stretch is active the grain windows handle their own decay â€”
         // clamping gainA here would silence the grains before they're audible.
         const isGranularStretch = sliceStretchA !== 0;
         if (!isLoopA && !isGranularStretch) {
@@ -6984,7 +6985,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           if (voice.eqHighNode) { try { voice.eqHighNode.disconnect(); } catch {} }
           if (voice.sendGainNode) { try { voice.sendGainNode.disconnect(); } catch {} }
           if (voice.voiceOutGain) { try { voice.voiceOutGain.disconnect(); } catch {} }
-          // Previously leaked nodes — now properly disconnected
+          // Previously leaked nodes â€” now properly disconnected
           if (voice.stutterGateNode) { try { voice.stutterGateNode.disconnect(); } catch {} }
           if (voice.stutterPannerNode) { try { voice.stutterPannerNode.disconnect(); } catch {} }
           if (voice.padPannerNode) { try { voice.padPannerNode.disconnect(); } catch {} }
@@ -7038,12 +7039,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const slot = sampleSlotsRef.current.find(s => s.id === slotId);
     if (!slot) return;
     const nextLoop = !slot.loopOn;
-    // Mutate in-place — audio engine sees it immediately
+    // Mutate in-place â€” audio engine sees it immediately
     slot.loopOn = nextLoop;
     setSampleSlots(prev => [...prev]);
     saveSlotMetadataToDb(slotId, { loopOn: nextLoop })
       .catch(err => console.error("Failed to auto-save loop setting to IndexedDB:", err));
-    showEditorStatus(`${getSlotLabel(slotId)} Play Mode: ${nextLoop ? 'LOOP' : 'ONE-SHOT'} 🔄`);
+    showEditorStatus(`${getSlotLabel(slotId)} Play Mode: ${nextLoop ? 'LOOP' : 'ONE-SHOT'} ðŸ”„`);
   };
 
   const cycleTriggerMode = (slotId, e) => {
@@ -7054,14 +7055,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const currentMode = slot.triggerMode || 'hold';
     const nextIdx = (modes.indexOf(currentMode) + 1) % modes.length;
     const nextMode = modes[nextIdx];
-    // Mutate in-place on ref — audio engine sees it immediately, zero allocation
+    // Mutate in-place on ref â€” audio engine sees it immediately, zero allocation
     slot.triggerMode = nextMode;
     // UI update (React batches this with showEditorStatus in same event handler)
     setSampleSlots(prev => [...prev]);
-    // Lightweight metadata-only save — no buffer copy
+    // Lightweight metadata-only save â€” no buffer copy
     saveSlotMetadataToDb(slotId, { triggerMode: nextMode })
       .catch(err => console.error("Failed to save slot triggerMode:", err));
-    showEditorStatus(`${getSlotLabel(slotId)} Mode: ${nextMode.toUpperCase()} 🎛️`);
+    showEditorStatus(`${getSlotLabel(slotId)} Mode: ${nextMode.toUpperCase()} ðŸŽ›ï¸`);
   };
 
   const handlePadRightClick = (e, deck, index) => {
@@ -7413,7 +7414,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (!ctx) return;
     
     if (perfRecordActive) {
-      // Issue 5: flush ref to state now that recording is done — one single setState call
+      // Issue 5: flush ref to state now that recording is done â€” one single setState call
       const recorded = [...perfEventsRef.current];
       setPerfEvents(recorded);
       // Issue 4: pre-sort once here so runPerfScheduler never sorts again
@@ -7438,13 +7439,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPlaybackActive(true);
         perfPlayStartTimeRef.current = perfStartTimeRef.current;
         seqStartBeatOffsetRef.current = 0.0;
-        showEditorStatus(`Overdub Complete! Seamlessly Playing... ▶️`);
+        showEditorStatus(`Overdub Complete! Seamlessly Playing... â–¶ï¸`);
       } else {
         setPerfPlaybackActive(false);
         if (schedulerNodeRef.current) {
           schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
         }
-        showEditorStatus(`Performance Recorded! (${recorded.length} events) ⏹️`);
+        showEditorStatus(`Performance Recorded! (${recorded.length} events) â¹ï¸`);
       }
       setPerfIsDubbing(false);
     } else {
@@ -7465,7 +7466,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               perfRecordActive: true
             });
           }
-          showEditorStatus("Overdub engaged on the fly! 🎙️");
+          showEditorStatus("Overdub engaged on the fly! ðŸŽ™ï¸");
           return;
         } else {
           // Clean Record from active playback: halt playback first
@@ -7490,7 +7491,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         perfCountInActiveRef.current = true;
         setPerfCountInActive(true);
         
-        showEditorStatus("Count-in Armed... Get Ready! ⏱️");
+        showEditorStatus("Count-in Armed... Get Ready! â±ï¸");
         startMetronome();
         return;
       }
@@ -7535,13 +7536,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             sortedEvents: sortedPerfEventsRef.current
           });
         }
-        showEditorStatus("Overdubbing Performance... 🎙️");
+        showEditorStatus("Overdubbing Performance... ðŸŽ™ï¸");
       } else {
         setPerfPlaybackActive(false);
         if (schedulerNodeRef.current) {
           schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
         }
-        showEditorStatus("Recording Performance (Clean)... ⏺️");
+        showEditorStatus("Recording Performance (Clean)... âºï¸");
       }
     }
   };
@@ -7567,10 +7568,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         if (typeof k === 'string' && k.startsWith('perf-')) stopPerfVoice(k);
       }
       setActivePerfPads({});
-      showEditorStatus("Playback Stopped. ⏹️");
+      showEditorStatus("Playback Stopped. â¹ï¸");
     } else {
       if (sortedPerfEventsRef.current.length === 0 && perfEventsRef.current.length === 0) {
-        showEditorStatus("No performance events recorded yet! ⚠️");
+        showEditorStatus("No performance events recorded yet! âš ï¸");
         return;
       }
       // Ensure sorted events are populated (fallback if stop-recording path was skipped)
@@ -7594,7 +7595,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           sortedEvents: sortedPerfEventsRef.current
         });
       }
-      showEditorStatus("Playing Performance... ▶️");
+      showEditorStatus("Playing Performance... â–¶ï¸");
     }
   };
 
@@ -7636,7 +7637,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       if (typeof k === 'string' && k.startsWith('perf-')) stopPerfVoice(k);
     }
     setActivePerfPads({});
-    showEditorStatus("Playback Stopped and Reset. ⏹️");
+    showEditorStatus("Playback Stopped and Reset. â¹ï¸");
   };
 
   const clearPerformance = () => {
@@ -7648,7 +7649,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (schedulerNodeRef.current) {
       schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
     }
-    showEditorStatus("Performance Cleared! 🗑️");
+    showEditorStatus("Performance Cleared! ðŸ—‘ï¸");
   };
 
   const getPlatterAngle = (e, rect) => {
@@ -9178,7 +9179,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         sortedEvents: sortedPerfEventsRef.current
       });
     }
-    showEditorStatus(`Drawn Note at Beat ${startBeat.toFixed(2)} ✏️`);
+    showEditorStatus(`Drawn Note at Beat ${startBeat.toFixed(2)} âœï¸`);
   };
 
   const erasePill = (deck, laneIdx, pill) => {
@@ -9201,20 +9202,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         sortedEvents: sortedPerfEventsRef.current
       });
     }
-    showEditorStatus(`Erased Note at Beat ${pill.start.toFixed(2)} ❌`);
+    showEditorStatus(`Erased Note at Beat ${pill.start.toFixed(2)} âŒ`);
   };
 
   const handleCopyDeck = (deck) => {
     const eventsToCopy = perfEvents.filter(evt => evt.deck === deck);
     if (eventsToCopy.length === 0) {
-      showEditorStatus(`No notes to copy on Deck ${deck}! 📑`);
+      showEditorStatus(`No notes to copy on Deck ${deck}! ðŸ“‘`);
       return;
     }
     setHighwayClipboard({
       deck,
       events: JSON.parse(JSON.stringify(eventsToCopy))
     });
-    showEditorStatus(`Copied Deck ${deck} notes to clipboard! 📑`);
+    showEditorStatus(`Copied Deck ${deck} notes to clipboard! ðŸ“‘`);
   };
 
   const handlePasteDeck = (targetDeck) => {
@@ -9236,7 +9237,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         sortedEvents: sortedPerfEventsRef.current
       });
     }
-    showEditorStatus(`Pasted clipboard onto Deck ${targetDeck}! 📑`);
+    showEditorStatus(`Pasted clipboard onto Deck ${targetDeck}! ðŸ“‘`);
   };
 
   const handleClearDeck = (deck) => {
@@ -9252,7 +9253,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           sortedEvents: sortedPerfEventsRef.current
         });
       }
-      showEditorStatus(`Cleared all notes on Deck ${deck}! 🧹`);
+      showEditorStatus(`Cleared all notes on Deck ${deck}! ðŸ§¹`);
     }
   };
 
@@ -9626,7 +9627,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Mutate in-place — audio engine sees it immediately
+                          // Mutate in-place â€” audio engine sees it immediately
                           slot.reverseOn = !slot.reverseOn;
                           setSampleSlots(prev => [...prev]);
                           saveSlotMetadataToDb(slotId, { reverseOn: slot.reverseOn })
@@ -9729,7 +9730,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 onClick={() => {
                   const nextSolo = !deckASoloActive;
                   setDeckASoloActive(nextSolo);
-                  showEditorStatus(`Deck A Solo Mode: ${nextSolo ? 'ON' : 'OFF'} 🎧`);
+                  showEditorStatus(`Deck A Solo Mode: ${nextSolo ? 'ON' : 'OFF'} ðŸŽ§`);
                 }}
                 title="Solo Deck A (Only one pad plays at a time)"
               >
@@ -9743,7 +9744,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     stopPerfVoice(`perf-a-slot-${i}`);
                   }
                   setDeckAPlaying(false);
-                  showEditorStatus("Deck A Cued ⏹️");
+                  showEditorStatus("Deck A Cued â¹ï¸");
                 }}
               >
                 Cue
@@ -9784,7 +9785,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       }
                     }
                   }
-                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) ⏪`);
+                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) âª`);
                 }}
                 style={{ 
                   fontSize: '0.45rem', 
@@ -9798,7 +9799,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Rewind 4 beats"
               >
-                ⏪
+                âª
               </button>
               <button
                 className="deck-btn-xs"
@@ -9815,7 +9816,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Stop and Reset Performance"
               >
-                ■ Stop
+                â–  Stop
               </button>
               <button
                 className={`deck-btn-xs ${perfPlaybackActive ? 'active' : ''}`}
@@ -9833,7 +9834,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title={perfPlaybackActive ? "Pause Performance" : "Play Performance"}
               >
-                {perfPlaybackActive ? '⏸ Pause' : '▶ Play'}
+                {perfPlaybackActive ? 'â¸ Pause' : 'â–¶ Play'}
               </button>
               <button
                 className="deck-btn-xs"
@@ -9855,7 +9856,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       }
                     }
                   }
-                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) ⏩`);
+                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) â©`);
                 }}
                 style={{ 
                   fontSize: '0.45rem', 
@@ -9869,7 +9870,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Forward 4 beats"
               >
-                ⏩
+                â©
               </button>
               <button
                 className={`deck-btn-xs ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
@@ -9887,7 +9888,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Record live pad triggers to performance sequencer"
               >
-                ● Rec
+                â— Rec
               </button>
             </div>
 
@@ -9910,7 +9911,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  🖐️ Play
+                  ðŸ–ï¸ Play
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'draw' ? 'active' : ''}`}
@@ -9928,7 +9929,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  ✏️ Draw
+                  âœï¸ Draw
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'resize' ? 'active' : ''}`}
@@ -9946,7 +9947,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  ↔️ Size
+                  â†”ï¸ Size
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'erase' ? 'active' : ''}`}
@@ -9964,7 +9965,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  ❌ Del
+                  âŒ Del
                 </button>
               </div>
 
@@ -10202,7 +10203,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               />
             </div>
             
-            {/* Central LED VU Meter — segments driven by DOM refs, NOT React state (Issue 1) */}
+            {/* Central LED VU Meter â€” segments driven by DOM refs, NOT React state (Issue 1) */}
             <div style={{ 
               display: 'flex', 
               gap: '3px', 
@@ -10468,7 +10469,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               onClick={() => {
                 const nextActive = !masterSyncActive;
                 setMasterSyncActive(nextActive);
-                showEditorStatus(`Master Tempo Sync: ${nextActive ? 'ON' : 'OFF'} 🔄`);
+                showEditorStatus(`Master Tempo Sync: ${nextActive ? 'ON' : 'OFF'} ðŸ”„`);
               }}
               style={{
                 marginTop: '6px',
@@ -10824,7 +10825,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Mutate in-place — audio engine sees it immediately
+                          // Mutate in-place â€” audio engine sees it immediately
                           slot.reverseOn = !slot.reverseOn;
                           setSampleSlots(prev => [...prev]);
                           saveSlotMetadataToDb(slotId, { reverseOn: slot.reverseOn })
@@ -10927,7 +10928,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 onClick={() => {
                   const nextSolo = !deckBSoloActive;
                   setDeckBSoloActive(nextSolo);
-                  showEditorStatus(`Deck B Solo Mode: ${nextSolo ? 'ON' : 'OFF'} 🎧`);
+                  showEditorStatus(`Deck B Solo Mode: ${nextSolo ? 'ON' : 'OFF'} ðŸŽ§`);
                 }}
                 title="Solo Deck B (Only one pad plays at a time)"
               >
@@ -10941,7 +10942,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     stopPerfVoice(`perf-b-slot-${i}`);
                   }
                   setDeckBPlaying(false);
-                  showEditorStatus("Deck B Cued ⏹️");
+                  showEditorStatus("Deck B Cued â¹ï¸");
                 }}
               >
                 Cue
@@ -10982,7 +10983,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       }
                     }
                   }
-                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) ⏪`);
+                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) âª`);
                 }}
                 style={{ 
                   fontSize: '0.45rem', 
@@ -10996,7 +10997,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Rewind 4 beats"
               >
-                ⏪
+                âª
               </button>
               <button
                 className="deck-btn-xs"
@@ -11013,7 +11014,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Stop and Reset Performance"
               >
-                ■ Stop
+                â–  Stop
               </button>
               <button
                 className={`deck-btn-xs ${perfPlaybackActive ? 'active' : ''}`}
@@ -11031,7 +11032,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title={perfPlaybackActive ? "Pause Performance" : "Play Performance"}
               >
-                {perfPlaybackActive ? '⏸ Pause' : '▶ Play'}
+                {perfPlaybackActive ? 'â¸ Pause' : 'â–¶ Play'}
               </button>
               <button
                 className="deck-btn-xs"
@@ -11053,7 +11054,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       }
                     }
                   }
-                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) ⏩`);
+                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) â©`);
                 }}
                 style={{ 
                   fontSize: '0.45rem', 
@@ -11067,7 +11068,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Forward 4 beats"
               >
-                ⏩
+                â©
               </button>
               <button
                 className={`deck-btn-xs ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
@@ -11085,7 +11086,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Record live pad triggers to performance sequencer"
               >
-                ● Rec
+                â— Rec
               </button>
             </div>
 
@@ -11108,7 +11109,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  🖐️ Play
+                  ðŸ–ï¸ Play
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'draw' ? 'active' : ''}`}
@@ -11126,7 +11127,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  ✏️ Draw
+                  âœï¸ Draw
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'resize' ? 'active' : ''}`}
@@ -11144,7 +11145,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  ↔️ Size
+                  â†”ï¸ Size
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'erase' ? 'active' : ''}`}
@@ -11162,7 +11163,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  ❌ Del
+                  âŒ Del
                 </button>
               </div>
 
@@ -11414,12 +11415,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         }
                       }
                     }
-                    showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) ⏪`);
+                    showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) âª`);
                   }}
                   style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#00f3ff', background: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.3)' }}
                   title="Rewind 4 beats"
                 >
-                  ⏪
+                  âª
                 </button>
 
                 {/* Stop */}
@@ -11429,7 +11430,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#ff4444', background: 'rgba(255, 68, 68, 0.05)', border: '1px solid rgba(255, 68, 68, 0.3)' }}
                   title="Stop and Reset"
                 >
-                  ■ Stop
+                  â–  Stop
                 </button>
 
                 {/* Play / Pause */}
@@ -11447,7 +11448,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                   title={perfPlaybackActive ? "Pause" : "Play"}
                 >
-                  {perfPlaybackActive ? '⏸ Pause' : '▶ Play'}
+                  {perfPlaybackActive ? 'â¸ Pause' : 'â–¶ Play'}
                 </button>
 
                 {/* Forward */}
@@ -11471,12 +11472,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         }
                       }
                     }
-                    showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) ⏩`);
+                    showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) â©`);
                   }}
                   style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#00f3ff', background: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.3)' }}
                   title="Forward 4 beats"
                 >
-                  ⏩
+                  â©
                 </button>
 
                 {/* Record */}
@@ -11494,7 +11495,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                   title={perfRecordActive && !perfIsDubbing ? "Stop Recording" : "Clean Record (clears sequence)"}
                 >
-                  {perfRecordActive && !perfIsDubbing ? '● REC...' : '● Record'}
+                  {perfRecordActive && !perfIsDubbing ? 'â— REC...' : 'â— Record'}
                 </button>
 
                 {/* Dub */}
@@ -11512,7 +11513,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                   title={perfRecordActive && perfIsDubbing ? "Stop Dubbing" : "Overdub (layers notes on top)"}
                 >
-                  {perfRecordActive && perfIsDubbing ? '● DUBBING' : '● Dub'}
+                  {perfRecordActive && perfIsDubbing ? 'â— DUBBING' : 'â— Dub'}
                 </button>
               </div>
 
@@ -12389,12 +12390,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                               }
                               
                               updateBufferForSlot(selectedEditSlotId, newBuffer, `Gain x${factor}: ${slot.name}`);
-                              showEditorStatus(`Gain scaled x${factor}! 🔊`);
+                              showEditorStatus(`Gain scaled x${factor}! ðŸ”Š`);
                             }}
                             style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ffe600', color: '#ffe600' }}
                             title="Adjust amplitude/gain of selection or entire sample"
                           >
-                            🔊 GAIN
+                            ðŸ”Š GAIN
                           </button>
                           <button
                             className="btn btn-xs"
@@ -12402,7 +12403,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#00f3ff', color: '#00f3ff' }}
                             title="Save sample buffer and settings to browser database"
                           >
-                            💾 SAVE
+                            ðŸ’¾ SAVE
                           </button>
                           <button
                             className="btn btn-xs"
@@ -12411,7 +12412,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ff00ff', color: '#ff00ff' }}
                             title="Export sample as WAV file"
                           >
-                            📥 EXPORT
+                            ðŸ“¥ EXPORT
                           </button>
                         </div>
                         {editorStatus ? (
@@ -12524,7 +12525,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                     const beats = slot.warpBeats || 4;
                                     const calculatedBpm = Math.round(Math.max(40, Math.min(250, (60 * beats) / origDur)) * 10) / 10;
                                     setParams(prev => ({ ...prev, arpBpm: calculatedBpm }));
-                                    showEditorStatus(`Synced Master Tempo to Slot BPM: ${calculatedBpm.toFixed(1)}! ⏱️`);
+                                    showEditorStatus(`Synced Master Tempo to Slot BPM: ${calculatedBpm.toFixed(1)}! â±ï¸`);
                                   }
                                 }}
                                 style={{
@@ -13227,7 +13228,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                               style={{ fontSize: '0.48rem', padding: '2px 1px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
                               title={`${getSlotLabel(s.id)}: ${s.name}`}
                             >
-                              {getSlotLabel(s.id)}:{s.buffer ? '●' : '○'}
+                              {getSlotLabel(s.id)}:{s.buffer ? 'â—' : 'â—‹'}
                             </button>
                           ))}
                         </div>
@@ -13243,7 +13244,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                               style={{ fontSize: '0.48rem', padding: '2px 1px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
                               title={`${getSlotLabel(s.id)}: ${s.name}`}
                             >
-                              {getSlotLabel(s.id)}:{s.buffer ? '●' : '○'}
+                              {getSlotLabel(s.id)}:{s.buffer ? 'â—' : 'â—‹'}
                             </button>
                           ))}
                         </div>
@@ -13449,7 +13450,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           />
                         </div>
                         <div style={{ fontSize: '0.5rem', color: '#ff00ff', textAlign: 'center', marginTop: '1px' }}>
-                          🖱️ Click & Drag to shape VCF Filter ADSR
+                          ðŸ–±ï¸ Click & Drag to shape VCF Filter ADSR
                         </div>
                       </div>
 
@@ -13469,7 +13470,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           />
                         </div>
                         <div style={{ fontSize: '0.5rem', color: '#ff00ff', textAlign: 'center', marginTop: '1px' }}>
-                          🖱️ Click & Drag to shape VCA Amplitude ADSR
+                          ðŸ–±ï¸ Click & Drag to shape VCA Amplitude ADSR
                         </div>
                       </div>
                     </div>
@@ -13776,7 +13777,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}
                   title="Clean Record (clears sequence)"
                 >
-                  {perfRecordActive && !perfIsDubbing ? '● REC ON' : '● REC'}
+                  {perfRecordActive && !perfIsDubbing ? 'â— REC ON' : 'â— REC'}
                 </button>
                 <button
                   className="btn btn-xs"
@@ -13793,7 +13794,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                   title="Overdub (layers notes on top)"
                 >
-                  {perfRecordActive && perfIsDubbing ? '● DUB ON' : '● DUB'}
+                  {perfRecordActive && perfIsDubbing ? 'â— DUB ON' : 'â— DUB'}
                 </button>
                 <button
                   className={`btn btn-xs ${perfPlaybackActive ? 'active-green' : ''}`}
@@ -13801,7 +13802,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}
                   title="Play/Pause"
                 >
-                  {perfPlaybackActive ? '⏸ PAUSE' : '► PLAY'}
+                  {perfPlaybackActive ? 'â¸ PAUSE' : 'â–º PLAY'}
                 </button>
                 <button
                   className="btn btn-xs"
@@ -13809,7 +13810,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0, borderColor: '#ff4444', color: '#ff4444' }}
                   title="Stop & Reset"
                 >
-                  ■ STOP
+                  â–  STOP
                 </button>
                 <button
                   className="btn btn-xs"
@@ -13996,7 +13997,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     }
                   }}
                 >
-                  ● REC
+                  â— REC
                 </button>
                 <button
                   className={`btn btn-xs ${isPlayingGesture ? 'active-cyan' : ''}`}
@@ -14011,7 +14012,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     }
                   }}
                 >
-                  ► PLAY
+                  â–º PLAY
                 </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -14326,7 +14327,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   value={perfQuantizeMode} 
                   onChange={(e) => {
                     setPerfQuantizeMode(e.target.value);
-                    showEditorStatus(`Quantize Grid: ${e.target.value} 📐`);
+                    showEditorStatus(`Quantize Grid: ${e.target.value} ðŸ“`);
                   }}
                   style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.4)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '62px', outline: 'none' }}
                 >
@@ -14347,7 +14348,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   onClick={() => {
                     const nextEnabled = !perfCountInEnabled;
                     setPerfCountInEnabled(nextEnabled);
-                    showEditorStatus(`Record Count-in (1 Bar): ${nextEnabled ? 'ON' : 'OFF'} ⏱️`);
+                    showEditorStatus(`Record Count-in (1 Bar): ${nextEnabled ? 'ON' : 'OFF'} â±ï¸`);
                   }}
                   style={{ padding: '2px 6px', fontSize: '0.5rem', borderColor: '#ffe600', color: '#ffe600', textShadow: perfCountInEnabled ? '0 0 4px #ffe600' : 'none', minWidth: '40px' }}
                 >
@@ -14477,1980 +14478,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       {/* Computer Keyboard Triggers listener */}
       <KeyboardTrigger playVoice={playVoice} stopVoice={stopVoice} />
 
-      <style>{`
-        /* 3D Card Flip CSS */
-        .rack-panel-center {
-          perspective: 1500px;
-          position: relative;
-        }
+      {/* Styles extracted to delta7-styles.css */}
 
-        .screen-flip-container {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          min-height: 585px;
-          transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-          transform-style: preserve-3d;
-        }
-
-        .screen-flip-container.flipped {
-          transform: rotateY(180deg);
-        }
-
-        .screen-front, .screen-back {
-          position: absolute;
-          top: 0; left: 0; right: 0; bottom: 0;
-          width: 100%;
-          height: 100%;
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .screen-back {
-          transform: rotateY(180deg);
-        }
-
-        /* Turntable UI Styles */
-        .turntable-deck {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: space-between;
-          padding: 8px;
-          background: #02070f;
-          height: 100%;
-          user-select: none;
-        }
-
-        /* Guitar Hero Vertical Sequencer Highway Styles */
-        .vertical-highway {
-          position: relative;
-          width: 250px;
-          height: 400px;
-          background: rgba(4, 8, 16, 0.78);
-          border-radius: 6px;
-          overflow: hidden;
-          box-shadow: inset 0 0 10px rgba(0,0,0,0.85);
-          user-select: none;
-          flex-shrink: 0;
-          margin: 6px auto;
-        }
-        .deck-a-highway {
-          border: 1px solid rgba(0, 243, 255, 0.25);
-          box-shadow: 0 0 8px rgba(0, 243, 255, 0.12), inset 0 0 10px rgba(0,0,0,0.85);
-        }
-        .deck-b-highway {
-          border: 1px solid rgba(255, 0, 255, 0.25);
-          box-shadow: 0 0 8px rgba(255, 0, 255, 0.12), inset 0 0 10px rgba(0,0,0,0.85);
-        }
-        .highway-lane-line {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          width: 0;
-          border-right: 1px dashed rgba(0, 243, 255, 0.25);
-          pointer-events: none;
-        }
-        .highway-playhead-line {
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: 35px;
-          height: 0;
-          border-bottom: 2px solid #ffe600;
-          box-shadow: 0 0 6px #ffe600;
-          z-index: 5;
-          pointer-events: none;
-        }
-        .highway-target-circle {
-          position: absolute;
-          bottom: 31px;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          border-width: 1.5px;
-          border-style: solid;
-          background: transparent;
-          z-index: 4;
-          pointer-events: none;
-          transition: background 0.08s, box-shadow 0.08s;
-        }
-        .highway-label {
-          position: absolute;
-          bottom: 6px;
-          font-size: 0.38rem;
-          font-weight: bold;
-          font-family: monospace;
-          text-align: center;
-          width: 12px;
-          z-index: 4;
-          pointer-events: none;
-        }
-        .highway-events-container {
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: 35px;
-          transform: translateY(0px);
-          pointer-events: none;
-        }
-
-        .vinyl-platter-wrapper {
-          position: relative;
-          width: 250px;
-          height: 250px;
-          margin: 6px auto;
-        }
-
-        .vinyl-platter {
-          width: 100%;
-          height: 100%;
-          border-radius: 50%;
-          position: relative;
-          cursor: grab;
-          transform-origin: center;
-          box-shadow: 
-            0 8px 16px rgba(0,0,0,0.6), 
-            inset 0 0 10px rgba(0,0,0,0.8),
-            0 0 4px rgba(0,243,255,0.1);
-        }
-
-        .vinyl-platter:active {
-          cursor: grabbing;
-        }
-
-
-        .performance-pads-grid {
-          display: grid;
-          grid-template-rows: repeat(2, 1fr);
-          gap: 6px;
-          width: 100%;
-          padding: 4px;
-        }
-
-        .performance-pads-grid-2x4 {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          grid-template-rows: repeat(2, 1fr);
-          gap: 8px;
-          width: 100%;
-          padding: 4px;
-        }
-
-        .performance-pads-grid-2x4 .perf-pad {
-          aspect-ratio: 1;
-          position: relative;
-          padding: 6px 4px;
-        }
-
-        .perf-pad-routing-badges {
-          position: absolute;
-          top: 3px;
-          left: 3px;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          pointer-events: none;
-        }
-
-        .pad-badge-fx {
-          background: rgba(180, 70, 255, 0.25);
-          border: 1px solid rgba(180, 70, 255, 0.6);
-          color: #c58cff;
-          font-size: 0.38rem;
-          padding: 0px 2px;
-          border-radius: 2px;
-          line-height: 1;
-        }
-
-        .pad-badge-pan {
-          background: rgba(0, 180, 255, 0.25);
-          border: 1px solid rgba(0, 180, 255, 0.6);
-          color: #66ccff;
-          font-size: 0.38rem;
-          padding: 0px 2px;
-          border-radius: 2px;
-          line-height: 1;
-        }
-
-        .pad-badge-dry {
-          background: rgba(113, 128, 150, 0.15);
-          border: 1px solid #718096;
-          color: #a0aec0;
-          font-size: 0.38rem;
-          padding: 0px 2px;
-          border-radius: 2px;
-          line-height: 1;
-        }
-
-        .performance-pads-row {
-          display: grid;
-          grid-template-columns: repeat(8, 1fr);
-          gap: 4px;
-          width: 100%;
-        }
-
-        .perf-pad {
-          position: relative;
-          aspect-ratio: 1;
-          border-radius: 4px;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(10,15,25,0.7);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          font-family: monospace;
-          font-weight: bold;
-          user-select: none;
-          transition: all 0.08s ease;
-          padding: 2px;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
-        }
-
-        .perf-pad.active,
-        .perf-pad[data-active="true"] {
-          transform: scale(0.96);
-        }
-
-        /* Zero-waste pad styling via data attributes + CSS custom properties (--pad-color) */
-        .perf-pad[data-loaded="true"] {
-          border-color: color-mix(in srgb, var(--pad-color, #fff) 45%, transparent);
-          background: color-mix(in srgb, var(--pad-color, #fff) 8%, transparent);
-          color: var(--pad-color, #fff);
-          box-shadow: inset 0 0 6px color-mix(in srgb, var(--pad-color, #fff) 10%, transparent);
-        }
-
-        .perf-pad[data-active="true"][data-loaded="true"] {
-          border-color: #ffffff;
-          background: var(--pad-color, #fff);
-          color: #000000;
-          box-shadow: 0 0 15px var(--pad-color, #fff), inset 0 0 4px rgba(255,255,255,0.8);
-        }
-
-        .perf-pad[data-pending="true"] {
-          animation: pad-pending-pulse 0.5s ease-in-out infinite;
-        }
-
-        .perf-pad.slice-loaded {
-          border-color: rgba(255, 230, 0, 0.35);
-          background: rgba(255, 230, 0, 0.05);
-          color: #ffe600;
-        }
-
-        .perf-pad.slice-active {
-          background: #ffe600 !important;
-          border-color: #fff !important;
-          color: #000 !important;
-          box-shadow: 0 0 15px #ffe600, inset 0 0 4px rgba(255,255,255,0.8) !important;
-          transform: scale(0.96);
-        }
-
-        .perf-pad-label {
-          font-size: 0.52rem;
-          line-height: 1;
-        }
-
-        .perf-pad-name {
-          font-size: 0.36rem;
-          color: #fff;
-          opacity: 0.8;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          width: 100%;
-          text-align: center;
-          margin-top: 2px;
-        }
-
-        /* Mixer column styles */
-        .mixer-column {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: flex-start;
-          gap: 12px;
-          border-left: 1px solid rgba(0, 243, 255, 0.1);
-          border-right: 1px solid rgba(0, 243, 255, 0.1);
-          background: #010408;
-          padding: 8px 6px;
-          height: 100%;
-        }
-
-        .mixer-eq-section {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-        }
-
-        .mixer-eq-channel {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .mixer-eq-label {
-          font-size: 0.42rem;
-          color: #88ccee;
-          font-family: monospace;
-          text-transform: uppercase;
-        }
-
-        .mixer-vertical-slider {
-          writing-mode: vertical-lr;
-          direction: rtl;
-          width: 8px;
-          height: 48px;
-          margin: 0;
-          cursor: pointer;
-          accent-color: #ffe600;
-        }
-
-        .mixer-vol-faders {
-          display: flex;
-          justify-content: space-around;
-          width: 100%;
-          margin: 8px 0;
-        }
-
-        .mixer-fader-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .mixer-fader-label {
-          font-size: 0.5rem;
-          color: #ffe600;
-          font-weight: bold;
-          font-family: monospace;
-        }
-
-        .mixer-vol-slider {
-          writing-mode: vertical-lr;
-          direction: rtl;
-          width: 12px;
-          height: 85px;
-          cursor: pointer;
-          accent-color: #ffe600;
-        }
-
-        .crossfader-section {
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 2px;
-          margin-top: 4px;
-        }
-
-        .crossfader-label {
-          font-size: 0.48rem;
-          font-family: monospace;
-          color: #ffe600;
-          letter-spacing: 1px;
-        }
-
-        .crossfader-slider {
-          width: 100%;
-          height: 10px;
-          cursor: pointer;
-          accent-color: #ffe600;
-        }
-
-        @keyframes pulse-red {
-          from { background: rgba(255, 0, 85, 0.2); }
-          to { background: rgba(255, 0, 85, 0.7); }
-        }
-
-        .delta7-hardware-chassis {
-          background: #040509;
-          background-image: 
-            linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
-          background-size: 30px 30px;
-          border: 2px solid rgba(0, 243, 255, 0.35);
-          border-radius: 16px;
-          box-shadow: 
-            0 25px 60px rgba(0, 0, 0, 0.95), 
-            0 0 40px rgba(0, 243, 255, 0.15),
-            inset 0 0 30px rgba(0, 243, 255, 0.05);
-          padding: 1.25rem;
-          color: #e2e8f0;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-          width: 100%;
-          max-width: 1400px;
-          margin: 0 auto;
-          user-select: none;
-        }
-
-        .rack-header-bar {
-          background: rgba(10, 12, 18, 0.95);
-          backdrop-filter: blur(12px);
-          border-radius: 8px;
-          border: 1px solid rgba(255, 0, 255, 0.25);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0.5rem 1.25rem;
-          color: #f1f5f9;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(255, 0, 255, 0.15);
-        }
-
-        .branding-title {
-          font-family: 'Outfit', sans-serif;
-          font-weight: 900;
-          font-size: 2.0rem;
-          letter-spacing: 5px;
-          color: #ffffff;
-          text-shadow: 
-            0 0 5px #00f3ff,
-            0 0 10px #00f3ff,
-            0 0 20px #00f3ff,
-            0 0 30px #ff00ff;
-          text-transform: uppercase;
-        }
-
-        .branding-sub {
-          font-family: 'Outfit', sans-serif;
-          font-size: 0.72rem;
-          font-weight: 700;
-          color: #00f3ff;
-          letter-spacing: 2px;
-          text-shadow: 0 0 5px rgba(0, 243, 255, 0.5);
-        }
-
-        .telemetry-bar {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 0.65rem;
-          font-family: monospace;
-          color: #00f3ff;
-        }
-
-        .telemetry-led {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #111111;
-          border: 1px solid #00f3ff;
-          transition: background 0.15s ease;
-        }
-
-        .telemetry-led.led-on {
-          background: #00ff66;
-          box-shadow: 0 0 8px #00ff66, 0 0 15px #00ff66;
-        }
-
-        .telemetry-led.led-midi {
-          background: #ffe600;
-          box-shadow: 0 0 8px #ffe600, 0 0 15px #ffe600;
-        }
-
-        /* Panels layout grid */
-        .rack-main-grid {
-          display: grid;
-          grid-template-columns: 260px 1fr 270px;
-          gap: 1.25rem;
-        }
-
-        .steel-plate {
-          background: rgba(10, 12, 18, 0.94);
-          backdrop-filter: blur(16px);
-          border: 1px solid rgba(0, 243, 255, 0.22);
-          box-shadow: 
-            0 8px 32px 0 rgba(0, 0, 0, 0.7),
-            0 0 15px rgba(0, 243, 255, 0.08), 
-            inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
-          border-radius: 12px;
-          padding: 0.85rem;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-          transition: all 0.3s ease;
-        }
-
-        .steel-plate:hover {
-          border-color: rgba(0, 243, 255, 0.35);
-          box-shadow: 
-            0 12px 40px 0 rgba(0, 0, 0, 0.8),
-            0 0 25px rgba(0, 243, 255, 0.15),
-            inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
-        }
-
-        .section-label {
-          font-family: 'Outfit', sans-serif;
-          font-size: 0.78rem;
-          font-weight: 800;
-          color: #ff00ff;
-          text-transform: uppercase;
-          border-bottom: 2px solid #00f3ff;
-          padding-bottom: 0.25rem;
-          margin-bottom: 0.5rem;
-          letter-spacing: 1.5px;
-          text-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
-        }
-
-        /* Tape Echo Deck reels and Knobs grid styling */
-        .tape-leslie-deck {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          align-items: center;
-          width: 100%;
-        }
-
-        .tape-deck-reels {
-          display: flex;
-          gap: 20px;
-          justify-content: center;
-          align-items: center;
-          margin: 0.5rem 0;
-          background: rgba(0, 0, 0, 0.5);
-          padding: 8px 16px;
-          border-radius: 8px;
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          width: 100%;
-        }
-
-        .tape-reel {
-          width: 48px;
-          height: 48px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          transform-origin: center;
-        }
-
-        .tape-reel.spinning {
-          animation: spin linear infinite;
-        }
-
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        .tape-knobs-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 8px 10px;
-          justify-items: center;
-          width: 100%;
-          margin-top: 0.4rem;
-        }
-
-        .leslie-separator {
-          width: 100%;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.2), transparent);
-          margin: 0.5rem 0;
-        }
-
-        .btn-xs.active-cyan {
-          background: #00f3ff;
-          color: #000000;
-          border-color: #ffffff;
-          box-shadow: 0 0 8px #00f3ff;
-          text-shadow: none;
-          font-weight: 800;
-        }
-
-        .btn-xs.active-magenta {
-          background: #ff00ff;
-          color: #000000;
-          border-color: #ffffff;
-          box-shadow: 0 0 8px #ff00ff;
-          text-shadow: none;
-          font-weight: 800;
-        }
-
-        .btn-glitch-active {
-          background: #ffe600 !important;
-          color: #000000 !important;
-          border-color: #ffffff !important;
-          box-shadow: 0 0 15px #ffe600, 0 0 30px #ffe600 !important;
-          text-shadow: none !important;
-          font-weight: 900;
-          animation: pulse-yellow 0.15s infinite alternate;
-        }
-
-        @keyframes pulse-yellow {
-          from { transform: scale(1.0); }
-          to { transform: scale(1.05); }
-        }
-
-        /* Joystick styles */
-        .joystick-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .joystick-well {
-          width: 90px;
-          height: 90px;
-          background: #000000;
-          border: 2px solid #00f3ff;
-          border-radius: 50%;
-          position: relative;
-          cursor: grab;
-          box-shadow: 
-            0 0 12px rgba(0, 243, 255, 0.3),
-            inset 0 0 15px rgba(0, 243, 255, 0.4);
-          overflow: hidden;
-        }
-
-        .joystick-well::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background-image: 
-            radial-gradient(circle, transparent 30%, rgba(0, 243, 255, 0.1) 70%),
-            linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px);
-          background-size: 100% 100%, 15px 15px, 15px 15px;
-          pointer-events: none;
-        }
-
-        .joystick-well:active {
-          cursor: grabbing;
-        }
-
-        .joystick-handle {
-          position: absolute;
-          left: calc(50% - 14px);
-          top: calc(50% - 14px);
-          width: 28px;
-          height: 28px;
-          transition: transform 0.05s ease-out;
-        }
-
-        .joystick-cap {
-          width: 28px;
-          height: 28px;
-          background: #ff0055;
-          border: 2px solid #ffffff;
-          border-radius: 50%;
-          box-shadow: 0 0 10px #ff0055, 0 0 20px #ff0055;
-        }
-
-        .joystick-readout {
-          font-size: 0.65rem;
-          color: #00f3ff;
-          text-shadow: 0 0 3px rgba(0, 243, 255, 0.3);
-        }
-
-        /* Ribbon controller styles */
-        .ribbon-wrapper {
-          display: flex;
-          flex-direction: column;
-          gap: 0.25rem;
-        }
-
-        .ribbon-strip {
-          height: 18px;
-          background: #000000;
-          border: 2px solid #ff00ff;
-          border-radius: 4px;
-          position: relative;
-          cursor: crosshair;
-          box-shadow: 0 0 8px rgba(255, 0, 255, 0.3);
-        }
-
-        .ribbon-indicator {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          width: 4px;
-          background: #00f3ff;
-          box-shadow: 0 0 10px #00f3ff, 0 0 20px #00f3ff;
-          transform: translateX(-50%);
-        }
-
-        /* Knobs & toggle options */
-        .realtime-knobs-section {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .knob-mode-toggle {
-          display: flex;
-          gap: 4px;
-        }
-
-        .knob-quad {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 0.5rem;
-          background: rgba(0, 0, 0, 0.85);
-          border: 1px solid #ff00ff;
-          box-shadow: inset 0 0 5px rgba(255, 0, 255, 0.2);
-          padding: 0.5rem;
-          border-radius: 6px;
-        }
-
-        /* LCD Screen Bezel & Panel styling */
-        .blue-screen-border {
-          background: #000000;
-          border: 3px solid #39ff14;
-          border-radius: 8px;
-          padding: 0.5rem;
-          box-shadow: 0 0 20px rgba(57, 255, 20, 0.3), inset 0 0 10px rgba(57, 255, 20, 0.2);
-        }
-
-        .lcd-bezel-shadow {
-          background: radial-gradient(circle at center, #02122b 0%, #00040f 100%);
-          border: 1px solid #00f3ff;
-          height: 100%;
-          border-radius: 4px;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-
-        .screen-header-tabs {
-          background: #000000;
-          border-bottom: 2px solid #00f3ff;
-          display: flex;
-          align-items: center;
-          gap: 1px;
-          padding: 0 4px;
-          flex-shrink: 0;
-          overflow-x: auto;
-        }
-
-        .tab-btn {
-          background: transparent;
-          border: none;
-          color: #0088cc;
-          font-family: 'Outfit', sans-serif;
-          font-size: 0.72rem;
-          font-weight: 700;
-          padding: 0.4rem 0.65rem;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-
-        .tab-btn:hover {
-          color: #00f3ff;
-          background: rgba(0, 243, 255, 0.1);
-        }
-
-        .tab-btn.active-mode {
-          color: #ffe600;
-          font-weight: 800;
-          text-shadow: 0 0 5px #ffe600;
-        }
-
-        .tab-btn.active-tab {
-          color: #00f3ff;
-          background: rgba(0, 243, 255, 0.05);
-          border-top: 1.5px solid #00f3ff;
-          text-shadow: 0 0 8px #00f3ff;
-        }
-
-        .divider-line {
-          width: 1px;
-          height: 18px;
-          background: #00f3ff20;
-          margin: 0 4px;
-        }
-
-        .screen-content-viewport {
-          padding: 0.75rem;
-          flex-grow: 1;
-          display: flex;
-          flex-direction: column;
-          color: #00f3ff;
-          overflow-y: auto;
-        }
-
-        .lcd-page {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-          height: 100%;
-        }
-
-        .lcd-patch-card {
-          background: #000000;
-          border: 1.5px dashed #00f3ff;
-          border-radius: 4px;
-          padding: 0.5rem 0.75rem;
-          box-shadow: 0 0 8px rgba(0, 243, 255, 0.1);
-        }
-
-        .lcd-cat-tag {
-          font-size: 0.6rem;
-          color: #ffe600;
-          letter-spacing: 1.5px;
-          text-shadow: 0 0 4px #ffe600;
-        }
-
-        .lcd-patch-name {
-          font-family: 'Outfit', sans-serif;
-          font-size: 1.15rem;
-          color: #ffffff;
-          margin: 0.2rem 0;
-          text-shadow: 0 0 10px #00f3ff, 0 0 20px #00f3ff;
-        }
-
-        .lcd-routing-row {
-          font-size: 0.62rem;
-          color: #55aaff;
-          display: flex;
-          gap: 1.5rem;
-          margin-top: 0.3rem;
-          text-shadow: 0 0 3px rgba(85, 170, 255, 0.4);
-        }
-
-        .lcd-scope-canvas {
-          background: #000000;
-          border: 2px solid #00f3ff;
-          box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
-          border-radius: 4px;
-          width: 100%;
-          height: 90px;
-        }
-
-        /* Parameters editing layouts */
-        .box-section-sub {
-          background: #000000;
-          border: 1px solid #00f3ff;
-          box-shadow: 0 0 8px rgba(0, 243, 255, 0.1);
-          border-radius: 5px;
-          padding: 0.5rem;
-          display: flex;
-          flex-direction: column;
-          gap: 0.4rem;
-        }
-
-        .box-section-sub h3, .box-section-sub h4 {
-          font-family: 'Outfit', sans-serif;
-          font-size: 0.75rem;
-          color: #ffffff;
-          border-bottom: 1px solid #00f3ff30;
-          padding-bottom: 0.2rem;
-          margin-bottom: 0.2rem;
-          text-shadow: 0 0 5px #00f3ff;
-        }
-
-        .flex-row-sub {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          font-size: 0.68rem;
-          font-family: sans-serif;
-          gap: 8px;
-        }
-
-        .flex-row-sub label {
-          color: #55aaff;
-          width: 70px;
-          flex-shrink: 0;
-          text-shadow: 0 0 3px rgba(85, 170, 255, 0.3);
-        }
-
-        .flex-row-sub select, .flex-row-sub input[type="number"] {
-          background: #000000;
-          border: 1px solid #00f3ff;
-          color: #ffffff;
-          font-size: 0.68rem;
-          border-radius: 2px;
-          padding: 1px 4px;
-          outline: none;
-          text-shadow: 0 0 3px #00f3ff;
-        }
-
-        .flex-row-sub input[type="range"] {
-          flex-grow: 1;
-          height: 3px;
-          accent-color: #00f3ff;
-        }
-
-        .row-grid-2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 0.5rem;
-        }
-
-        /* Envelope Canvas editor styles */
-        .canvas-container-sub {
-          background: #000000;
-          border: 1px solid #00f3ff;
-          border-radius: 4px;
-          overflow: hidden;
-          cursor: crosshair;
-        }
-
-        .eg-draw-canvas {
-          display: block;
-          width: 100%;
-          height: 60px;
-        }
-
-        .eg-stages-labels {
-          display: flex;
-          justify-content: space-between;
-          font-size: 0.6rem;
-          color: #00f3ff;
-          margin-top: 0.2rem;
-        }
-
-        /* Right panel / Kaoss Pad and Patches selector */
-        .kaoss-pad-container {
-          background: #000000;
-          border: 2px solid #ff5500;
-          border-radius: 8px;
-          padding: 0.65rem;
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          color: #ffe600;
-          box-shadow: 
-            0 0 15px rgba(255, 85, 0, 0.3), 
-            inset 0 0 10px rgba(255, 85, 0, 0.1);
-        }
-
-        .kaoss-targets-selectors {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-
-        .target-select-row {
-          display: flex;
-          justify-content: space-between;
-          font-size: 0.6rem;
-          color: #ff5500;
-          text-shadow: 0 0 3px rgba(255, 85, 0, 0.3);
-        }
-
-        .target-select-row select {
-          background: #000000;
-          border: 1px solid #ff5500;
-          color: #ffe600;
-          font-size: 0.6rem;
-          border-radius: 3px;
-          outline: none;
-          max-width: 130px;
-          text-shadow: 0 0 3px #ffe600;
-        }
-
-        .kaoss-touchpad {
-          height: 110px;
-          background: radial-gradient(circle at center, #1b0000 0%, #000000 100%);
-          border: 2px solid #ff5500;
-          border-radius: 6px;
-          position: relative;
-          cursor: crosshair;
-          overflow: hidden;
-        }
-
-        .kaoss-touchpad.glow-red {
-          border-color: #ff0055;
-          box-shadow: 0 0 15px #ff0055, 0 0 25px rgba(255, 0, 85, 0.3);
-        }
-
-        .kaoss-crosshair {
-          position: absolute;
-          width: 12px;
-          height: 12px;
-          border: 2px solid #ffffff;
-          border-radius: 50%;
-          background: #ff5500;
-          transform: translate(-50%, 50%);
-          box-shadow: 0 0 10px #ff5500, 0 0 20px #ff5500;
-          pointer-events: none;
-          transition: left 0.05s ease-out, bottom 0.05s ease-out;
-        }
-
-        .kaoss-gridlines {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-image: 
-            linear-gradient(rgba(255, 85, 0, 0.15) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 85, 0, 0.15) 1px, transparent 1px);
-          background-size: 15px 15px;
-          pointer-events: none;
-        }
-
-        .grid-center-cross {
-          position: absolute;
-          left: 50%;
-          top: 0;
-          bottom: 0;
-          width: 1px;
-          background: rgba(255, 85, 0, 0.3);
-        }
-
-        .kaoss-footer-actions {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .coord-readout {
-          font-size: 0.62rem;
-          color: #ff5500;
-        }
-
-        .patches-quick-category {
-          display: flex;
-          flex-direction: column;
-          gap: 0.4rem;
-        }
-
-        .patches-grid-buttons {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 4px;
-        }
-
-        .combi-select-buttons {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 4px;
-          border-top: 1px solid rgba(255, 0, 255, 0.2);
-          padding-top: 0.4rem;
-          margin-top: 0.2rem;
-        }
-
-        .patch-select-key {
-          background: #000000;
-          border: 1px solid #00f3ff;
-          color: #00f3ff;
-          font-size: 0.65rem;
-          font-weight: 800;
-          padding: 0.35rem 0;
-          border-radius: 4px;
-          cursor: pointer;
-          box-shadow: 0 0 5px rgba(0, 243, 255, 0.2);
-          text-shadow: 0 0 2px #00f3ff;
-        }
-
-        .patch-select-key:hover {
-          background: rgba(0, 243, 255, 0.15);
-          box-shadow: 0 0 8px #00f3ff;
-        }
-
-        .patch-select-key.key-selected {
-          background: #00f3ff;
-          color: #000000;
-          border-color: #ffffff;
-          box-shadow: 0 0 12px #00f3ff, 0 0 20px #00f3ff;
-          text-shadow: none;
-        }
-
-        .patch-select-key.combi-key {
-          border-color: #ff00ff;
-          color: #ff00ff;
-          box-shadow: 0 0 5px rgba(255, 0, 255, 0.2);
-          text-shadow: 0 0 2px #ff00ff;
-        }
-
-        .patch-select-key.combi-key:hover {
-          background: rgba(255, 0, 255, 0.15);
-          box-shadow: 0 0 8px #ff00ff;
-        }
-
-        .patch-select-key.key-selected-combi {
-          background: #ff00ff;
-          color: #000000;
-          border-color: #ffffff;
-          box-shadow: 0 0 12px #ff00ff, 0 0 20px #ff00ff;
-          text-shadow: none;
-        }
-
-        /* Keyboard layout */
-        .keyboard-section-bezel {
-          background: #000000;
-          border: 3px solid #ff00ff;
-          border-radius: 6px;
-          padding: 0.5rem;
-          box-shadow: 0 0 15px rgba(255, 0, 255, 0.3);
-        }
-
-        .white-black-keys-row {
-          display: flex;
-          height: 100px;
-          position: relative;
-          background: #000000;
-          border-radius: 3px;
-          overflow: hidden;
-        }
-
-        .piano-key {
-          flex: 1;
-          border: 1px solid #111111;
-          position: relative;
-          outline: none;
-          cursor: pointer;
-        }
-
-        .white-key {
-          background: rgba(0, 15, 30, 0.95);
-          border: 1px solid rgba(0, 243, 255, 0.3);
-          z-index: 1;
-        }
-
-        .white-key::after {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0; bottom: 0;
-          border: 1px solid transparent;
-          transition: border-color 0.1s;
-        }
-
-        .white-key:hover {
-          border-color: #00f3ff;
-          box-shadow: inset 0 0 8px rgba(0, 243, 255, 0.3);
-        }
-
-        .black-key {
-          background: #000000;
-          border: 1px solid rgba(255, 0, 255, 0.5);
-          z-index: 2;
-          height: 60px;
-          margin-left: -2%;
-          margin-right: -2%;
-          width: 4%;
-          box-shadow: 0 0 6px rgba(255, 0, 255, 0.2);
-        }
-
-        .black-key:hover {
-          border-color: #ff00ff;
-          box-shadow: 0 0 10px #ff00ff;
-        }
-
-        .piano-key.key-triggered {
-          background: #ffe600 !important;
-          border-color: #ffffff !important;
-          box-shadow: 0 0 15px #ffe600, 0 0 25px #ffe600 !important;
-        }
-
-        .label-key-c {
-          position: absolute;
-          bottom: 4px;
-          left: calc(50% - 4px);
-          font-size: 0.65rem;
-          color: #00f3ff;
-          font-weight: 800;
-          text-shadow: 0 0 3px #00f3ff;
-        }
-
-        .keyboard-footer-strip {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding-top: 0.4rem;
-          color: #00f3ff;
-        }
-
-        .keyboard-notes-display {
-          font-size: 0.65rem;
-          color: #55aaff;
-          text-shadow: 0 0 3px rgba(85, 170, 255, 0.4);
-        }
-
-        /* Custom buttons styling */
-        .btn {
-          font-family: 'Outfit', sans-serif;
-          font-weight: 700;
-          border: 1px solid transparent;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: all 0.1s ease;
-          text-shadow: 0 0 2px currentColor;
-        }
-
-        .btn-xs {
-          font-size: 0.55rem;
-          padding: 2px 6px;
-          background: #000000;
-          color: #ff00ff;
-          border: 1px solid #ff00ff;
-        }
-
-        .btn-xs.active-amber {
-          background: #ff00ff;
-          color: #000000;
-          border-color: #ffffff;
-          box-shadow: 0 0 8px #ff00ff;
-          text-shadow: none;
-        }
-
-        .btn-sm {
-          font-size: 0.72rem;
-          padding: 0.35rem 0.75rem;
-          background: #000000;
-          color: #00f3ff;
-          border: 1.5px solid #00f3ff;
-          box-shadow: 0 0 6px rgba(0, 243, 255, 0.2);
-        }
-
-        .btn-sm:hover {
-          background: rgba(0, 243, 255, 0.15);
-          box-shadow: 0 0 10px #00f3ff;
-        }
-
-        .btn-sm.active-red {
-          background: #ff0055;
-          color: #ffffff;
-          border-color: #ffffff;
-          box-shadow: 0 0 12px #ff0055, 0 0 20px #ff0055;
-          text-shadow: none;
-        }
-
-        .btn-panic {
-          background: #000000;
-          color: #ef4444;
-          border-color: #ef4444;
-          box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
-        }
-
-        .btn-panic:hover {
-          background: rgba(239, 68, 68, 0.15);
-          box-shadow: 0 0 10px #ef4444;
-        }
-
-        .text-cyan {
-          color: #00f3ff;
-          text-shadow: 0 0 6px #00f3ff;
-        }
-
-        .knob-label {
-          font-size: 0.62rem;
-          font-family: 'Outfit', sans-serif;
-          text-transform: uppercase;
-          color: #00f3ff;
-          font-weight: 800;
-          letter-spacing: 1px;
-          text-shadow: 0 0 3px rgba(0, 243, 255, 0.4);
-        }
-
-        .mappings-tag-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 3px;
-          max-height: 80px;
-          overflow-y: auto;
-          margin-top: 0.3rem;
-          background: #000000;
-          border: 1px solid #00f3ff30;
-          padding: 0.3rem;
-          border-radius: 4px;
-        }
-
-        .mapping-item-tag {
-          font-size: 0.58rem;
-          display: flex;
-          justify-content: space-between;
-          color: #ffffff;
-          border-bottom: 1px solid rgba(0, 243, 255, 0.1);
-        }
-
-        .param-label-tag {
-          color: #00f3ff;
-        }
-
-        .cc-number-tag {
-          color: #ff00ff;
-          text-shadow: 0 0 2px #ff00ff;
-        }
-
-        /* Upgraded Dashboard Grid & Sidebar Styles */
-        .dashboard-grid {
-          display: grid;
-          grid-template-columns: 320px 1fr;
-          height: 250px;
-          gap: 12px;
-        }
-
-        .preset-dashboard-container {
-          background: rgba(0, 0, 0, 0.45);
-          border-right: 1px solid rgba(0, 243, 255, 0.15);
-          padding: 6px;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .preset-category-group {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .category-header {
-          font-size: 0.58rem;
-          color: #ff00ff;
-          font-weight: bold;
-          letter-spacing: 1px;
-          text-transform: uppercase;
-          border-bottom: 1px solid rgba(255, 0, 255, 0.15);
-          padding-bottom: 2px;
-          margin-bottom: 2px;
-        }
-
-        .category-buttons-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 4px;
-        }
-
-        .preset-card {
-          background: rgba(10, 12, 18, 0.8);
-          border: 1px solid rgba(0, 243, 255, 0.15);
-          border-radius: 4px;
-          padding: 4px 6px;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          cursor: pointer;
-          transition: all 0.1s ease;
-          min-height: 34px;
-          justify-content: center;
-        }
-
-        .preset-card .card-id {
-          font-size: 0.5rem;
-          color: #00f3ff;
-          opacity: 0.8;
-          line-height: 1;
-        }
-
-        .preset-card .card-name {
-          font-size: 0.58rem;
-          color: #ffffff;
-          font-weight: 500;
-          text-align: left;
-          line-height: 1.2;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          width: 100%;
-        }
-
-        .preset-card:hover {
-          background: rgba(0, 243, 255, 0.15);
-          border-color: rgba(0, 243, 255, 0.4);
-          box-shadow: 0 0 6px rgba(0, 243, 255, 0.15);
-        }
-
-        .preset-card.selected {
-          background: rgba(0, 243, 255, 0.25);
-          border-color: #00f3ff;
-          box-shadow: 0 0 8px rgba(0, 243, 255, 0.25);
-        }
-
-        .preset-card.combi .card-id {
-          color: #ff00ff;
-        }
-
-        .preset-card.combi.selected {
-          background: rgba(255, 0, 255, 0.25);
-          border-color: #ff00ff;
-          box-shadow: 0 0 8px rgba(255, 0, 255, 0.25);
-        }
-
-        .dashboard-main-view {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          overflow: hidden;
-        }
-
-        /* Segmented Controls & Buttons */
-        .segmented-strip {
-          display: flex;
-          background: rgba(0, 0, 0, 0.6);
-          border: 1px solid rgba(0, 243, 255, 0.25);
-          border-radius: 4px;
-          overflow: hidden;
-          padding: 1px;
-        }
-
-        .segmented-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 2px;
-          background: rgba(0, 0, 0, 0.4);
-          border: 1px solid rgba(0, 243, 255, 0.2);
-          border-radius: 4px;
-          padding: 2px;
-        }
-
-        .segmented-btn {
-          background: transparent;
-          border: none;
-          color: #88ccee;
-          font-family: var(--font-mono);
-          font-size: 0.54rem;
-          padding: 2px 4px;
-          cursor: pointer;
-          transition: all 0.1s ease;
-          border-radius: 2px;
-          text-align: center;
-          white-space: nowrap;
-        }
-
-        .segmented-btn:hover {
-          background: rgba(0, 243, 255, 0.15);
-          color: #ffffff;
-        }
-
-        .segmented-btn.active {
-          background: #00f3ff;
-          color: #000000;
-          font-weight: bold;
-          box-shadow: 0 0 6px #00f3ff;
-        }
-
-        .segmented-btn:disabled {
-          opacity: 0.3;
-          cursor: not-allowed;
-          background: transparent !important;
-          color: #88ccee !important;
-          box-shadow: none !important;
-        }
-
-        /* Delta Pad targets selections on right panel */
-        .target-select-row-new {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .target-row-label {
-          font-size: 0.55rem;
-          color: #ff5500;
-          font-weight: bold;
-          letter-spacing: 0.5px;
-        }
-
-        .target-btn-strip {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 2px;
-        }
-
-        .target-btn {
-          background: #000000;
-          border: 1px solid rgba(255, 85, 0, 0.3);
-          color: #ffe600;
-          font-family: var(--font-mono);
-          font-size: 0.52rem;
-          padding: 2px 4px;
-          border-radius: 3px;
-          cursor: pointer;
-          transition: all 0.1s;
-        }
-
-        .target-btn:hover {
-          background: rgba(255, 85, 0, 0.15);
-          border-color: rgba(255, 85, 0, 0.6);
-        }
-
-        .target-btn.selected-x {
-          background: #ff5500;
-          color: #ffffff;
-          border-color: #ffffff;
-          box-shadow: 0 0 6px #ff5500;
-          font-weight: bold;
-        }
-
-        .target-btn.selected-y {
-          background: #ff0055;
-          color: #ffffff;
-          border-color: #ffffff;
-          box-shadow: 0 0 6px #ff0055;
-          font-weight: bold;
-        }
-
-        /* Sampler LCD Page Styles */
-        .sampler-page-lcd {
-          display: flex;
-          flex-direction: column;
-          gap: 0.6rem;
-        }
-
-        .mic-level-meter-container {
-          background: rgba(0, 243, 255, 0.04);
-          border: 1px solid rgba(0, 243, 255, 0.15);
-          padding: 6px 10px;
-          border-radius: 4px;
-        }
-
-        .mic-level-bar-label {
-          font-size: 0.55rem;
-          color: rgba(0, 243, 255, 0.75);
-          margin-bottom: 3px;
-        }
-
-        .mic-level-bar-track {
-          width: 100%;
-          height: 6px;
-          background: #020d1e;
-          border-radius: 3px;
-          overflow: hidden;
-          position: relative;
-        }
-
-        .mic-level-bar-fill {
-          height: 100%;
-          width: 0%;
-          background: linear-gradient(90deg, #00ff66 0%, #ffe600 70%, #ff0055 100%);
-          border-radius: 3px;
-          transition: width 0.05s ease-out;
-        }
-
-        .active-yellow {
-          background: rgba(255, 230, 0, 0.15) !important;
-          border-color: #ffe600 !important;
-          color: #ffe600 !important;
-          box-shadow: 0 0 6px rgba(255, 230, 0, 0.3) !important;
-        }
-
-        .active-red {
-          background: rgba(255, 0, 85, 0.25) !important;
-          border-color: #ff0055 !important;
-          color: #ffffff !important;
-          box-shadow: 0 0 8px rgba(255, 0, 85, 0.5) !important;
-        }
-
-        .active-green {
-          background: rgba(0, 255, 102, 0.15) !important;
-          border-color: #00ff66 !important;
-          color: #00ff66 !important;
-          box-shadow: 0 0 6px rgba(0, 255, 102, 0.3) !important;
-        }
-
-        .active-pink {
-          background: rgba(255, 0, 255, 0.15) !important;
-          border-color: #ff00ff !important;
-          color: #ff00ff !important;
-          box-shadow: 0 0 6px rgba(255, 0, 255, 0.3) !important;
-        }
-
-        @keyframes blink-rec {
-          0% { opacity: 1; }
-          50% { opacity: 0.5; }
-          100% { opacity: 1; }
-        }
-
-        .blinking {
-          animation: blink-rec 1s infinite;
-        }
-
-        .waveform-draw-canvas {
-          box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.15);
-        }
-
-        .sampler-help-alert {
-          background: rgba(0, 243, 255, 0.05);
-          border: 1px dashed rgba(0, 243, 255, 0.3);
-          border-radius: 4px;
-          padding: 6px 10px;
-          margin-top: 6px;
-          font-size: 0.62rem;
-          color: #00f3ff;
-          text-align: center;
-          font-family: var(--font-mono);
-          text-shadow: 0 0 2px rgba(0, 243, 255, 0.4);
-        }
-
-        /* Deck Lower Controls Panel Styles */
-        .deck-lower-controls {
-          width: 100%;
-          display: grid;
-          grid-template-columns: 1fr 52px;
-          gap: 8px;
-          padding: 8px;
-          background: rgba(0, 0, 0, 0.25);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          border-radius: 6px;
-          margin-top: auto;
-          box-sizing: border-box;
-        }
-
-        .deck-left-panel {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .deck-pitch-section {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 4px;
-          background: rgba(0, 0, 0, 0.35);
-          padding: 4px 2px;
-          border-radius: 4px;
-          border: 1px solid rgba(255, 255, 255, 0.04);
-        }
-
-        .deck-pitch-slider-wrapper {
-          height: 120px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .deck-pitch-slider {
-          writing-mode: vertical-lr;
-          direction: rtl;
-          width: 16px;
-          height: 110px;
-          cursor: pointer;
-          accent-color: #ffe600;
-        }
-
-        .deck-row {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          justify-content: space-between;
-        }
-
-        .deck-btn {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 24px;
-          border-radius: 4px;
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          font-family: monospace;
-          font-size: 0.55rem;
-          font-weight: bold;
-          text-transform: uppercase;
-          cursor: pointer;
-          background: rgba(10, 15, 25, 0.8);
-          color: #888;
-          transition: all 0.1s ease;
-          user-select: none;
-        }
-
-        .deck-btn:active {
-          transform: scale(0.95);
-        }
-
-        .deck-btn-sync {
-          border-color: #00f3ff;
-          color: #00f3ff;
-        }
-        .deck-btn-sync.active {
-          background: #00f3ff;
-          color: #000;
-          box-shadow: 0 0 8px #00f3ff;
-        }
-
-        .deck-btn-cue {
-          border-color: #ffaa00;
-          color: #ffaa00;
-        }
-        .deck-btn-cue.active {
-          background: #ffaa00;
-          color: #000;
-          box-shadow: 0 0 8px #ffaa00;
-        }
-
-        .deck-btn-play {
-          border-color: #00ff66;
-          color: #00ff66;
-        }
-        .deck-btn-play.active {
-          background: #00ff66;
-          color: #000;
-          box-shadow: 0 0 8px #00ff66;
-        }
-
-        .deck-loop-display {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 22px;
-          background: #000;
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 3px;
-          font-family: monospace;
-          font-size: 0.55rem;
-          color: #00ff66;
-          text-shadow: 0 0 3px #00ff66;
-        }
-
-        .deck-readout-label {
-          font-family: monospace;
-          font-size: 0.45rem;
-          color: #aaa;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        /* Performance Timeline Panel Styles */
-        .perf-timeline-panel {
-          display: flex;
-          flex-direction: column;
-          background: #020509;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
-          padding: 2px;
-          height: 120px;
-          box-sizing: border-box;
-        }
-        .perf-timeline-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 2px 4px;
-          background: rgba(255, 255, 255, 0.02);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-          margin-bottom: 2px;
-        }
-        .perf-timeline-title {
-          font-size: 0.45rem;
-          font-weight: bold;
-          color: #ff00ff;
-          letter-spacing: 1px;
-          font-family: monospace;
-        }
-        .perf-timeline-controls {
-          display: flex;
-          gap: 6px;
-          align-items: center;
-        }
-        .perf-timeline-body {
-          display: flex;
-          flex: 1;
-          min-height: 0;
-          position: relative;
-        }
-        .perf-timeline-labels {
-          width: 25px;
-          display: flex;
-          flex-direction: column;
-          background: rgba(0, 0, 0, 0.3);
-          border-right: 1px solid rgba(255, 255, 255, 0.1);
-          user-select: none;
-          box-sizing: border-box;
-          padding-top: 12px;
-        }
-        .perf-lane-label {
-          height: 5.5px;
-          font-size: 0.35rem;
-          line-height: 5.5px;
-          font-family: monospace;
-          text-align: center;
-          font-weight: bold;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-          box-sizing: border-box;
-        }
-        .perf-lane-label.label-deck-a {
-          color: #00f3ff;
-        }
-        .perf-lane-label.label-deck-b {
-          color: #ff00ff;
-        }
-        .perf-timeline-scroll-container {
-          flex: 1;
-          overflow-x: auto;
-          overflow-y: hidden;
-          position: relative;
-          background: rgba(0, 0, 0, 0.2);
-        }
-        .perf-timeline-scroll-container::-webkit-scrollbar {
-          height: 4px;
-        }
-        .perf-timeline-scroll-container::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.15);
-          border-radius: 2px;
-        }
-        .perf-timeline-grid-canvas {
-          height: 100%;
-          position: relative;
-          box-sizing: border-box;
-          padding-top: 12px;
-        }
-        .perf-timeline-grid-line {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          width: 1px;
-          pointer-events: none;
-        }
-        .perf-timeline-grid-line.minor {
-          border-left: 1px dashed rgba(255, 255, 255, 0.04);
-        }
-        .perf-timeline-grid-line.major {
-          border-left: 1px solid rgba(255, 255, 255, 0.12);
-        }
-        .beat-number {
-          position: absolute;
-          top: 1px;
-          left: 2px;
-          font-size: 0.32rem;
-          color: rgba(255, 255, 255, 0.35);
-          font-family: monospace;
-        }
-        .perf-timeline-lane {
-          height: 5.5px;
-          position: relative;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-          box-sizing: border-box;
-        }
-        .perf-timeline-pill {
-          position: absolute;
-          top: 1px;
-          height: 3.5px;
-          border-radius: 1.5px;
-          opacity: 0.85;
-        }
-        .perf-timeline-playhead {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          width: 1.5px;
-          background: #ffe600;
-          box-shadow: 0 0 6px #ffe600;
-          z-index: 10;
-          pointer-events: none;
-        }
-
-        .perf-pad.pending {
-          animation: perf-pad-blink 0.3s infinite alternate;
-        }
-        @keyframes perf-pad-blink {
-          from { opacity: 0.4; filter: brightness(0.6); }
-          to { opacity: 1.0; filter: brightness(1.4) drop-shadow(0 0 5px currentColor); }
-        }
-
-        /* Pad Context Menu Popover */
-        .pad-fx-popover-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: 9999;
-          background: transparent;
-        }
-        .pad-fx-popover {
-          position: absolute;
-          background: rgba(13, 20, 32, 0.96);
-          border: 1px solid rgba(0, 243, 255, 0.45);
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 15px rgba(0, 243, 255, 0.15);
-          border-radius: 8px;
-          padding: 14px;
-          width: 240px;
-          backdrop-filter: blur(8px);
-          font-family: 'Inter', system-ui, sans-serif;
-          color: #e2e8f0;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          z-index: 10000;
-          animation: popoverFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        @keyframes popoverFadeIn {
-          from { opacity: 0; transform: scale(0.95) translateY(-5px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        .popover-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          padding-bottom: 6px;
-          margin-bottom: 4px;
-        }
-        .popover-title {
-          font-weight: 700;
-          font-size: 0.85rem;
-          color: #00f3ff;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .popover-close-btn {
-          background: transparent;
-          border: none;
-          color: #a0aec0;
-          cursor: pointer;
-          font-size: 0.95rem;
-          line-height: 1;
-          padding: 2px;
-          transition: color 0.2s;
-        }
-        .popover-close-btn:hover {
-          color: #f56565;
-        }
-        .popover-field {
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-        }
-        .popover-field label {
-          font-size: 0.72rem;
-          color: #a0aec0;
-          font-weight: 500;
-          text-transform: uppercase;
-        }
-        .popover-select {
-          background: rgba(26, 32, 44, 0.8);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          color: #fff;
-          border-radius: 4px;
-          padding: 6px;
-          font-size: 0.75rem;
-          cursor: pointer;
-          transition: border-color 0.2s;
-          outline: none;
-        }
-        .popover-select:focus {
-          border-color: #00f3ff;
-        }
-        .popover-slider-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .popover-slider-row input[type="range"] {
-          flex: 1;
-          accent-color: #00f3ff;
-          cursor: pointer;
-        }
-        .popover-val-span {
-          font-size: 0.75rem;
-          font-family: monospace;
-          color: #00f3ff;
-          min-width: 36px;
-          text-align: right;
-        }
-        .popover-reset-hint {
-          font-size: 0.62rem;
-          color: #718096;
-          text-align: center;
-          margin-top: -4px;
-        }
-      `}</style>
 
       {padMenuState.visible && (() => {
         const prefix = padMenuState.deck === 'A' ? 'a0' : 'b0';
@@ -16465,7 +14494,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const tuning = slot.tuning !== undefined ? slot.tuning : 0;
 
         const updateSlotParam = (key, value) => {
-          // Mutate in-place on ref — audio engine sees it immediately
+          // Mutate in-place on ref â€” audio engine sees it immediately
           const slot = sampleSlotsRef.current.find(s => s.id === slotId);
           if (slot) slot[key] = value;
           setSampleSlots(prev => [...prev]);
@@ -16498,7 +14527,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   className="popover-close-btn"
                   onClick={() => setPadMenuState(prev => ({ ...prev, visible: false }))}
                 >
-                  ✕
+                  âœ•
                 </button>
               </div>
 
@@ -16726,7 +14755,7 @@ export const saveSlotMetadataToDb = async (slotId, updates) => {
     getReq.onsuccess = (e) => {
       const existing = e.target.result;
       if (!existing) { resolve(); return; } // no record to update
-      // Patch only the changed fields — channels/sampleRate untouched
+      // Patch only the changed fields â€” channels/sampleRate untouched
       Object.assign(existing, updates);
       const putReq = store.put(existing);
       putReq.onsuccess = () => resolve();
