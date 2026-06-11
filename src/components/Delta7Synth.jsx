@@ -700,22 +700,22 @@ export default function Delta7Synth() {
 
   // --- Sampler States & Slots ---
   const [sampleSlots, setSampleSlots] = useState([
-    { id: 'a01', name: 'Bank A Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a02', name: 'Bank A Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a03', name: 'Bank A Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a04', name: 'Bank A Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a05', name: 'Bank A Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a06', name: 'Bank A Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a07', name: 'Bank A Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a08', name: 'Bank A Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b01', name: 'Bank B Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b02', name: 'Bank B Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b03', name: 'Bank B Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b04', name: 'Bank B Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b05', name: 'Bank B Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b06', name: 'Bank B Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b07', name: 'Bank B Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b08', name: 'Bank B Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a01', name: 'Bank A Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a02', name: 'Bank A Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a03', name: 'Bank A Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a04', name: 'Bank A Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a05', name: 'Bank A Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a06', name: 'Bank A Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a07', name: 'Bank A Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'a08', name: 'Bank A Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b01', name: 'Bank B Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b02', name: 'Bank B Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b03', name: 'Bank B Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b04', name: 'Bank B Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b05', name: 'Bank B Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b06', name: 'Bank B Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b07', name: 'Bank B Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    { id: 'b08', name: 'Bank B Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
   ]);
   const sampleSlotsRef = useRef(sampleSlots);
   useEffect(() => {
@@ -749,7 +749,15 @@ export default function Delta7Synth() {
 
   useEffect(() => { perfCountInActiveRef.current = perfCountInActive; }, [perfCountInActive]);
   useEffect(() => { perfCountInRemainingRef.current = perfCountInRemaining; }, [perfCountInRemaining]);
-  const [activePerfPads, setActivePerfPads] = useState({});
+  const [activePerfPads, setActivePerfPadsState] = useState({});
+  const activePerfPadsRef = useRef({});
+  const setActivePerfPads = (updater) => {
+    setActivePerfPadsState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      activePerfPadsRef.current = next;
+      return next;
+    });
+  };
   const [deckAPlaying, setDeckAPlaying] = useState(false);
   const [deckBPlaying, setDeckBPlaying] = useState(false);
   // Refs to avoid tickLoop teardown on every state change (Issues 2, 8)
@@ -2734,6 +2742,7 @@ export default function Delta7Synth() {
                 fxSend: saved.fxSend ?? slot.fxSend,
                 routeToXyPad: saved.routeToXyPad ?? slot.routeToXyPad,
                 tuning: saved.tuning ?? slot.tuning,
+                triggerMode: saved.triggerMode ?? slot.triggerMode,
               };
             }
             return slot;
@@ -4170,7 +4179,8 @@ export default function Delta7Synth() {
         handleLiveTrigger(msg) {
           const now = currentTime;
           const beatDuration = 60 / this.bpm;
-          const shouldQuantize = msg.isNoteOn && this.perfRecordActive && this.quantizeMode !== 'None';
+          const quantGrid = msg.forceQuantizeGrid || (msg.isNoteOn && this.perfRecordActive ? this.quantizeMode : 'None');
+          const shouldQuantize = quantGrid !== 'None';
           
           let targetTime = now;
           let targetBeat = 0;
@@ -4184,14 +4194,15 @@ export default function Delta7Synth() {
             const currentBeat = elapsed / beatDuration;
             
             let gridSize = 1.0;
-            if (this.quantizeMode === '1/128') gridSize = 0.03125;
-            else if (this.quantizeMode === '1/64') gridSize = 0.0625;
-            else if (this.quantizeMode === '1/32') gridSize = 0.125;
-            else if (this.quantizeMode === '1/16') gridSize = 0.25;
-            else if (this.quantizeMode === '1/8') gridSize = 0.5;
-            else if (this.quantizeMode === '1/4') gridSize = 1.0;
-            else if (this.quantizeMode === '1/2') gridSize = 2.0;
-            else if (this.quantizeMode === 'Bar') gridSize = 4.0;
+            const mode = msg.forceQuantizeGrid || this.quantizeMode;
+            if (mode === '1/128') gridSize = 0.03125;
+            else if (mode === '1/64') gridSize = 0.0625;
+            else if (mode === '1/32') gridSize = 0.125;
+            else if (mode === '1/16') gridSize = 0.25;
+            else if (mode === '1/8') gridSize = 0.5;
+            else if (mode === '1/4') gridSize = 1.0;
+            else if (mode === '1/2') gridSize = 2.0;
+            else if (mode === 'Bar') gridSize = 4.0;
             
             const nextGridBeat = Math.ceil(currentBeat / gridSize) * gridSize;
             targetBeat = nextGridBeat;
@@ -4514,8 +4525,8 @@ export default function Delta7Synth() {
           fxType: slot.fxType,
           fxSend: slot.fxSend,
           routeToXyPad: slot.routeToXyPad,
-    tuning: slot.tuning,
           tuning: slot.tuning,
+          triggerMode: slot.triggerMode || 'hold',
           channels: channels,
           sampleRate: sampleRate
         });
@@ -4656,7 +4667,8 @@ export default function Delta7Synth() {
               fxType: savedSlot.fxType ?? slot.fxType,
               fxSend: savedSlot.fxSend ?? slot.fxSend,
               routeToXyPad: savedSlot.routeToXyPad ?? slot.routeToXyPad,
-              tuning: savedSlot.tuning ?? slot.tuning
+              tuning: savedSlot.tuning ?? slot.tuning,
+              triggerMode: savedSlot.triggerMode ?? slot.triggerMode
             };
           }
         }
@@ -5538,8 +5550,8 @@ export default function Delta7Synth() {
     const bufferB = slotB ? (isReverseB ? slotB.revBuffer : slotB.buffer) : null;
     const revBufferB = slotB ? slotB.revBuffer : null;
 
-    const isLoopA = prog.oscATriggerMode === 'slice' ? (sliceLoopA || sliceSustainA) : (slotA ? slotA.loopOn : false);
-    const isLoopB = prog.oscBTriggerMode === 'slice' ? (sliceLoopB || sliceSustainB) : (slotB ? slotB.loopOn : false);
+    const isLoopA = prog.loopOverride !== undefined ? prog.loopOverride : (prog.oscATriggerMode === 'slice' ? (sliceLoopA || sliceSustainA) : (slotA ? slotA.loopOn : false));
+    const isLoopB = prog.loopOverride !== undefined ? prog.loopOverride : (prog.oscBTriggerMode === 'slice' ? (sliceLoopB || sliceSustainB) : (slotB ? slotB.loopOn : false));
 
     // Pre-calculate custom slice bounds and timings
     let sliceStartNormAPrecalc = 0;
@@ -5814,6 +5826,19 @@ export default function Delta7Synth() {
         } else {
           playhead = (prog.grainPosition !== undefined ? prog.grainPosition : 0.0) * bufferA.duration;
           isLoopA = true;
+        }
+        
+        if (prog.fluxOffset !== undefined) {
+          if (isSliceGranular) {
+            const loopLen = sliceDurationA || 0.01;
+            playhead = startOffsetA + (prog.fluxOffset % loopLen);
+          } else if (isWarpedGranularA) {
+            const loopLen = (endOffsetA - startOffsetA) || 0.01;
+            playhead = startOffsetA + (prog.fluxOffset % loopLen);
+          } else {
+            const loopLen = bufferA.duration || 0.01;
+            playhead = (playhead + prog.fluxOffset) % loopLen;
+          }
         }
         
         const lookahead = 0.05; // 50ms lookahead to ensure Web Audio scheduling is always in the future
@@ -6161,6 +6186,19 @@ export default function Delta7Synth() {
             : slotB.end * bufferB.duration;
           playhead = startOffsetB;
           isLoopB = !!slotB.loopOn;
+        }
+        
+        if (prog.fluxOffset !== undefined) {
+          if (isSliceGranularB) {
+            const loopLen = sliceDurationB || 0.01;
+            playhead = startOffsetB + (prog.fluxOffset % loopLen);
+          } else if (isWarpedGranularB) {
+            const loopLen = (endOffsetB - startOffsetB) || 0.01;
+            playhead = startOffsetB + (prog.fluxOffset % loopLen);
+          } else {
+            const loopLen = bufferB.duration || 0.01;
+            playhead = (playhead + prog.fluxOffset) % loopLen;
+          }
         }
 
         const lookahead = 0.05; // 50ms lookahead to ensure Web Audio scheduling is always in the future
@@ -6583,17 +6621,29 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         durationToPlayA = (slotA.end - slotA.start) * bufferA.duration;
       }
 
-      if (isLoopA) {
-        if (oscA) oscA.start(now, startOffsetA);
-        if (oscA_L) oscA_L.start(now, startOffsetA);
-        if (oscA_R) oscA_R.start(now, startOffsetA);
-      } else {
-        const dPlay = Math.max(0.01, durationToPlayA / freqScaleA);
-        if (oscA) oscA.start(now, startOffsetA, dPlay);
-        if (oscA_L) oscA_L.start(now, startOffsetA, dPlay);
-        if (oscA_R) oscA_R.start(now, startOffsetA, dPlay);
+      let finalStartOffsetA = startOffsetA;
+      let finalDurationA = durationToPlayA;
+
+      if (prog.fluxOffset !== undefined) {
+        const loopDuration = durationToPlayA || 0.01;
+        const wrappedFlux = prog.fluxOffset % loopDuration;
+        finalStartOffsetA = startOffsetA + wrappedFlux;
+        if (!isLoopA) {
+          finalDurationA = durationToPlayA - wrappedFlux;
+        }
       }
-      voiceObj.startOffsetA = startOffsetA;
+
+      if (isLoopA) {
+        if (oscA) oscA.start(now, finalStartOffsetA);
+        if (oscA_L) oscA_L.start(now, finalStartOffsetA);
+        if (oscA_R) oscA_R.start(now, finalStartOffsetA);
+      } else {
+        const dPlay = Math.max(0.01, finalDurationA / freqScaleA);
+        if (oscA) oscA.start(now, finalStartOffsetA, dPlay);
+        if (oscA_L) oscA_L.start(now, finalStartOffsetA, dPlay);
+        if (oscA_R) oscA_R.start(now, finalStartOffsetA, dPlay);
+      }
+      voiceObj.startOffsetA = finalStartOffsetA;
     }
 
     if (oscB && bufferB) {
@@ -6612,12 +6662,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         durationToPlayB = (slotB.end - slotB.start) * bufferB.duration;
       }
 
-      if (isLoopB) {
-        oscB.start(now, startOffsetB);
-      } else {
-        oscB.start(now, startOffsetB, Math.max(0.01, durationToPlayB / freqScaleB));
+      let finalStartOffsetB = startOffsetB;
+      let finalDurationB = durationToPlayB;
+
+      if (prog.fluxOffset !== undefined) {
+        const loopDuration = durationToPlayB || 0.01;
+        const wrappedFlux = prog.fluxOffset % loopDuration;
+        finalStartOffsetB = startOffsetB + wrappedFlux;
+        if (!isLoopB) {
+          finalDurationB = durationToPlayB - wrappedFlux;
+        }
       }
-      voiceObj.startOffsetB = startOffsetB;
+
+      if (isLoopB) {
+        oscB.start(now, finalStartOffsetB);
+      } else {
+        oscB.start(now, finalStartOffsetB, Math.max(0.01, finalDurationB / freqScaleB));
+      }
+      voiceObj.startOffsetB = finalStartOffsetB;
     }
 
     // Save final references back into voiceObj
@@ -6886,6 +6948,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }));
   };
 
+  const cycleTriggerMode = (slotId, e) => {
+    if (e) e.stopPropagation();
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    if (!slot) return;
+    const modes = ['hold', 'latch', 'free', 'flux'];
+    const currentMode = slot.triggerMode || 'hold';
+    const nextIdx = (modes.indexOf(currentMode) + 1) % modes.length;
+    const nextMode = modes[nextIdx];
+    const updated = { ...slot, triggerMode: nextMode };
+    setSampleSlots(prev => prev.map(s => s.id === slotId ? updated : s));
+    saveSampleToDb(updated).catch(err => console.error("Failed to save slot triggerMode:", err));
+    showEditorStatus(`${getSlotLabel(slotId)} Mode: ${nextMode.toUpperCase()} 🎛️`);
+  };
+
   const handlePadRightClick = (e, deck, index) => {
     e.preventDefault();
     setPadMenuState({
@@ -6924,10 +7000,29 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (!ctx) return;
     const now = ctx.currentTime;
 
+    const currentParams = paramsRef.current;
+    let slotId = '';
+    if (type === 'slot') {
+      slotId = (deck === 'A' ? 'a0' : 'b0') + (index + 1);
+    } else {
+      slotId = deck === 'A' ? currentParams.oscAWave : currentParams.oscBWave;
+    }
+
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    if (!slot || !slot.buffer) return;
+
+    const triggerMode = slot.triggerMode || 'hold';
     const voiceKey = `perf-${deck.toLowerCase()}-${type}-${index}`;
     const padKey = `${deck}-${type}-${index}`;
 
+    // 1. Handle Key Release (Note Off)
     if (!isNoteOn) {
+      if (triggerMode === 'latch' || triggerMode === 'free') {
+        // Latch and Free modes ignore key release
+        return;
+      }
+
+      // Hold and Flux modes stop playback on release
       stopPerfVoice(voiceKey);
       setActivePerfPads(prev => {
         const next = { ...prev };
@@ -6942,6 +7037,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       return;
     }
 
+    // 2. Handle Key Press (Note On)
+    if (triggerMode === 'latch') {
+      // Toggle logic
+      const isAlreadyActive = activePerfPadsRef.current[padKey];
+      if (isAlreadyActive) {
+        // Stop it
+        stopPerfVoice(voiceKey);
+        setActivePerfPads(prev => {
+          const next = { ...prev };
+          delete next[padKey];
+          delete next[`${padKey}-pending`];
+          return next;
+        });
+        if (shouldRecord && perfRecordActiveRef.current) {
+          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+        }
+        return;
+      }
+    }
+
+    // Stop previous voice instance
     stopPerfVoice(voiceKey);
 
     // Solo Mode logic: Cut out all other pads on the active deck
@@ -6993,18 +7109,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       });
     }
 
-    const currentParams = paramsRef.current;
-    let slotId = '';
-    
-    if (type === 'slot') {
-      slotId = (deck === 'A' ? 'a0' : 'b0') + (index + 1);
-    } else {
-      slotId = deck === 'A' ? currentParams.oscAWave : currentParams.oscBWave;
-    }
-
-    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
-    if (!slot || !slot.buffer) return;
-
     const rootNote = slot.rootNote || 60;
     const triggerNote = type === 'slot' ? rootNote : rootNote + index;
 
@@ -7023,6 +7127,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       perfPadFxSend: slot ? (slot.fxSend !== undefined ? slot.fxSend : 0) : 0
     };
 
+    // Flux mode logic: calculate fluxOffset
+    if (triggerMode === 'flux') {
+      let fluxOffset = 0;
+      const fileDur = slot.buffer.duration * (slot.end - slot.start);
+      if (perfPlaybackActiveRef.current || seqCurrentBeatRef.current > 0) {
+        const bpm = paramsRef.current.arpBpm || 120;
+        const beatDur = 60 / bpm;
+        const loopBeats = slot.warpOn ? slot.warpBeats : Math.max(1, fileDur / beatDur);
+        const beatPhase = targetBeat % loopBeats;
+        fluxOffset = beatPhase * beatDur;
+      } else {
+        fluxOffset = now % fileDur;
+      }
+      tempProg.fluxOffset = fluxOffset;
+    }
+
     const delayOffset = Math.max(0, targetTime - now);
 
     const startVoiceTrigger = () => {
@@ -7030,16 +7150,28 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       activeVoicesRef.current.set(voiceKey, [voice]);
       setActivePerfPads(prev => ({ ...prev, [padKey]: true }));
 
+      const dur = slot.buffer.duration * (slot.end - slot.start);
+
       if (deck === 'A') {
         setDeckAPlaying(true);
         if (deckATimerRef.current) clearTimeout(deckATimerRef.current);
-        const dur = slot.buffer.duration * (slot.end - slot.start);
         deckATimerRef.current = setTimeout(() => setDeckAPlaying(false), dur * 1000);
       } else {
         setDeckBPlaying(true);
         if (deckBTimerRef.current) clearTimeout(deckBTimerRef.current);
-        const dur = slot.buffer.duration * (slot.end - slot.start);
         deckBTimerRef.current = setTimeout(() => setDeckBPlaying(false), dur * 1000);
+      }
+
+      // Auto clear pad active state for non-looping free/latch triggers once they finish playing
+      if (!slot.loopOn && (triggerMode === 'free' || triggerMode === 'latch')) {
+        setTimeout(() => {
+          setActivePerfPads(prev => {
+            const next = { ...prev };
+            delete next[padKey];
+            delete next[`${padKey}-pending`];
+            return next;
+          });
+        }, dur * 1000);
       }
     };
 
@@ -7052,7 +7184,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           return next;
         });
         startVoiceTrigger();
-      }, delayOffset * 1000 - 15); // Trigger slightly before target time to avoid JS task queue lag
+      }, delayOffset * 1000 - 15);
     } else {
       startVoiceTrigger();
     }
@@ -9328,6 +9460,53 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         {slot.loopOn ? 'LOOP' : '1-SHOT'}
                       </button>
                     )}
+                    {isLoaded && (
+                      <button
+                        className="perf-pad-trigger-mode-badge"
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          background: (slot.triggerMode || 'hold') === 'hold' ? 'rgba(255, 255, 255, 0.05)' :
+                                      (slot.triggerMode === 'latch') ? 'rgba(0, 243, 255, 0.2)' :
+                                      (slot.triggerMode === 'free') ? 'rgba(0, 255, 136, 0.2)' :
+                                      'rgba(255, 0, 128, 0.2)',
+                          border: `1px solid ${
+                                      (slot.triggerMode || 'hold') === 'hold' ? 'rgba(255,255,255,0.15)' :
+                                      (slot.triggerMode === 'latch') ? '#00f3ff' :
+                                      (slot.triggerMode === 'free') ? '#00ff88' :
+                                      '#ff0080'
+                                    }`,
+                          borderRadius: '2px',
+                          color: (slot.triggerMode || 'hold') === 'hold' ? '#888' :
+                                 (slot.triggerMode === 'latch') ? '#00f3ff' :
+                                 (slot.triggerMode === 'free') ? '#00ff88' :
+                                 '#ff0080',
+                          fontSize: '0.40rem',
+                          fontWeight: 'bold',
+                          padding: '1px 3.5px',
+                          lineHeight: 1,
+                          cursor: 'pointer',
+                          zIndex: 5,
+                          boxShadow: (slot.triggerMode && slot.triggerMode !== 'hold') ? `0 0 4px ${
+                            slot.triggerMode === 'latch' ? '#00f3ff' :
+                            slot.triggerMode === 'free' ? '#00ff88' :
+                            '#ff0080'
+                          }` : 'none'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cycleTriggerMode(slotId, e);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onMouseUp={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
+                        title={`Trigger Mode: ${(slot.triggerMode || 'hold').toUpperCase()} (Click to toggle)`}
+                      >
+                        {(slot.triggerMode || 'hold').substring(0, 3).toUpperCase()}
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -9368,6 +9547,136 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
               >
                 {deckAPlaying ? 'Pause' : 'Play'}
+              </button>
+            </div>
+
+            {/* Performance Sequencer Transport controls for Deck A */}
+            <div className="deck-row" style={{ width: '250px', margin: '4px auto 2px auto', display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '3px 6px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.2)' }}>
+              <span style={{ fontSize: '0.45rem', color: '#00f3ff', fontFamily: 'monospace', fontWeight: 'bold', marginRight: 'auto', letterSpacing: '0.5px' }}>SEQ:</span>
+              <button
+                className="deck-btn-xs"
+                onClick={() => {
+                  const nextBeat = Math.max(0.0, seqCurrentBeatRef.current - 4.0);
+                  seqCurrentBeatRef.current = nextBeat;
+                  seqStartBeatOffsetRef.current = nextBeat;
+                  if (perfPlaybackActiveRef.current) {
+                    const ctx = audioCtxRef.current;
+                    if (ctx) {
+                      perfPlayStartTimeRef.current = ctx.currentTime;
+                      if (schedulerNodeRef.current) {
+                        schedulerNodeRef.current.port.postMessage({
+                          type: 'START_PLAYBACK',
+                          startTime: ctx.currentTime,
+                          startBeatOffset: nextBeat,
+                          sortedEvents: sortedPerfEventsRef.current
+                        });
+                      }
+                    }
+                  }
+                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) ⏪`);
+                }}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: 'rgba(0, 243, 255, 0.05)', 
+                  color: '#00f3ff', 
+                  border: '1px solid rgba(0, 243, 255, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer' 
+                }}
+                title="Rewind 4 beats"
+              >
+                ⏪
+              </button>
+              <button
+                className="deck-btn-xs"
+                onClick={stopPerformancePlayback}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: 'rgba(255, 68, 68, 0.05)', 
+                  color: '#ff4444', 
+                  border: '1px solid rgba(255, 68, 68, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer' 
+                }}
+                title="Stop and Reset Performance"
+              >
+                ■ Stop
+              </button>
+              <button
+                className={`deck-btn-xs ${perfPlaybackActive ? 'active' : ''}`}
+                onClick={togglePerformancePlayback}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: perfPlaybackActive ? '#00f3ff' : 'rgba(0, 243, 255, 0.05)', 
+                  color: perfPlaybackActive ? '#000' : '#00f3ff', 
+                  border: '1px solid rgba(0, 243, 255, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer',
+                  boxShadow: perfPlaybackActive ? '0 0 6px #00f3ff' : 'none'
+                }}
+                title={perfPlaybackActive ? "Pause Performance" : "Play Performance"}
+              >
+                {perfPlaybackActive ? '⏸ Pause' : '▶ Play'}
+              </button>
+              <button
+                className="deck-btn-xs"
+                onClick={() => {
+                  const nextBeat = seqCurrentBeatRef.current + 4.0;
+                  seqCurrentBeatRef.current = nextBeat;
+                  seqStartBeatOffsetRef.current = nextBeat;
+                  if (perfPlaybackActiveRef.current) {
+                    const ctx = audioCtxRef.current;
+                    if (ctx) {
+                      perfPlayStartTimeRef.current = ctx.currentTime;
+                      if (schedulerNodeRef.current) {
+                        schedulerNodeRef.current.port.postMessage({
+                          type: 'START_PLAYBACK',
+                          startTime: ctx.currentTime,
+                          startBeatOffset: nextBeat,
+                          sortedEvents: sortedPerfEventsRef.current
+                        });
+                      }
+                    }
+                  }
+                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) ⏩`);
+                }}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: 'rgba(0, 243, 255, 0.05)', 
+                  color: '#00f3ff', 
+                  border: '1px solid rgba(0, 243, 255, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer' 
+                }}
+                title="Forward 4 beats"
+              >
+                ⏩
+              </button>
+              <button
+                className={`deck-btn-xs ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
+                onClick={() => togglePerformanceRecord(false)}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: perfRecordActive && !perfIsDubbing ? '#ff0055' : 'rgba(255, 0, 85, 0.05)', 
+                  color: perfRecordActive && !perfIsDubbing ? '#000' : '#ff0055', 
+                  border: '1px solid rgba(255, 0, 85, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer',
+                  boxShadow: perfRecordActive && !perfIsDubbing ? '0 0 6px #ff0055' : 'none'
+                }}
+                title="Record live pad triggers to performance sequencer"
+              >
+                ● Rec
               </button>
             </div>
 
@@ -10351,6 +10660,53 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         {slot.loopOn ? 'LOOP' : '1-SHOT'}
                       </button>
                     )}
+                    {isLoaded && (
+                      <button
+                        className="perf-pad-trigger-mode-badge"
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          background: (slot.triggerMode || 'hold') === 'hold' ? 'rgba(255, 255, 255, 0.05)' :
+                                      (slot.triggerMode === 'latch') ? 'rgba(0, 243, 255, 0.2)' :
+                                      (slot.triggerMode === 'free') ? 'rgba(0, 255, 136, 0.2)' :
+                                      'rgba(255, 0, 128, 0.2)',
+                          border: `1px solid ${
+                                      (slot.triggerMode || 'hold') === 'hold' ? 'rgba(255,255,255,0.15)' :
+                                      (slot.triggerMode === 'latch') ? '#00f3ff' :
+                                      (slot.triggerMode === 'free') ? '#00ff88' :
+                                      '#ff0080'
+                                    }`,
+                          borderRadius: '2px',
+                          color: (slot.triggerMode || 'hold') === 'hold' ? '#888' :
+                                 (slot.triggerMode === 'latch') ? '#00f3ff' :
+                                 (slot.triggerMode === 'free') ? '#00ff88' :
+                                 '#ff0080',
+                          fontSize: '0.40rem',
+                          fontWeight: 'bold',
+                          padding: '1px 3.5px',
+                          lineHeight: 1,
+                          cursor: 'pointer',
+                          zIndex: 5,
+                          boxShadow: (slot.triggerMode && slot.triggerMode !== 'hold') ? `0 0 4px ${
+                            slot.triggerMode === 'latch' ? '#00f3ff' :
+                            slot.triggerMode === 'free' ? '#00ff88' :
+                            '#ff0080'
+                          }` : 'none'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cycleTriggerMode(slotId, e);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onMouseUp={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
+                        title={`Trigger Mode: ${(slot.triggerMode || 'hold').toUpperCase()} (Click to toggle)`}
+                      >
+                        {(slot.triggerMode || 'hold').substring(0, 3).toUpperCase()}
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -10391,6 +10747,136 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
               >
                 {deckBPlaying ? 'Pause' : 'Play'}
+              </button>
+            </div>
+
+            {/* Performance Sequencer Transport controls for Deck B */}
+            <div className="deck-row" style={{ width: '250px', margin: '4px auto 2px auto', display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '3px 6px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.2)' }}>
+              <span style={{ fontSize: '0.45rem', color: '#00f3ff', fontFamily: 'monospace', fontWeight: 'bold', marginRight: 'auto', letterSpacing: '0.5px' }}>SEQ:</span>
+              <button
+                className="deck-btn-xs"
+                onClick={() => {
+                  const nextBeat = Math.max(0.0, seqCurrentBeatRef.current - 4.0);
+                  seqCurrentBeatRef.current = nextBeat;
+                  seqStartBeatOffsetRef.current = nextBeat;
+                  if (perfPlaybackActiveRef.current) {
+                    const ctx = audioCtxRef.current;
+                    if (ctx) {
+                      perfPlayStartTimeRef.current = ctx.currentTime;
+                      if (schedulerNodeRef.current) {
+                        schedulerNodeRef.current.port.postMessage({
+                          type: 'START_PLAYBACK',
+                          startTime: ctx.currentTime,
+                          startBeatOffset: nextBeat,
+                          sortedEvents: sortedPerfEventsRef.current
+                        });
+                      }
+                    }
+                  }
+                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) ⏪`);
+                }}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: 'rgba(0, 243, 255, 0.05)', 
+                  color: '#00f3ff', 
+                  border: '1px solid rgba(0, 243, 255, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer' 
+                }}
+                title="Rewind 4 beats"
+              >
+                ⏪
+              </button>
+              <button
+                className="deck-btn-xs"
+                onClick={stopPerformancePlayback}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: 'rgba(255, 68, 68, 0.05)', 
+                  color: '#ff4444', 
+                  border: '1px solid rgba(255, 68, 68, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer' 
+                }}
+                title="Stop and Reset Performance"
+              >
+                ■ Stop
+              </button>
+              <button
+                className={`deck-btn-xs ${perfPlaybackActive ? 'active' : ''}`}
+                onClick={togglePerformancePlayback}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: perfPlaybackActive ? '#00f3ff' : 'rgba(0, 243, 255, 0.05)', 
+                  color: perfPlaybackActive ? '#000' : '#00f3ff', 
+                  border: '1px solid rgba(0, 243, 255, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer',
+                  boxShadow: perfPlaybackActive ? '0 0 6px #00f3ff' : 'none'
+                }}
+                title={perfPlaybackActive ? "Pause Performance" : "Play Performance"}
+              >
+                {perfPlaybackActive ? '⏸ Pause' : '▶ Play'}
+              </button>
+              <button
+                className="deck-btn-xs"
+                onClick={() => {
+                  const nextBeat = seqCurrentBeatRef.current + 4.0;
+                  seqCurrentBeatRef.current = nextBeat;
+                  seqStartBeatOffsetRef.current = nextBeat;
+                  if (perfPlaybackActiveRef.current) {
+                    const ctx = audioCtxRef.current;
+                    if (ctx) {
+                      perfPlayStartTimeRef.current = ctx.currentTime;
+                      if (schedulerNodeRef.current) {
+                        schedulerNodeRef.current.port.postMessage({
+                          type: 'START_PLAYBACK',
+                          startTime: ctx.currentTime,
+                          startBeatOffset: nextBeat,
+                          sortedEvents: sortedPerfEventsRef.current
+                        });
+                      }
+                    }
+                  }
+                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) ⏩`);
+                }}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: 'rgba(0, 243, 255, 0.05)', 
+                  color: '#00f3ff', 
+                  border: '1px solid rgba(0, 243, 255, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer' 
+                }}
+                title="Forward 4 beats"
+              >
+                ⏩
+              </button>
+              <button
+                className={`deck-btn-xs ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
+                onClick={() => togglePerformanceRecord(false)}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: perfRecordActive && !perfIsDubbing ? '#ff0055' : 'rgba(255, 0, 85, 0.05)', 
+                  color: perfRecordActive && !perfIsDubbing ? '#000' : '#ff0055', 
+                  border: '1px solid rgba(255, 0, 85, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer',
+                  boxShadow: perfRecordActive && !perfIsDubbing ? '0 0 6px #ff0055' : 'none'
+                }}
+                title="Record live pad triggers to performance sequencer"
+              >
+                ● Rec
               </button>
             </div>
 
@@ -13996,6 +14482,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         }
 
         .perf-pad {
+          position: relative;
           aspect-ratio: 1;
           border-radius: 4px;
           border: 1px solid rgba(255,255,255,0.1);
