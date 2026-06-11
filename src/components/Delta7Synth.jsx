@@ -515,7 +515,7 @@ export default function Delta7Synth() {
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState('');
   const [midiActivity, setMidiActivity] = useState(false);
-  // Zero-waste: activeNotes is ref-only â€” no re-renders from note on/off events
+  // Zero-waste: activeNotes is ref-only Ã¢â‚¬â€ no re-renders from note on/off events
   const activeNotesRef = useRef(new Set());
   const activeNotesDirtyRef = useRef(false);
   const setActiveNotes = (updater) => {
@@ -760,17 +760,17 @@ export default function Delta7Synth() {
 
   useEffect(() => { perfCountInActiveRef.current = perfCountInActive; }, [perfCountInActive]);
   useEffect(() => { perfCountInRemainingRef.current = perfCountInRemaining; }, [perfCountInRemaining]);
-  // Zero-waste: activePerfPads is ref-only â€” no useState re-renders from audio triggers
+  // Zero-waste: activePerfPads is ref-only Ã¢â‚¬â€ no useState re-renders from audio triggers
   const activePerfPadsRef = useRef({});
   const perfPadsDirtyRef = useRef(false); // dirty flag for batched rAF visual sync
-  // Zero-waste: direct mutation helpers â€” no spread allocation per trigger
+  // Zero-waste: direct mutation helpers Ã¢â‚¬â€ no spread allocation per trigger
   const setActivePerfPads = (updater) => {
     const prev = activePerfPadsRef.current;
     const next = typeof updater === 'function' ? updater(prev) : updater;
     activePerfPadsRef.current = next;
     perfPadsDirtyRef.current = true;
   };
-  // Mutation shorthand: setPerfPad('A-slot-0', true) â€” zero allocation
+  // Mutation shorthand: setPerfPad('A-slot-0', true) Ã¢â‚¬â€ zero allocation
   const setPerfPad = (key, val) => {
     if (val) {
       activePerfPadsRef.current[key] = true;
@@ -779,7 +779,7 @@ export default function Delta7Synth() {
     }
     perfPadsDirtyRef.current = true;
   };
-  // Zero-waste: deckPlaying is ref-only â€” no useState, no re-renders
+  // Zero-waste: deckPlaying is ref-only Ã¢â‚¬â€ no useState, no re-renders
   const deckAPlayingRef = useRef(false);
   const deckBPlayingRef = useRef(false);
   const deckPlayingDirtyRef = useRef(false); // dirty flag for batched rAF visual sync
@@ -815,7 +815,7 @@ export default function Delta7Synth() {
   const deckALastPlaying = useRef(false); // tracks last synced value to avoid redundant DOM writes
   const deckBLastPlaying = useRef(false);
   const perfTempProgRef = useRef({}); // Zero-waste: pre-allocated staging object for triggerPerfPadDSP
-  // VU meter DOM refs â€” updated directly in tickLoop to avoid React re-renders (Issue 1)
+  // VU meter DOM refs Ã¢â‚¬â€ updated directly in tickLoop to avoid React re-renders (Issue 1)
   const vuLevelLRef = useRef(0);
   const vuLevelRRef = useRef(0);
   const vuSegLRefsArr = useRef([]);
@@ -829,7 +829,7 @@ export default function Delta7Synth() {
   const [deckBEqLow, setDeckBEqLow] = useState(0.0);
   const [deckBEqMid, setDeckBEqMid] = useState(0.0);
   const [deckBEqHigh, setDeckBEqHigh] = useState(0.0);
-  // VU levels: refs only (vuLevelLRef/vuLevelRRef) â€” dead useState removed
+  // VU levels: refs only (vuLevelLRef/vuLevelRRef) Ã¢â‚¬â€ dead useState removed
   const [deckAPitch, setDeckAPitch] = useState(0.0);
   const [deckBPitch, setDeckBPitch] = useState(0.0);
   const [deckALoopSize, setDeckALoopSize] = useState(4);
@@ -839,7 +839,7 @@ export default function Delta7Synth() {
   const [deckAKeyLock, setDeckAKeyLock] = useState(true);
   const [deckBKeyLock, setDeckBKeyLock] = useState(true);
 
-  // deckAPlaying/deckBPlaying are now ref-only â€” sync effects removed
+  // deckAPlaying/deckBPlaying are now ref-only Ã¢â‚¬â€ sync effects removed
   useEffect(() => { crossfaderValRef.current = crossfaderVal; }, [crossfaderVal]);
 
   const deckAVolFaderRef = useRef(0.8);
@@ -849,14 +849,14 @@ export default function Delta7Synth() {
 
   // Playback timeout tracker to cancel stale timers on stop (Issue 6)
   const perfPlaybackTimersRef = useRef([]);
-  // Pre-sorted events array â€” populated once when recording stops (Issue 4)
+  // Pre-sorted events array Ã¢â‚¬â€ populated once when recording stops (Issue 4)
   const sortedPerfEventsRef = useRef([]);
 
   const [masterSyncActive, setMasterSyncActive] = useState(false);
   const masterSyncActiveRef = useRef(false);
   useEffect(() => { masterSyncActiveRef.current = masterSyncActive; }, [masterSyncActive]);
 
-  // Dead state removed: ringAnglesA, ringAnglesB, currentPerfPlayBeat â€” rings use direct DOM mutation in rAF loop
+  // Dead state removed: ringAnglesA, ringAnglesB, currentPerfPlayBeat Ã¢â‚¬â€ rings use direct DOM mutation in rAF loop
   const [perfQuantizeMode, setPerfQuantizeMode] = useState('None');
   const [perfTimeSignature, setPerfTimeSignature] = useState('4/4');
 
@@ -1089,7 +1089,7 @@ export default function Delta7Synth() {
     const bufferLength = 32;
     const dataArray = new Uint8Array(bufferLength);
     
-    // Issue 8: replaced Map spread with early-exit for...of â€” eliminates 240 array allocations/sec
+    // Issue 8: replaced Map spread with early-exit for...of Ã¢â‚¬â€ eliminates 240 array allocations/sec
     const getIsDeckActive = (deck) => {
       if (deck === 'A') {
         if (deckAPlayingRef.current) return true;
@@ -1259,7 +1259,7 @@ export default function Delta7Synth() {
         }
       }
 
-      // Issue 1: VU Meter â€” direct DOM mutation, NO setState, zero React re-renders
+      // Issue 1: VU Meter Ã¢â‚¬â€ direct DOM mutation, NO setState, zero React re-renders
       if (analyserRef.current) {
         analyserRef.current.getByteTimeDomainData(dataArray);
         let sum = 0;
@@ -1369,7 +1369,7 @@ export default function Delta7Synth() {
       cancelAnimationFrame(animId);
     };
   // Zero-waste: all audio-rate visuals (deckPlaying, activePerfPads, activeNotes) are ref-only
-  // and synced to DOM via the batched rAF loop above â€” no React re-renders from audio triggers
+  // and synced to DOM via the batched rAF loop above Ã¢â‚¬â€ no React re-renders from audio triggers
   }, [performanceViewActive]);
 
   // Real-time Mixer Fader & EQ voice modulator
@@ -1609,13 +1609,13 @@ export default function Delta7Synth() {
             liveRecPendingStartRef.current = false;
             setIsLiveRecording(true);
             setLiveRecPendingStart(false);
-            showEditorStatus("Live Recording Started! ðŸ”´");
+            showEditorStatus("Live Recording Started! Ã°Å¸â€Â´");
           } else {
             isRecordingRef.current = true;
             manualRecPendingStartRef.current = false;
             setIsRecording(true);
             setManualRecPendingStart(false);
-            showEditorStatus("Recording Started... âºï¸");
+            showEditorStatus("Recording Started... Ã¢ÂÂºÃ¯Â¸Â");
           }
         } else if (msg.type === 'STOPPED') {
           if (isLiveRecordingRef.current) {
@@ -1696,7 +1696,7 @@ export default function Delta7Synth() {
           setTimeout(() => {
             setIsRecording(true);
             setManualRecPendingStart(false);
-            showEditorStatus("Recording Started... âºï¸");
+            showEditorStatus("Recording Started... Ã¢ÂÂºÃ¯Â¸Â");
           }, 0);
           return;
         }
@@ -1760,7 +1760,7 @@ export default function Delta7Synth() {
           setTimeout(() => {
             setIsLiveRecording(true);
             setLiveRecPendingStart(false);
-            showEditorStatus("Live Recording Started! ðŸ”´");
+            showEditorStatus("Live Recording Started! Ã°Å¸â€Â´");
           }, 0);
           return;
         }
@@ -1808,14 +1808,14 @@ export default function Delta7Synth() {
     if (ctx.state === 'suspended') ctx.resume();
     
     if (!streamRef.current) {
-      showEditorStatus("Arming mic/instrument input... ðŸŽ¤");
+      showEditorStatus("Arming mic/instrument input... Ã°Å¸Å½Â¤");
       armMicrophone()
         .then(() => {
           triggerLiveLoopRecInternal();
         })
         .catch(err => {
           console.error("Arming microphone failed:", err);
-          showEditorStatus("Failed to arm input source! âŒ");
+          showEditorStatus("Failed to arm input source! Ã¢ÂÅ’");
         });
     } else {
       triggerLiveLoopRecInternal();
@@ -1845,7 +1845,7 @@ export default function Delta7Synth() {
       liveRecStartTimeRef.current = nextBeatTime;
       liveRecPendingStartRef.current = true;
       setLiveRecPendingStart(true);
-      showEditorStatus("Armed: Waiting for next beat... â³");
+      showEditorStatus("Armed: Waiting for next beat... Ã¢ÂÂ³");
       
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({
@@ -1860,7 +1860,7 @@ export default function Delta7Synth() {
       setLiveRecPendingStart(false);
       isLiveRecordingRef.current = true;
       setIsLiveRecording(true);
-      showEditorStatus("Live Recording Started! ðŸ”´");
+      showEditorStatus("Live Recording Started! Ã°Å¸â€Â´");
       
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({
@@ -1925,7 +1925,7 @@ export default function Delta7Synth() {
     if (updatedSlot) {
       saveSampleToDb(updatedSlot)
         .then(() => {
-          showEditorStatus(`Live Loop Saved to ${getSlotLabel(targetSlotId)}! ðŸ’¾`);
+          showEditorStatus(`Live Loop Saved to ${getSlotLabel(targetSlotId)}! Ã°Å¸â€™Â¾`);
         })
         .catch((e) => {
           console.error("Failed to save live loop to DB:", e);
@@ -1939,7 +1939,7 @@ export default function Delta7Synth() {
       liveRecPendingStartRef.current = false;
       setIsLiveRecording(false);
       setLiveRecPendingStart(false);
-      showEditorStatus("Live Recording Cancelled â¹ï¸");
+      showEditorStatus("Live Recording Cancelled Ã¢ÂÂ¹Ã¯Â¸Â");
       if (recordingWorkletNodeRef.current) {
         recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
       }
@@ -1965,7 +1965,7 @@ export default function Delta7Synth() {
       } else {
         liveRecPendingStartRef.current = false;
         setLiveRecPendingStart(false);
-        showEditorStatus("Live Recording Aborted â¹ï¸");
+        showEditorStatus("Live Recording Aborted Ã¢ÂÂ¹Ã¯Â¸Â");
       }
     }
   };
@@ -1980,7 +1980,7 @@ export default function Delta7Synth() {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devices.filter(device => device.kind === 'audioinput');
         setAudioDevices(audioInputs);
-        // Read ref not state â€” avoids stale closure resetting selection on hot-plug
+        // Read ref not state Ã¢â‚¬â€ avoids stale closure resetting selection on hot-plug
         if (audioInputs.length > 0 && !selectedAudioDeviceRef.current) {
           const defaultDevice = audioInputs.find(d => d.deviceId === 'default') || audioInputs[0];
           setSelectedAudioDevice(defaultDevice.deviceId);
@@ -2246,7 +2246,7 @@ export default function Delta7Synth() {
     if (updatedSlot) {
       saveSampleToDb(updatedSlot)
         .then(() => {
-          showEditorStatus(`Saved Lossless Resample to ${getSlotLabel(targetSlotId)}! ðŸ’¾`);
+          showEditorStatus(`Saved Lossless Resample to ${getSlotLabel(targetSlotId)}! Ã°Å¸â€™Â¾`);
         })
         .catch((e) => {
           console.error("Failed to auto-save resampled sample to DB:", e);
@@ -2274,7 +2274,7 @@ export default function Delta7Synth() {
       manualRecStartTimeRef.current = nextBeatTime;
       manualRecPendingStartRef.current = true;
       setManualRecPendingStart(true);
-      showEditorStatus("Record Armed: starting on next beat... â³");
+      showEditorStatus("Record Armed: starting on next beat... Ã¢ÂÂ³");
       
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({
@@ -2284,7 +2284,7 @@ export default function Delta7Synth() {
       }
     } else {
       if (!streamRef.current && recordingInputMode !== 'resample') {
-        showEditorStatus("Arming input first... ðŸŽ¤");
+        showEditorStatus("Arming input first... Ã°Å¸Å½Â¤");
         const armFunc = recordingInputMode === 'mic' ? armMicrophone : armMonitor;
         armFunc()
           .then(() => {
@@ -2292,7 +2292,7 @@ export default function Delta7Synth() {
             recordedChunksR.current = [];
             isRecordingRef.current = true;
             setIsRecording(true);
-            showEditorStatus("Recording Started... âºï¸");
+            showEditorStatus("Recording Started... Ã¢ÂÂºÃ¯Â¸Â");
             
             if (useWorklet) {
               recordingWorkletNodeRef.current.port.postMessage({ type: 'START' });
@@ -2308,7 +2308,7 @@ export default function Delta7Synth() {
       recordedChunksR.current = [];
       isRecordingRef.current = true;
       setIsRecording(true);
-      showEditorStatus("Recording Started... âºï¸");
+      showEditorStatus("Recording Started... Ã¢ÂÂºÃ¯Â¸Â");
       
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({ type: 'START' });
@@ -2329,7 +2329,7 @@ export default function Delta7Synth() {
       manualRecStopTimeRef.current = nextBeatTime;
       manualRecPendingStopRef.current = true;
       setManualRecPendingStop(true);
-      showEditorStatus("Record Stop Armed: stopping on next beat... â³");
+      showEditorStatus("Record Stop Armed: stopping on next beat... Ã¢ÂÂ³");
       
       const bpm = paramsRef.current.arpBpm || 120;
       const beatDuration = 60 / bpm;
@@ -2479,7 +2479,7 @@ export default function Delta7Synth() {
  
       setIsArmed(true);
       startMicMonitor();
-      showEditorStatus(`Resampler armed for ${prefix.toUpperCase()}${slotNum}! âºï¸`);
+      showEditorStatus(`Resampler armed for ${prefix.toUpperCase()}${slotNum}! Ã¢ÂÂºÃ¯Â¸Â`);
     } catch (err) {
       console.error("Error arming resampler:", err);
       alert("Resampler arming failed.");
@@ -2666,7 +2666,7 @@ export default function Delta7Synth() {
             }
             return s;
           }));
-          showEditorStatus(`Cleared ${bankLabel}${targetNum} from DB! ðŸ—‘ï¸`);
+          showEditorStatus(`Cleared ${bankLabel}${targetNum} from DB! Ã°Å¸â€”â€˜Ã¯Â¸Â`);
         } catch (err) {
           console.error(err);
           alert('Failed to clear database record.');
@@ -2727,7 +2727,7 @@ export default function Delta7Synth() {
         return next;
       });
       
-      showEditorStatus(`Saved to ${slotInput.toUpperCase()}! ðŸ’¾`);
+      showEditorStatus(`Saved to ${slotInput.toUpperCase()}! Ã°Å¸â€™Â¾`);
     } catch (err) {
       console.error(err);
       alert('Failed to save to database. Make sure your browser supports IndexedDB.');
@@ -2753,7 +2753,7 @@ export default function Delta7Synth() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      showEditorStatus('Exported WAV! ðŸ“¥');
+      showEditorStatus('Exported WAV! Ã°Å¸â€œÂ¥');
     } catch (err) {
       console.error(err);
       alert('Failed to export sample as WAV.');
@@ -3016,7 +3016,7 @@ export default function Delta7Synth() {
     const ctx = canvas.getContext('2d');
     
     const drawWaveform = () => {
-      // Issue 12: skip RAF when performance view is active â€” sampler canvas is not visible
+      // Issue 12: skip RAF when performance view is active Ã¢â‚¬â€ sampler canvas is not visible
       if (performanceViewActive) {
         samplerCanvasAnimIdRef.current = requestAnimationFrame(drawWaveform);
         return;
@@ -3800,7 +3800,7 @@ export default function Delta7Synth() {
     formantDryGain.gain.setValueAtTime(1.0, now);
     formantDryGainRef.current = formantDryGain;
 
-    // Issue 3: replaced ScriptProcessor bitcrusher with AudioWorklet â€” runs OFF main thread
+    // Issue 3: replaced ScriptProcessor bitcrusher with AudioWorklet Ã¢â‚¬â€ runs OFF main thread
     const bitcrusherInput = ctx.createGain();
     const bitcrusherOutput = ctx.createGain();
 
@@ -4446,9 +4446,9 @@ export default function Delta7Synth() {
                     sortedEvents: sortedPerfEventsRef.current
                   });
                 }
-                showEditorStatus("Overdub recording started! ðŸŽ™ï¸");
+                showEditorStatus("Overdub recording started! Ã°Å¸Å½â„¢Ã¯Â¸Â");
               } else {
-                showEditorStatus("Recording started! ðŸŽ™ï¸");
+                showEditorStatus("Recording started! Ã°Å¸Å½â„¢Ã¯Â¸Â");
               }
               
               if (!paramsRef.current.metronomeOn) {
@@ -4523,7 +4523,7 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     
-    showEditorStatus(`Generating ${kitType} Kit... â³`);
+    showEditorStatus(`Generating ${kitType} Kit... Ã¢ÂÂ³`);
     try {
       const generatedSamples = generateSynthesizedKit(ctx, kitType);
       
@@ -4561,7 +4561,7 @@ export default function Delta7Synth() {
         }
       }
 
-      showEditorStatus(`Loaded ${kitType} Kit to Bank ${bankType.toUpperCase()}! ðŸ’¾`);
+      showEditorStatus(`Loaded ${kitType} Kit to Bank ${bankType.toUpperCase()}! Ã°Å¸â€™Â¾`);
     } catch (err) {
       console.error("Error loading kit preset:", err);
       showEditorStatus("Failed to generate kit preset.");
@@ -4577,7 +4577,7 @@ export default function Delta7Synth() {
     );
     if (bankName === null) return; // cancelled
     
-    showEditorStatus(`Saving Bank ${bankType.toUpperCase()} Preset ${presetNum}... â³`);
+    showEditorStatus(`Saving Bank ${bankType.toUpperCase()} Preset ${presetNum}... Ã¢ÂÂ³`);
     try {
       const slotsToSave = sampleSlotsRef.current.filter(s => s.id.startsWith(bankType));
       
@@ -4628,7 +4628,7 @@ export default function Delta7Synth() {
       };
       
       await saveBankToDb(record);
-      showEditorStatus(`Bank ${bankType.toUpperCase()} Preset ${presetNum} Saved! ðŸ’¾`);
+      showEditorStatus(`Bank ${bankType.toUpperCase()} Preset ${presetNum} Saved! Ã°Å¸â€™Â¾`);
     } catch (err) {
       console.error("Failed to save bank preset:", err);
       showEditorStatus("Error saving bank preset.");
@@ -4684,7 +4684,7 @@ export default function Delta7Synth() {
       for (const slot of bankSlots) {
         await deleteSampleFromDb(slot.id);
       }
-      showEditorStatus(`Bank ${bankType.toUpperCase()} Cleared! ðŸ—‘ï¸`);
+      showEditorStatus(`Bank ${bankType.toUpperCase()} Cleared! Ã°Å¸â€”â€˜Ã¯Â¸Â`);
     } catch (err) {
       console.error("Failed to clear database records for bank:", err);
       showEditorStatus("Error clearing bank database.");
@@ -4696,7 +4696,7 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     
-    showEditorStatus(`Loading Bank ${bankType.toUpperCase()} Preset ${presetNum}... â³`);
+    showEditorStatus(`Loading Bank ${bankType.toUpperCase()} Preset ${presetNum}... Ã¢ÂÂ³`);
     try {
       const savedBank = await getSavedBankFromDb(`bank_${bankType}_preset_${presetNum}`);
       if (!savedBank) {
@@ -4770,7 +4770,7 @@ export default function Delta7Synth() {
         }
       }
       
-      showEditorStatus(`Loaded Preset: ${savedBank.name}! ðŸ’¾`);
+      showEditorStatus(`Loaded Preset: ${savedBank.name}! Ã°Å¸â€™Â¾`);
     } catch (err) {
       console.error("Failed to load bank preset:", err);
       showEditorStatus("Error loading bank preset.");
@@ -5876,7 +5876,7 @@ export default function Delta7Synth() {
       isReverseB: isReverseB
     };
 
-    // isSliceGranular must be hoisted outside if(bufferA) â€” it's used in the panner block after that inner if closes
+    // isSliceGranular must be hoisted outside if(bufferA) Ã¢â‚¬â€ it's used in the panner block after that inner if closes
     const isSliceGranular = !prog.granularActive && (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0);
     const isWarpedGranularA = !!(slotA && bufferA && (slotA.warpOn || masterSyncActiveRef.current) && (slotA.tuning || 0) !== 0 && prog.oscATriggerMode !== 'slice');
     const isWarpedGranularB = !!(slotB && bufferB && (slotB.warpOn || masterSyncActiveRef.current) && (slotB.tuning || 0) !== 0 && prog.oscBTriggerMode !== 'slice');
@@ -5952,7 +5952,7 @@ export default function Delta7Synth() {
 
           if (nextGrainTime < ctxNow + lookahead) {
             const drift = (ctxNow + lookahead) - nextGrainTime;
-            // Playhead speed: for slice stretch, 1/(1+stretch) â€” stretch=0 â†’ 1.0 (normal), stretch=1 â†’ 0.5 (half speed = 2Ã— longer)
+            // Playhead speed: for slice stretch, 1/(1+stretch) Ã¢â‚¬â€ stretch=0 Ã¢â€ â€™ 1.0 (normal), stretch=1 Ã¢â€ â€™ 0.5 (half speed = 2Ãƒâ€” longer)
             const playheadSpeed = isSliceGranular ? (1.0 / Math.max(0.05, 1.0 + sliceStretchA)) : (isWarpedGranularA ? freqScaleA : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0));
             playhead += drift * playheadSpeed;
             nextGrainTime = ctxNow + lookahead;
@@ -6325,7 +6325,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
             const clampedStartOffset = Math.max(0, Math.min(currentBuf.duration - 0.005, grainStart));
 
-            // Grain playback rate = pitch-only (base 1.0) â€” tempo controlled by playhead speed
+            // Grain playback rate = pitch-only (base 1.0) Ã¢â‚¬â€ tempo controlled by playhead speed
             let grainPlaybackRateB = 1.0;
             if (isSliceGranularB) {
               grainPlaybackRateB = Math.pow(2, (slicePitchB + oscBPitch + oscBOctave * 12) / 12) * Math.pow(2, oscBDetune / 1200);
@@ -6581,7 +6581,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         let att = sliceEnvA.attack;
         let dec = sliceEnvA.decay;
         // Only clamp attack/decay to dPlayA for standard (non-stretched) slice playback.
-        // When granular time-stretch is active the grain windows handle their own decay â€”
+        // When granular time-stretch is active the grain windows handle their own decay Ã¢â‚¬â€
         // clamping gainA here would silence the grains before they're audible.
         const isGranularStretch = sliceStretchA !== 0;
         if (!isLoopA && !isGranularStretch) {
@@ -6985,7 +6985,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           if (voice.eqHighNode) { try { voice.eqHighNode.disconnect(); } catch {} }
           if (voice.sendGainNode) { try { voice.sendGainNode.disconnect(); } catch {} }
           if (voice.voiceOutGain) { try { voice.voiceOutGain.disconnect(); } catch {} }
-          // Previously leaked nodes â€” now properly disconnected
+          // Previously leaked nodes Ã¢â‚¬â€ now properly disconnected
           if (voice.stutterGateNode) { try { voice.stutterGateNode.disconnect(); } catch {} }
           if (voice.stutterPannerNode) { try { voice.stutterPannerNode.disconnect(); } catch {} }
           if (voice.padPannerNode) { try { voice.padPannerNode.disconnect(); } catch {} }
@@ -7039,12 +7039,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const slot = sampleSlotsRef.current.find(s => s.id === slotId);
     if (!slot) return;
     const nextLoop = !slot.loopOn;
-    // Mutate in-place â€” audio engine sees it immediately
+    // Mutate in-place Ã¢â‚¬â€ audio engine sees it immediately
     slot.loopOn = nextLoop;
     setSampleSlots(prev => [...prev]);
     saveSlotMetadataToDb(slotId, { loopOn: nextLoop })
       .catch(err => console.error("Failed to auto-save loop setting to IndexedDB:", err));
-    showEditorStatus(`${getSlotLabel(slotId)} Play Mode: ${nextLoop ? 'LOOP' : 'ONE-SHOT'} ðŸ”„`);
+    showEditorStatus(`${getSlotLabel(slotId)} Play Mode: ${nextLoop ? 'LOOP' : 'ONE-SHOT'} Ã°Å¸â€â€ž`);
   };
 
   const cycleTriggerMode = (slotId, e) => {
@@ -7055,14 +7055,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const currentMode = slot.triggerMode || 'hold';
     const nextIdx = (modes.indexOf(currentMode) + 1) % modes.length;
     const nextMode = modes[nextIdx];
-    // Mutate in-place on ref â€” audio engine sees it immediately, zero allocation
+    // Mutate in-place on ref Ã¢â‚¬â€ audio engine sees it immediately, zero allocation
     slot.triggerMode = nextMode;
     // UI update (React batches this with showEditorStatus in same event handler)
     setSampleSlots(prev => [...prev]);
-    // Lightweight metadata-only save â€” no buffer copy
+    // Lightweight metadata-only save Ã¢â‚¬â€ no buffer copy
     saveSlotMetadataToDb(slotId, { triggerMode: nextMode })
       .catch(err => console.error("Failed to save slot triggerMode:", err));
-    showEditorStatus(`${getSlotLabel(slotId)} Mode: ${nextMode.toUpperCase()} ðŸŽ›ï¸`);
+    showEditorStatus(`${getSlotLabel(slotId)} Mode: ${nextMode.toUpperCase()} Ã°Å¸Å½â€ºÃ¯Â¸Â`);
   };
 
   const handlePadRightClick = (e, deck, index) => {
@@ -7154,8 +7154,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
   };
 
-  // ── Event-delegated pad grid handlers ──────────────────────────
-  // Single set of handlers on the grid container — reads data-deck/data-idx
+  // â”€â”€ Event-delegated pad grid handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Single set of handlers on the grid container â€” reads data-deck/data-idx
   // from closest .perf-pad. Eliminates 96+ closures per render.
   const getPadData = (e) => {
     const pad = e.target.closest('.perf-pad[data-deck]');
@@ -7194,6 +7194,41 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const d = getPadData(e); if (!d) return;
     e.preventDefault();
     handlePadRightClick(e, d.deck, d.idx);
+  }, []);
+
+  // Shared stopPropagation handler â€” replaces hundreds of (e) => e.stopPropagation() closures
+  const stopProp = useCallback((e) => e.stopPropagation(), []);
+
+  // Badge click handlers using data-slot-id
+  const handleRevBadgeClick = useCallback((e) => {
+    e.stopPropagation();
+    const slotId = e.currentTarget.closest('.perf-pad[data-deck]')?.dataset.deck
+      ? (e.currentTarget.closest('.perf-pad[data-deck]').dataset.deck === 'A' ? 'a0' : 'b0') +
+        (parseInt(e.currentTarget.closest('.perf-pad[data-deck]').dataset.idx, 10) + 1)
+      : null;
+    if (!slotId) return;
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    if (!slot) return;
+    slot.reverseOn = !slot.reverseOn;
+    setSampleSlots(prev => [...prev]);
+    saveSlotMetadataToDb(slotId, { reverseOn: slot.reverseOn })
+      .catch(err => console.error("Failed to save slot reverse:", err));
+  }, []);
+
+  const handleLoopBadgeClick = useCallback((e) => {
+    e.stopPropagation();
+    const pad = e.currentTarget.closest('.perf-pad[data-deck]');
+    if (!pad) return;
+    const slotId = (pad.dataset.deck === 'A' ? 'a0' : 'b0') + (parseInt(pad.dataset.idx, 10) + 1);
+    toggleSlotLoop(slotId, e);
+  }, []);
+
+  const handleTriggerModeBadgeClick = useCallback((e) => {
+    e.stopPropagation();
+    const pad = e.currentTarget.closest('.perf-pad[data-deck]');
+    if (!pad) return;
+    const slotId = (pad.dataset.deck === 'A' ? 'a0' : 'b0') + (parseInt(pad.dataset.idx, 10) + 1);
+    cycleTriggerMode(slotId, e);
   }, []);
 
   const triggerPerfPadDSP = (deck, type, index, velocity, isNoteOn, shouldRecord, targetTime, targetBeat) => {
@@ -7456,7 +7491,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (!ctx) return;
     
     if (perfRecordActive) {
-      // Issue 5: flush ref to state now that recording is done â€” one single setState call
+      // Issue 5: flush ref to state now that recording is done Ã¢â‚¬â€ one single setState call
       const recorded = [...perfEventsRef.current];
       setPerfEvents(recorded);
       // Issue 4: pre-sort once here so runPerfScheduler never sorts again
@@ -7481,13 +7516,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPlaybackActive(true);
         perfPlayStartTimeRef.current = perfStartTimeRef.current;
         seqStartBeatOffsetRef.current = 0.0;
-        showEditorStatus(`Overdub Complete! Seamlessly Playing... â–¶ï¸`);
+        showEditorStatus(`Overdub Complete! Seamlessly Playing... Ã¢â€“Â¶Ã¯Â¸Â`);
       } else {
         setPerfPlaybackActive(false);
         if (schedulerNodeRef.current) {
           schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
         }
-        showEditorStatus(`Performance Recorded! (${recorded.length} events) â¹ï¸`);
+        showEditorStatus(`Performance Recorded! (${recorded.length} events) Ã¢ÂÂ¹Ã¯Â¸Â`);
       }
       setPerfIsDubbing(false);
     } else {
@@ -7508,7 +7543,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               perfRecordActive: true
             });
           }
-          showEditorStatus("Overdub engaged on the fly! ðŸŽ™ï¸");
+          showEditorStatus("Overdub engaged on the fly! Ã°Å¸Å½â„¢Ã¯Â¸Â");
           return;
         } else {
           // Clean Record from active playback: halt playback first
@@ -7533,7 +7568,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         perfCountInActiveRef.current = true;
         setPerfCountInActive(true);
         
-        showEditorStatus("Count-in Armed... Get Ready! â±ï¸");
+        showEditorStatus("Count-in Armed... Get Ready! Ã¢ÂÂ±Ã¯Â¸Â");
         startMetronome();
         return;
       }
@@ -7578,13 +7613,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             sortedEvents: sortedPerfEventsRef.current
           });
         }
-        showEditorStatus("Overdubbing Performance... ðŸŽ™ï¸");
+        showEditorStatus("Overdubbing Performance... Ã°Å¸Å½â„¢Ã¯Â¸Â");
       } else {
         setPerfPlaybackActive(false);
         if (schedulerNodeRef.current) {
           schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
         }
-        showEditorStatus("Recording Performance (Clean)... âºï¸");
+        showEditorStatus("Recording Performance (Clean)... Ã¢ÂÂºÃ¯Â¸Â");
       }
     }
   };
@@ -7610,10 +7645,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         if (typeof k === 'string' && k.startsWith('perf-')) stopPerfVoice(k);
       }
       setActivePerfPads({});
-      showEditorStatus("Playback Stopped. â¹ï¸");
+      showEditorStatus("Playback Stopped. Ã¢ÂÂ¹Ã¯Â¸Â");
     } else {
       if (sortedPerfEventsRef.current.length === 0 && perfEventsRef.current.length === 0) {
-        showEditorStatus("No performance events recorded yet! âš ï¸");
+        showEditorStatus("No performance events recorded yet! Ã¢Å¡Â Ã¯Â¸Â");
         return;
       }
       // Ensure sorted events are populated (fallback if stop-recording path was skipped)
@@ -7637,7 +7672,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           sortedEvents: sortedPerfEventsRef.current
         });
       }
-      showEditorStatus("Playing Performance... â–¶ï¸");
+      showEditorStatus("Playing Performance... Ã¢â€“Â¶Ã¯Â¸Â");
     }
   };
 
@@ -7679,7 +7714,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       if (typeof k === 'string' && k.startsWith('perf-')) stopPerfVoice(k);
     }
     setActivePerfPads({});
-    showEditorStatus("Playback Stopped and Reset. â¹ï¸");
+    showEditorStatus("Playback Stopped and Reset. Ã¢ÂÂ¹Ã¯Â¸Â");
   };
 
   const clearPerformance = () => {
@@ -7691,7 +7726,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (schedulerNodeRef.current) {
       schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
     }
-    showEditorStatus("Performance Cleared! ðŸ—‘ï¸");
+    showEditorStatus("Performance Cleared! Ã°Å¸â€”â€˜Ã¯Â¸Â");
   };
 
   const getPlatterAngle = (e, rect) => {
@@ -9221,7 +9256,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         sortedEvents: sortedPerfEventsRef.current
       });
     }
-    showEditorStatus(`Drawn Note at Beat ${startBeat.toFixed(2)} âœï¸`);
+    showEditorStatus(`Drawn Note at Beat ${startBeat.toFixed(2)} Ã¢Å“ÂÃ¯Â¸Â`);
   };
 
   const erasePill = (deck, laneIdx, pill) => {
@@ -9244,20 +9279,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         sortedEvents: sortedPerfEventsRef.current
       });
     }
-    showEditorStatus(`Erased Note at Beat ${pill.start.toFixed(2)} âŒ`);
+    showEditorStatus(`Erased Note at Beat ${pill.start.toFixed(2)} Ã¢ÂÅ’`);
   };
 
   const handleCopyDeck = (deck) => {
     const eventsToCopy = perfEvents.filter(evt => evt.deck === deck);
     if (eventsToCopy.length === 0) {
-      showEditorStatus(`No notes to copy on Deck ${deck}! ðŸ“‘`);
+      showEditorStatus(`No notes to copy on Deck ${deck}! Ã°Å¸â€œâ€˜`);
       return;
     }
     setHighwayClipboard({
       deck,
       events: JSON.parse(JSON.stringify(eventsToCopy))
     });
-    showEditorStatus(`Copied Deck ${deck} notes to clipboard! ðŸ“‘`);
+    showEditorStatus(`Copied Deck ${deck} notes to clipboard! Ã°Å¸â€œâ€˜`);
   };
 
   const handlePasteDeck = (targetDeck) => {
@@ -9279,7 +9314,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         sortedEvents: sortedPerfEventsRef.current
       });
     }
-    showEditorStatus(`Pasted clipboard onto Deck ${targetDeck}! ðŸ“‘`);
+    showEditorStatus(`Pasted clipboard onto Deck ${targetDeck}! Ã°Å¸â€œâ€˜`);
   };
 
   const handleClearDeck = (deck) => {
@@ -9295,7 +9330,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           sortedEvents: sortedPerfEventsRef.current
         });
       }
-      showEditorStatus(`Cleared all notes on Deck ${deck}! ðŸ§¹`);
+      showEditorStatus(`Cleared all notes on Deck ${deck}! Ã°Å¸Â§Â¹`);
     }
   };
 
@@ -9657,18 +9692,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       <button
                         className="perf-pad-rev-badge"
                         data-active={slot.reverseOn ? 'true' : 'false'}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Mutate in-place â€” audio engine sees it immediately
-                          slot.reverseOn = !slot.reverseOn;
-                          setSampleSlots(prev => [...prev]);
-                          saveSlotMetadataToDb(slotId, { reverseOn: slot.reverseOn })
-                            .catch(err => console.error("Failed to save slot reverse:", err));
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onMouseUp={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
+                        onClick={handleRevBadgeClick}
+                        onMouseDown={stopProp}
+                        onMouseUp={stopProp}
+                        onTouchStart={stopProp}
+                        onTouchEnd={stopProp}
                       >
                         {slot.reverseOn ? 'REV' : 'FWD'}
                       </button>
@@ -9679,14 +9707,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         className="perf-pad-loop-badge"
                         data-active={slot.loopOn ? 'true' : 'false'}
                         style={{ '--pad-color': ringColor }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSlotLoop(slotId, e);
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onMouseUp={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
+                        onClick={handleLoopBadgeClick}
+                        onMouseDown={stopProp}
+                        onMouseUp={stopProp}
+                        onTouchStart={stopProp}
+                        onTouchEnd={stopProp}
                       >
                         {slot.loopOn ? 'LOOP' : '1-SHOT'}
                       </button>
@@ -9695,14 +9720,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       <button
                         className="perf-pad-trigger-mode-badge"
                         data-mode={slot.triggerMode || 'hold'}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          cycleTriggerMode(slotId, e);
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onMouseUp={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
+                        onClick={handleTriggerModeBadgeClick}
+                        onMouseDown={stopProp}
+                        onMouseUp={stopProp}
+                        onTouchStart={stopProp}
+                        onTouchEnd={stopProp}
                         title={`Trigger Mode: ${(slot.triggerMode || 'hold').toUpperCase()} (Click to toggle)`}
                       >
                         {(slot.triggerMode || 'hold').substring(0, 3).toUpperCase()}
@@ -9720,7 +9742,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 onClick={() => {
                   const nextSolo = !deckASoloActive;
                   setDeckASoloActive(nextSolo);
-                  showEditorStatus(`Deck A Solo Mode: ${nextSolo ? 'ON' : 'OFF'} ðŸŽ§`);
+                  showEditorStatus(`Deck A Solo Mode: ${nextSolo ? 'ON' : 'OFF'} Ã°Å¸Å½Â§`);
                 }}
                 title="Solo Deck A (Only one pad plays at a time)"
               >
@@ -9734,7 +9756,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     stopPerfVoice(`perf-a-slot-${i}`);
                   }
                   setDeckAPlaying(false);
-                  showEditorStatus("Deck A Cued â¹ï¸");
+                  showEditorStatus("Deck A Cued Ã¢ÂÂ¹Ã¯Â¸Â");
                 }}
               >
                 Cue
@@ -9775,7 +9797,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       }
                     }
                   }
-                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) âª`);
+                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) Ã¢ÂÂª`);
                 }}
                 style={{ 
                   fontSize: '0.45rem', 
@@ -9789,7 +9811,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Rewind 4 beats"
               >
-                âª
+                Ã¢ÂÂª
               </button>
               <button
                 className="deck-btn-xs"
@@ -9806,7 +9828,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Stop and Reset Performance"
               >
-                â–  Stop
+                Ã¢â€“Â  Stop
               </button>
               <button
                 className={`deck-btn-xs ${perfPlaybackActive ? 'active' : ''}`}
@@ -9824,7 +9846,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title={perfPlaybackActive ? "Pause Performance" : "Play Performance"}
               >
-                {perfPlaybackActive ? 'â¸ Pause' : 'â–¶ Play'}
+                {perfPlaybackActive ? 'Ã¢ÂÂ¸ Pause' : 'Ã¢â€“Â¶ Play'}
               </button>
               <button
                 className="deck-btn-xs"
@@ -9846,7 +9868,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       }
                     }
                   }
-                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) â©`);
+                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) Ã¢ÂÂ©`);
                 }}
                 style={{ 
                   fontSize: '0.45rem', 
@@ -9860,7 +9882,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Forward 4 beats"
               >
-                â©
+                Ã¢ÂÂ©
               </button>
               <button
                 className={`deck-btn-xs ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
@@ -9878,7 +9900,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Record live pad triggers to performance sequencer"
               >
-                â— Rec
+                Ã¢â€”Â Rec
               </button>
             </div>
 
@@ -9901,7 +9923,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  ðŸ–ï¸ Play
+                  Ã°Å¸â€“ÂÃ¯Â¸Â Play
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'draw' ? 'active' : ''}`}
@@ -9919,7 +9941,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  âœï¸ Draw
+                  Ã¢Å“ÂÃ¯Â¸Â Draw
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'resize' ? 'active' : ''}`}
@@ -9937,7 +9959,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  â†”ï¸ Size
+                  Ã¢â€ â€Ã¯Â¸Â Size
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'erase' ? 'active' : ''}`}
@@ -9955,7 +9977,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  âŒ Del
+                  Ã¢ÂÅ’ Del
                 </button>
               </div>
 
@@ -10193,7 +10215,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               />
             </div>
             
-            {/* Central LED VU Meter â€” segments driven by DOM refs, NOT React state (Issue 1) */}
+            {/* Central LED VU Meter Ã¢â‚¬â€ segments driven by DOM refs, NOT React state (Issue 1) */}
             <div style={{ 
               display: 'flex', 
               gap: '3px', 
@@ -10459,7 +10481,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               onClick={() => {
                 const nextActive = !masterSyncActive;
                 setMasterSyncActive(nextActive);
-                showEditorStatus(`Master Tempo Sync: ${nextActive ? 'ON' : 'OFF'} ðŸ”„`);
+                showEditorStatus(`Master Tempo Sync: ${nextActive ? 'ON' : 'OFF'} Ã°Å¸â€â€ž`);
               }}
               style={{
                 marginTop: '6px',
@@ -10803,18 +10825,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       <button
                         className="perf-pad-rev-badge"
                         data-active={slot.reverseOn ? 'true' : 'false'}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Mutate in-place â€” audio engine sees it immediately
-                          slot.reverseOn = !slot.reverseOn;
-                          setSampleSlots(prev => [...prev]);
-                          saveSlotMetadataToDb(slotId, { reverseOn: slot.reverseOn })
-                            .catch(err => console.error("Failed to save slot reverse:", err));
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onMouseUp={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
+                        onClick={handleRevBadgeClick}
+                        onMouseDown={stopProp}
+                        onMouseUp={stopProp}
+                        onTouchStart={stopProp}
+                        onTouchEnd={stopProp}
                       >
                         {slot.reverseOn ? 'REV' : 'FWD'}
                       </button>
@@ -10825,14 +10840,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         className="perf-pad-loop-badge"
                         data-active={slot.loopOn ? 'true' : 'false'}
                         style={{ '--pad-color': ringColor }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSlotLoop(slotId, e);
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onMouseUp={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
+                        onClick={handleLoopBadgeClick}
+                        onMouseDown={stopProp}
+                        onMouseUp={stopProp}
+                        onTouchStart={stopProp}
+                        onTouchEnd={stopProp}
                       >
                         {slot.loopOn ? 'LOOP' : '1-SHOT'}
                       </button>
@@ -10841,14 +10853,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       <button
                         className="perf-pad-trigger-mode-badge"
                         data-mode={slot.triggerMode || 'hold'}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          cycleTriggerMode(slotId, e);
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onMouseUp={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
+                        onClick={handleTriggerModeBadgeClick}
+                        onMouseDown={stopProp}
+                        onMouseUp={stopProp}
+                        onTouchStart={stopProp}
+                        onTouchEnd={stopProp}
                         title={`Trigger Mode: ${(slot.triggerMode || 'hold').toUpperCase()} (Click to toggle)`}
                       >
                         {(slot.triggerMode || 'hold').substring(0, 3).toUpperCase()}
@@ -10866,7 +10875,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 onClick={() => {
                   const nextSolo = !deckBSoloActive;
                   setDeckBSoloActive(nextSolo);
-                  showEditorStatus(`Deck B Solo Mode: ${nextSolo ? 'ON' : 'OFF'} ðŸŽ§`);
+                  showEditorStatus(`Deck B Solo Mode: ${nextSolo ? 'ON' : 'OFF'} Ã°Å¸Å½Â§`);
                 }}
                 title="Solo Deck B (Only one pad plays at a time)"
               >
@@ -10880,7 +10889,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     stopPerfVoice(`perf-b-slot-${i}`);
                   }
                   setDeckBPlaying(false);
-                  showEditorStatus("Deck B Cued â¹ï¸");
+                  showEditorStatus("Deck B Cued Ã¢ÂÂ¹Ã¯Â¸Â");
                 }}
               >
                 Cue
@@ -10921,7 +10930,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       }
                     }
                   }
-                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) âª`);
+                  showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) Ã¢ÂÂª`);
                 }}
                 style={{ 
                   fontSize: '0.45rem', 
@@ -10935,7 +10944,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Rewind 4 beats"
               >
-                âª
+                Ã¢ÂÂª
               </button>
               <button
                 className="deck-btn-xs"
@@ -10952,7 +10961,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Stop and Reset Performance"
               >
-                â–  Stop
+                Ã¢â€“Â  Stop
               </button>
               <button
                 className={`deck-btn-xs ${perfPlaybackActive ? 'active' : ''}`}
@@ -10970,7 +10979,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title={perfPlaybackActive ? "Pause Performance" : "Play Performance"}
               >
-                {perfPlaybackActive ? 'â¸ Pause' : 'â–¶ Play'}
+                {perfPlaybackActive ? 'Ã¢ÂÂ¸ Pause' : 'Ã¢â€“Â¶ Play'}
               </button>
               <button
                 className="deck-btn-xs"
@@ -10992,7 +11001,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       }
                     }
                   }
-                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) â©`);
+                  showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) Ã¢ÂÂ©`);
                 }}
                 style={{ 
                   fontSize: '0.45rem', 
@@ -11006,7 +11015,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Forward 4 beats"
               >
-                â©
+                Ã¢ÂÂ©
               </button>
               <button
                 className={`deck-btn-xs ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
@@ -11024,7 +11033,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Record live pad triggers to performance sequencer"
               >
-                â— Rec
+                Ã¢â€”Â Rec
               </button>
             </div>
 
@@ -11047,7 +11056,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  ðŸ–ï¸ Play
+                  Ã°Å¸â€“ÂÃ¯Â¸Â Play
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'draw' ? 'active' : ''}`}
@@ -11065,7 +11074,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  âœï¸ Draw
+                  Ã¢Å“ÂÃ¯Â¸Â Draw
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'resize' ? 'active' : ''}`}
@@ -11083,7 +11092,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  â†”ï¸ Size
+                  Ã¢â€ â€Ã¯Â¸Â Size
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'erase' ? 'active' : ''}`}
@@ -11101,7 +11110,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
-                  âŒ Del
+                  Ã¢ÂÅ’ Del
                 </button>
               </div>
 
@@ -11353,12 +11362,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         }
                       }
                     }
-                    showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) âª`);
+                    showEditorStatus(`Rewound 4 Beats (to ${nextBeat.toFixed(1)}) Ã¢ÂÂª`);
                   }}
                   style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#00f3ff', background: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.3)' }}
                   title="Rewind 4 beats"
                 >
-                  âª
+                  Ã¢ÂÂª
                 </button>
 
                 {/* Stop */}
@@ -11368,7 +11377,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#ff4444', background: 'rgba(255, 68, 68, 0.05)', border: '1px solid rgba(255, 68, 68, 0.3)' }}
                   title="Stop and Reset"
                 >
-                  â–  Stop
+                  Ã¢â€“Â  Stop
                 </button>
 
                 {/* Play / Pause */}
@@ -11386,7 +11395,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                   title={perfPlaybackActive ? "Pause" : "Play"}
                 >
-                  {perfPlaybackActive ? 'â¸ Pause' : 'â–¶ Play'}
+                  {perfPlaybackActive ? 'Ã¢ÂÂ¸ Pause' : 'Ã¢â€“Â¶ Play'}
                 </button>
 
                 {/* Forward */}
@@ -11410,12 +11419,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         }
                       }
                     }
-                    showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) â©`);
+                    showEditorStatus(`Forwarded 4 Beats (to ${nextBeat.toFixed(1)}) Ã¢ÂÂ©`);
                   }}
                   style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#00f3ff', background: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.3)' }}
                   title="Forward 4 beats"
                 >
-                  â©
+                  Ã¢ÂÂ©
                 </button>
 
                 {/* Record */}
@@ -11433,7 +11442,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                   title={perfRecordActive && !perfIsDubbing ? "Stop Recording" : "Clean Record (clears sequence)"}
                 >
-                  {perfRecordActive && !perfIsDubbing ? 'â— REC...' : 'â— Record'}
+                  {perfRecordActive && !perfIsDubbing ? 'Ã¢â€”Â REC...' : 'Ã¢â€”Â Record'}
                 </button>
 
                 {/* Dub */}
@@ -11451,7 +11460,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                   title={perfRecordActive && perfIsDubbing ? "Stop Dubbing" : "Overdub (layers notes on top)"}
                 >
-                  {perfRecordActive && perfIsDubbing ? 'â— DUBBING' : 'â— Dub'}
+                  {perfRecordActive && perfIsDubbing ? 'Ã¢â€”Â DUBBING' : 'Ã¢â€”Â Dub'}
                 </button>
               </div>
 
@@ -12328,12 +12337,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                               }
                               
                               updateBufferForSlot(selectedEditSlotId, newBuffer, `Gain x${factor}: ${slot.name}`);
-                              showEditorStatus(`Gain scaled x${factor}! ðŸ”Š`);
+                              showEditorStatus(`Gain scaled x${factor}! Ã°Å¸â€Å `);
                             }}
                             style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ffe600', color: '#ffe600' }}
                             title="Adjust amplitude/gain of selection or entire sample"
                           >
-                            ðŸ”Š GAIN
+                            Ã°Å¸â€Å  GAIN
                           </button>
                           <button
                             className="btn btn-xs"
@@ -12341,7 +12350,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#00f3ff', color: '#00f3ff' }}
                             title="Save sample buffer and settings to browser database"
                           >
-                            ðŸ’¾ SAVE
+                            Ã°Å¸â€™Â¾ SAVE
                           </button>
                           <button
                             className="btn btn-xs"
@@ -12350,7 +12359,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ff00ff', color: '#ff00ff' }}
                             title="Export sample as WAV file"
                           >
-                            ðŸ“¥ EXPORT
+                            Ã°Å¸â€œÂ¥ EXPORT
                           </button>
                         </div>
                         {editorStatus ? (
@@ -12463,7 +12472,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                     const beats = slot.warpBeats || 4;
                                     const calculatedBpm = Math.round(Math.max(40, Math.min(250, (60 * beats) / origDur)) * 10) / 10;
                                     setParams(prev => ({ ...prev, arpBpm: calculatedBpm }));
-                                    showEditorStatus(`Synced Master Tempo to Slot BPM: ${calculatedBpm.toFixed(1)}! â±ï¸`);
+                                    showEditorStatus(`Synced Master Tempo to Slot BPM: ${calculatedBpm.toFixed(1)}! Ã¢ÂÂ±Ã¯Â¸Â`);
                                   }
                                 }}
                                 className="btn btn-xs btn-fit-bpm"
@@ -13155,7 +13164,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                               style={{ fontSize: '0.48rem', padding: '2px 1px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
                               title={`${getSlotLabel(s.id)}: ${s.name}`}
                             >
-                              {getSlotLabel(s.id)}:{s.buffer ? 'â—' : 'â—‹'}
+                              {getSlotLabel(s.id)}:{s.buffer ? 'Ã¢â€”Â' : 'Ã¢â€”â€¹'}
                             </button>
                           ))}
                         </div>
@@ -13171,7 +13180,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                               style={{ fontSize: '0.48rem', padding: '2px 1px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}
                               title={`${getSlotLabel(s.id)}: ${s.name}`}
                             >
-                              {getSlotLabel(s.id)}:{s.buffer ? 'â—' : 'â—‹'}
+                              {getSlotLabel(s.id)}:{s.buffer ? 'Ã¢â€”Â' : 'Ã¢â€”â€¹'}
                             </button>
                           ))}
                         </div>
@@ -13377,7 +13386,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           />
                         </div>
                         <div style={{ fontSize: '0.5rem', color: '#ff00ff', textAlign: 'center', marginTop: '1px' }}>
-                          ðŸ–±ï¸ Click & Drag to shape VCF Filter ADSR
+                          Ã°Å¸â€“Â±Ã¯Â¸Â Click & Drag to shape VCF Filter ADSR
                         </div>
                       </div>
 
@@ -13397,7 +13406,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           />
                         </div>
                         <div style={{ fontSize: '0.5rem', color: '#ff00ff', textAlign: 'center', marginTop: '1px' }}>
-                          ðŸ–±ï¸ Click & Drag to shape VCA Amplitude ADSR
+                          Ã°Å¸â€“Â±Ã¯Â¸Â Click & Drag to shape VCA Amplitude ADSR
                         </div>
                       </div>
                     </div>
@@ -13704,7 +13713,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}
                   title="Clean Record (clears sequence)"
                 >
-                  {perfRecordActive && !perfIsDubbing ? 'â— REC ON' : 'â— REC'}
+                  {perfRecordActive && !perfIsDubbing ? 'Ã¢â€”Â REC ON' : 'Ã¢â€”Â REC'}
                 </button>
                 <button
                   className="btn btn-xs"
@@ -13721,7 +13730,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                   title="Overdub (layers notes on top)"
                 >
-                  {perfRecordActive && perfIsDubbing ? 'â— DUB ON' : 'â— DUB'}
+                  {perfRecordActive && perfIsDubbing ? 'Ã¢â€”Â DUB ON' : 'Ã¢â€”Â DUB'}
                 </button>
                 <button
                   className={`btn btn-xs ${perfPlaybackActive ? 'active-green' : ''}`}
@@ -13729,7 +13738,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0 }}
                   title="Play/Pause"
                 >
-                  {perfPlaybackActive ? 'â¸ PAUSE' : 'â–º PLAY'}
+                  {perfPlaybackActive ? 'Ã¢ÂÂ¸ PAUSE' : 'Ã¢â€“Âº PLAY'}
                 </button>
                 <button
                   className="btn btn-xs"
@@ -13737,7 +13746,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ padding: '2px 8px', fontSize: '0.55rem', fontWeight: 'bold', margin: 0, borderColor: '#ff4444', color: '#ff4444' }}
                   title="Stop & Reset"
                 >
-                  â–  STOP
+                  Ã¢â€“Â  STOP
                 </button>
                 <button
                   className="btn btn-xs"
@@ -13924,7 +13933,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     }
                   }}
                 >
-                  â— REC
+                  Ã¢â€”Â REC
                 </button>
                 <button
                   className={`btn btn-xs ${isPlayingGesture ? 'active-cyan' : ''}`}
@@ -13939,7 +13948,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     }
                   }}
                 >
-                  â–º PLAY
+                  Ã¢â€“Âº PLAY
                 </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -14254,7 +14263,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   value={perfQuantizeMode} 
                   onChange={(e) => {
                     setPerfQuantizeMode(e.target.value);
-                    showEditorStatus(`Quantize Grid: ${e.target.value} ðŸ“`);
+                    showEditorStatus(`Quantize Grid: ${e.target.value} Ã°Å¸â€œÂ`);
                   }}
                   style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.4)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '62px', outline: 'none' }}
                 >
@@ -14275,7 +14284,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   onClick={() => {
                     const nextEnabled = !perfCountInEnabled;
                     setPerfCountInEnabled(nextEnabled);
-                    showEditorStatus(`Record Count-in (1 Bar): ${nextEnabled ? 'ON' : 'OFF'} â±ï¸`);
+                    showEditorStatus(`Record Count-in (1 Bar): ${nextEnabled ? 'ON' : 'OFF'} Ã¢ÂÂ±Ã¯Â¸Â`);
                   }}
                   style={{ padding: '2px 6px', fontSize: '0.5rem', borderColor: '#ffe600', color: '#ffe600', textShadow: perfCountInEnabled ? '0 0 4px #ffe600' : 'none', minWidth: '40px' }}
                 >
@@ -14421,7 +14430,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const tuning = slot.tuning !== undefined ? slot.tuning : 0;
 
         const updateSlotParam = (key, value) => {
-          // Mutate in-place on ref â€” audio engine sees it immediately
+          // Mutate in-place on ref Ã¢â‚¬â€ audio engine sees it immediately
           const slot = sampleSlotsRef.current.find(s => s.id === slotId);
           if (slot) slot[key] = value;
           setSampleSlots(prev => [...prev]);
@@ -14454,7 +14463,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   className="popover-close-btn"
                   onClick={() => setPadMenuState(prev => ({ ...prev, visible: false }))}
                 >
-                  âœ•
+                  Ã¢Å“â€¢
                 </button>
               </div>
 
@@ -14682,7 +14691,7 @@ export const saveSlotMetadataToDb = async (slotId, updates) => {
     getReq.onsuccess = (e) => {
       const existing = e.target.result;
       if (!existing) { resolve(); return; } // no record to update
-      // Patch only the changed fields â€” channels/sampleRate untouched
+      // Patch only the changed fields Ã¢â‚¬â€ channels/sampleRate untouched
       Object.assign(existing, updates);
       const putReq = store.put(existing);
       putReq.onsuccess = () => resolve();
