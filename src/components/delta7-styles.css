@@ -1,4 +1,4 @@
-﻿/* Delta7 Synth â€” Extracted styles (previously embedded in Delta7Synth.jsx) */
+/* Delta7 Synth â€” Extracted styles (previously embedded in Delta7Synth.jsx) */
 
 /* 3D Card Flip CSS */
         .rack-panel-center {
@@ -2260,4 +2260,17 @@
   border: 1px solid rgba(0, 243, 255, 0.08);
   border-radius: 4px;
   padding: 4px 6px;
+}
+
+/* Concentric playhead rings static classes to decouple from React style reconciliation */
+.ring-track-static {
+  transform-origin: 125px 125px;
+  opacity: 0.18;
+  transition: opacity 0.2s ease;
+}
+
+.ring-dot-static {
+  opacity: 0;
+  transform-origin: 125px 125px;
+  transition: opacity 0.1s ease;
 }

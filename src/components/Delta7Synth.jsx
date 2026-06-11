@@ -9595,27 +9595,23 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         stroke={color}
                         strokeWidth="2.2"
                         strokeDasharray="4, 5"
-                        style={{
-                          transformOrigin: '125px 125px',
-                          opacity: 0.18,
-                          transition: 'opacity 0.2s ease'
-                        }}
+                        className="ring-track-static"
                       />
                       {/* Bright glowing playhead dot */}
                       <circle
-                        ref={(el) => { if (el) ringDotsRefA.current[idx] = el; }}
+                        ref={(el) => { 
+                          if (el) {
+                            ringDotsRefA.current[idx] = el;
+                            el.style.filter = `drop-shadow(0 0 5px ${color})`;
+                          }
+                        }}
                         cx="125"
                         cy={125 - r}
                         r="3.5"
                         fill="#ffffff"
                         stroke={color}
                         strokeWidth="1.5"
-                        style={{
-                          opacity: 0,
-                          transformOrigin: '125px 125px',
-                          filter: `drop-shadow(0 0 5px ${color})`,
-                          transition: 'opacity 0.1s ease'
-                        }}
+                        className="ring-dot-static"
                       />
                     </g>
                   );
@@ -10728,27 +10724,23 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         stroke={color}
                         strokeWidth="2.2"
                         strokeDasharray="4, 5"
-                        style={{
-                          transformOrigin: '125px 125px',
-                          opacity: 0.18,
-                          transition: 'opacity 0.2s ease'
-                        }}
+                        className="ring-track-static"
                       />
                       {/* Bright glowing playhead dot */}
                       <circle
-                        ref={(el) => { if (el) ringDotsRefB.current[idx] = el; }}
+                        ref={(el) => { 
+                          if (el) {
+                            ringDotsRefB.current[idx] = el;
+                            el.style.filter = `drop-shadow(0 0 5px ${color})`;
+                          }
+                        }}
                         cx="125"
                         cy={125 - r}
                         r="3.5"
                         fill="#ffffff"
                         stroke={color}
                         strokeWidth="1.5"
-                        style={{
-                          opacity: 0,
-                          transformOrigin: '125px 125px',
-                          filter: `drop-shadow(0 0 5px ${color})`,
-                          transition: 'opacity 0.1s ease'
-                        }}
+                        className="ring-dot-static"
                       />
                     </g>
                   );
