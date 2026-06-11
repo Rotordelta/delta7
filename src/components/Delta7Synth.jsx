@@ -7035,16 +7035,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
   const toggleSlotLoop = (slotId, e) => {
     if (e) e.stopPropagation();
-    setSampleSlots(prev => prev.map(s => {
-      if (s.id === slotId) {
-        const nextLoop = !s.loopOn;
-        const updated = { ...s, loopOn: nextLoop };
-        saveSampleToDb(updated).catch(err => console.error("Failed to auto-save loop setting to IndexedDB:", err));
-        showEditorStatus(`${getSlotLabel(slotId)} Play Mode: ${nextLoop ? 'LOOP' : 'ONE-SHOT'} 🔄`);
-        return updated;
-      }
-      return s;
-    }));
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    if (!slot) return;
+    const nextLoop = !slot.loopOn;
+    // Mutate in-place — audio engine sees it immediately
+    slot.loopOn = nextLoop;
+    setSampleSlots(prev => [...prev]);
+    saveSlotMetadataToDb(slotId, { loopOn: nextLoop })
+      .catch(err => console.error("Failed to auto-save loop setting to IndexedDB:", err));
+    showEditorStatus(`${getSlotLabel(slotId)} Play Mode: ${nextLoop ? 'LOOP' : 'ONE-SHOT'} 🔄`);
   };
 
   const cycleTriggerMode = (slotId, e) => {
@@ -7055,9 +7054,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const currentMode = slot.triggerMode || 'hold';
     const nextIdx = (modes.indexOf(currentMode) + 1) % modes.length;
     const nextMode = modes[nextIdx];
-    const updated = { ...slot, triggerMode: nextMode };
-    setSampleSlots(prev => prev.map(s => s.id === slotId ? updated : s));
-    saveSampleToDb(updated).catch(err => console.error("Failed to save slot triggerMode:", err));
+    // Mutate in-place on ref — audio engine sees it immediately, zero allocation
+    slot.triggerMode = nextMode;
+    // UI update (React batches this with showEditorStatus in same event handler)
+    setSampleSlots(prev => [...prev]);
+    // Lightweight metadata-only save — no buffer copy
+    saveSlotMetadataToDb(slotId, { triggerMode: nextMode })
+      .catch(err => console.error("Failed to save slot triggerMode:", err));
     showEditorStatus(`${getSlotLabel(slotId)} Mode: ${nextMode.toUpperCase()} 🎛️`);
   };
 
@@ -9623,9 +9626,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          const updated = { ...slot, reverseOn: !slot.reverseOn };
-                          setSampleSlots(prev => prev.map(s => s.id === slotId ? updated : s));
-                          saveSampleToDb(updated).catch(err => console.error("Failed to save slot reverse:", err));
+                          // Mutate in-place — audio engine sees it immediately
+                          slot.reverseOn = !slot.reverseOn;
+                          setSampleSlots(prev => [...prev]);
+                          saveSlotMetadataToDb(slotId, { reverseOn: slot.reverseOn })
+                            .catch(err => console.error("Failed to save slot reverse:", err));
                         }}
                         onMouseDown={(e) => e.stopPropagation()}
                         onMouseUp={(e) => e.stopPropagation()}
@@ -10819,9 +10824,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          const updated = { ...slot, reverseOn: !slot.reverseOn };
-                          setSampleSlots(prev => prev.map(s => s.id === slotId ? updated : s));
-                          saveSampleToDb(updated).catch(err => console.error("Failed to save slot reverse:", err));
+                          // Mutate in-place — audio engine sees it immediately
+                          slot.reverseOn = !slot.reverseOn;
+                          setSampleSlots(prev => [...prev]);
+                          saveSlotMetadataToDb(slotId, { reverseOn: slot.reverseOn })
+                            .catch(err => console.error("Failed to save slot reverse:", err));
                         }}
                         onMouseDown={(e) => e.stopPropagation()}
                         onMouseUp={(e) => e.stopPropagation()}
@@ -16458,14 +16465,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const tuning = slot.tuning !== undefined ? slot.tuning : 0;
 
         const updateSlotParam = (key, value) => {
-          setSampleSlots(prev => prev.map(s => {
-            if (s.id === slotId) {
-              const updated = { ...s, [key]: value };
-              saveSampleToDb(updated).catch(err => console.error("Failed to save slot route to DB:", err));
-              return updated;
-            }
-            return s;
-          }));
+          // Mutate in-place on ref — audio engine sees it immediately
+          const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+          if (slot) slot[key] = value;
+          setSampleSlots(prev => [...prev]);
+          saveSlotMetadataToDb(slotId, { [key]: value })
+            .catch(err => console.error("Failed to save slot param to DB:", err));
         };
 
         return (
@@ -16697,6 +16702,7 @@ export const saveSampleToDb = async (slot) => {
     fxSend: slot.fxSend,
     routeToXyPad: slot.routeToXyPad,
     tuning: slot.tuning,
+    triggerMode: slot.triggerMode || 'hold',
     channels: channels,
     sampleRate: slot.buffer.sampleRate
   };
@@ -16705,6 +16711,28 @@ export const saveSampleToDb = async (slot) => {
     const req = store.put(record);
     req.onsuccess = () => resolve();
     req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+// Zero-waste metadata save: reads existing record from DB and patches only
+// the changed fields. No buffer copies, no main-thread stall.
+export const saveSlotMetadataToDb = async (slotId, updates) => {
+  const db = await openSamplerDB();
+  const tx = db.transaction('samples', 'readwrite');
+  const store = tx.objectStore('samples');
+  
+  return new Promise((resolve, reject) => {
+    const getReq = store.get(slotId);
+    getReq.onsuccess = (e) => {
+      const existing = e.target.result;
+      if (!existing) { resolve(); return; } // no record to update
+      // Patch only the changed fields — channels/sampleRate untouched
+      Object.assign(existing, updates);
+      const putReq = store.put(existing);
+      putReq.onsuccess = () => resolve();
+      putReq.onerror = (ev) => reject(ev.target.error);
+    };
+    getReq.onerror = (e) => reject(e.target.error);
   });
 };
 
