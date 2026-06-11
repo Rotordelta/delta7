@@ -9827,7 +9827,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Rewind 4 beats"
               >
-                PAUSE
+                REW
               </button>
               <button
                 className="deck-btn-xs"
@@ -9898,7 +9898,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Forward 4 beats"
               >
-                PAUSE
+                FWD
               </button>
               <button
                 className={`deck-btn-xs ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
@@ -10960,7 +10960,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Rewind 4 beats"
               >
-                PAUSE
+                REW
               </button>
               <button
                 className="deck-btn-xs"
@@ -11031,7 +11031,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
                 title="Forward 4 beats"
               >
-                PAUSE
+                FWD
               </button>
               <button
                 className={`deck-btn-xs ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
@@ -11383,7 +11383,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#00f3ff', background: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.3)' }}
                   title="Rewind 4 beats"
                 >
-                  PAUSE
+                  REW
                 </button>
 
                 {/* Stop */}
@@ -11440,7 +11440,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   style={{ height: '18px', padding: '1px 6px', fontSize: '0.55rem', color: '#00f3ff', background: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.3)' }}
                   title="Forward 4 beats"
                 >
-                  PAUSE
+                  FWD
                 </button>
 
                 {/* Record */}
