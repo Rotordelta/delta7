@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Knob from './Knob.jsx';
 import './delta7-styles.css';
 
@@ -6372,16 +6372,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             const playheadSpeed = isSliceGranularB ? (1.0 / Math.max(0.05, 1.0 + sliceStretchB)) : freqScaleB;
             playhead += gRate * playheadSpeed;
 
-            if (sliceLoopB) {
-              if (playhead >= sliceEndSecB) {
-                playhead = startOffsetB + ((playhead - startOffsetB) % sliceDurationB);
+            if (isSliceGranularB || isWarpedGranularB) {
+              if (isLoopB) {
+                if (playhead >= endOffsetB) {
+                  const loopLen = endOffsetB - startOffsetB;
+                  playhead = startOffsetB + ((playhead - startOffsetB) % Math.max(0.01, loopLen));
+                }
+              } else if (sliceSustainB && isSliceGranularB) {
+                if (playhead >= endOffsetB) {
+                  const sustainLength = Math.min(0.05, (endOffsetB - startOffsetB) * 0.2);
+                  const sustainStart = endOffsetB - sustainLength;
+                  playhead = sustainStart + ((playhead - sustainStart) % sustainLength);
+                }
               }
-            } else if (sliceSustainB) {
-              if (playhead >= sliceEndSecB) {
-                const sustainLength = Math.min(0.05, sliceDurationB * 0.2);
-                const sustainStart = sliceEndSecB - sustainLength;
-                playhead = sustainStart + ((playhead - sustainStart) % sustainLength);
-              }
+            } else {
+              if (playhead >= currentBuf.duration) playhead = 0;
+              if (playhead < 0) playhead = currentBuf.duration - 0.01;
             }
 
             nextGrainTime += gRate;
