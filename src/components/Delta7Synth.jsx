@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Knob from './Knob.jsx';
 import './delta7-styles.css';
 
@@ -9591,12 +9591,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     {isLoaded && (
                       <div className="perf-pad-routing-badges">
                         {slot.routeToXyPad === false && (
-                          <span className="pad-badge-dry" style={{ border: '1px solid #718096', color: '#a0aec0', background: 'rgba(113, 128, 150, 0.15)', fontSize: '0.38rem', padding: '0px 2px', borderRadius: '2px', lineHeight: 1 }} title="Bypasses Delta XY Modulator">
+                          <span className="pad-badge-dry" title="Bypasses Delta XY Modulator">
                             BYP
                           </span>
                         )}
                         {fxType !== 'None' && (
-                          <span className="pad-badge-fx" style={{ border: `1px solid ${ringColor}`, color: ringColor, background: `${ringColor}18` }} title={`FX: ${fxType} (${Math.round(fxSend * 100)}%)`}>
+                          <span className="pad-badge-fx" data-has-color="true" style={{ '--pad-color': ringColor }} title={`FX: ${fxType} (${Math.round(fxSend * 100)}%)`}>
                             {fxType === 'Space Echo' ? 'DLY' : fxType === 'Rotor Cabinet' ? 'ROT' : 'RVB'}: {Math.round(fxSend * 100)}%
                           </span>
                         )}
@@ -9611,20 +9611,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     {isLoaded && (
                       <button
                         className="perf-pad-rev-badge"
-                        style={{
-                          position: 'absolute',
-                          bottom: '2px',
-                          left: '2px',
-                          background: slot.reverseOn ? 'rgba(255, 70, 70, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-                          border: `1px solid ${slot.reverseOn ? '#ff4444' : 'rgba(255,255,255,0.2)'}`,
-                          borderRadius: '2px',
-                          color: slot.reverseOn ? '#ff4444' : '#aaa',
-                          fontSize: '0.42rem',
-                          padding: '1px 3px',
-                          lineHeight: 1,
-                          cursor: 'pointer',
-                          zIndex: 5
-                        }}
+                        data-active={slot.reverseOn ? 'true' : 'false'}
                         onClick={(e) => {
                           e.stopPropagation();
                           // Mutate in-place â€” audio engine sees it immediately
@@ -9645,20 +9632,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     {isLoaded && (
                       <button
                         className="perf-pad-loop-badge"
-                        style={{
-                          position: 'absolute',
-                          bottom: '2px',
-                          right: '2px',
-                          background: slot.loopOn ? `${ringColor}40` : 'rgba(255, 255, 255, 0.08)',
-                          border: `1px solid ${slot.loopOn ? ringColor : 'rgba(255,255,255,0.2)'}`,
-                          borderRadius: '2px',
-                          color: slot.loopOn ? ringColor : '#aaa',
-                          fontSize: '0.42rem',
-                          padding: '1px 3px',
-                          lineHeight: 1,
-                          cursor: 'pointer',
-                          zIndex: 5
-                        }}
+                        data-active={slot.loopOn ? 'true' : 'false'}
+                        style={{ '--pad-color': ringColor }}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleSlotLoop(slotId, e);
@@ -9674,37 +9649,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     {isLoaded && (
                       <button
                         className="perf-pad-trigger-mode-badge"
-                        style={{
-                          position: 'absolute',
-                          top: '2px',
-                          right: '2px',
-                          background: (slot.triggerMode || 'hold') === 'hold' ? 'rgba(255, 255, 255, 0.05)' :
-                                      (slot.triggerMode === 'latch') ? 'rgba(0, 243, 255, 0.2)' :
-                                      (slot.triggerMode === 'free') ? 'rgba(0, 255, 136, 0.2)' :
-                                      'rgba(255, 0, 128, 0.2)',
-                          border: `1px solid ${
-                                      (slot.triggerMode || 'hold') === 'hold' ? 'rgba(255,255,255,0.15)' :
-                                      (slot.triggerMode === 'latch') ? '#00f3ff' :
-                                      (slot.triggerMode === 'free') ? '#00ff88' :
-                                      '#ff0080'
-                                    }`,
-                          borderRadius: '2px',
-                          color: (slot.triggerMode || 'hold') === 'hold' ? '#888' :
-                                 (slot.triggerMode === 'latch') ? '#00f3ff' :
-                                 (slot.triggerMode === 'free') ? '#00ff88' :
-                                 '#ff0080',
-                          fontSize: '0.40rem',
-                          fontWeight: 'bold',
-                          padding: '1px 3.5px',
-                          lineHeight: 1,
-                          cursor: 'pointer',
-                          zIndex: 5,
-                          boxShadow: (slot.triggerMode && slot.triggerMode !== 'hold') ? `0 0 4px ${
-                            slot.triggerMode === 'latch' ? '#00f3ff' :
-                            slot.triggerMode === 'free' ? '#00ff88' :
-                            '#ff0080'
-                          }` : 'none'
-                        }}
+                        data-mode={slot.triggerMode || 'hold'}
                         onClick={(e) => {
                           e.stopPropagation();
                           cycleTriggerMode(slotId, e);
@@ -10789,12 +10734,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     {isLoaded && (
                       <div className="perf-pad-routing-badges">
                         {slot.routeToXyPad === false && (
-                          <span className="pad-badge-dry" style={{ border: '1px solid #718096', color: '#a0aec0', background: 'rgba(113, 128, 150, 0.15)', fontSize: '0.38rem', padding: '0px 2px', borderRadius: '2px', lineHeight: 1 }} title="Bypasses Delta XY Modulator">
+                          <span className="pad-badge-dry" title="Bypasses Delta XY Modulator">
                             BYP
                           </span>
                         )}
                         {fxType !== 'None' && (
-                          <span className="pad-badge-fx" style={{ border: `1px solid ${ringColor}`, color: ringColor, background: `${ringColor}18` }} title={`FX: ${fxType} (${Math.round(fxSend * 100)}%)`}>
+                          <span className="pad-badge-fx" data-has-color="true" style={{ '--pad-color': ringColor }} title={`FX: ${fxType} (${Math.round(fxSend * 100)}%)`}>
                             {fxType === 'Space Echo' ? 'DLY' : fxType === 'Rotor Cabinet' ? 'ROT' : 'RVB'}: {Math.round(fxSend * 100)}%
                           </span>
                         )}
@@ -10809,20 +10754,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     {isLoaded && (
                       <button
                         className="perf-pad-rev-badge"
-                        style={{
-                          position: 'absolute',
-                          bottom: '2px',
-                          left: '2px',
-                          background: slot.reverseOn ? 'rgba(255, 70, 70, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-                          border: `1px solid ${slot.reverseOn ? '#ff4444' : 'rgba(255,255,255,0.2)'}`,
-                          borderRadius: '2px',
-                          color: slot.reverseOn ? '#ff4444' : '#aaa',
-                          fontSize: '0.42rem',
-                          padding: '1px 3px',
-                          lineHeight: 1,
-                          cursor: 'pointer',
-                          zIndex: 5
-                        }}
+                        data-active={slot.reverseOn ? 'true' : 'false'}
                         onClick={(e) => {
                           e.stopPropagation();
                           // Mutate in-place â€” audio engine sees it immediately
@@ -10843,20 +10775,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     {isLoaded && (
                       <button
                         className="perf-pad-loop-badge"
-                        style={{
-                          position: 'absolute',
-                          bottom: '2px',
-                          right: '2px',
-                          background: slot.loopOn ? `${ringColor}40` : 'rgba(255, 255, 255, 0.08)',
-                          border: `1px solid ${slot.loopOn ? ringColor : 'rgba(255,255,255,0.2)'}`,
-                          borderRadius: '2px',
-                          color: slot.loopOn ? ringColor : '#aaa',
-                          fontSize: '0.42rem',
-                          padding: '1px 3px',
-                          lineHeight: 1,
-                          cursor: 'pointer',
-                          zIndex: 5
-                        }}
+                        data-active={slot.loopOn ? 'true' : 'false'}
+                        style={{ '--pad-color': ringColor }}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleSlotLoop(slotId, e);
@@ -10872,37 +10792,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     {isLoaded && (
                       <button
                         className="perf-pad-trigger-mode-badge"
-                        style={{
-                          position: 'absolute',
-                          top: '2px',
-                          right: '2px',
-                          background: (slot.triggerMode || 'hold') === 'hold' ? 'rgba(255, 255, 255, 0.05)' :
-                                      (slot.triggerMode === 'latch') ? 'rgba(0, 243, 255, 0.2)' :
-                                      (slot.triggerMode === 'free') ? 'rgba(0, 255, 136, 0.2)' :
-                                      'rgba(255, 0, 128, 0.2)',
-                          border: `1px solid ${
-                                      (slot.triggerMode || 'hold') === 'hold' ? 'rgba(255,255,255,0.15)' :
-                                      (slot.triggerMode === 'latch') ? '#00f3ff' :
-                                      (slot.triggerMode === 'free') ? '#00ff88' :
-                                      '#ff0080'
-                                    }`,
-                          borderRadius: '2px',
-                          color: (slot.triggerMode || 'hold') === 'hold' ? '#888' :
-                                 (slot.triggerMode === 'latch') ? '#00f3ff' :
-                                 (slot.triggerMode === 'free') ? '#00ff88' :
-                                 '#ff0080',
-                          fontSize: '0.40rem',
-                          fontWeight: 'bold',
-                          padding: '1px 3.5px',
-                          lineHeight: 1,
-                          cursor: 'pointer',
-                          zIndex: 5,
-                          boxShadow: (slot.triggerMode && slot.triggerMode !== 'hold') ? `0 0 4px ${
-                            slot.triggerMode === 'latch' ? '#00f3ff' :
-                            slot.triggerMode === 'free' ? '#00ff88' :
-                            '#ff0080'
-                          }` : 'none'
-                        }}
+                        data-mode={slot.triggerMode || 'hold'}
                         onClick={(e) => {
                           e.stopPropagation();
                           cycleTriggerMode(slotId, e);

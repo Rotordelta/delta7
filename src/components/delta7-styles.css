@@ -1,4 +1,4 @@
-﻿/* Delta7 Synth — Extracted styles (previously embedded in Delta7Synth.jsx) */
+/* Delta7 Synth — Extracted styles (previously embedded in Delta7Synth.jsx) */
 
 /* 3D Card Flip CSS */
         .rack-panel-center {
@@ -1972,3 +1972,82 @@
           text-align: center;
           margin-top: -4px;
         }
+
+/* ============================================
+   Phase 2: Pad badge buttons — inline style elimination
+   Uses data attributes for state-driven styling
+   ============================================ */
+
+/* Shared base for all pad corner badges */
+.perf-pad-rev-badge,
+.perf-pad-loop-badge,
+.perf-pad-trigger-mode-badge {
+  position: absolute;
+  font-size: 0.42rem;
+  padding: 1px 3px;
+  line-height: 1;
+  border-radius: 2px;
+  cursor: pointer;
+  z-index: 5;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #aaa;
+}
+
+/* REV/FWD badge — bottom left */
+.perf-pad-rev-badge {
+  bottom: 2px;
+  left: 2px;
+}
+.perf-pad-rev-badge[data-active="true"] {
+  background: rgba(255, 70, 70, 0.25);
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+/* LOOP/1-SHOT badge — bottom right, uses --pad-color */
+.perf-pad-loop-badge {
+  bottom: 2px;
+  right: 2px;
+}
+.perf-pad-loop-badge[data-active="true"] {
+  background: color-mix(in srgb, var(--pad-color, #fff) 25%, transparent);
+  border-color: var(--pad-color, #fff);
+  color: var(--pad-color, #fff);
+}
+
+/* Trigger mode badge — top right */
+.perf-pad-trigger-mode-badge {
+  top: 2px;
+  right: 2px;
+  font-size: 0.40rem;
+  font-weight: bold;
+  padding: 1px 3.5px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #888;
+}
+.perf-pad-trigger-mode-badge[data-mode="latch"] {
+  background: rgba(0, 243, 255, 0.2);
+  border-color: #00f3ff;
+  color: #00f3ff;
+  box-shadow: 0 0 4px #00f3ff;
+}
+.perf-pad-trigger-mode-badge[data-mode="free"] {
+  background: rgba(0, 255, 136, 0.2);
+  border-color: #00ff88;
+  color: #00ff88;
+  box-shadow: 0 0 4px #00ff88;
+}
+.perf-pad-trigger-mode-badge[data-mode="flux"] {
+  background: rgba(255, 0, 128, 0.2);
+  border-color: #ff0080;
+  color: #ff0080;
+  box-shadow: 0 0 4px #ff0080;
+}
+
+/* FX badge — uses --pad-color for dynamic tinting */
+.pad-badge-fx[data-has-color="true"] {
+  border-color: var(--pad-color, #c58cff);
+  color: var(--pad-color, #c58cff);
+  background: color-mix(in srgb, var(--pad-color, #c58cff) 10%, transparent);
+}
