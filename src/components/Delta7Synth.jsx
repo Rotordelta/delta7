@@ -731,6 +731,12 @@ export default function Delta7Synth() {
   const [perfIsDubbing, setPerfIsDubbing] = useState(false);
   const [perfPlaybackActive, setPerfPlaybackActive] = useState(false);
   const [perfEvents, setPerfEvents] = useState([]);
+  const [highwayEditMode, setHighwayEditMode] = useState('perform'); // 'perform', 'draw', 'resize', 'erase'
+  const [highwayZoom, setHighwayZoom] = useState(60); // px per beat
+  const highwayZoomRef = useRef(60);
+  useEffect(() => { highwayZoomRef.current = highwayZoom; }, [highwayZoom]);
+  const [resizeDragTarget, setResizeDragTarget] = useState(null);
+  const [highwayClipboard, setHighwayClipboard] = useState(null);
   const [perfRecordStartBpm, setPerfRecordStartBpm] = useState(120);
 
   // Count-in pre-click states and refs
@@ -1132,7 +1138,7 @@ export default function Delta7Synth() {
         }
 
         // Translate Guitar Hero highways downwards (GPU transform)
-        const translatePx = currentBeat * 60;
+        const translatePx = currentBeat * highwayZoomRef.current;
         if (highwayEventsRefA.current) {
           highwayEventsRefA.current.style.transform = `translateY(${translatePx}px)`;
         }
@@ -4135,6 +4141,19 @@ export default function Delta7Synth() {
               while (this.playbackNextEventIdx < this.sortedEvents.length && 
                      this.sortedEvents[this.playbackNextEventIdx].beat < this.playbackStartBeatOffset) {
                 this.playbackNextEventIdx++;
+              }
+              break;
+              
+            case 'UPDATE_EVENTS':
+              this.sortedEvents = msg.sortedEvents || [];
+              if (this.playbackActive) {
+                const elapsed = currentTime - this.playbackStartTime;
+                const currentBeat = elapsed / (60 / this.bpm) + this.playbackStartBeatOffset;
+                this.playbackNextEventIdx = 0;
+                while (this.playbackNextEventIdx < this.sortedEvents.length && 
+                       this.sortedEvents[this.playbackNextEventIdx].beat < currentBeat) {
+                  this.playbackNextEventIdx++;
+                }
               }
               break;
               
@@ -8785,6 +8804,257 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     });
   };
 
+  const drawNote = (deck, laneIdx, startBeat, endBeat) => {
+    const noteOn = {
+      beat: startBeat,
+      deck,
+      type: 'slot',
+      index: laneIdx,
+      velocity: 100,
+      isNoteOn: true
+    };
+    const noteOff = {
+      beat: endBeat,
+      deck,
+      type: 'slot',
+      index: laneIdx,
+      velocity: 100,
+      isNoteOn: false
+    };
+
+    const nextEvents = [...perfEvents, noteOn, noteOff];
+    setPerfEvents(nextEvents);
+    perfEventsRef.current = nextEvents;
+    sortedPerfEventsRef.current = [...nextEvents].sort((a, b) => a.beat - b.beat);
+    
+    if (schedulerNodeRef.current && perfPlaybackActiveRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'UPDATE_EVENTS',
+        sortedEvents: sortedPerfEventsRef.current
+      });
+    }
+    showEditorStatus(`Drawn Note at Beat ${startBeat.toFixed(2)} ✏️`);
+  };
+
+  const erasePill = (deck, laneIdx, pill) => {
+    const nextEvents = perfEvents.filter(evt => {
+      const matchLane = evt.deck === deck && evt.type === 'slot' && evt.index === laneIdx;
+      if (matchLane) {
+        if (evt.isNoteOn && Math.abs(evt.beat - pill.start) < 0.001) return false;
+        if (!evt.isNoteOn && Math.abs(evt.beat - pill.end) < 0.001) return false;
+      }
+      return true;
+    });
+
+    setPerfEvents(nextEvents);
+    perfEventsRef.current = nextEvents;
+    sortedPerfEventsRef.current = [...nextEvents].sort((a, b) => a.beat - b.beat);
+    
+    if (schedulerNodeRef.current && perfPlaybackActiveRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'UPDATE_EVENTS',
+        sortedEvents: sortedPerfEventsRef.current
+      });
+    }
+    showEditorStatus(`Erased Note at Beat ${pill.start.toFixed(2)} ❌`);
+  };
+
+  const handleCopyDeck = (deck) => {
+    const eventsToCopy = perfEvents.filter(evt => evt.deck === deck);
+    if (eventsToCopy.length === 0) {
+      showEditorStatus(`No notes to copy on Deck ${deck}! 📑`);
+      return;
+    }
+    setHighwayClipboard({
+      deck,
+      events: JSON.parse(JSON.stringify(eventsToCopy))
+    });
+    showEditorStatus(`Copied Deck ${deck} notes to clipboard! 📑`);
+  };
+
+  const handlePasteDeck = (targetDeck) => {
+    if (!highwayClipboard) return;
+    const otherEvents = perfEvents.filter(evt => evt.deck !== targetDeck);
+    const pastedEvents = highwayClipboard.events.map(evt => ({
+      ...evt,
+      deck: targetDeck
+    }));
+
+    const nextEvents = [...otherEvents, ...pastedEvents];
+    setPerfEvents(nextEvents);
+    perfEventsRef.current = nextEvents;
+    sortedPerfEventsRef.current = [...nextEvents].sort((a, b) => a.beat - b.beat);
+    
+    if (schedulerNodeRef.current && perfPlaybackActiveRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'UPDATE_EVENTS',
+        sortedEvents: sortedPerfEventsRef.current
+      });
+    }
+    showEditorStatus(`Pasted clipboard onto Deck ${targetDeck}! 📑`);
+  };
+
+  const handleClearDeck = (deck) => {
+    if (window.confirm(`Are you sure you want to clear ALL performance notes on Deck ${deck}?`)) {
+      const nextEvents = perfEvents.filter(evt => evt.deck !== deck);
+      setPerfEvents(nextEvents);
+      perfEventsRef.current = nextEvents;
+      sortedPerfEventsRef.current = [...nextEvents].sort((a, b) => a.beat - b.beat);
+      
+      if (schedulerNodeRef.current && perfPlaybackActiveRef.current) {
+        schedulerNodeRef.current.port.postMessage({
+          type: 'UPDATE_EVENTS',
+          sortedEvents: sortedPerfEventsRef.current
+        });
+      }
+      showEditorStatus(`Cleared all notes on Deck ${deck}! 🧹`);
+    }
+  };
+
+  const handleHighwayMouseDown = (deck, e) => {
+    if (highwayEditMode === 'perform') return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const laneIdx = Math.max(0, Math.min(7, Math.floor(x / 31.25))); // 250px wide / 8 lanes = 31.25px per lane
+    const playheadY = 280 - 35; // 280 height, playhead at bottom 35
+    const distY = playheadY - y;
+    const beatOffset = distY / highwayZoom;
+    let clickedBeat = seqCurrentBeatRef.current + beatOffset;
+    if (clickedBeat < 0) clickedBeat = 0;
+
+    let gridSize = 0.25;
+    if (perfQuantizeMode === '1/128') gridSize = 0.03125;
+    else if (perfQuantizeMode === '1/64') gridSize = 0.0625;
+    else if (perfQuantizeMode === '1/32') gridSize = 0.125;
+    else if (perfQuantizeMode === '1/16') gridSize = 0.25;
+    else if (perfQuantizeMode === '1/8') gridSize = 0.5;
+    else if (perfQuantizeMode === '1/4') gridSize = 1.0;
+    else if (perfQuantizeMode === '1/2') gridSize = 2.0;
+    else if (perfQuantizeMode === 'Bar') gridSize = 4.0;
+
+    const snappedBeat = Math.round(clickedBeat / gridSize) * gridSize;
+
+    // Helper to get pills
+    const getPillsForLane = (d, index) => {
+      const pills = [];
+      const events = perfEvents.filter(evt => evt.deck === d && evt.type === 'slot' && evt.index === index);
+      const sorted = [...events].sort((a, b) => a.beat - b.beat);
+      
+      let activePill = null;
+      sorted.forEach(evt => {
+        if (evt.isNoteOn) {
+          if (activePill) {
+            activePill.end = evt.beat;
+            pills.push(activePill);
+          }
+          activePill = { start: evt.beat, end: evt.beat + 1.0 };
+        } else {
+          if (activePill) {
+            activePill.end = evt.beat;
+            pills.push(activePill);
+            activePill = null;
+          }
+        }
+      });
+      if (activePill) {
+        pills.push(activePill);
+      }
+      return pills;
+    };
+
+    if (highwayEditMode === 'draw') {
+      const pills = getPillsForLane(deck, laneIdx);
+      const existingPill = pills.find(p => snappedBeat >= p.start - 0.01 && snappedBeat <= p.end + 0.01);
+      
+      if (existingPill) {
+        erasePill(deck, laneIdx, existingPill);
+      } else {
+        const noteLength = gridSize;
+        drawNote(deck, laneIdx, snappedBeat, snappedBeat + noteLength);
+      }
+    } else if (highwayEditMode === 'erase') {
+      const pills = getPillsForLane(deck, laneIdx);
+      const existingPill = pills.find(p => snappedBeat >= p.start - 0.01 && snappedBeat <= p.end + 0.01);
+      if (existingPill) {
+        erasePill(deck, laneIdx, existingPill);
+      }
+    } else if (highwayEditMode === 'resize') {
+      const pills = getPillsForLane(deck, laneIdx);
+      const existingPill = pills.find(p => snappedBeat >= p.start - 0.05 && snappedBeat <= p.end + 0.05);
+      if (existingPill) {
+        setResizeDragTarget({
+          deck,
+          laneIdx,
+          startBeat: existingPill.start,
+          originalEndBeat: existingPill.end
+        });
+      }
+    }
+  };
+
+  const handleHighwayMouseMove = (e) => {
+    if (highwayEditMode !== 'resize' || !resizeDragTarget) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const playheadY = 280 - 35;
+    const distY = playheadY - y;
+    const beatOffset = distY / highwayZoom;
+    let hoverBeat = seqCurrentBeatRef.current + beatOffset;
+    if (hoverBeat < resizeDragTarget.startBeat + 0.05) {
+      hoverBeat = resizeDragTarget.startBeat + 0.05;
+    }
+
+    let gridSize = 0.25;
+    if (perfQuantizeMode === '1/128') gridSize = 0.03125;
+    else if (perfQuantizeMode === '1/64') gridSize = 0.0625;
+    else if (perfQuantizeMode === '1/32') gridSize = 0.125;
+    else if (perfQuantizeMode === '1/16') gridSize = 0.25;
+    else if (perfQuantizeMode === '1/8') gridSize = 0.5;
+    else if (perfQuantizeMode === '1/4') gridSize = 1.0;
+    else if (perfQuantizeMode === '1/2') gridSize = 2.0;
+    else if (perfQuantizeMode === 'Bar') gridSize = 4.0;
+
+    const snappedHoverBeat = Math.round(hoverBeat / gridSize) * gridSize;
+    const finalEndBeat = Math.max(resizeDragTarget.startBeat + gridSize, snappedHoverBeat);
+
+    const updatedEvents = perfEvents.map(evt => {
+      if (evt.deck === resizeDragTarget.deck && 
+          evt.type === 'slot' && 
+          evt.index === resizeDragTarget.laneIdx) {
+        if (!evt.isNoteOn && Math.abs(evt.beat - resizeDragTarget.originalEndBeat) < 0.001) {
+          return { ...evt, beat: finalEndBeat };
+        }
+      }
+      return evt;
+    });
+
+    setPerfEvents(updatedEvents);
+    perfEventsRef.current = updatedEvents;
+    sortedPerfEventsRef.current = [...updatedEvents].sort((a, b) => a.beat - b.beat);
+    
+    if (schedulerNodeRef.current && perfPlaybackActiveRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'UPDATE_EVENTS',
+        sortedEvents: sortedPerfEventsRef.current
+      });
+    }
+
+    setResizeDragTarget(prev => ({
+      ...prev,
+      originalEndBeat: finalEndBeat
+    }));
+  };
+
+  const handleHighwayMouseUp = () => {
+    setResizeDragTarget(null);
+  };
+
   const renderPerformanceDeck = () => {
     const getPillsForLane = (deck, index) => {
       const pills = [];
@@ -9101,8 +9371,152 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </button>
             </div>
 
+            {/* Highway Editor Controls for Deck A */}
+            <div className="deck-row" style={{ width: '250px', margin: '4px auto 2px auto', display: 'flex', gap: '3px', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '3px 4px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.15)' }}>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'perform' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('perform')}
+                  title="Perform Mode (pads trigger live)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'perform' ? 'rgba(0, 243, 255, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'perform' ? '#00f3ff' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'perform' ? '#00f3ff' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🖐️ Play
+                </button>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'draw' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('draw')}
+                  title="Draw Mode (click lane to add/remove notes)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'draw' ? 'rgba(0, 255, 102, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'draw' ? '#00ff66' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'draw' ? '#00ff66' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✏️ Draw
+                </button>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'resize' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('resize')}
+                  title="Resize Mode (drag notes to change length)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'resize' ? 'rgba(255, 230, 0, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'resize' ? '#ffe600' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'resize' ? '#ffe600' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ↔️ Size
+                </button>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'erase' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('erase')}
+                  title="Erase Mode (click notes to delete)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'erase' ? 'rgba(255, 0, 85, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'erase' ? '#ff0055' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'erase' ? '#ff0055' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ❌ Del
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                <button
+                  className="deck-btn-xs"
+                  onClick={() => handleCopyDeck('A')}
+                  title="Copy Deck A notes"
+                  style={{ 
+                    fontSize: '0.4rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#ffe600',
+                    border: '1px solid rgba(255, 230, 0, 0.3)',
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Copy
+                </button>
+                <button
+                  className="deck-btn-xs"
+                  onClick={() => handlePasteDeck('A')}
+                  disabled={!highwayClipboard}
+                  title="Paste notes to Deck A"
+                  style={{ 
+                    fontSize: '0.4rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#00f3ff',
+                    border: '1px solid rgba(0, 243, 255, 0.3)',
+                    borderRadius: '2px',
+                    cursor: highwayClipboard ? 'pointer' : 'default',
+                    opacity: highwayClipboard ? 1 : 0.4
+                  }}
+                >
+                  Paste
+                </button>
+                <button
+                  className="deck-btn-xs"
+                  onClick={() => handleClearDeck('A')}
+                  title="Clear all notes on Deck A"
+                  style={{ 
+                    fontSize: '0.4rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#ff0055',
+                    border: '1px solid rgba(255, 0, 85, 0.3)',
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
             {/* Vertical Highway for Deck A (sitting below Cue Play Sync row) */}
-            <div className="vertical-highway deck-a-highway">
+            <div 
+              className="vertical-highway deck-a-highway"
+              onMouseDown={(e) => handleHighwayMouseDown('A', e)}
+              onMouseMove={handleHighwayMouseMove}
+              onMouseUp={handleHighwayMouseUp}
+              onMouseLeave={handleHighwayMouseUp}
+              style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
+            >
               {Array.from({ length: 8 }).map((_, idx) => (
                 <div 
                   key={`line-a-${idx}`} 
@@ -9142,8 +9556,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   return (
                     <div key={`hw-lane-a-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
                       {pills.map((pill, pIdx) => {
-                        const startY = - (pill.start * 60);
-                        const endY = - (pill.end * 60);
+                        const startY = - (pill.start * highwayZoom);
+                        const endY = - (pill.end * highwayZoom);
                         const height = startY - endY;
                         return (
                           <div
@@ -9921,8 +10335,152 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </button>
             </div>
 
+            {/* Highway Editor Controls for Deck B */}
+            <div className="deck-row" style={{ width: '250px', margin: '4px auto 2px auto', display: 'flex', gap: '3px', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '3px 4px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.15)' }}>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'perform' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('perform')}
+                  title="Perform Mode (pads trigger live)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'perform' ? 'rgba(0, 243, 255, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'perform' ? '#00f3ff' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'perform' ? '#00f3ff' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🖐️ Play
+                </button>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'draw' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('draw')}
+                  title="Draw Mode (click lane to add/remove notes)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'draw' ? 'rgba(0, 255, 102, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'draw' ? '#00ff66' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'draw' ? '#00ff66' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✏️ Draw
+                </button>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'resize' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('resize')}
+                  title="Resize Mode (drag notes to change length)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'resize' ? 'rgba(255, 230, 0, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'resize' ? '#ffe600' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'resize' ? '#ffe600' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ↔️ Size
+                </button>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'erase' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('erase')}
+                  title="Erase Mode (click notes to delete)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'erase' ? 'rgba(255, 0, 85, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'erase' ? '#ff0055' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'erase' ? '#ff0055' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ❌ Del
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                <button
+                  className="deck-btn-xs"
+                  onClick={() => handleCopyDeck('B')}
+                  title="Copy Deck B notes"
+                  style={{ 
+                    fontSize: '0.4rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#ffe600',
+                    border: '1px solid rgba(255, 230, 0, 0.3)',
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Copy
+                </button>
+                <button
+                  className="deck-btn-xs"
+                  onClick={() => handlePasteDeck('B')}
+                  disabled={!highwayClipboard}
+                  title="Paste notes to Deck B"
+                  style={{ 
+                    fontSize: '0.4rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#00f3ff',
+                    border: '1px solid rgba(0, 243, 255, 0.3)',
+                    borderRadius: '2px',
+                    cursor: highwayClipboard ? 'pointer' : 'default',
+                    opacity: highwayClipboard ? 1 : 0.4
+                  }}
+                >
+                  Paste
+                </button>
+                <button
+                  className="deck-btn-xs"
+                  onClick={() => handleClearDeck('B')}
+                  title="Clear all notes on Deck B"
+                  style={{ 
+                    fontSize: '0.4rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#ff0055',
+                    border: '1px solid rgba(255, 0, 85, 0.3)',
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
             {/* Vertical Highway for Deck B (sitting below Cue Play Sync row) */}
-            <div className="vertical-highway deck-b-highway">
+            <div 
+              className="vertical-highway deck-b-highway"
+              onMouseDown={(e) => handleHighwayMouseDown('B', e)}
+              onMouseMove={handleHighwayMouseMove}
+              onMouseUp={handleHighwayMouseUp}
+              onMouseLeave={handleHighwayMouseUp}
+              style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
+            >
               {Array.from({ length: 8 }).map((_, idx) => (
                 <div 
                   key={`line-b-${idx}`} 
@@ -9962,8 +10520,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   return (
                     <div key={`hw-lane-b-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
                       {pills.map((pill, pIdx) => {
-                        const startY = - (pill.start * 60);
-                        const endY = - (pill.end * 60);
+                        const startY = - (pill.start * highwayZoom);
+                        const endY = - (pill.end * highwayZoom);
                         const height = startY - endY;
                         return (
                           <div
@@ -10003,6 +10561,21 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', borderRadius: '3px', padding: '2px 6px', fontFamily: 'monospace' }}>
                 <span style={{ fontSize: '0.48rem', color: '#888' }}>BEAT:</span>
                 <span ref={seqTimerDisplayRef} style={{ fontSize: '0.68rem', color: '#00f3ff', fontWeight: 'bold', minWidth: '40px', display: 'inline-block', textAlign: 'right' }}>0.0</span>
+              </div>
+
+              {/* Highway Zoom Slider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0, 0, 0, 0.4)', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: '4px', padding: '3px 8px', height: '26px' }}>
+                <span style={{ fontSize: '0.48rem', color: '#888', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>ZOOM:</span>
+                <input
+                  type="range"
+                  min="30"
+                  max="150"
+                  value={highwayZoom}
+                  onChange={(e) => setHighwayZoom(parseInt(e.target.value))}
+                  style={{ width: '60px', height: '6px', accentColor: '#00f3ff', cursor: 'pointer' }}
+                  title="Zoom in/out of the performance sequencer highways"
+                />
+                <span style={{ fontSize: '0.48rem', color: '#00f3ff', fontFamily: 'monospace', minWidth: '22px' }}>{highwayZoom}px</span>
               </div>
 
               {/* Tape-style DAW Transport Controls */}
