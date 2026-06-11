@@ -10335,7 +10335,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             {/* Crossfader */}
             <div className="crossfader-section" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '2px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 6px' }}>
-                <span className="crossfader-label" style={{ color: '#00f3ff' }}>A</span>
+                <span className="crossfader-label" className="label-cyan">A</span>
                 <span className="crossfader-label" style={{ fontSize: '0.38rem', color: '#666', letterSpacing: '1px' }}>CROSSFADER</span>
                 <span className="crossfader-label" style={{ color: '#ff5599' }}>B</span>
               </div>
@@ -12928,10 +12928,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                       {/* OSC 1 (A) Setup */}
-                      <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0, 243, 255, 0.08)', borderRadius: '4px', padding: '4px 6px' }}>
+                      <div className="param-box">
                         <div className="flex-row-sub" style={{ fontSize: '0.62rem', justifyContent: 'space-between', marginBottom: '2px' }}>
                           <span style={{ fontWeight: 'bold', color: '#ffe600' }}>OSC 1 (A):</span>
-                          <span style={{ color: '#fff', fontSize: '0.58rem' }}>{(sampleSlots.find(s => s.id === params.oscAWave)?.name || '').slice(0, 10)}</span>
+                          <span className="val-white-58">{(sampleSlots.find(s => s.id === params.oscAWave)?.name || '').slice(0, 10)}</span>
                         </div>
                         <div className="segmented-grid" style={{ marginTop: '2px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
                           {sampleSlots.filter(s => s.id.startsWith('a')).map(slot => (
@@ -12942,7 +12942,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                 setParams(prev => ({ ...prev, oscAWave: slot.id }));
                                 setSelectedEditSlotId(slot.id);
                               }}
-                              style={{ fontSize: '0.52rem', padding: '1px 2px' }}
+                              className="btn-seg-xs"
                             >
                               {getSlotLabel(slot.id)}
                             </button>
@@ -12952,14 +12952,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '4px', marginTop: '4px' }}>
                           {/* Octave selection */}
                           <div className="flex-row-sub" style={{ fontSize: '0.58rem', flexDirection: 'column', gap: '1px', alignItems: 'flex-start' }}>
-                            <span style={{ color: '#88ccee' }}>Octave:</span>
+                            <span className="label-blue">Octave:</span>
                             <div className="segmented-strip">
                               {[-2, -1, 0, 1, 2].map(oct => (
                                 <button
                                   key={oct}
                                   className={`segmented-btn btn-xs ${params.oscAOctave === oct ? 'active' : ''}`}
                                   onClick={() => setParams(prev => ({ ...prev, oscAOctave: oct }))}
-                                  style={{ padding: '0px 2px', fontSize: '0.5rem' }}
+                                  className="btn-seg-pad0"
                                 >
                                   {oct > 0 ? `+${oct}` : oct}
                                 </button>
@@ -12969,14 +12969,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
                           {/* Trigger mode selection */}
                           <div className="flex-row-sub" style={{ fontSize: '0.58rem', flexDirection: 'column', gap: '1px', alignItems: 'flex-end' }}>
-                            <span style={{ color: '#88ccee' }}>Play Mode:</span>
+                            <span className="label-blue">Play Mode:</span>
                             <div className="segmented-strip">
                               {['pitch', 'slice'].map(m => (
                                 <button
                                   key={m}
                                   className={`segmented-btn btn-xs ${params.oscATriggerMode === m ? 'active' : ''}`}
                                   onClick={() => setParams(prev => ({ ...prev, oscATriggerMode: m }))}
-                                  style={{ padding: '1px 3px', fontSize: '0.5rem' }}
+                                  className="btn-seg-sm"
                                 >
                                   {m.toUpperCase()}
                                 </button>
@@ -12987,46 +12987,46 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
                         {/* Detune slider */}
                         <div className="flex-row-sub" style={{ fontSize: '0.58rem', marginTop: '3px' }}>
-                          <span style={{ color: '#88ccee' }}>Detune:</span>
+                          <span className="label-blue">Detune:</span>
                           <input 
                             type="range" min="-50" max="50" 
                             value={params.oscADetune} 
                             onChange={(e) => setParams(prev => ({ ...prev, oscADetune: parseInt(e.target.value) }))} 
                             style={{ flexGrow: 1, height: '8px' }}
                           />
-                          <span className="val-text font-mono" style={{ color: '#fff', fontSize: '0.55rem' }}>{params.oscADetune}c</span>
+                          <span className="val-text font-mono" className="val-white-55">{params.oscADetune}c</span>
                         </div>
 
                         {/* Echo Send slider */}
                         <div className="flex-row-sub" style={{ fontSize: '0.58rem', marginTop: '3px' }}>
-                          <span style={{ color: '#88ccee' }}>Echo Send:</span>
+                          <span className="label-blue">Echo Send:</span>
                           <input 
                             type="range" min="0" max="1" step="0.05"
                             value={params.mfx1SendA} 
                             onChange={(e) => setParams(prev => ({ ...prev, mfx1SendA: parseFloat(e.target.value) }))} 
                             style={{ flexGrow: 1, height: '8px' }}
                           />
-                          <span className="val-text font-mono" style={{ color: '#fff', fontSize: '0.55rem' }}>{Math.round(params.mfx1SendA * 100)}%</span>
+                          <span className="val-text font-mono" className="val-white-55">{Math.round(params.mfx1SendA * 100)}%</span>
                         </div>
 
                         {/* Reverb Send slider */}
                         <div className="flex-row-sub" style={{ fontSize: '0.58rem', marginTop: '3px' }}>
-                          <span style={{ color: '#88ccee' }}>Reverb Send:</span>
+                          <span className="label-blue">Reverb Send:</span>
                           <input 
                             type="range" min="0" max="1" step="0.05"
                             value={params.mfx2SendA} 
                             onChange={(e) => setParams(prev => ({ ...prev, mfx2SendA: parseFloat(e.target.value) }))} 
                             style={{ flexGrow: 1, height: '8px' }}
                           />
-                          <span className="val-text font-mono" style={{ color: '#fff', fontSize: '0.55rem' }}>{Math.round(params.mfx2SendA * 100)}%</span>
+                          <span className="val-text font-mono" className="val-white-55">{Math.round(params.mfx2SendA * 100)}%</span>
                         </div>
                       </div>
 
                       {/* OSC 2 (B) Setup */}
-                      <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0, 243, 255, 0.08)', borderRadius: '4px', padding: '4px 6px' }}>
+                      <div className="param-box">
                         <div className="flex-row-sub" style={{ fontSize: '0.62rem', justifyContent: 'space-between', marginBottom: '2px' }}>
-                          <span style={{ fontWeight: 'bold', color: '#ff00ff' }}>OSC 2 (B):</span>
-                          <span style={{ color: '#fff', fontSize: '0.58rem' }}>{(sampleSlots.find(s => s.id === params.oscBWave)?.name || '').slice(0, 10)}</span>
+                          <span className="label-magenta" style={{ fontWeight: 'bold' }}>OSC 2 (B):</span>
+                          <span className="val-white-58">{(sampleSlots.find(s => s.id === params.oscBWave)?.name || '').slice(0, 10)}</span>
                         </div>
                         <div className="segmented-grid" style={{ marginTop: '2px', gridTemplateColumns: 'repeat(4, 1fr)' }}>
                           {sampleSlots.filter(s => s.id.startsWith('b')).map(slot => (
@@ -13038,7 +13038,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                 setSelectedEditSlotId(slot.id);
                               }}
                               disabled={params.oscMode === 'single'}
-                              style={{ fontSize: '0.52rem', padding: '1px 2px' }}
+                              className="btn-seg-xs"
                             >
                               {getSlotLabel(slot.id)}
                             </button>
@@ -13056,7 +13056,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                   className={`segmented-btn btn-xs ${params.oscBOctave === oct ? 'active' : ''}`}
                                   onClick={() => setParams(prev => ({ ...prev, oscBOctave: oct }))}
                                   disabled={params.oscMode === 'single'}
-                                  style={{ padding: '0px 2px', fontSize: '0.5rem' }}
+                                  className="btn-seg-pad0"
                                 >
                                   {oct > 0 ? `+${oct}` : oct}
                                 </button>
@@ -13074,7 +13074,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                   className={`segmented-btn btn-xs ${params.oscBTriggerMode === m ? 'active' : ''}`}
                                   onClick={() => setParams(prev => ({ ...prev, oscBTriggerMode: m }))}
                                   disabled={params.oscMode === 'single'}
-                                  style={{ padding: '1px 3px', fontSize: '0.5rem' }}
+                                  className="btn-seg-sm"
                                 >
                                   {m.toUpperCase()}
                                 </button>
@@ -13127,7 +13127,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     {/* Oscillator Mode and Crossfader */}
                     <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '10px', marginTop: '4px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '4px' }}>
                       <div className="flex-row-sub" style={{ fontSize: '0.62rem', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ color: '#88ccee' }}>OSC Mode:</span>
+                        <span className="label-blue">OSC Mode:</span>
                         <button
                           className="segmented-btn btn-xs active"
                           style={{ margin: 0, padding: '1px 6px', fontSize: '0.55rem', fontWeight: 'bold' }}
@@ -13198,7 +13198,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
                     {/* Source Selector & Input Controls */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.62rem', marginTop: '4px', marginBottom: '4px' }}>
-                      <span style={{ color: '#88ccee' }}>REC SOURCE:</span>
+                      <span className="label-blue">REC SOURCE:</span>
                       <div className="segmented-strip">
                         {['mic', 'monitor', 'resample'].map(mode => (
                           <button
@@ -13607,7 +13607,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           GLOBAL FX
                         </div>
                         <div className="flex-row-sub" style={{ justifyContent: 'space-between' }}>
-                          <span style={{ color: '#ffe600' }}>IFX1:</span>
+                          <span className="label-yellow">IFX1:</span>
                           <select
                             value={params.ifx1Type}
                             onChange={(e) => setParams(prev => ({ ...prev, ifx1Type: e.target.value }))}
@@ -13630,7 +13630,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         </div>
 
                         <div className="flex-row-sub" style={{ justifyContent: 'space-between', marginTop: '2px' }}>
-                          <span style={{ color: '#ffe600' }}>IFX2:</span>
+                          <span className="label-yellow">IFX2:</span>
                           <select
                             value={params.ifx2Type}
                             onChange={(e) => setParams(prev => ({ ...prev, ifx2Type: e.target.value }))}
@@ -14172,7 +14172,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '6px' }}>
               {/* Tempo row */}
               <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                <span className="font-mono" style={{ color: '#00f3ff', fontSize: '0.55rem' }}>TEMPO:</span>
+                <span className="font-mono" className="label-cyan" style={{ fontSize: '0.55rem' }}>TEMPO:</span>
                 <input 
                   type="range" min="40" max="250" step="0.1"
                   value={params.arpBpm || 120} 
