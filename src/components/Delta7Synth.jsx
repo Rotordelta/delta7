@@ -732,6 +732,17 @@ export default function Delta7Synth() {
   const [perfPlaybackActive, setPerfPlaybackActive] = useState(false);
   const [perfEvents, setPerfEvents] = useState([]);
   const [perfRecordStartBpm, setPerfRecordStartBpm] = useState(120);
+
+  // Count-in pre-click states and refs
+  const [perfCountInEnabled, setPerfCountInEnabled] = useState(true);
+  const [perfCountInActive, setPerfCountInActive] = useState(false);
+  const [perfCountInRemaining, setPerfCountInRemaining] = useState(4);
+  const perfCountInActiveRef = useRef(false);
+  const perfCountInRemainingRef = useRef(4);
+  const perfCountInIsDubRef = useRef(false);
+
+  useEffect(() => { perfCountInActiveRef.current = perfCountInActive; }, [perfCountInActive]);
+  useEffect(() => { perfCountInRemainingRef.current = perfCountInRemaining; }, [perfCountInRemaining]);
   const [activePerfPads, setActivePerfPads] = useState({});
   const [deckAPlaying, setDeckAPlaying] = useState(false);
   const [deckBPlaying, setDeckBPlaying] = useState(false);
@@ -4146,17 +4157,22 @@ export default function Delta7Synth() {
           let targetBeat = 0;
           
           if (this.perfStartTime > 0) {
-            targetBeat = (now - this.perfStartTime) / beatDuration;
+            targetBeat = Math.max(0.0, (now - this.perfStartTime) / beatDuration);
           }
           
           if (shouldQuantize) {
-            const elapsed = now - this.perfStartTime;
+            const elapsed = Math.max(0.0, now - this.perfStartTime);
             const currentBeat = elapsed / beatDuration;
             
             let gridSize = 1.0;
-            if (this.quantizeMode === '1/16') gridSize = 0.25;
-            else if (this.quantizeMode === '1') gridSize = 1.0;
-            else if (this.quantizeMode === '4') gridSize = 4.0;
+            if (this.quantizeMode === '1/128') gridSize = 0.03125;
+            else if (this.quantizeMode === '1/64') gridSize = 0.0625;
+            else if (this.quantizeMode === '1/32') gridSize = 0.125;
+            else if (this.quantizeMode === '1/16') gridSize = 0.25;
+            else if (this.quantizeMode === '1/8') gridSize = 0.5;
+            else if (this.quantizeMode === '1/4') gridSize = 1.0;
+            else if (this.quantizeMode === '1/2') gridSize = 2.0;
+            else if (this.quantizeMode === 'Bar') gridSize = 4.0;
             
             const nextGridBeat = Math.ceil(currentBeat / gridSize) * gridSize;
             targetBeat = nextGridBeat;
@@ -4275,6 +4291,59 @@ export default function Delta7Synth() {
         const msg = e.data;
         if (msg.type === 'METRONOME_CLICK') {
           playMetronomeClick(ctx, msg.time, msg.isDownbeat);
+          
+          if (perfCountInActiveRef.current) {
+            perfCountInRemainingRef.current--;
+            setPerfCountInRemaining(perfCountInRemainingRef.current);
+            
+            if (perfCountInRemainingRef.current === 0) {
+              const targetStartTime = msg.time;
+              perfCountInActiveRef.current = false;
+              setPerfCountInActive(false);
+              
+              const isDub = perfCountInIsDubRef.current;
+              const bpm = paramsRef.current.arpBpm || 120;
+              
+              perfStartTimeRef.current = targetStartTime;
+              setPerfRecordStartBpm(bpm);
+              setPerfRecordActive(true);
+              setPerfIsDubbing(isDub);
+              
+              if (schedulerNodeRef.current) {
+                schedulerNodeRef.current.port.postMessage({
+                  type: 'SET_PARAMS',
+                  perfStartTime: targetStartTime,
+                  perfRecordActive: true
+                });
+              }
+              
+              if (isDub) {
+                setPerfPlaybackActive(true);
+                perfPlayStartTimeRef.current = targetStartTime;
+                seqStartBeatOffsetRef.current = 0.0;
+                
+                if (schedulerNodeRef.current) {
+                  schedulerNodeRef.current.port.postMessage({
+                    type: 'START_PLAYBACK',
+                    startTime: targetStartTime,
+                    startBeatOffset: 0.0,
+                    sortedEvents: sortedPerfEventsRef.current
+                  });
+                }
+                showEditorStatus("Overdub recording started! 🎙️");
+              } else {
+                showEditorStatus("Recording started! 🎙️");
+              }
+              
+              if (!paramsRef.current.metronomeOn) {
+                setTimeout(() => {
+                  if (!perfCountInActiveRef.current && !paramsRef.current.metronomeOn) {
+                    stopMetronome();
+                  }
+                }, 100);
+              }
+            }
+          }
         } else if (msg.type === 'ARP_TICK') {
           handleArpTick(msg.time, msg.stepIndex);
         } else if (msg.type === 'PLAYBACK_EVENT') {
@@ -7043,6 +7112,25 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         }
       }
 
+      if (perfCountInEnabled) {
+        if (!isDub) {
+          perfEventsRef.current = [];
+          sortedPerfEventsRef.current = [];
+          setPerfEvents([]);
+          seqCurrentBeatRef.current = 0.0;
+          seqStartBeatOffsetRef.current = 0.0;
+        }
+        perfCountInRemainingRef.current = 4;
+        setPerfCountInRemaining(4);
+        perfCountInIsDubRef.current = isDub;
+        perfCountInActiveRef.current = true;
+        setPerfCountInActive(true);
+        
+        showEditorStatus("Count-in Armed... Get Ready! ⏱️");
+        startMetronome();
+        return;
+      }
+
       if (!isDub) {
         // Clean recording: wipe previous events
         perfEventsRef.current = [];
@@ -7162,6 +7250,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     setPerfIsDubbing(false);
     seqCurrentBeatRef.current = 0.0;
     seqStartBeatOffsetRef.current = 0.0;
+    
+    perfCountInActiveRef.current = false;
+    setPerfCountInActive(false);
+    perfCountInRemainingRef.current = 4;
+    setPerfCountInRemaining(4);
+    if (!paramsRef.current.metronomeOn) {
+      stopMetronome();
+    }
 
     if (schedulerNodeRef.current) {
       schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
@@ -13025,6 +13121,48 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 <span style={{ fontFamily: 'monospace', fontSize: '0.52rem', width: '24px', textAlign: 'right', color: '#ff00ff' }}>
                   {Math.round(metronomeVolume * 100)}%
                 </span>
+              </div>
+
+              {/* Sequencer Settings (Quantize & Count-in) */}
+              <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', borderTop: '1px dashed rgba(0, 243, 255, 0.15)', paddingTop: '4px', marginTop: '4px' }}>
+                <span className="font-mono" style={{ color: '#00f3ff', fontSize: '0.52rem' }}>GRID:</span>
+                <select 
+                  value={perfQuantizeMode} 
+                  onChange={(e) => {
+                    setPerfQuantizeMode(e.target.value);
+                    showEditorStatus(`Quantize Grid: ${e.target.value} 📐`);
+                  }}
+                  style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.4)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '62px', outline: 'none' }}
+                >
+                  <option value="None">Off</option>
+                  <option value="1/128">1/128</option>
+                  <option value="1/64">1/64</option>
+                  <option value="1/32">1/32</option>
+                  <option value="1/16">1/16</option>
+                  <option value="1/8">1/8</option>
+                  <option value="1/4">1/4</option>
+                  <option value="1/2">1/2</option>
+                  <option value="Bar">Bar</option>
+                </select>
+
+                <span className="font-mono" style={{ color: '#ffe600', fontSize: '0.52rem', marginLeft: '4px' }}>COUNT-IN:</span>
+                <button
+                  className={`segmented-btn btn-xs ${perfCountInEnabled ? 'active' : ''}`}
+                  onClick={() => {
+                    const nextEnabled = !perfCountInEnabled;
+                    setPerfCountInEnabled(nextEnabled);
+                    showEditorStatus(`Record Count-in (1 Bar): ${nextEnabled ? 'ON' : 'OFF'} ⏱️`);
+                  }}
+                  style={{ padding: '2px 6px', fontSize: '0.5rem', borderColor: '#ffe600', color: '#ffe600', textShadow: perfCountInEnabled ? '0 0 4px #ffe600' : 'none', minWidth: '40px' }}
+                >
+                  {perfCountInEnabled ? '1 BAR' : 'OFF'}
+                </button>
+                
+                {perfCountInActive && (
+                  <span className="font-mono" style={{ color: '#ff0055', fontSize: '0.55rem', fontWeight: 'bold', textShadow: '0 0 6px #ff0055', animation: 'pulse-red 0.5s infinite alternate', marginLeft: '4px' }}>
+                    {perfCountInRemaining}
+                  </span>
+                )}
               </div>
             </div>
           </div>
