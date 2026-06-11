@@ -9430,14 +9430,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     };
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 32px)', background: '#020509', flexGrow: 1, minHeight: 0 }}>
+      <div className="deck-layout-wrapper">
         {/* TOP ROW: DECKS & MIXER */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 1fr', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div className="deck-grid-layout">
         
         {/* LEFT DECK (DECK A) */}
         <div className="turntable-deck">
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#00f3ff', letterSpacing: '2px', fontFamily: 'monospace' }}>
+          <div className="deck-header-label">
+            <span className="deck-title-text deck-title-text-a">
               DECK A &mdash; {getSlotLabel(params.oscAWave)}
             </span>
             
@@ -10579,8 +10579,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
         {/* RIGHT DECK (DECK B) */}
         <div className="turntable-deck" style={{ borderLeft: 'none' }}>
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#ff00ff', letterSpacing: '2px', fontFamily: 'monospace' }}>
+          <div className="deck-header-label">
+            <span className="deck-title-text deck-title-text-b">
               DECK B &mdash; {getSlotLabel(params.oscBWave)}
             </span>
             
@@ -12306,22 +12306,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           </button>
                         </div>
                         {editorStatus ? (
-                          <div style={{ fontSize: '0.58rem', color: '#00ff66', fontFamily: 'monospace', fontWeight: 'bold', textShadow: '0 0 4px rgba(0,255,102,0.4)' }}>
+                          <div className="editor-status-msg">
                             {editorStatus}
                           </div>
                         ) : selectionStart !== null && selectionEnd !== null ? (
-                          <div style={{ fontSize: '0.58rem', color: '#00f3ff', fontFamily: 'monospace' }}>
+                          <div className="editor-sel-msg">
                             SEL: {Math.round(Math.min(selectionStart, selectionEnd) * 100)}% to {Math.round(Math.max(selectionStart, selectionEnd) * 100)}%
                           </div>
                         ) : (
-                          <div style={{ fontSize: '0.55rem', color: '#888', fontStyle: 'italic' }}>
+                          <div className="editor-hint-msg">
                             Drag on wave to select
                           </div>
                         )}
                       </div>
 
                       {/* Loop Enable, Root Note, Volume and Preview buttons */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '95px 75px 120px 1.3fr 110px', gap: '8px', marginTop: '4px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '4px', alignItems: 'center' }}>
+                      <div className="editor-toolbar-row" style={{ gridTemplateColumns: '95px 75px 120px 1.3fr 110px' }}>
                         <button 
                           className={`btn btn-xs ${slot.loopOn ? 'active-green' : ''}`}
                           onClick={() => updateSlotParam(selectedEditSlotId, 'loopOn', !slot.loopOn)}
@@ -12340,20 +12340,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
                         {/* Sample Slot Level Volume control */}
                         <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem' }}>
-                          <span style={{ color: '#00f3ff' }}>Vol:</span>
+                          <span className="label-cyan">Vol:</span>
                           <input 
                             type="range" min="0" max="1.5" step="0.05"
                             value={slot.volume !== undefined ? slot.volume : 1.0}
                             onChange={(e) => updateSlotParam(selectedEditSlotId, 'volume', parseFloat(e.target.value))}
                             style={{ flexGrow: 1, height: '6px', accentColor: '#00f3ff' }}
                           />
-                          <span className="font-mono" style={{ color: '#ffe600', fontSize: '0.52rem', width: '22px', textAlign: 'right' }}>
+                          <span className="font-mono value-readout-sm">
                             {Math.round((slot.volume !== undefined ? slot.volume : 1.0) * 100)}%
                           </span>
                         </div>
 
                         <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem' }}>
-                          <span style={{ color: '#88ccee' }}>Root:</span>
+                          <span className="label-blue">Root:</span>
                           <div className="segmented-strip" style={{ flexGrow: 1 }}>
                             {[36, 48, 60, 72, 84].map(val => (
                               <button
@@ -12379,8 +12379,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       </div>
 
                       {/* Warp Sync controls */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px', marginTop: '4px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div className="editor-flex-row" style={{ justifyContent: 'flex-start', gap: '10px', marginTop: '4px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '4px' }}>
+                        <div className="editor-flex-row">
                           <button 
                             className={`btn btn-xs ${slot.warpOn ? 'active-yellow' : ''}`}
                             onClick={() => updateSlotParam(selectedEditSlotId, 'warpOn', !slot.warpOn)}
@@ -12390,8 +12390,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           </button>
                         </div>
                         {slot.warpOn && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.62rem' }}>
-                            <span style={{ color: '#00f3ff' }}>LOOP LENGTH (BEATS):</span>
+                          <div className="editor-flex-row-gap6" style={{ fontSize: '0.62rem' }}>
+                            <span className="label-cyan">LOOP LENGTH (BEATS):</span>
                             <div className="segmented-strip">
                               {[1, 2, 4, 8, 16, 32].map(beats => (
                                 <button
@@ -12418,18 +12418,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                     showEditorStatus(`Synced Master Tempo to Slot BPM: ${calculatedBpm.toFixed(1)}! â±ï¸`);
                                   }
                                 }}
-                                style={{
-                                  margin: 0,
-                                  padding: '1px 4px',
-                                  fontSize: '0.52rem',
-                                  borderColor: '#ffe600',
-                                  color: '#ffe600',
-                                  background: 'transparent',
-                                  cursor: 'pointer',
-                                  lineHeight: '1',
-                                  height: '14px',
-                                  verticalAlign: 'middle'
-                                }}
+                                className="btn btn-xs btn-fit-bpm"
                               >
                                 FIT BPM
                               </button>
@@ -12439,14 +12428,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       </div>
 
                       {/* Slice Editor Sub-Panel */}
-                      <div style={{ marginTop: '6px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', border: '1px dashed rgba(0, 243, 255, 0.2)', padding: '5px 8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <div className="slice-editor-panel">
+                        <div className="slice-header-row">
+                          <div className="editor-flex-row">
                             <span style={{ fontWeight: 'bold', color: '#00f3ff', fontSize: '0.62rem' }}>
                               SLICE AD ENVELOPES (1-{slot.sliceCount || 16})
                             </span>
                             <div className="flex-row-sub" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '8px' }}>
-                              <span style={{ color: '#88ccee', fontSize: '0.55rem' }}>SLICES:</span>
+                              <span className="label-blue" style={{ fontSize: '0.55rem' }}>SLICES:</span>
                               <div className="segmented-strip" style={{ display: 'inline-flex' }}>
                                 {[16, 12, 8, 4].map(count => (
                                   <button
@@ -12667,7 +12656,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
                           {/* Row 1: Attack and Decay */}
                           <div className="flex-row-sub" style={{ fontSize: '0.58rem' }}>
-                            <span style={{ color: '#ffe600', width: '40px' }}>Attack:</span>
+                            <span className="label-yellow" style={{ width: '40px' }}>Attack:</span>
                             <input
                               type="range" min="0.001" max="2.0" step="0.01"
                               value={slot.sliceParams?.[selectedSliceIndex]?.attack || 0.01}
@@ -12684,13 +12673,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                 sampleSlotsRef.current = nextSlots;
                                 setSampleSlots(nextSlots);
                               }}
-                              style={{ flexGrow: 1, height: '8px' }}
+                              className="range-compact-8"
                             />
-                            <span className="font-mono" style={{ color: '#fff', fontSize: '0.52rem', width: '42px', textAlign: 'right' }}>{(slot.sliceParams?.[selectedSliceIndex]?.attack || 0.01).toFixed(3)}s</span>
+                            <span className="font-mono value-readout">{(slot.sliceParams?.[selectedSliceIndex]?.attack || 0.01).toFixed(3)}s</span>
                           </div>
                           
                           <div className="flex-row-sub" style={{ fontSize: '0.58rem' }}>
-                            <span style={{ color: '#ff0055', width: '40px' }}>Decay:</span>
+                            <span className="label-red" style={{ width: '40px' }}>Decay:</span>
                             <input
                               type="range" min="0.01" max="5.0" step="0.05"
                               value={slot.sliceParams?.[selectedSliceIndex]?.decay || 0.3}

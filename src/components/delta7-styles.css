@@ -1,4 +1,4 @@
-/* Delta7 Synth — Extracted styles (previously embedded in Delta7Synth.jsx) */
+﻿/* Delta7 Synth â€” Extracted styles (previously embedded in Delta7Synth.jsx) */
 
 /* 3D Card Flip CSS */
         .rack-panel-center {
@@ -1974,7 +1974,7 @@
         }
 
 /* ============================================
-   Phase 2: Pad badge buttons — inline style elimination
+   Phase 2: Pad badge buttons â€” inline style elimination
    Uses data attributes for state-driven styling
    ============================================ */
 
@@ -1994,7 +1994,7 @@
   color: #aaa;
 }
 
-/* REV/FWD badge — bottom left */
+/* REV/FWD badge â€” bottom left */
 .perf-pad-rev-badge {
   bottom: 2px;
   left: 2px;
@@ -2005,7 +2005,7 @@
   color: #ff4444;
 }
 
-/* LOOP/1-SHOT badge — bottom right, uses --pad-color */
+/* LOOP/1-SHOT badge â€” bottom right, uses --pad-color */
 .perf-pad-loop-badge {
   bottom: 2px;
   right: 2px;
@@ -2016,7 +2016,7 @@
   color: var(--pad-color, #fff);
 }
 
-/* Trigger mode badge — top right */
+/* Trigger mode badge â€” top right */
 .perf-pad-trigger-mode-badge {
   top: 2px;
   right: 2px;
@@ -2045,9 +2045,180 @@
   box-shadow: 0 0 4px #ff0080;
 }
 
-/* FX badge — uses --pad-color for dynamic tinting */
+/* FX badge â€” uses --pad-color for dynamic tinting */
 .pad-badge-fx[data-has-color="true"] {
   border-color: var(--pad-color, #c58cff);
   color: var(--pad-color, #c58cff);
   background: color-mix(in srgb, var(--pad-color, #c58cff) 10%, transparent);
+}
+
+/* ============================================
+   Phase 2: Common utility classes
+   Replaces the most repeated inline styles
+   ============================================ */
+
+/* Editor status messages */
+.editor-status-msg {
+  font-size: 0.58rem;
+  color: #00ff66;
+  font-family: monospace;
+  font-weight: bold;
+  text-shadow: 0 0 4px rgba(0,255,102,0.4);
+}
+
+.editor-sel-msg {
+  font-size: 0.58rem;
+  color: #00f3ff;
+  font-family: monospace;
+}
+
+.editor-hint-msg {
+  font-size: 0.55rem;
+  color: #888;
+  font-style: italic;
+}
+
+/* Editor toolbar and param row layouts */
+.editor-toolbar-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  border-top: 1px dashed rgba(0, 243, 255, 0.1);
+  padding-top: 4px;
+  align-items: center;
+}
+
+.editor-flex-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.editor-flex-row-gap6 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Common button overrides for editor */
+.btn-editor-sm {
+  margin: 0;
+  padding: 2px 4px;
+  font-size: 0.6rem;
+}
+
+.btn-editor-md {
+  margin: 0;
+  padding: 2px 6px;
+  font-size: 0.65rem;
+}
+
+/* Param label colors */
+.label-cyan { color: #00f3ff; }
+.label-magenta { color: #ff00ff; }
+.label-yellow { color: #ffe600; }
+.label-green { color: #00ff88; }
+.label-blue { color: #88ccee; }
+.label-red { color: #ff0055; }
+
+/* Slice editor panel */
+.slice-editor-panel {
+  margin-top: 6px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+  border: 1px dashed rgba(0, 243, 255, 0.2);
+  padding: 5px 8px;
+}
+
+.slice-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+/* Deck layout wrappers */
+.deck-layout-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 32px);
+  background: #020509;
+  flex-grow: 1;
+  min-height: 0;
+}
+
+.deck-grid-layout {
+  display: grid;
+  grid-template-columns: 1fr 130px 1fr;
+  flex-grow: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.deck-header-label {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.deck-title-text {
+  font-size: 0.65rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  font-family: monospace;
+}
+
+.deck-title-text-a { color: #00f3ff; }
+.deck-title-text-b { color: #ff00ff; }
+
+/* SVG overlay for rings */
+.platter-overlay-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* FIT BPM button */
+.btn-fit-bpm {
+  margin: 0;
+  padding: 1px 4px;
+  font-size: 0.52rem;
+  border-color: #ffe600;
+  color: #ffe600;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+  height: 14px;
+  vertical-align: middle;
+}
+
+/* Range input compact */
+.range-compact {
+  flex-grow: 1;
+  height: 6px;
+}
+
+.range-compact-8 {
+  flex-grow: 1;
+  height: 8px;
+}
+
+/* Value readout */
+.value-readout {
+  font-family: monospace;
+  font-size: 0.52rem;
+  width: 42px;
+  text-align: right;
+  color: #fff;
+}
+
+.value-readout-sm {
+  font-family: monospace;
+  font-size: 0.52rem;
+  width: 22px;
+  text-align: right;
+  color: #ffe600;
 }
