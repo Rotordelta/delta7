@@ -2810,7 +2810,7 @@ export default function Delta7Synth() {
           intervals.push(next[i] - next[i - 1]);
         }
         const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-        const computedBpm = Math.round(60000 / avgInterval);
+        const computedBpm = Math.round((60000 / avgInterval) * 10) / 10;
         if (computedBpm >= 40 && computedBpm <= 250) {
           setParams(prev => ({ ...prev, arpBpm: computedBpm }));
         }
@@ -9871,9 +9871,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               <Knob 
                 label="Tempo"
                 value={params.arpBpm || 120}
-                min={40} max={250} step={1} defaultValue={120}
+                min={40} max={250} step={0.1} defaultValue={120}
                 onChange={(v) => setParams(prev => ({ ...prev, arpBpm: v }))}
-                displayFormat={(v) => `${Math.round(v)}`}
+                displayFormat={(v) => `${v.toFixed(1)}`}
                 glowColor="yellow"
                 size={26}
               />
@@ -11827,9 +11827,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                   const origDur = slot.buffer ? slot.buffer.duration * (slot.end - slot.start) : 0;
                                   if (origDur > 0) {
                                     const beats = slot.warpBeats || 4;
-                                    const calculatedBpm = Math.round(Math.max(40, Math.min(250, (60 * beats) / origDur)));
+                                    const calculatedBpm = Math.round(Math.max(40, Math.min(250, (60 * beats) / origDur)) * 10) / 10;
                                     setParams(prev => ({ ...prev, arpBpm: calculatedBpm }));
-                                    showEditorStatus(`Synced Master Tempo to Slot BPM: ${calculatedBpm}! ⏱️`);
+                                    showEditorStatus(`Synced Master Tempo to Slot BPM: ${calculatedBpm.toFixed(1)}! ⏱️`);
                                   }
                                 }}
                                 style={{
@@ -12828,9 +12828,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             {params.arpOn ? 'ON' : 'OFF'}
                           </button>
                           <input 
-                            type="range" min="40" max="250" step="1"
+                            type="range" min="40" max="250" step="0.1"
                             value={params.arpBpm || 120} 
-                            onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseInt(e.target.value) || 120 }))} 
+                            onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseFloat(e.target.value) || 120 }))} 
                             style={{ flexGrow: 1, height: '8px', minWidth: '25px' }}
                           />
                         </div>
@@ -13532,35 +13532,35 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                 <span className="font-mono" style={{ color: '#00f3ff', fontSize: '0.55rem' }}>TEMPO:</span>
                 <input 
-                  type="range" min="40" max="250" step="1"
+                  type="range" min="40" max="250" step="0.1"
                   value={params.arpBpm || 120} 
-                  onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseInt(e.target.value) || 120 }))} 
+                  onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseFloat(e.target.value) || 120 }))} 
                   style={{ flexGrow: 1, height: '8px' }}
                 />
                 <input 
                   type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  inputMode="decimal"
                   value={params.arpBpm} 
                   onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    if (val === '') {
-                      setParams(prev => ({ ...prev, arpBpm: '' }));
-                    } else {
-                      const parsed = parseInt(val, 10);
-                      setParams(prev => ({ ...prev, arpBpm: Math.min(250, parsed) }));
+                    const val = e.target.value;
+                    // Allow digits and at most one decimal point
+                    if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                      setParams(prev => ({ ...prev, arpBpm: val }));
                     }
                   }}
                   onBlur={() => {
-                    const parsed = parseInt(params.arpBpm, 10);
+                    const parsed = parseFloat(params.arpBpm);
                     if (isNaN(parsed) || parsed < 40) {
                       setParams(prev => ({ ...prev, arpBpm: 40 }));
                     } else if (parsed > 250) {
                       setParams(prev => ({ ...prev, arpBpm: 250 }));
+                    } else {
+                      // Round to 1 decimal place
+                      setParams(prev => ({ ...prev, arpBpm: Math.round(parsed * 10) / 10 }));
                     }
                   }}
                   style={{ 
-                    width: '24px', 
+                    width: '32px', // slightly wider for decimal value display
                     background: '#000', 
                     border: '1px solid rgba(0, 243, 255, 0.4)', 
                     color: '#00f3ff', 
