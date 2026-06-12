@@ -6516,6 +6516,7 @@ export default function Delta7Synth() {
           playhead = (prog.grainPosition !== undefined ? prog.grainPosition : 0.0) * bufferA.duration;
           isLoopA = true;
         }
+        voiceObj.isLoopA = isLoopA;
         
         if (prog.fluxOffset !== undefined) {
           if (isSliceGranular) {
@@ -6543,10 +6544,11 @@ export default function Delta7Synth() {
           const ctxNow = ctx.currentTime;
 
           let gSize, gRate;
-          if (isSliceGranular) {
+          if (isSliceGranular || isWarpedGranularA) {
             // Serato-style time-stretch: grain size 80-120ms, hop = 25% of grain (4 grains overlapping)
-            // Clamped to at most the full slice duration to avoid reading beyond boundaries
-            gSize = Math.min(Math.max(0.08, sliceDurationA * 0.5), 0.12);
+            gSize = isSliceGranular 
+              ? Math.min(Math.max(0.08, sliceDurationA * 0.5), 0.12)
+              : 0.1;
             gRate = gSize * 0.25;
           } else {
             gSize = (prog.grainSize !== undefined ? prog.grainSize : 100) / 1000;
@@ -6876,6 +6878,7 @@ export default function Delta7Synth() {
           playhead = startOffsetB;
           isLoopB = !!slotB.loopOn;
         }
+        voiceObj.isLoopB = isLoopB;
         
         if (prog.fluxOffset !== undefined) {
           if (isSliceGranularB) {
