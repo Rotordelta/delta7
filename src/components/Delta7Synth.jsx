@@ -32,7 +32,7 @@ const DEFAULT_PARAMS = {
   oscAVol: 0.8,
   oscBVol: 0.8,
   unisonDetune: 10,
-  preampDrive: 0.1,
+  preampDrive: 0.0,
   granularActive: false,
   grainSize: 100,
   grainRate: 40,
@@ -5876,13 +5876,15 @@ export default function Delta7Synth() {
   };
 
   const makeDistCurve = (amount) => {
-    const k = typeof amount === 'number' ? amount * 100 : 50;
-    const n_samples = 512; // 512 is sufficient precision for a waveshaper curve
+    if (!amount || amount <= 0) {
+      return null;
+    }
+    const k = amount * 20; // Scale factor for distortion intensity
+    const n_samples = 512;
     const curve = new Float32Array(n_samples);
-    const deg = Math.PI / 180;
     for (let i = 0; i < n_samples; ++i) {
       const x = (i * 2) / n_samples - 1;
-      curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+      curve[i] = (x * (1 + k)) / (1 + k * Math.abs(x));
     }
     return curve;
   };
