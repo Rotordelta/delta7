@@ -7759,6 +7759,31 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
   };
 
+  const startPlaybackAutomatically = () => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+    const bpm = paramsRef.current.arpBpm || 120;
+    
+    setPerfRecordActive(false);
+    setPerfIsDubbing(false);
+    setPerfPlaybackActive(true);
+    perfPlaybackActiveRef.current = true;
+    
+    const startTime = ctx.currentTime;
+    perfPlayStartTimeRef.current = startTime;
+    syncSabPlaybackState(true, startTime, seqStartBeatOffsetRef.current, bpm);
+    
+    if (schedulerNodeRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'START_PLAYBACK',
+        startTime,
+        startBeatOffset: seqStartBeatOffsetRef.current,
+        sortedEvents: sortedPerfEventsRef.current
+      });
+    }
+    showEditorStatus("Playback Started Automatically (Latched) ▶️");
+  };
+
   const triggerPerfPadInternal = (deck, type, index, velocity, isNoteOn, shouldRecord = false) => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
@@ -7779,13 +7804,25 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       if (!isNoteOn) return; // ignore release completely
       const padKey = `${deck}-${type}-${index}`;
       const isAlreadyActive = activePerfPadsRef.current[padKey] || activePerfPadsRef.current[`${padKey}-pending`];
-      dispatchLiveTrigger(deck, type, index, velocity, true, shouldRecord, isAlreadyActive ? 'None' : 'Bar');
+      
+      const quantGrid = perfQuantizeModeRef.current !== 'None' ? perfQuantizeModeRef.current : '1/4';
+      
+      // Auto-start playback if not already active to scroll highways and align start
+      if (!isAlreadyActive && !perfPlaybackActiveRef.current) {
+        startPlaybackAutomatically();
+      }
+      
+      if (!isAlreadyActive) {
+        setPerfPad(`${padKey}-pending`, true);
+      }
+      
+      dispatchLiveTrigger(deck, type, index, velocity, true, shouldRecord, isAlreadyActive ? 'None' : quantGrid);
       return;
     }
 
     // 2. Free Mode Routing
     if (triggerMode === 'free') {
-      dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, shouldRecord, isNoteOn ? 'Bar' : 'None');
+      dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, shouldRecord, 'None');
       return;
     }
 
@@ -8108,6 +8145,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       }
       activeVoicesRef.current.set(voiceKey, [voice]);
       setPerfPad(padKey, true);
+      setPerfPad(`${padKey}-pending`, false);
 
       const dur = slot.buffer.duration * (slot.end - slot.start);
 
@@ -8325,8 +8363,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       showEditorStatus("Playback Stopped. ⏹️");
     } else {
       if (sortedPerfEventsRef.current.length === 0 && perfEventsRef.current.length === 0) {
-        showEditorStatus("No performance events recorded yet! ⚠️");
-        return;
+        showEditorStatus("Starting Clean Playback (Jam Mode)... 🎵");
       }
       // Ensure sorted events are populated (fallback if stop-recording path was skipped)
       if (sortedPerfEventsRef.current.length === 0 && perfEventsRef.current.length > 0) {
