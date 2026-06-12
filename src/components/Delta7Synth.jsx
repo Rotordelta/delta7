@@ -57,6 +57,12 @@ const DEFAULT_PARAMS = {
   oscATriggerMode: 'pitch',
   oscBTriggerMode: 'pitch',
   reverbMix: 0.15,
+  reverbActive: true,
+  reverbType: 'hall',
+  reverbDecay: 2.5,
+  reverbPreDelay: 0.02,
+  reverbHighCut: 8000,
+  reverbFreeze: false,
   ifx1Type: 'Bypass',
   ifx1Mix: 0.0,
   ifx2Type: 'Bypass',
@@ -137,6 +143,14 @@ const ROTOR_PRESETS = [
   { name: 'Deep Stereo Swirl', params: { leslieSpeed: 'Fast', leslieDrive: 0.2, leslieWidth: 1.0, leslieCrossover: 500 } },
   { name: 'Cabinet Growl (Stop)', params: { leslieSpeed: 'Off', leslieDrive: 0.8, leslieWidth: 0.0, leslieCrossover: 700 } },
   { name: 'Vocal Horn Crossover', params: { leslieSpeed: 'Slow', leslieDrive: 0.25, leslieWidth: 0.6, leslieCrossover: 1400 } }
+];
+
+const REVERB_PRESETS = [
+  { name: 'Small Room', params: { reverbMix: 0.15, reverbDecay: 1.0, reverbPreDelay: 0.01, reverbHighCut: 12000 } },
+  { name: 'Medium Hall', params: { reverbMix: 0.25, reverbDecay: 2.2, reverbPreDelay: 0.02, reverbHighCut: 8000 } },
+  { name: 'Large Cathedral', params: { reverbMix: 0.40, reverbDecay: 4.5, reverbPreDelay: 0.04, reverbHighCut: 6000 } },
+  { name: 'Ambient Space', params: { reverbMix: 0.60, reverbDecay: 8.0, reverbPreDelay: 0.08, reverbHighCut: 4000 } },
+  { name: 'Dark Void', params: { reverbMix: 0.50, reverbDecay: 6.0, reverbPreDelay: 0.05, reverbHighCut: 1500 } }
 ];
 
 // Helper to synthesize sample kits on-the-fly
@@ -515,6 +529,18 @@ const ringColors = [
   '#ff00ff'  // Neon Magenta
 ];
 
+const ringColorsRgba = [
+  'rgba(255, 0, 85, 0.22)',
+  'rgba(255, 85, 0, 0.22)',
+  'rgba(255, 204, 0, 0.22)',
+  'rgba(0, 255, 102, 0.22)',
+  'rgba(0, 243, 255, 0.22)',
+  'rgba(0, 102, 255, 0.22)',
+  'rgba(153, 0, 255, 0.22)',
+  'rgba(255, 0, 255, 0.22)'
+];
+
+
 // Pre-allocated index arrays â€” avoids Array.from() re-allocation in render loops
 const EIGHT_INDICES = Array.from({ length: 8 }, (_, i) => i);
 const BEAT_INDICES_256 = Array.from({ length: 256 }, (_, i) => i);
@@ -586,16 +612,18 @@ export default function Delta7Synth() {
 
   // SharedArrayBuffer Ref
   const sharedBufferRef = useRef(null);
-  const sharedArrayRef = useRef(null);
+  const sharedFloatRef = useRef(null);
+  const sharedIntRef = useRef(null);
   
   if (sharedBufferRef.current === null && typeof window.SharedArrayBuffer !== 'undefined') {
     try {
       const sab = new window.SharedArrayBuffer(SAB_SIZE * 4);
       sharedBufferRef.current = sab;
-      sharedArrayRef.current = new Float32Array(sab);
-      sharedArrayRef.current[SAB_WRITE_IDX] = 0;
-      sharedArrayRef.current[SAB_READ_IDX] = 0;
-      sharedArrayRef.current[SAB_PLAYBACK_ACTIVE] = 0.0;
+      sharedFloatRef.current = new Float32Array(sab);
+      sharedIntRef.current = new Int32Array(sab);
+      sharedIntRef.current[SAB_WRITE_IDX] = 0;
+      sharedIntRef.current[SAB_READ_IDX] = 0;
+      sharedFloatRef.current[SAB_PLAYBACK_ACTIVE] = 0.0;
     } catch (e) {
       console.warn("SharedArrayBuffer not enabled/supported in this environment:", e);
     }
@@ -604,6 +632,8 @@ export default function Delta7Synth() {
   // DOM Refs for GPU Animation target circles
   const targetCirclesRefsA = useRef([]);
   const targetCirclesRefsB = useRef([]);
+  const laneBgsRefsA = useRef([]);
+  const laneBgsRefsB = useRef([]);
   const kaossReadoutRef = useRef(null);
   const kaossContainerRef = useRef(null);
   const kaossHoldButtonRef = useRef(null);
@@ -612,6 +642,20 @@ export default function Delta7Synth() {
   const [kaossTargetY, setKaossTargetY] = useState('resonance'); // resonance, reverbDecay, chorusRate, ringModMix
   const [kaossPad, setKaossPad] = useState({ x: 0.5, y: 0.5, isHolding: false, holdActive: false, touchActive: false });
   const [padReturnMode, setPadReturnMode] = useState('hold'); // hold, snap, spring, throw
+
+  // Local state for the tempo text input — decoupled from params.arpBpm so that
+  // partially-typed values (including empty string from Delete key) never cause
+  // downstream .toFixed / arithmetic crashes on numeric params.
+  const [tempoInputVal, setTempoInputVal] = useState(String(120));
+  // Keep the text display in sync when BPM changes from external sources
+  // (tap tempo, range slider, knob, "Fit BPM") — but only when it's a real number.
+  useEffect(() => {
+    const numeric = parseFloat(params.arpBpm);
+    if (!isNaN(numeric)) {
+      setTempoInputVal(String(numeric));
+    }
+  }, [params.arpBpm]);
+
   const [isRecordingGesture, setIsRecordingGesture] = useState(false);
   const [isPlayingGesture, setIsPlayingGesture] = useState(false);
   const [gestureMode, setGestureMode] = useState('loop'); // loop, one-shot, ping-pong
@@ -694,6 +738,13 @@ export default function Delta7Synth() {
 
   const reverbHPFRef = useRef(null);
   const reverbFeedbackGainRef = useRef(null);
+  const reverbPreDelayNodeRef = useRef(null);
+  const reverbHighCutFilterRef = useRef(null);
+  const reverbConvolverRef = useRef(null);
+  const lastReverbDecayRef = useRef(2.5);
+  const lastReverbPreDelayRef = useRef(0.02);
+  const lastReverbHighCutRef = useRef(8000);
+  const lastReverbTypeRef = useRef('hall');
 
   // Master Audio Context references
   const audioCtxRef = useRef(null);
@@ -1039,6 +1090,7 @@ export default function Delta7Synth() {
   const [tapTimes, setTapTimes] = useState([]); // Timestamps for tap tempo calculation
   const [selectedEchoPresetIdx, setSelectedEchoPresetIdx] = useState(''); // Current echo preset index
   const [selectedRotorPresetIdx, setSelectedRotorPresetIdx] = useState(''); // Current rotor preset index
+  const [selectedReverbPresetIdx, setSelectedReverbPresetIdx] = useState(''); // Current reverb preset index
   const [editorStatus, setEditorStatus] = useState('');
   const editorStatusTimeoutRef = useRef(null);
   const showEditorStatus = (msg) => {
@@ -1239,14 +1291,20 @@ export default function Delta7Synth() {
       if (ctx) {
         // Timeline beat & auto-scroll (prioritize SharedArrayBuffer beat tracking)
         let currentBeat = 0;
-        if (sharedArrayRef.current && sharedArrayRef.current[SAB_PLAYBACK_ACTIVE] > 0.5) {
-          currentBeat = sharedArrayRef.current[SAB_CURRENT_BEAT];
+        if (sharedFloatRef.current && sharedFloatRef.current[SAB_PLAYBACK_ACTIVE] > 0.5) {
+          currentBeat = sharedFloatRef.current[SAB_CURRENT_BEAT];
           seqCurrentBeatRef.current = currentBeat;
         } else if (perfPlaybackActiveRef.current && perfPlayStartTimeRef.current > 0) {
           const elapsed = ctx.currentTime - perfPlayStartTimeRef.current;
           const bpm = paramsRef.current.arpBpm || 120;
           const beatDuration = 60 / bpm;
-          currentBeat = elapsed / beatDuration + seqStartBeatOffsetRef.current;
+          let calculatedBeat = elapsed / beatDuration + seqStartBeatOffsetRef.current;
+          if (sortedPerfEventsRef.current.length > 0) {
+            const lastEvent = sortedPerfEventsRef.current[sortedPerfEventsRef.current.length - 1];
+            const endBeat = Math.max(16, Math.ceil(lastEvent.beat / 4) * 4);
+            calculatedBeat = calculatedBeat % endBeat;
+          }
+          currentBeat = calculatedBeat;
           seqCurrentBeatRef.current = currentBeat;
         } else if (perfRecordActiveRef.current && perfStartTimeRef.current > 0) {
           const elapsed = ctx.currentTime - perfStartTimeRef.current;
@@ -1286,19 +1344,52 @@ export default function Delta7Synth() {
           
           const isA = deck === 'A';
           const duration = isA ? voice.activeDurationA : voice.activeDurationB;
-          const rate = isA ? (voice.orig_oscA_rate || 1.0) : (voice.orig_oscB_rate || 1.0);
           const isLoop = isA ? voice.isLoopA : voice.isLoopB;
           const isReverse = isA ? voice.isReverseA : voice.isReverseB;
           
           if (duration <= 0) return 0;
           
-          let pos = elapsed * rate;
-          if (isLoop) {
-            pos = pos % duration;
+          let progress = 0;
+          const bpm = paramsRef.current.arpBpm || 120;
+          const beatDuration = 60 / bpm;
+          const isTimelineRunning = perfPlaybackActiveRef.current || perfRecordActiveRef.current;
+          
+          if (isTimelineRunning && voice.triggerBeat !== undefined) {
+            const elapsedBeats = Math.max(0.0, currentBeat - voice.triggerBeat);
+            const warpOn = isA ? voice.warpOnA : voice.warpOnB;
+            const warpBeats = isA ? voice.warpBeatsA : voice.warpBeatsB;
+            
+            if (warpOn && warpBeats) {
+              const loopBeats = warpBeats;
+              let beatPos = elapsedBeats;
+              if (isLoop) {
+                beatPos = ((beatPos % loopBeats) + loopBeats) % loopBeats;
+              } else {
+                if (beatPos >= loopBeats) return 0;
+              }
+              progress = beatPos / loopBeats;
+            } else {
+              const durationBeats = duration / beatDuration;
+              let beatPos = elapsedBeats;
+              if (isLoop) {
+                beatPos = ((beatPos % durationBeats) + durationBeats) % durationBeats;
+              } else {
+                if (beatPos >= durationBeats) return 0;
+              }
+              progress = beatPos / durationBeats;
+            }
           } else {
-            if (pos >= duration) return 0;
+            // Fallback to real-time timer when sequencer is not running
+            const rate = isA ? (voice.orig_oscA_rate || 1.0) : (voice.orig_oscB_rate || 1.0);
+            let pos = elapsed * rate;
+            if (isLoop) {
+              pos = pos % duration;
+            } else {
+              if (pos >= duration) return 0;
+            }
+            progress = pos / duration;
           }
-          const progress = pos / duration;
+          
           return (isReverse ? (1.0 - progress) : progress) * 360;
         };
 
@@ -1424,6 +1515,13 @@ export default function Delta7Synth() {
             targetCircleA.style.background = isActiveA ? ringColors[pi] : 'transparent';
             targetCircleA.style.boxShadow = isActiveA ? `0 0 6px ${ringColors[pi]}` : 'none';
           }
+          // Update highway lane background A directly in DOM
+          const laneBgA = laneBgsRefsA.current[pi];
+          if (laneBgA) {
+            laneBgA.style.background = isActiveA 
+              ? `linear-gradient(to top, ${ringColorsRgba[pi]} 0%, transparent 100%)` 
+              : 'transparent';
+          }
 
           const elB = padDomRefsB.current[pi];
           const isActiveB = !!pads[`B-slot-${pi}`];
@@ -1437,6 +1535,13 @@ export default function Delta7Synth() {
           if (targetCircleB) {
             targetCircleB.style.background = isActiveB ? ringColors[pi] : 'transparent';
             targetCircleB.style.boxShadow = isActiveB ? `0 0 6px ${ringColors[pi]}` : 'none';
+          }
+          // Update highway lane background B directly in DOM
+          const laneBgB = laneBgsRefsB.current[pi];
+          if (laneBgB) {
+            laneBgB.style.background = isActiveB 
+              ? `linear-gradient(to top, ${ringColorsRgba[pi]} 0%, transparent 100%)` 
+              : 'transparent';
           }
         }
       }
@@ -2944,6 +3049,175 @@ export default function Delta7Synth() {
     }
   }, []);
 
+  const syncActiveVoiceParams = (slotId, param, val) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const deck = slotId.startsWith('a') ? 'a' : 'b';
+    const index = parseInt(slotId.slice(1)) - 1;
+    const voiceKey = `perf-${deck}-slot-${index}`;
+
+    const voices = activeVoicesRef.current.get(voiceKey);
+    if (!voices || voices.length === 0) return;
+
+    voices.forEach(voice => {
+      if (!voice) return;
+
+      if (param === 'fxSend' || param === 'fxType') {
+        const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+        if (!slot) return;
+
+        const currentFxType = slot.fxType || 'None';
+        const currentFxSend = slot.fxSend !== undefined ? slot.fxSend : 0.0;
+        const sendGainNode = voice.sendGainNode;
+
+        if (sendGainNode) {
+          try {
+            sendGainNode.disconnect();
+          } catch (e) {}
+
+          if (currentFxType === 'Space Echo' && delayInputRef.current) {
+            sendGainNode.connect(delayInputRef.current);
+          } else if (currentFxType === 'Reverb' && mfx2Ref.current && mfx2Ref.current.input) {
+            sendGainNode.connect(mfx2Ref.current.input);
+          } else if (currentFxType === 'Rotor Cabinet' && leslieInputRef.current) {
+            sendGainNode.connect(leslieInputRef.current);
+          }
+
+          const targetGain = currentFxType === 'None' ? 0.0 : currentFxSend;
+          sendGainNode.gain.cancelScheduledValues(now);
+          sendGainNode.gain.setValueAtTime(sendGainNode.gain.value, now);
+          sendGainNode.gain.linearRampToValueAtTime(targetGain, now + 0.015);
+        }
+      }
+
+      if (param === 'pan') {
+        if (voice.padPannerNode) {
+          voice.padPannerNode.pan.cancelScheduledValues(now);
+          voice.padPannerNode.pan.setValueAtTime(voice.padPannerNode.pan.value, now);
+          voice.padPannerNode.pan.linearRampToValueAtTime(val, now + 0.015);
+        }
+      }
+
+      if (param === 'routeToXyPad') {
+        if (voice.voiceOutGain) {
+          try {
+            voice.voiceOutGain.disconnect();
+          } catch (e) {}
+
+          if (val && ifx1InputRef.current) {
+            voice.voiceOutGain.connect(ifx1InputRef.current);
+            voice.routeToXyPad = true;
+          } else if (masterEqLowRef.current) {
+            voice.voiceOutGain.connect(masterEqLowRef.current);
+            voice.routeToXyPad = false;
+          } else {
+            voice.voiceOutGain.connect(masterGainRef.current);
+            voice.routeToXyPad = false;
+          }
+        }
+      }
+
+      if (param === 'tuning') {
+        const isDeckA = deck === 'a';
+        const stopFactor = tapeStopFactorRef.current;
+
+        if (isDeckA) {
+          const slotA = sampleSlotsRef.current.find(s => s.id === slotId);
+          if (!slotA) return;
+
+          let warpBaseRateA = 1.0;
+          if (voice.type === 'slice') {
+            warpBaseRateA = Math.pow(2, voice.oscAOctave || 0) * Math.pow(2, (voice.oscAPitch || 0) / 12) * Math.pow(2, (voice.slicePitchA || 0) / 12) * Math.pow(2, val / 12);
+          } else {
+            const rootNoteA = slotA.rootNote || 60;
+            warpBaseRateA = Math.pow(2, (voice.note - rootNoteA + (voice.oscAPitch || 0) + (voice.oscAOctave || 0) * 12 + val) / 12) * (voice.pbFactor || 1.0);
+          }
+
+          voice.warpBaseRateA = warpBaseRateA;
+
+          let freqScaleA = warpBaseRateA;
+          if (voice.warpOnA && voice.activeDurationA && voice.warpBeatsA) {
+            const bpm = paramsRef.current.arpBpm || 120;
+            const targetDuration = (60 / bpm) * voice.warpBeatsA;
+            const warpFactor = voice.activeDurationA / targetDuration;
+            freqScaleA = warpFactor * warpBaseRateA;
+          }
+
+          let pitchFactorA = 1.0 + (deckAPitchRef.current / 100);
+          freqScaleA *= pitchFactorA;
+
+          voice.freqScaleA = freqScaleA;
+          voice.orig_oscA_rate = freqScaleA;
+          voice.orig_oscA_L_rate = freqScaleA;
+          voice.orig_oscA_R_rate = freqScaleA;
+
+          if (voice.oscA && voice.oscA.playbackRate) {
+            voice.oscA.playbackRate.cancelScheduledValues(now);
+            voice.oscA.playbackRate.setValueAtTime(voice.oscA.playbackRate.value, now);
+            voice.oscA.playbackRate.linearRampToValueAtTime(freqScaleA * stopFactor, now + 0.035);
+          }
+          if (voice.oscA_L && voice.oscA_L.playbackRate) {
+            voice.oscA_L.playbackRate.cancelScheduledValues(now);
+            voice.oscA_L.playbackRate.setValueAtTime(voice.oscA_L.playbackRate.value, now);
+            voice.oscA_L.playbackRate.linearRampToValueAtTime(freqScaleA * stopFactor, now + 0.035);
+          }
+          if (voice.oscA_R && voice.oscA_R.playbackRate) {
+            voice.oscA_R.playbackRate.cancelScheduledValues(now);
+            voice.oscA_R.playbackRate.setValueAtTime(voice.oscA_R.playbackRate.value, now);
+            voice.oscA_R.playbackRate.linearRampToValueAtTime(freqScaleA * stopFactor, now + 0.035);
+          }
+        } else {
+          const slotB = sampleSlotsRef.current.find(s => s.id === slotId);
+          if (!slotB) return;
+
+          let warpBaseRateB = 1.0;
+          if (voice.type === 'slice') {
+            warpBaseRateB = Math.pow(2, voice.oscBOctave || 0) * Math.pow(2, (voice.oscBPitch || 0) / 12) * Math.pow(2, (voice.slicePitchB || 0) / 12) * Math.pow(2, val / 12);
+          } else {
+            const rootNoteB = slotB.rootNote || 60;
+            warpBaseRateB = Math.pow(2, (voice.note - rootNoteB + (voice.oscBPitch || 0) + (voice.oscBOctave || 0) * 12 + val) / 12) * (voice.pbFactor || 1.0);
+          }
+
+          voice.warpBaseRateB = warpBaseRateB;
+
+          let freqScaleB = warpBaseRateB;
+          if (voice.warpOnB && voice.activeDurationB && voice.warpBeatsB) {
+            const bpm = paramsRef.current.arpBpm || 120;
+            const targetDuration = (60 / bpm) * voice.warpBeatsB;
+            const warpFactor = voice.activeDurationB / targetDuration;
+            freqScaleB = warpFactor * warpBaseRateB;
+          }
+
+          let pitchFactorB = 1.0 + (deckBPitchRef.current / 100);
+          freqScaleB *= pitchFactorB;
+
+          voice.freqScaleB = freqScaleB;
+          voice.orig_oscB_rate = freqScaleB;
+          voice.orig_oscB_L_rate = freqScaleB;
+          voice.orig_oscB_R_rate = freqScaleB;
+
+          if (voice.oscB && voice.oscB.playbackRate) {
+            voice.oscB.playbackRate.cancelScheduledValues(now);
+            voice.oscB.playbackRate.setValueAtTime(voice.oscB.playbackRate.value, now);
+            voice.oscB.playbackRate.linearRampToValueAtTime(freqScaleB * stopFactor, now + 0.035);
+          }
+          if (voice.oscB_L && voice.oscB_L.playbackRate) {
+            voice.oscB_L.playbackRate.cancelScheduledValues(now);
+            voice.oscB_L.playbackRate.setValueAtTime(voice.oscB_L.playbackRate.value, now);
+            voice.oscB_L.playbackRate.linearRampToValueAtTime(freqScaleB * stopFactor, now + 0.035);
+          }
+          if (voice.oscB_R && voice.oscB_R.playbackRate) {
+            voice.oscB_R.playbackRate.cancelScheduledValues(now);
+            voice.oscB_R.playbackRate.setValueAtTime(voice.oscB_R.playbackRate.value, now);
+            voice.oscB_R.playbackRate.linearRampToValueAtTime(freqScaleB * stopFactor, now + 0.035);
+          }
+        }
+      }
+    });
+  };
+
   // --- Waveform Editor Actions ---
   const updateSlotParam = (slotId, param, val) => {
     const nextSlots = sampleSlotsRef.current.map(s => {
@@ -2954,6 +3228,7 @@ export default function Delta7Synth() {
     });
     sampleSlotsRef.current = nextSlots;
     setSampleSlots(nextSlots);
+    syncActiveVoiceParams(slotId, param, val);
   };
 
   const handleStartChange = (val) => {
@@ -3031,6 +3306,18 @@ export default function Delta7Synth() {
     const prst = ROTOR_PRESETS[idx];
     if (!prst) return;
     setSelectedRotorPresetIdx(presetIdx);
+    setParams(prev => ({ ...prev, ...prst.params }));
+  };
+
+  const handleLoadReverbPreset = (presetIdx) => {
+    if (presetIdx === '') {
+      setSelectedReverbPresetIdx('');
+      return;
+    }
+    const idx = parseInt(presetIdx, 10);
+    const prst = REVERB_PRESETS[idx];
+    if (!prst) return;
+    setSelectedReverbPresetIdx(presetIdx);
     setParams(prev => ({ ...prev, ...prst.params }));
   };
 
@@ -3556,8 +3843,8 @@ export default function Delta7Synth() {
   const tapeStopFactorRef = useRef(1.0);
   useEffect(() => {
     paramsRef.current = params;
-    if (sharedArrayRef.current) {
-      sharedArrayRef.current[SAB_BPM] = params.arpBpm || 120;
+    if (sharedFloatRef.current) {
+      sharedFloatRef.current[SAB_BPM] = params.arpBpm || 120;
     }
     if (audioCtxRef.current) {
       const now = audioCtxRef.current.currentTime;
@@ -3576,10 +3863,10 @@ export default function Delta7Synth() {
       const sendB2 = typeof params.mfx2SendB === 'number' && isFinite(params.mfx2SendB) ? params.mfx2SendB : 0;
       
       if (mfx1SendGainRef.current) {
-        mfx1SendGainRef.current.gain.setValueAtTime((sendA1 + sendB1) * 0.5, now);
+        mfx1SendGainRef.current.gain.setValueAtTime(Math.max(sendA1, sendB1), now);
       }
       if (mfx2SendGainRef.current) {
-        mfx2SendGainRef.current.gain.setValueAtTime((sendA2 + sendB2) * 0.5, now);
+        mfx2SendGainRef.current.gain.setValueAtTime(Math.max(sendA2, sendB2), now);
       }
       
       if (preampNodeRef.current && typeof params.preampDrive === 'number' && isFinite(params.preampDrive)) {
@@ -3614,10 +3901,34 @@ export default function Delta7Synth() {
         lastIfx2MixRef.current = mix2;
       }
 
-      // Update Reverb return/master wet gain
-      const revMix = typeof params.reverbMix === 'number' && isFinite(params.reverbMix) ? params.reverbMix : 0.15;
+      // Update Reverb return/master wet gain and active state
+      const isReverbActive = params.reverbActive !== false;
+      const revMix = isReverbActive && typeof params.reverbMix === 'number' && isFinite(params.reverbMix) ? params.reverbMix : 0.0;
       if (mfx2Ref.current && mfx2Ref.current.output) {
         mfx2Ref.current.output.gain.setValueAtTime(revMix, now);
+      }
+
+      // Sync and update Reverb parameters dynamically
+      if (mfx2Ref.current) {
+        const decayVal = typeof params.reverbDecay === 'number' && isFinite(params.reverbDecay) ? params.reverbDecay : 2.5;
+        const typeVal = params.reverbType || 'hall';
+        if (decayVal !== lastReverbDecayRef.current || typeVal !== lastReverbTypeRef.current) {
+          updateReverbDecay(audioCtxRef.current, decayVal, typeVal);
+          lastReverbDecayRef.current = decayVal;
+          lastReverbTypeRef.current = typeVal;
+        }
+
+        const preDelayVal = typeof params.reverbPreDelay === 'number' && isFinite(params.reverbPreDelay) ? params.reverbPreDelay : 0.02;
+        if (preDelayVal !== lastReverbPreDelayRef.current && reverbPreDelayNodeRef.current) {
+          reverbPreDelayNodeRef.current.delayTime.setTargetAtTime(preDelayVal, now, 0.01);
+          lastReverbPreDelayRef.current = preDelayVal;
+        }
+
+        const highCutVal = typeof params.reverbHighCut === 'number' && isFinite(params.reverbHighCut) ? params.reverbHighCut : 8000;
+        if (highCutVal !== lastReverbHighCutRef.current && reverbHighCutFilterRef.current) {
+          reverbHighCutFilterRef.current.frequency.setTargetAtTime(highCutVal, now, 0.01);
+          lastReverbHighCutRef.current = highCutVal;
+        }
       }
 
       // Update Space Echo and standard delay live parameters
@@ -3827,6 +4138,7 @@ export default function Delta7Synth() {
     // MFX1 (Delay / Space Echo)
     delayInputRef.current = ctx.createGain();
     delayOutputRef.current = ctx.createGain();
+    delayOutputRef.current.gain.setValueAtTime(0.85, now); // Staged to prevent clipping
     mfx1Ref.current = delayInputRef.current; // for backward compatibility in checks
 
     rebuildDelayEffect(ctx, paramsRef.current.spaceEchoActive);
@@ -3834,7 +4146,7 @@ export default function Delta7Synth() {
     const sendA1 = typeof paramsRef.current.mfx1SendA === 'number' && isFinite(paramsRef.current.mfx1SendA) ? paramsRef.current.mfx1SendA : 0;
     const sendB1 = typeof paramsRef.current.mfx1SendB === 'number' && isFinite(paramsRef.current.mfx1SendB) ? paramsRef.current.mfx1SendB : 0;
     const mfx1SendGain = ctx.createGain();
-    mfx1SendGain.gain.setValueAtTime((sendA1 + sendB1) * 0.5, now);
+    mfx1SendGain.gain.setValueAtTime(Math.max(sendA1, sendB1), now);
     mfx1SendGainRef.current = mfx1SendGain;
 
     // MFX2 (Reverb)
@@ -3843,7 +4155,7 @@ export default function Delta7Synth() {
     const sendA2 = typeof paramsRef.current.mfx2SendA === 'number' && isFinite(paramsRef.current.mfx2SendA) ? paramsRef.current.mfx2SendA : 0;
     const sendB2 = typeof paramsRef.current.mfx2SendB === 'number' && isFinite(paramsRef.current.mfx2SendB) ? paramsRef.current.mfx2SendB : 0;
     const mfx2SendGain = ctx.createGain();
-    mfx2SendGain.gain.setValueAtTime((sendA2 + sendB2) * 0.5, now);
+    mfx2SendGain.gain.setValueAtTime(Math.max(sendA2, sendB2), now);
     mfx2SendGainRef.current = mfx2SendGain;
 
     // Dedicated Leslie cabinet (for per-pad sends)
@@ -4286,6 +4598,7 @@ export default function Delta7Synth() {
           // Event queue for lookahead scheduling
           this.eventQueue = [];
           this.sharedFloat32Array = null;
+          this.sharedInt32Array = null;
         }
 
         handleMessage(e) {
@@ -4293,6 +4606,7 @@ export default function Delta7Synth() {
           switch (msg.type) {
             case 'INIT_SHARED_BUFFER':
               this.sharedFloat32Array = new Float32Array(msg.buffer);
+              this.sharedInt32Array = new Int32Array(msg.buffer);
               break;
 
             case 'SET_PARAMS':
@@ -4413,8 +4727,9 @@ export default function Delta7Synth() {
         process(inputs, outputs, parameters) {
           const now = currentTime;
           
-          if (this.sharedFloat32Array) {
+          if (this.sharedFloat32Array && this.sharedInt32Array) {
             const arr = this.sharedFloat32Array;
+            const arrInt = this.sharedInt32Array;
             
             // Sync playback active status
             const pbActive = arr[2] > 0.5;
@@ -4443,8 +4758,8 @@ export default function Delta7Synth() {
             }
             
             // Read and schedule queue events
-            let readIdx = Atomics.load(arr, 1); // SAB_READ_IDX = 1
-            const writeIdx = Atomics.load(arr, 0); // SAB_WRITE_IDX = 0
+            let readIdx = Atomics.load(arrInt, 1); // SAB_READ_IDX = 1
+            const writeIdx = Atomics.load(arrInt, 0); // SAB_WRITE_IDX = 0
             
             while (readIdx !== writeIdx) {
               const offset = 10 + readIdx * 8; // SAB_QUEUE_START = 10, SAB_EVENT_STRIDE = 8
@@ -4482,7 +4797,7 @@ export default function Delta7Synth() {
               this.handleLiveTrigger(fakeMsg);
               
               readIdx = (readIdx + 1) % 30; // SAB_QUEUE_LIMIT = 30
-              Atomics.store(arr, 1, readIdx);
+              Atomics.store(arrInt, 1, readIdx);
             }
           }
           const lookahead = 0.05; // 50ms look-ahead buffer
@@ -4546,7 +4861,7 @@ export default function Delta7Synth() {
             // Handle playback loop wrap
             if (this.playbackNextEventIdx >= this.sortedEvents.length && this.sortedEvents.length > 0) {
               const lastEvent = this.sortedEvents[this.sortedEvents.length - 1];
-              const endBeat = Math.ceil(lastEvent.beat / 4) * 4;
+              const endBeat = Math.max(16, Math.ceil(lastEvent.beat / 4) * 4);
               if (elapsedBeats >= endBeat) {
                 this.playbackStartTime = now;
                 this.playbackStartBeatOffset = 0.0;
@@ -5104,8 +5419,9 @@ export default function Delta7Synth() {
     const wetGain = ctx.createGain();
     const now = ctx.currentTime;
 
-    dryGain.gain.setValueAtTime(1.0 - mix, now);
-    wetGain.gain.setValueAtTime(mix, now);
+    const wetScale = type === 'Overdrive' ? 0.7 : type === 'Flanger' ? 0.8 : type === 'Rotary Speaker' ? 0.9 : type === 'Ring Modulator' ? 0.85 : 1.0;
+    dryGain.gain.setValueAtTime(Math.cos(mix * Math.PI / 2), now);
+    wetGain.gain.setValueAtTime(Math.sin(mix * Math.PI / 2) * wetScale, now);
 
     inputNode.connect(dryGain);
     dryGain.connect(outputNode);
@@ -5219,12 +5535,13 @@ export default function Delta7Synth() {
 
     wetGain.connect(outputNode);
 
+    const mixObj = { dryGain, wetGain, wetScale };
     if (slotNum === 1) {
       ifx1EffectRef.current = fxNode;
-      ifx1MixRef.current = { dryGain, wetGain };
+      ifx1MixRef.current = mixObj;
     } else {
       ifx2EffectRef.current = fxNode;
-      ifx2MixRef.current = { dryGain, wetGain };
+      ifx2MixRef.current = mixObj;
     }
   };
 
@@ -5424,8 +5741,9 @@ export default function Delta7Synth() {
   const updateIFXMix = (mixNode, mix) => {
     if (!audioCtxRef.current || !mixNode) return;
     const now = audioCtxRef.current.currentTime;
-    mixNode.dryGain.gain.setValueAtTime(1.0 - mix, now);
-    mixNode.wetGain.gain.setValueAtTime(mix, now);
+    const wetScale = mixNode.wetScale !== undefined ? mixNode.wetScale : 1.0;
+    mixNode.dryGain.gain.setValueAtTime(Math.cos(mix * Math.PI / 2), now);
+    mixNode.wetGain.gain.setValueAtTime(Math.sin(mix * Math.PI / 2) * wetScale, now);
   };
 
   const createStereoDelay = (ctx) => {
@@ -5457,44 +5775,101 @@ export default function Delta7Synth() {
     return { input, output, delayL, delayR, feedbackL, feedbackR };
   };
 
+  const updateReverbDecay = (ctx, decayTime, reverbType) => {
+    if (!ctx || !reverbConvolverRef.current) return;
+    const sampleRate = ctx.sampleRate;
+    const type = reverbType || 'hall';
+    
+    // Calculate decay length boundaries based on algorithm
+    let actualDecayTime = typeof decayTime === 'number' && isFinite(decayTime) ? decayTime : 2.5;
+    if (type === 'short') {
+      actualDecayTime = Math.min(1.2, actualDecayTime);
+    } else if (type === 'long') {
+      actualDecayTime = Math.max(4.0, actualDecayTime);
+    }
+    
+    const length = Math.round(sampleRate * Math.max(0.1, actualDecayTime));
+    const impulse = ctx.createBuffer(2, length, sampleRate);
+    const left = impulse.getChannelData(0);
+    const right = impulse.getChannelData(1);
+    
+    const decayConstant = actualDecayTime / 3;
+    
+    // We'll generate a dense noise tail and apply the envelope
+    for (let i = 0; i < length; i++) {
+      let env = 0;
+      if (type === 'reverse') {
+        // Reverse builds up exponentially
+        env = Math.exp(-(length - i) / (sampleRate * (actualDecayTime / 2.5)));
+      } else if (type === 'plate') {
+        // Plate has a very fast onset and linear-exponential decay
+        env = Math.exp(-i / (sampleRate * (actualDecayTime / 3.5)));
+      } else {
+        // Hall / Long / Short
+        env = Math.exp(-i / (sampleRate * decayConstant));
+      }
+      
+      let leftNoise = (Math.random() * 2 - 1) * env;
+      let rightNoise = (Math.random() * 2 - 1) * env;
+      
+      // Plate filtering to add high-frequency density (metallic shimmer)
+      if (type === 'plate') {
+        if (i > 0) {
+          leftNoise = leftNoise - 0.25 * left[i - 1];
+          rightNoise = rightNoise - 0.25 * right[i - 1];
+        }
+      }
+      
+      left[i] = leftNoise;
+      right[i] = rightNoise;
+    }
+    
+    reverbConvolverRef.current.buffer = impulse;
+  };
+
   const createReverb = (ctx) => {
-    // Generate exponential noise tail for algorithmic reverb
     const input = ctx.createGain();
     const output = ctx.createGain();
     const convolver = ctx.createConvolver();
     const now = ctx.currentTime;
-
-    const sampleRate = ctx.sampleRate;
-    const length = sampleRate * 2.5; // 2.5 second reverb tail
-    const impulse = ctx.createBuffer(2, length, sampleRate);
-    const left = impulse.getChannelData(0);
-    const right = impulse.getChannelData(1);
-
-    for (let i = 0; i < length; i++) {
-      const decay = Math.exp(-i / (sampleRate * 0.7)); // decay constant
-      left[i] = (Math.random() * 2 - 1) * decay;
-      right[i] = (Math.random() * 2 - 1) * decay;
-    }
-
-    convolver.buffer = impulse;
-    input.connect(convolver);
-    convolver.connect(output);
-
+    
+    reverbConvolverRef.current = convolver;
+    
+    // Create pre-delay node
+    const preDelay = ctx.createDelay(1.0);
+    preDelay.delayTime.setValueAtTime(0.02, now); // default 20ms
+    reverbPreDelayNodeRef.current = preDelay;
+    
+    // Create high-cut filter
+    const highCut = ctx.createBiquadFilter();
+    highCut.type = 'lowpass';
+    highCut.frequency.setValueAtTime(8000, now); // default 8kHz
+    reverbHighCutFilterRef.current = highCut;
+    
+    // Initialize buffer with default parameters
+    updateReverbDecay(ctx, 2.5, 'hall');
+    
+    // Connect chain: input -> preDelay -> convolver -> highCut -> output
+    input.connect(preDelay);
+    preDelay.connect(convolver);
+    convolver.connect(highCut);
+    highCut.connect(output);
+    
     // Reverb Freeze feedback path
     const fbHPF = ctx.createBiquadFilter();
     fbHPF.type = 'highpass';
     fbHPF.frequency.setValueAtTime(20, now);
     reverbHPFRef.current = fbHPF;
-
+    
     const fbGain = ctx.createGain();
     fbGain.gain.setValueAtTime(0.0, now);
     reverbFeedbackGainRef.current = fbGain;
-
+    
     // Connect feedback loop: convolver -> highpass filter -> feedback gain -> input
     convolver.connect(fbHPF);
     fbHPF.connect(fbGain);
     fbGain.connect(input);
-
+    
     return { input, output };
   };
 
@@ -5887,11 +6262,12 @@ export default function Delta7Synth() {
     let freqScaleA = 1.0;
     let warpBaseRateA = 1.0;
     if (bufferA) {
+      const tuningA = slotA && slotA.tuning !== undefined ? slotA.tuning : 0;
       if (prog.oscATriggerMode === 'slice') {
-        warpBaseRateA = Math.pow(2, oscAOctave) * Math.pow(2, oscAPitch / 12) * Math.pow(2, slicePitchA / 12);
+        warpBaseRateA = Math.pow(2, oscAOctave) * Math.pow(2, oscAPitch / 12) * Math.pow(2, slicePitchA / 12) * Math.pow(2, tuningA / 12);
       } else {
         const rootNoteA = slotA ? slotA.rootNote : 60;
-        warpBaseRateA = Math.pow(2, (note - rootNoteA + oscAPitch + oscAOctave * 12) / 12) * pbFactor;
+        warpBaseRateA = Math.pow(2, (note - rootNoteA + oscAPitch + oscAOctave * 12 + tuningA) / 12) * pbFactor;
       }
       
       const isWarpedA = slotA && (slotA.warpOn || masterSyncActiveRef.current);
@@ -5909,11 +6285,12 @@ export default function Delta7Synth() {
     let freqScaleB = 1.0;
     let warpBaseRateB = 1.0;
     if (bufferB) {
+      const tuningB = slotB && slotB.tuning !== undefined ? slotB.tuning : 0;
       if (prog.oscBTriggerMode === 'slice') {
-        warpBaseRateB = Math.pow(2, oscBOctave) * Math.pow(2, oscBPitch / 12) * Math.pow(2, slicePitchB / 12);
+        warpBaseRateB = Math.pow(2, oscBOctave) * Math.pow(2, oscBPitch / 12) * Math.pow(2, slicePitchB / 12) * Math.pow(2, tuningB / 12);
       } else {
         const rootNoteB = slotB ? slotB.rootNote : 60;
-        warpBaseRateB = Math.pow(2, (note - rootNoteB + oscBPitch + oscBOctave * 12) / 12) * pbFactor;
+        warpBaseRateB = Math.pow(2, (note - rootNoteB + oscBPitch + oscBOctave * 12 + tuningB) / 12) * pbFactor;
       }
       
       const isWarpedB = slotB && (slotB.warpOn || masterSyncActiveRef.current);
@@ -6708,9 +7085,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       padPannerNode.connect(voiceOutGain);
     }
 
-    if (padFxType !== 'None' && padFxSend > 0) {
+    // Always create sendGainNode for performance voices to allow real-time send automation
+    const isPerfVoice = voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-');
+    if (isPerfVoice || (padFxType !== 'None' && padFxSend > 0)) {
       const sendGainNode = ctx.createGain();
-      sendGainNode.gain.setValueAtTime(padFxSend, now);
+      const initialSendGain = (padFxType !== 'None') ? padFxSend : 0.0;
+      sendGainNode.gain.setValueAtTime(initialSendGain, now);
       padPannerNode.connect(sendGainNode);
 
       if (padFxType === 'Space Echo' && delayInputRef.current) {
@@ -6989,6 +7369,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     voiceObj.playheadRateA = freqScaleA / Math.max(0.05, 1 + sliceStretchA);
     voiceObj.playheadRateB = freqScaleB / Math.max(0.05, 1 + sliceStretchB);
 
+    voiceObj.oscAOctave = oscAOctave;
+    voiceObj.oscAPitch = oscAPitch;
+    voiceObj.slicePitchA = slicePitchA;
+    voiceObj.oscBOctave = oscBOctave;
+    voiceObj.oscBPitch = oscBPitch;
+    voiceObj.slicePitchB = slicePitchB;
+    voiceObj.pbFactor = pbFactor;
+
     if (prog.stutterOn) {
       startStutterModulation(voiceObj);
     }
@@ -7263,11 +7651,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const writeEventToSab = (deck, index, velocity, isNoteOn, shouldRecord, note, forceQuantizeGrid) => {
-    if (!sharedArrayRef.current) return false;
+    if (!sharedIntRef.current || !sharedFloatRef.current) return false;
     
-    const arr = sharedArrayRef.current;
-    let writeIdx = Atomics.load(arr, SAB_WRITE_IDX);
-    let readIdx = Atomics.load(arr, SAB_READ_IDX);
+    const arrInt = sharedIntRef.current;
+    const arrFloat = sharedFloatRef.current;
+    let writeIdx = Atomics.load(arrInt, SAB_WRITE_IDX);
+    let readIdx = Atomics.load(arrInt, SAB_READ_IDX);
     
     // Check if buffer is full
     const nextWriteIdx = (writeIdx + 1) % SAB_QUEUE_LIMIT;
@@ -7277,22 +7666,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
     
     const offset = SAB_QUEUE_START + writeIdx * SAB_EVENT_STRIDE;
-    arr[offset] = deck === 'A' ? 65.0 : 66.0;
-    arr[offset + 1] = index;
-    arr[offset + 2] = velocity;
-    arr[offset + 3] = isNoteOn ? 1.0 : 0.0;
-    arr[offset + 4] = shouldRecord ? 1.0 : 0.0;
+    arrFloat[offset] = deck === 'A' ? 65.0 : 66.0;
+    arrFloat[offset + 1] = index;
+    arrFloat[offset + 2] = velocity;
+    arrFloat[offset + 3] = isNoteOn ? 1.0 : 0.0;
+    arrFloat[offset + 4] = shouldRecord ? 1.0 : 0.0;
     
-    arr[offset + 5] = note === 'slot' ? -1.0 : parseFloat(note);
-    arr[offset + 6] = forceQuantizeGrid;
-    arr[offset + 7] = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
+    arrFloat[offset + 5] = note === 'slot' ? -1.0 : parseFloat(note);
+    arrFloat[offset + 6] = forceQuantizeGrid;
+    arrFloat[offset + 7] = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
     
-    Atomics.store(arr, SAB_WRITE_IDX, nextWriteIdx);
+    Atomics.store(arrInt, SAB_WRITE_IDX, nextWriteIdx);
     return true;
   };
 
   const dispatchLiveTrigger = (deck, type, index, velocity, isNoteOn, shouldRecord, forceQuantizeGrid) => {
-    if (sharedArrayRef.current) {
+    if (sharedIntRef.current && schedulerNodeRef.current) {
       let gridVal = 0.0;
       if (forceQuantizeGrid === '1/128') gridVal = 1.0;
       else if (forceQuantizeGrid === '1/64') gridVal = 2.0;
@@ -7482,6 +7871,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPad(`${padKey}-pending`, false);
         if (shouldRecord && perfRecordActiveRef.current) {
           perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+          setPerfEvents([...perfEventsRef.current]);
         }
         return;
       }
@@ -7493,6 +7883,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       
       if (shouldRecord && perfRecordActiveRef.current) {
         perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+        setPerfEvents([...perfEventsRef.current]);
       }
       return;
     }
@@ -7508,6 +7899,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPad(`${padKey}-pending`, false);
         if (shouldRecord && perfRecordActiveRef.current) {
           perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+          setPerfEvents([...perfEventsRef.current]);
         }
         return;
       }
@@ -7566,6 +7958,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           
           if (shouldRecord && perfRecordActiveRef.current) {
             perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true });
+            setPerfEvents([...perfEventsRef.current]);
           }
           return;
         }
@@ -7654,6 +8047,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     const startVoiceTrigger = () => {
       const voice = playProgramVoice(ctx, triggerNote, velocity, tempProg, voiceKey, delayOffset);
+      if (voice) {
+        voice.triggerBeat = targetBeat;
+        voice.type = type;
+      }
       activeVoicesRef.current.set(voiceKey, [voice]);
       setPerfPad(padKey, true);
 
@@ -7690,12 +8087,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     if (shouldRecord && perfRecordActiveRef.current) {
       perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true });
+      setPerfEvents([...perfEventsRef.current]);
     }
   };
 
   const syncSabPlaybackState = (active, startTime, startBeatOffset, bpm) => {
-    if (sharedArrayRef.current) {
-      const arr = sharedArrayRef.current;
+    if (sharedFloatRef.current) {
+      const arr = sharedFloatRef.current;
       arr[SAB_PLAYBACK_START_TIME] = startTime;
       arr[SAB_PLAYBACK_BEAT_OFFSET] = startBeatOffset;
       arr[SAB_BPM] = bpm;
@@ -8701,8 +9099,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (formantDryGainRef.current && formantMixGainRef.current) {
       if (isFormantActive) {
         const formantMix = 0.95;
-        formantDryGainRef.current.gain.setTargetAtTime(1.0 - formantMix, now, 0.02);
-        formantMixGainRef.current.gain.setTargetAtTime(formantMix, now, 0.02);
+        formantDryGainRef.current.gain.setTargetAtTime(Math.cos(formantMix * Math.PI / 2), now, 0.02);
+        formantMixGainRef.current.gain.setTargetAtTime(Math.sin(formantMix * Math.PI / 2), now, 0.02);
         updateFormantFrequencies(x, y);
       } else {
         formantDryGainRef.current.gain.setTargetAtTime(1.0, now, 0.02);
@@ -8715,8 +9113,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (bitcrusherDryGainRef.current && bitcrusherMixGainRef.current) {
       if (isBitcrushActive) {
         const crushMix = 0.85;
-        bitcrusherDryGainRef.current.gain.setTargetAtTime(1.0 - crushMix, now, 0.02);
-        bitcrusherMixGainRef.current.gain.setTargetAtTime(crushMix, now, 0.02);
+        bitcrusherDryGainRef.current.gain.setTargetAtTime(Math.cos(crushMix * Math.PI / 2), now, 0.02);
+        bitcrusherMixGainRef.current.gain.setTargetAtTime(Math.sin(crushMix * Math.PI / 2), now, 0.02);
         
         const ratioVal = (kaossTargetX === 'bitcrush') ? (x * 23 + 1) : (y * 23 + 1);
         const depthVal = (kaossTargetX === 'bitcrush') ? (16 - x * 14) : (16 - y * 14);
@@ -8744,13 +9142,17 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
 
     // --- Reverb Freeze ---
-    const isReverbFreezeActive = (kaossTargetX === 'reverbFreeze' || kaossTargetY === 'reverbFreeze') && isTouchedOrHolding;
+    const isReverbFreezeActive = params.reverbFreeze || ((kaossTargetX === 'reverbFreeze' || kaossTargetY === 'reverbFreeze') && isTouchedOrHolding);
     if (reverbFeedbackGainRef.current && reverbHPFRef.current) {
       if (isReverbFreezeActive) {
-        const fbVal = (kaossTargetX === 'reverbFreeze') ? (x * 0.88) : (y * 0.88);
+        const fbVal = ((kaossTargetX === 'reverbFreeze' || kaossTargetY === 'reverbFreeze') && isTouchedOrHolding)
+          ? ((kaossTargetX === 'reverbFreeze') ? (x * 0.88) : (y * 0.88))
+          : 0.90; // High feedback gain to sustain indefinitely
         reverbFeedbackGainRef.current.gain.setTargetAtTime(fbVal, now, 0.05);
         
-        const hpfVal = (kaossTargetX === 'reverbFreeze') ? (x * 3980 + 20) : (y * 3980 + 20);
+        const hpfVal = ((kaossTargetX === 'reverbFreeze' || kaossTargetY === 'reverbFreeze') && isTouchedOrHolding)
+          ? ((kaossTargetX === 'reverbFreeze') ? (x * 3980 + 20) : (y * 3980 + 20))
+          : 20; // Default low cutoff for manual freeze
         reverbHPFRef.current.frequency.setTargetAtTime(hpfVal, now, 0.05);
       } else {
         reverbFeedbackGainRef.current.gain.setTargetAtTime(0.0, now, 0.05);
@@ -8938,13 +9340,19 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           v.playheadRateA = warpFactor;
           
           if (v.oscA && v.oscA.playbackRate) {
-            v.oscA.playbackRate.setValueAtTime(finalRate, now);
+            v.oscA.playbackRate.cancelScheduledValues(now);
+            v.oscA.playbackRate.setValueAtTime(v.oscA.playbackRate.value, now);
+            v.oscA.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
           }
           if (v.oscA_L && v.oscA_L.playbackRate) {
-            v.oscA_L.playbackRate.setValueAtTime(finalRate, now);
+            v.oscA_L.playbackRate.cancelScheduledValues(now);
+            v.oscA_L.playbackRate.setValueAtTime(v.oscA_L.playbackRate.value, now);
+            v.oscA_L.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
           }
           if (v.oscA_R && v.oscA_R.playbackRate) {
-            v.oscA_R.playbackRate.setValueAtTime(finalRate, now);
+            v.oscA_R.playbackRate.cancelScheduledValues(now);
+            v.oscA_R.playbackRate.setValueAtTime(v.oscA_R.playbackRate.value, now);
+            v.oscA_R.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
           }
         }
         
@@ -8959,13 +9367,19 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           v.playheadRateB = warpFactor;
           
           if (v.oscB && v.oscB.playbackRate) {
-            v.oscB.playbackRate.setValueAtTime(finalRate, now);
+            v.oscB.playbackRate.cancelScheduledValues(now);
+            v.oscB.playbackRate.setValueAtTime(v.oscB.playbackRate.value, now);
+            v.oscB.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
           }
           if (v.oscB_L && v.oscB_L.playbackRate) {
-            v.oscB_L.playbackRate.setValueAtTime(finalRate, now);
+            v.oscB_L.playbackRate.cancelScheduledValues(now);
+            v.oscB_L.playbackRate.setValueAtTime(v.oscB_L.playbackRate.value, now);
+            v.oscB_L.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
           }
           if (v.oscB_R && v.oscB_R.playbackRate) {
-            v.oscB_R.playbackRate.setValueAtTime(finalRate, now);
+            v.oscB_R.playbackRate.cancelScheduledValues(now);
+            v.oscB_R.playbackRate.setValueAtTime(v.oscB_R.playbackRate.value, now);
+            v.oscB_R.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
           }
         }
       };
@@ -8999,7 +9413,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             
             const oscs = [voice.oscA, voice.oscA_L, voice.oscA_R].filter(Boolean);
             oscs.forEach(osc => {
-              osc.playbackRate.setValueAtTime(finalRate, now);
+              osc.playbackRate.cancelScheduledValues(now);
+              osc.playbackRate.setValueAtTime(osc.playbackRate.value, now);
+              osc.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
             });
           } else {
             const baseRate = voice.base_oscB_rate || 1.0;
@@ -9010,7 +9426,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             
             const oscs = [voice.oscB, voice.oscB_L, voice.oscB_R].filter(Boolean);
             oscs.forEach(osc => {
-              osc.playbackRate.setValueAtTime(finalRate, now);
+              osc.playbackRate.cancelScheduledValues(now);
+              osc.playbackRate.setValueAtTime(osc.playbackRate.value, now);
+              osc.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
             });
           }
         });
@@ -9568,8 +9986,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const laneIdx = Math.max(0, Math.min(7, Math.floor(x / 31.25))); // 250px wide / 8 lanes = 31.25px per lane
-    const playheadY = 400 - 35; // 400 height, playhead at bottom 35
+    const laneIdx = Math.max(0, Math.min(7, Math.floor(x / 28))); // 224px wide / 8 lanes = 28px per lane
+    const playheadY = 170 - 35; // 170 height, playhead at bottom 35
     const distY = playheadY - y;
     const beatOffset = distY / highwayZoom;
     let clickedBeat = seqCurrentBeatRef.current + beatOffset;
@@ -9652,7 +10070,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const playheadY = 400 - 35;
+    const playheadY = 170 - 35;
     const distY = playheadY - y;
     const beatOffset = distY / highwayZoom;
     let hoverBeat = seqCurrentBeatRef.current + beatOffset;
@@ -9747,7 +10165,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             <div 
               key={`line-a-${idx}`} 
               className="highway-lane-line" 
-              style={{ left: `${(idx + 0.5) * 31}px` }} 
+              style={{ left: `${(idx + 0.5) * 28}px` }} 
             />
           ))}
           <div className="highway-playhead-line" />
@@ -9757,7 +10175,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               ref={el => { targetCirclesRefsA.current[idx] = el; }}
               className="highway-target-circle" 
               style={{ 
-                left: `${idx * 31 + 11.5}px`, 
+                left: `${idx * 28 + 10}px`, 
                 borderColor: ringColors[idx],
                 background: 'transparent',
                 boxShadow: 'none'
@@ -9768,7 +10186,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             <div 
               key={`lbl-a-${idx}`} 
               className="highway-label" 
-              style={{ left: `${idx * 31 + 9.5}px`, color: ringColors[idx] }}
+              style={{ left: `${idx * 28 + 8}px`, color: ringColors[idx] }}
             >
               A{idx + 1}
             </div>
@@ -9783,7 +10201,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               const isBarStart = b % beatsPerBar === 0;
               const barNum = Math.floor(b / beatsPerBar) + 1;
               const beatInBar = (b % beatsPerBar) + 1;
-              const startY = - (b * highwayZoom);
+              const startY = b * highwayZoom;
               
               return (
                 <div 
@@ -9793,11 +10211,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     left: 0,
                     right: 0,
                     bottom: `${startY}px`,
-                    height: 0,
-                    borderBottom: isBarStart 
-                      ? '1px solid rgba(0, 243, 255, 0.45)' 
-                      : '1px dashed rgba(0, 243, 255, 0.18)',
-                    pointerEvents: 'none'
+                    height: '1px',
+                    background: isBarStart 
+                      ? 'rgba(0, 243, 255, 0.65)' 
+                      : 'rgba(0, 243, 255, 0.25)',
+                    boxShadow: isBarStart
+                      ? '0 0 6px rgba(0, 243, 255, 0.4)'
+                      : 'none',
+                    pointerEvents: 'none',
+                    zIndex: 1
                   }}
                 >
                   {/* Bar/Beat labels on the left and right sides */}
@@ -9840,24 +10262,43 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               const pills = getPillsForLane('A', laneIdx);
               const color = ringColors[laneIdx];
               return (
-                <div key={`hw-lane-a-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
+                <div 
+                  key={`hw-lane-a-${laneIdx}`} 
+                  style={{ position: 'absolute', left: `${laneIdx * 28}px`, width: '28px', top: 0, bottom: 0, zIndex: 2 }}
+                >
+                  {/* Dynamic lane highlight background */}
+                  <div
+                    ref={el => { laneBgsRefsA.current[laneIdx] = el; }}
+                    style={{
+                      position: 'absolute',
+                      left: '2px',
+                      right: '2px',
+                      top: 0,
+                      bottom: 0,
+                      background: 'transparent',
+                      pointerEvents: 'none',
+                      transition: 'background 0.15s, opacity 0.15s',
+                      zIndex: 0
+                    }}
+                  />
                   {pills.map((pill, pIdx) => {
-                    const startY = - (pill.start * highwayZoom);
-                    const endY = - (pill.end * highwayZoom);
-                    const height = startY - endY;
+                    const startY = pill.start * highwayZoom;
+                    const endY = pill.end * highwayZoom;
+                    const height = endY - startY;
                     return (
                       <div
                         key={`hw-pill-a-${laneIdx}-${pIdx}`}
                         style={{
                           position: 'absolute',
-                          left: '11.5px',
-                          width: '8px',
+                          left: '3px',
+                          width: '22px',
                           bottom: `${startY}px`,
                           height: `${Math.max(6, height)}px`,
-                          background: color,
-                          borderRadius: '4px',
-                          boxShadow: `0 0 6px ${color}`,
-                          border: `1.5px solid ${color}`
+                          background: '#000000',
+                          borderRadius: '3px',
+                          border: `1.5px solid ${color}`,
+                          boxShadow: `0 0 8px ${color}, inset 0 0 8px ${color}`,
+                          zIndex: 2
                         }}
                       />
                     );
@@ -9884,7 +10325,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             <div 
               key={`line-b-${idx}`} 
               className="highway-lane-line" 
-              style={{ left: `${(idx + 0.5) * 31}px` }} 
+              style={{ left: `${(idx + 0.5) * 28}px` }} 
             />
           ))}
           <div className="highway-playhead-line" />
@@ -9894,7 +10335,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               ref={el => { targetCirclesRefsB.current[idx] = el; }}
               className="highway-target-circle" 
               style={{ 
-                left: `${idx * 31 + 11.5}px`, 
+                left: `${idx * 28 + 10}px`, 
                 borderColor: ringColors[idx],
                 background: 'transparent',
                 boxShadow: 'none'
@@ -9905,7 +10346,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             <div 
               key={`lbl-b-${idx}`} 
               className="highway-label" 
-              style={{ left: `${idx * 31 + 9.5}px`, color: ringColors[idx] }}
+              style={{ left: `${idx * 28 + 8}px`, color: ringColors[idx] }}
             >
               B{idx + 1}
             </div>
@@ -9920,7 +10361,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               const isBarStart = b % beatsPerBar === 0;
               const barNum = Math.floor(b / beatsPerBar) + 1;
               const beatInBar = (b % beatsPerBar) + 1;
-              const startY = - (b * highwayZoom);
+              const startY = b * highwayZoom;
               
               return (
                 <div 
@@ -9930,11 +10371,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     left: 0,
                     right: 0,
                     bottom: `${startY}px`,
-                    height: 0,
-                    borderBottom: isBarStart 
-                      ? '1px solid rgba(0, 243, 255, 0.45)' 
-                      : '1px dashed rgba(0, 243, 255, 0.18)',
-                    pointerEvents: 'none'
+                    height: '1px',
+                    background: isBarStart 
+                      ? 'rgba(0, 243, 255, 0.65)' 
+                      : 'rgba(0, 243, 255, 0.25)',
+                    boxShadow: isBarStart
+                      ? '0 0 6px rgba(0, 243, 255, 0.4)'
+                      : 'none',
+                    pointerEvents: 'none',
+                    zIndex: 1
                   }}
                 >
                   {/* Bar/Beat labels on the left and right sides */}
@@ -9977,24 +10422,43 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               const pills = getPillsForLane('B', laneIdx);
               const color = ringColors[laneIdx];
               return (
-                <div key={`hw-lane-b-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
+                <div 
+                  key={`hw-lane-b-${laneIdx}`} 
+                  style={{ position: 'absolute', left: `${laneIdx * 28}px`, width: '28px', top: 0, bottom: 0, zIndex: 2 }}
+                >
+                  {/* Dynamic lane highlight background */}
+                  <div
+                    ref={el => { laneBgsRefsB.current[laneIdx] = el; }}
+                    style={{
+                      position: 'absolute',
+                      left: '2px',
+                      right: '2px',
+                      top: 0,
+                      bottom: 0,
+                      background: 'transparent',
+                      pointerEvents: 'none',
+                      transition: 'background 0.15s, opacity 0.15s',
+                      zIndex: 0
+                    }}
+                  />
                   {pills.map((pill, pIdx) => {
-                    const startY = - (pill.start * highwayZoom);
-                    const endY = - (pill.end * highwayZoom);
-                    const height = startY - endY;
+                    const startY = pill.start * highwayZoom;
+                    const endY = pill.end * highwayZoom;
+                    const height = endY - startY;
                     return (
                       <div
                         key={`hw-pill-b-${laneIdx}-${pIdx}`}
                         style={{
                           position: 'absolute',
-                          left: '11.5px',
-                          width: '8px',
+                          left: '3px',
+                          width: '22px',
                           bottom: `${startY}px`,
                           height: `${Math.max(6, height)}px`,
-                          background: color,
-                          borderRadius: '4px',
-                          boxShadow: `0 0 6px ${color}`,
-                          border: `1.5px solid ${color}`
+                          background: '#000000',
+                          borderRadius: '3px',
+                          border: `1.5px solid ${color}`,
+                          boxShadow: `0 0 8px ${color}, inset 0 0 8px ${color}`,
+                          zIndex: 2
                         }}
                       />
                     );
@@ -10728,7 +11192,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 TEMPO BPM
               </div>
               <div style={{ fontSize: '0.82rem', color: '#ff2828', fontWeight: 'bold', textShadow: '0 0 4px #ff0000', letterSpacing: '0.5px', marginTop: '1px', lineHeight: 1 }}>
-                {(params.arpBpm || 120).toFixed(1)}
+                {(parseFloat(params.arpBpm) || 120).toFixed(1)}
               </div>
             </div>
 
@@ -12002,104 +12466,150 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
           </div>
 
-          {/* Realtime Control Knobs 1-4 */}
-          <div className="realtime-knobs-section">
-            <div className="knob-mode-toggle">
+          {/* Reverb Unit */}
+          <div className="reverb-unit-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(0, 243, 255, 0.25)', paddingTop: '10px', marginTop: '10px' }}>
+            <span className="knob-label" style={{ color: '#d000ff', textShadow: '0 0 5px rgba(208, 0, 255, 0.5)', display: 'block', fontWeight: 'bold', fontSize: '0.62rem', letterSpacing: '0.5px' }}>REVERB UNIT</span>
+            
+            {/* Reverb Active Toggle */}
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+              <label style={{ color: '#d000ff', fontWeight: 'bold', fontSize: '0.58rem' }}>REVERB:</label>
               <button 
-                className={`btn btn-xs ${realtimeKnobMode === 'A' ? 'active-amber' : ''}`}
-                onClick={() => setRealtimeKnobMode('A')}
+                className={`btn btn-xs ${params.reverbActive !== false ? 'active-magenta' : ''}`}
+                onClick={() => {
+                  const nextActive = params.reverbActive === false ? true : false;
+                  setParams(prev => ({ ...prev, reverbActive: nextActive }));
+                  setSelectedReverbPresetIdx('');
+                }}
+                style={{ fontSize: '0.52rem', padding: '2px 6px', margin: 0 }}
               >
-                SELECT A (FILTER/EG)
-              </button>
-              <button 
-                className={`btn btn-xs ${realtimeKnobMode === 'B' ? 'active-amber' : ''}`}
-                onClick={() => setRealtimeKnobMode('B')}
-              >
-                SELECT B (ASSIGNABLE)
+                {params.reverbActive !== false ? 'ON' : 'OFF'}
               </button>
             </div>
 
-            <div className="knob-quad">
-              {realtimeKnobMode === 'A' ? (
-                <>
-                  <Knob 
-                    label="Cutoff" 
-                    value={params.cutoff} 
-                    min={20} max={20000} step={10}
-                    onChange={(v) => setParams(prev => ({ ...prev, cutoff: v }))} 
-                    midiLearnParam="cutoff" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
-                    glowColor="cyan"
-                  />
-                  <Knob 
-                    label="Resonance" 
-                    value={params.resonance} 
-                    min={0.1} max={15} step={0.1}
-                    onChange={(v) => setParams(prev => ({ ...prev, resonance: v }))}
-                    midiLearnParam="resonance" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
-                    glowColor="magenta"
-                  />
-                  <Knob 
-                    label="EG Intensity" 
-                    value={params.filterEnvAmt} 
-                    min={0} max={4000} step={50}
-                    onChange={(v) => setParams(prev => ({ ...prev, filterEnvAmt: v }))}
-                    midiLearnParam="filterEnvAmt" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
-                    glowColor="green"
-                  />
-                  <Knob 
-                    label="EG Release" 
-                    value={params.vcaEG.releaseTime} 
-                    min={0.01} max={4.0} step={0.02}
-                    onChange={(v) => updateEgParam('VCA', 'releaseTime', v)}
-                    midiLearnParam="vcaRelease" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
-                    glowColor="yellow"
-                  />
-                </>
-              ) : (
-                <>
-                  <Knob 
-                    label="Osc A Vol" 
-                    value={params.oscAVol} 
-                    min={0} max={1.0} step={0.01}
-                    onChange={(v) => setParams(prev => ({ ...prev, oscAVol: v }))}
-                    midiLearnParam="oscAVol" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
-                    glowColor="cyan"
-                  />
-                  <Knob 
-                    label="Osc B Vol" 
-                    value={params.oscBVol} 
-                    min={0} max={1.0} step={0.01}
-                    onChange={(v) => setParams(prev => ({ ...prev, oscBVol: v }))}
-                    midiLearnParam="oscBVol" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
-                    glowColor="pink"
-                  />
-                  <Knob 
-                    label="LFO1 Rate" 
-                    value={params.lfo1Rate} 
-                    min={0.1} max={20} step={0.1}
-                    onChange={(v) => setParams(prev => ({ ...prev, lfo1Rate: v }))}
-                    midiLearnParam="lfo1Rate" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
-                    glowColor="green"
-                  />
-                  <Knob 
-                    label="IFX Mix" 
-                    value={params.ifx1Mix} 
-                    min={0} max={1.0} step={0.02}
-                    onChange={(v) => {
-                      setParams(prev => ({ ...prev, ifx1Mix: v }));
-                      if (ifx1MixRef.current) updateIFXMix(ifx1MixRef.current, v);
-                    }}
-                    midiLearnParam="ifxMix" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
-                    glowColor="magenta"
-                  />
-                </>
-              )}
+            {/* Reverb Type Selector */}
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+              <label style={{ color: '#d000ff', fontWeight: 'bold', fontSize: '0.58rem' }}>TYPE:</label>
+              <select
+                value={params.reverbType || 'hall'}
+                onChange={(e) => {
+                  setParams(prev => ({ ...prev, reverbType: e.target.value }));
+                  setSelectedReverbPresetIdx('');
+                }}
+                style={{ 
+                  background: '#000', 
+                  border: '1px solid rgba(208, 0, 255, 0.3)', 
+                  color: '#d000ff', 
+                  fontSize: '0.55rem', 
+                  padding: '1px 3px', 
+                  borderRadius: '3px', 
+                  width: '95px',
+                  outline: 'none'
+                }}
+              >
+                {['PLATE', 'LONG', 'SHORT', 'HALL', 'REVERSE'].map(t => (
+                  <option key={t} value={t.toLowerCase()}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Reverb Preset Selector */}
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+              <label style={{ color: '#d000ff', fontWeight: 'bold', fontSize: '0.58rem' }}>PRESET:</label>
+              <select
+                value={selectedReverbPresetIdx}
+                onChange={(e) => handleLoadReverbPreset(e.target.value)}
+                style={{ 
+                  background: '#000', 
+                  border: '1px solid rgba(208, 0, 255, 0.3)', 
+                  color: '#d000ff', 
+                  fontSize: '0.55rem', 
+                  padding: '1px 3px', 
+                  borderRadius: '3px', 
+                  width: '95px',
+                  outline: 'none'
+                }}
+              >
+                <option value="">-- CUSTOM --</option>
+                {REVERB_PRESETS.map((prst, idx) => (
+                  <option key={idx} value={idx}>{prst.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Reverb Knobs Grid */}
+            <div className="reverb-knobs-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 10px', justifyItems: 'center', width: '100%', marginTop: '4px' }}>
+              <Knob 
+                label="Mix" 
+                value={params.reverbMix} 
+                min={0.0} max={0.8} step={0.01}
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, reverbMix: v }));
+                  setSelectedReverbPresetIdx('');
+                }} 
+                midiLearnParam="reverbMix" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="magenta"
+                size={34}
+              />
+              <Knob 
+                label="Decay" 
+                value={params.reverbDecay !== undefined ? params.reverbDecay : 2.5} 
+                min={0.1} max={8.0} step={0.1}
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, reverbDecay: v }));
+                  setSelectedReverbPresetIdx('');
+                }} 
+                midiLearnParam="reverbDecay" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="magenta"
+                size={34}
+              />
+              <Knob 
+                label="Pre-Delay" 
+                value={params.reverbPreDelay !== undefined ? params.reverbPreDelay : 0.02} 
+                min={0.0} max={0.2} step={0.005}
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, reverbPreDelay: v }));
+                  setSelectedReverbPresetIdx('');
+                }} 
+                midiLearnParam="reverbPreDelay" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                glowColor="magenta"
+                size={34}
+              />
+            </div>
+
+            {/* Reverb High-Cut & Freeze */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', borderTop: '1px dashed rgba(208, 0, 255, 0.15)', paddingTop: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexGrow: 1 }}>
+                <span style={{ color: '#d000ff', fontSize: '0.48rem', fontWeight: 'bold' }}>HI-CUT:</span>
+                <input 
+                  type="range" min="100" max="20000" step="100"
+                  value={params.reverbHighCut !== undefined ? params.reverbHighCut : 8000}
+                  onChange={(e) => {
+                    setParams(prev => ({ ...prev, reverbHighCut: parseInt(e.target.value) }));
+                    setSelectedReverbPresetIdx('');
+                  }}
+                  style={{ flexGrow: 1, height: '8px', cursor: 'pointer' }}
+                />
+                <span className="font-mono text-cyan" style={{ fontSize: '0.45rem', minWidth: '22px', textAlign: 'right' }}>
+                  {params.reverbHighCut >= 1000 ? `${(params.reverbHighCut / 1000).toFixed(0)}k` : `${params.reverbHighCut}`}
+                </span>
+              </div>
+
+              <button
+                className={`btn btn-xs ${params.reverbFreeze ? 'active-magenta' : ''}`}
+                onClick={() => {
+                  setParams(prev => ({ ...prev, reverbFreeze: !prev.reverbFreeze }));
+                  setSelectedReverbPresetIdx('');
+                }}
+                style={{ fontSize: '0.45rem', padding: '1px 4px', fontWeight: 'bold', margin: 0, height: '16px', lineHeight: '14px' }}
+              >
+                FREEZE
+              </button>
             </div>
           </div>
         </div>
 
         {/* ================= CENTER TOUCHVIEW SCREEN ================= */}
-        <div className="rack-panel-center blue-screen-border" style={{ minHeight: '585px', padding: 0 }}>
+        <div className="rack-panel-center blue-screen-border" style={{ minHeight: '585px', padding: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div className={`screen-flip-container ${performanceViewActive ? 'flipped' : ''}`}>
             {/* FRONT CARD: NORMAL WORKSTATION */}
             <div className="screen-front" style={{ padding: '0.5rem' }}>
@@ -13937,6 +14447,146 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         </div>
 
       </div> {/* closes screen-flip-container */}
+
+      {/* Central Workstation Bottom Knobs Panel */}
+      <div className="workstation-knobs-panel" style={{ 
+        background: 'linear-gradient(180deg, rgba(2, 6, 12, 0.95) 0%, rgba(1, 2, 4, 0.98) 100%)', 
+        borderTop: '2px solid rgba(0, 243, 255, 0.4)', 
+        borderBottomLeftRadius: '6px',
+        borderBottomRightRadius: '6px',
+        padding: '6px 12px', 
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px',
+        userSelect: 'none'
+      }}>
+        {/* Filter / EG Knobs Block (Select A) */}
+        <div style={{ 
+          background: 'rgba(0,0,0,0.4)', 
+          border: '1px solid rgba(0, 243, 255, 0.25)', 
+          borderRadius: '6px', 
+          padding: '6px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
+          <div style={{ 
+            color: '#00f3ff', 
+            fontSize: '0.58rem', 
+            fontWeight: 'bold', 
+            letterSpacing: '0.8px', 
+            borderBottom: '1px solid rgba(0, 243, 255, 0.15)',
+            paddingBottom: '2px',
+            textTransform: 'uppercase',
+            fontFamily: 'monospace'
+          }}>
+            REALTIME FILTER & EG (GROUP A)
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', marginTop: '2px' }}>
+            <Knob 
+              label="Cutoff" 
+              value={params.cutoff} 
+              min={20} max={20000} step={10}
+              onChange={(v) => setParams(prev => ({ ...prev, cutoff: v }))} 
+              midiLearnParam="cutoff" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              glowColor="cyan"
+              size={32}
+            />
+            <Knob 
+              label="Resonance" 
+              value={params.resonance} 
+              min={0.1} max={15} step={0.1}
+              onChange={(v) => setParams(prev => ({ ...prev, resonance: v }))}
+              midiLearnParam="resonance" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              glowColor="magenta"
+              size={32}
+            />
+            <Knob 
+              label="EG Int" 
+              value={params.filterEnvAmt} 
+              min={0} max={4000} step={50}
+              onChange={(v) => setParams(prev => ({ ...prev, filterEnvAmt: v }))}
+              midiLearnParam="filterEnvAmt" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              glowColor="green"
+              size={32}
+            />
+            <Knob 
+              label="EG Rel" 
+              value={params.vcaEG.releaseTime} 
+              min={0.01} max={4.0} step={0.02}
+              onChange={(v) => updateEgParam('VCA', 'releaseTime', v)}
+              midiLearnParam="vcaRelease" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              glowColor="yellow"
+              size={32}
+            />
+          </div>
+        </div>
+
+        {/* Assignable / Volume Knobs Block (Select B) */}
+        <div style={{ 
+          background: 'rgba(0,0,0,0.4)', 
+          border: '1px solid rgba(255, 0, 255, 0.25)', 
+          borderRadius: '6px', 
+          padding: '6px 8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
+          <div style={{ 
+            color: '#ff00ff', 
+            fontSize: '0.58rem', 
+            fontWeight: 'bold', 
+            letterSpacing: '0.8px', 
+            borderBottom: '1px solid rgba(255, 0, 255, 0.15)',
+            paddingBottom: '2px',
+            textTransform: 'uppercase',
+            fontFamily: 'monospace'
+          }}>
+            ASSIGNABLE & LEVELS (GROUP B)
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', marginTop: '2px' }}>
+            <Knob 
+              label="Osc A Vol" 
+              value={params.oscAVol} 
+              min={0} max={1.0} step={0.01}
+              onChange={(v) => setParams(prev => ({ ...prev, oscAVol: v }))}
+              midiLearnParam="oscAVol" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              glowColor="cyan"
+              size={32}
+            />
+            <Knob 
+              label="Osc B Vol" 
+              value={params.oscBVol} 
+              min={0} max={1.0} step={0.01}
+              onChange={(v) => setParams(prev => ({ ...prev, oscBVol: v }))}
+              midiLearnParam="oscBVol" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              glowColor="pink"
+              size={32}
+            />
+            <Knob 
+              label="LFO Rate" 
+              value={params.lfo1Rate} 
+              min={0.1} max={20} step={0.1}
+              onChange={(v) => setParams(prev => ({ ...prev, lfo1Rate: v }))}
+              midiLearnParam="lfo1Rate" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              glowColor="green"
+              size={32}
+            />
+            <Knob 
+              label="IFX Mix" 
+              value={params.ifx1Mix} 
+              min={0} max={1.0} step={0.02}
+              onChange={(v) => {
+                setParams(prev => ({ ...prev, ifx1Mix: v }));
+                if (ifx1MixRef.current) updateIFXMix(ifx1MixRef.current, v);
+              }}
+              midiLearnParam="ifxMix" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              glowColor="magenta"
+              size={32}
+            />
+          </div>
+        </div>
+      </div>
     </div>
 
         {/* ================= RIGHT SIDE CONTROLS & KAOSS PAD ================= */}
@@ -14337,27 +14987,29 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 <input 
                   type="text"
                   inputMode="decimal"
-                  value={params.arpBpm} 
+                  value={tempoInputVal} 
                   onChange={(e) => {
                     const val = e.target.value;
-                    // Allow digits and at most one decimal point
+                    // Allow empty string or valid partial decimal while typing
                     if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                      setParams(prev => ({ ...prev, arpBpm: val }));
+                      setTempoInputVal(val);
                     }
                   }}
                   onBlur={() => {
-                    const parsed = parseFloat(params.arpBpm);
+                    const parsed = parseFloat(tempoInputVal);
+                    let clamped;
                     if (isNaN(parsed) || parsed < 40) {
-                      setParams(prev => ({ ...prev, arpBpm: 40 }));
+                      clamped = 40;
                     } else if (parsed > 250) {
-                      setParams(prev => ({ ...prev, arpBpm: 250 }));
+                      clamped = 250;
                     } else {
-                      // Round to 1 decimal place
-                      setParams(prev => ({ ...prev, arpBpm: Math.round(parsed * 10) / 10 }));
+                      clamped = Math.round(parsed * 10) / 10;
                     }
+                    setTempoInputVal(String(clamped));
+                    setParams(prev => ({ ...prev, arpBpm: clamped }));
                   }}
                   style={{ 
-                    width: '32px', // slightly wider for decimal value display
+                    width: '32px',
                     background: '#000', 
                     border: '1px solid rgba(0, 243, 255, 0.4)', 
                     color: '#00f3ff', 
@@ -14595,12 +15247,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const tuning = slot.tuning !== undefined ? slot.tuning : 0;
 
         const updateSlotParam = (key, value) => {
-          // Mutate in-place on ref — audio engine sees it immediately
+          // Mutate in-place on ref —  audio engine sees it immediately
           const slot = sampleSlotsRef.current.find(s => s.id === slotId);
           if (slot) slot[key] = value;
           setSampleSlots(prev => [...prev]);
           saveSlotMetadataToDb(slotId, { [key]: value })
             .catch(err => console.error("Failed to save slot param to DB:", err));
+          syncActiveVoiceParams(slotId, key, value);
         };
 
         return (
@@ -14682,19 +15335,19 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </div>
 
               <div className="popover-field">
-                <label>Tuning ({tuning > 0 ? '+' : ''}{tuning} semitones)</label>
+                <label>Tuning ({tuning > 0 ? '+' : ''}{tuning.toFixed(1)} semitones)</label>
                 <div className="popover-slider-row">
                   <input 
                     type="range"
                     min="-24"
                     max="24"
-                    step="1"
+                    step="0.1"
                     value={tuning}
-                    onChange={(e) => updateSlotParam('tuning', parseInt(e.target.value))}
+                    onChange={(e) => updateSlotParam('tuning', parseFloat(e.target.value))}
                     onDoubleClick={() => updateSlotParam('tuning', 0)}
                   />
                   <span className="popover-val-span">
-                    {tuning > 0 ? '+' : ''}{tuning}st
+                    {tuning > 0 ? '+' : ''}{tuning.toFixed(1)}st
                   </span>
                 </div>
                 <div className="popover-reset-hint">Double-click slider to reset to 0</div>
