@@ -8094,7 +8094,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const startVoiceTrigger = () => {
       const voice = playProgramVoice(ctx, triggerNote, velocity, tempProg, voiceKey, delayOffset);
       if (voice) {
-        voice.triggerBeat = targetBeat;
+        if (triggerMode === 'flux' && tempProg.fluxOffset !== undefined) {
+          const bpm = paramsRef.current.arpBpm || 120;
+          const beatDur = 60 / bpm;
+          const fluxOffsetBeats = tempProg.fluxOffset / beatDur;
+          voice.triggerBeat = targetBeat - fluxOffsetBeats;
+          const rate = deck === 'A' ? freqScaleA : freqScaleB;
+          voice.startTime = now - (tempProg.fluxOffset / rate);
+        } else {
+          voice.triggerBeat = targetBeat;
+        }
         voice.type = type;
       }
       activeVoicesRef.current.set(voiceKey, [voice]);
