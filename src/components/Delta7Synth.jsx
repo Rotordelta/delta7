@@ -3152,6 +3152,7 @@ export default function Delta7Synth() {
           voice.orig_oscA_rate = freqScaleA;
           voice.orig_oscA_L_rate = freqScaleA;
           voice.orig_oscA_R_rate = freqScaleA;
+          voice.tuningA = val;
 
           if (voice.oscA && voice.oscA.playbackRate) {
             voice.oscA.playbackRate.cancelScheduledValues(now);
@@ -3197,6 +3198,7 @@ export default function Delta7Synth() {
           voice.orig_oscB_rate = freqScaleB;
           voice.orig_oscB_L_rate = freqScaleB;
           voice.orig_oscB_R_rate = freqScaleB;
+          voice.tuningB = val;
 
           if (voice.oscB && voice.oscB.playbackRate) {
             voice.oscB.playbackRate.cancelScheduledValues(now);
@@ -6400,6 +6402,40 @@ export default function Delta7Synth() {
     gainA.gain.value = 0;
     gainA.gain.setValueAtTime(0, now);
 
+    let warpFactorA = 1.0;
+    let notePitchFactorA = 1.0;
+    if (bufferA) {
+      if (prog.oscATriggerMode === 'slice') {
+        notePitchFactorA = Math.pow(2, oscAOctave) * Math.pow(2, oscAPitch / 12) * Math.pow(2, slicePitchA / 12);
+      } else {
+        const rootNoteA = slotA ? slotA.rootNote : 60;
+        notePitchFactorA = Math.pow(2, (note - rootNoteA + oscAPitch + oscAOctave * 12) / 12) * pbFactor;
+      }
+      if (slotA && (slotA.warpOn || masterSyncActiveRef.current)) {
+        const activeDurationA = bufferA.duration * (slotA.end - slotA.start);
+        const bpm = prog.arpBpm || 120;
+        const targetDuration = (60 / bpm) * (slotA.warpBeats || 4);
+        warpFactorA = activeDurationA / targetDuration;
+      }
+    }
+
+    let warpFactorB = 1.0;
+    let notePitchFactorB = 1.0;
+    if (bufferB) {
+      if (prog.oscBTriggerMode === 'slice') {
+        notePitchFactorB = Math.pow(2, oscBOctave) * Math.pow(2, oscBPitch / 12) * Math.pow(2, slicePitchB / 12);
+      } else {
+        const rootNoteB = slotB ? slotB.rootNote : 60;
+        notePitchFactorB = Math.pow(2, (note - rootNoteB + oscBPitch + oscBOctave * 12) / 12) * pbFactor;
+      }
+      if (slotB && (slotB.warpOn || masterSyncActiveRef.current)) {
+        const activeDurationB = bufferB.duration * (slotB.end - slotB.start);
+        const bpm = prog.arpBpm || 120;
+        const targetDuration = (60 / bpm) * (slotB.warpBeats || 4);
+        warpFactorB = activeDurationB / targetDuration;
+      }
+    }
+
     const releasedRef = { current: false };
     const voiceObj = {
       note,
@@ -6430,13 +6466,23 @@ export default function Delta7Synth() {
       warpBaseRateB: warpBaseRateB,
 
       isReverseA: isReverseA,
-      isReverseB: isReverseB
+      isReverseB: isReverseB,
+
+      warpFactorA,
+      notePitchFactorA,
+      pitchFactorA,
+      tuningA: slotA && slotA.tuning !== undefined ? slotA.tuning : 0,
+
+      warpFactorB,
+      notePitchFactorB,
+      pitchFactorB,
+      tuningB: slotB && slotB.tuning !== undefined ? slotB.tuning : 0
     };
 
     // isSliceGranular must be hoisted outside if(bufferA) — it's used in the panner block after that inner if closes
     const isSliceGranular = !prog.granularActive && (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0);
-    const isWarpedGranularA = !!(slotA && bufferA && (slotA.warpOn || masterSyncActiveRef.current) && (slotA.tuning || 0) !== 0 && prog.oscATriggerMode !== 'slice');
-    const isWarpedGranularB = !!(slotB && bufferB && (slotB.warpOn || masterSyncActiveRef.current) && (slotB.tuning || 0) !== 0 && prog.oscBTriggerMode !== 'slice');
+    const isWarpedGranularA = !!(slotA && bufferA && (slotA.warpOn || masterSyncActiveRef.current) && prog.oscATriggerMode !== 'slice');
+    const isWarpedGranularB = !!(slotB && bufferB && (slotB.warpOn || masterSyncActiveRef.current) && prog.oscBTriggerMode !== 'slice');
 
     if (prog.granularActive || (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0 && bufferA) || isWarpedGranularA) {
       // --- Granular Synthesis Engine ---
@@ -6510,7 +6556,7 @@ export default function Delta7Synth() {
           if (nextGrainTime < ctxNow + lookahead) {
             const drift = (ctxNow + lookahead) - nextGrainTime;
             // Playhead speed: for slice stretch, 1/(1+stretch) — stretch=0 → 1.0 (normal), stretch=1 → 0.5 (half speed = 2× longer)
-            const playheadSpeed = isSliceGranular ? (1.0 / Math.max(0.05, 1.0 + sliceStretchA)) : (isWarpedGranularA ? freqScaleA : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0));
+            const playheadSpeed = isSliceGranular ? (1.0 / Math.max(0.05, 1.0 + sliceStretchA)) : (isWarpedGranularA ? (voiceObj.warpFactorA * voiceObj.pitchFactorA * voiceObj.notePitchFactorA) : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0));
             playhead += drift * playheadSpeed;
             nextGrainTime = ctxNow + lookahead;
           }
@@ -6541,7 +6587,7 @@ export default function Delta7Synth() {
               grainPlaybackRate = Math.pow(2, (slicePitchA + oscAPitch + oscAOctave * 12) / 12) * Math.pow(2, oscADetune / 1200);
             } else if (isWarpedGranularA) {
               // Lock speed to warpFactor and pitch shift by tuning semitones
-              grainPlaybackRate = freqScaleA * Math.pow(2, (slotA.tuning || 0) / 12);
+              grainPlaybackRate = (voiceObj.warpFactorA * voiceObj.pitchFactorA * voiceObj.notePitchFactorA) * Math.pow(2, (voiceObj.tuningA || 0) / 12);
             } else {
               grainPlaybackRate = (baseFreq / rootFreqA) * Math.pow(2, oscADetune / 1200);
             }
@@ -6591,7 +6637,7 @@ export default function Delta7Synth() {
             // Advance playhead at the correct time-stretched speed
             const playheadSpeed = isSliceGranular
               ? (1.0 / Math.max(0.05, 1.0 + sliceStretchA))
-              : (isWarpedGranularA ? freqScaleA : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0));
+              : (isWarpedGranularA ? (voiceObj.warpFactorA * voiceObj.pitchFactorA * voiceObj.notePitchFactorA) : (prog.grainSpeed !== undefined ? prog.grainSpeed : 1.0));
             playhead += gRate * playheadSpeed;
 
             if (isSliceGranular || isWarpedGranularA) {
@@ -6862,7 +6908,7 @@ export default function Delta7Synth() {
 
           if (nextGrainTime < ctxNow + lookahead) {
             const drift = (ctxNow + lookahead) - nextGrainTime;
-            const playheadSpeed = isSliceGranularB ? (1.0 / Math.max(0.05, 1.0 + sliceStretchB)) : freqScaleB;
+            const playheadSpeed = isSliceGranularB ? (1.0 / Math.max(0.05, 1.0 + sliceStretchB)) : (isWarpedGranularB ? (voiceObj.warpFactorB * voiceObj.pitchFactorB * voiceObj.notePitchFactorB) : freqScaleB);
             playhead += drift * playheadSpeed;
             nextGrainTime = ctxNow + lookahead;
           }
@@ -6887,9 +6933,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             if (isSliceGranularB) {
               grainPlaybackRateB = Math.pow(2, (slicePitchB + oscBPitch + oscBOctave * 12) / 12) * Math.pow(2, oscBDetune / 1200);
             } else if (isWarpedGranularB) {
-              grainPlaybackRateB = freqScaleB * Math.pow(2, (slotB.tuning || 0) / 12);
+              grainPlaybackRateB = (voiceObj.warpFactorB * voiceObj.pitchFactorB * voiceObj.notePitchFactorB) * Math.pow(2, (voiceObj.tuningB || 0) / 12);
             }
-
+            
             let stutterPitchOffset = 0;
             if (paramsRef.current.stutterOn && paramsRef.current.stutterPitchSweep !== 0) {
               const elapsed = nextGrainTime - voiceObj.startTime;
@@ -6916,7 +6962,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             grainSource.stop(nextGrainTime + gSize + 0.01);
 
             // Advance playhead at time-stretched speed (independent of pitch)
-            const playheadSpeed = isSliceGranularB ? (1.0 / Math.max(0.05, 1.0 + sliceStretchB)) : freqScaleB;
+            const playheadSpeed = isSliceGranularB ? (1.0 / Math.max(0.05, 1.0 + sliceStretchB)) : (isWarpedGranularB ? (voiceObj.warpFactorB * voiceObj.pitchFactorB * voiceObj.notePitchFactorB) : freqScaleB);
             playhead += gRate * playheadSpeed;
 
             if (isSliceGranularB || isWarpedGranularB) {
@@ -9338,6 +9384,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           v.orig_oscA_L_rate = finalRate;
           v.orig_oscA_R_rate = finalRate;
           v.playheadRateA = warpFactor;
+          v.warpFactorA = warpFactor;
           
           if (v.oscA && v.oscA.playbackRate) {
             v.oscA.playbackRate.cancelScheduledValues(now);
@@ -9365,6 +9412,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           v.orig_oscB_L_rate = finalRate;
           v.orig_oscB_R_rate = finalRate;
           v.playheadRateB = warpFactor;
+          v.warpFactorB = warpFactor;
           
           if (v.oscB && v.oscB.playbackRate) {
             v.oscB.playbackRate.cancelScheduledValues(now);
@@ -9410,6 +9458,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             voice.orig_oscA_rate = finalRate;
             voice.orig_oscA_L_rate = finalRate;
             voice.orig_oscA_R_rate = finalRate;
+            voice.pitchFactorA = pitchFactor;
             
             const oscs = [voice.oscA, voice.oscA_L, voice.oscA_R].filter(Boolean);
             oscs.forEach(osc => {
@@ -9423,6 +9472,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             voice.orig_oscB_rate = finalRate;
             voice.orig_oscB_L_rate = finalRate;
             voice.orig_oscB_R_rate = finalRate;
+            voice.pitchFactorB = pitchFactor;
             
             const oscs = [voice.oscB, voice.oscB_L, voice.oscB_R].filter(Boolean);
             oscs.forEach(osc => {
