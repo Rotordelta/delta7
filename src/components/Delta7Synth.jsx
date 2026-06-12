@@ -6481,8 +6481,8 @@ export default function Delta7Synth() {
 
     // isSliceGranular must be hoisted outside if(bufferA) — it's used in the panner block after that inner if closes
     const isSliceGranular = !prog.granularActive && (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0);
-    const isWarpedGranularA = !!(slotA && bufferA && (slotA.warpOn || masterSyncActiveRef.current) && prog.oscATriggerMode !== 'slice');
-    const isWarpedGranularB = !!(slotB && bufferB && (slotB.warpOn || masterSyncActiveRef.current) && prog.oscBTriggerMode !== 'slice');
+    const isWarpedGranularA = !!(slotA && bufferA && (slotA.warpOn || masterSyncActiveRef.current) && (slotA.tuning || 0) !== 0 && prog.oscATriggerMode !== 'slice');
+    const isWarpedGranularB = !!(slotB && bufferB && (slotB.warpOn || masterSyncActiveRef.current) && (slotB.tuning || 0) !== 0 && prog.oscBTriggerMode !== 'slice');
 
     if (prog.granularActive || (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0 && bufferA) || isWarpedGranularA) {
       // --- Granular Synthesis Engine ---
