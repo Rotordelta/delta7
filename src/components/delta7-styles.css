@@ -115,7 +115,9 @@
           left: 0;
           right: 0;
           bottom: 35px;
-          transform: translateY(0px);
+          transform: translate3d(0, 0, 0);
+          will-change: transform;
+          backface-visibility: hidden;
           pointer-events: none;
         }
 
@@ -263,6 +265,9 @@
           transition: all 0.08s ease;
           padding: 2px;
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+          will-change: transform;
+          transform: translate3d(0, 0, 0);
+          backface-visibility: hidden;
         }
 
         .perf-pad.active,
@@ -393,6 +398,9 @@
           height: 85px;
           cursor: pointer;
           accent-color: #ffe600;
+          will-change: transform;
+          transform: translate3d(0, 0, 0);
+          backface-visibility: hidden;
         }
 
         .crossfader-section {
@@ -416,6 +424,9 @@
           height: 10px;
           cursor: pointer;
           accent-color: #ffe600;
+          will-change: transform;
+          transform: translate3d(0, 0, 0);
+          backface-visibility: hidden;
         }
 
         @keyframes pulse-red {
@@ -1011,6 +1022,11 @@
           position: relative;
           cursor: crosshair;
           overflow: hidden;
+        }
+        .kaoss-touchpad canvas {
+          will-change: transform;
+          transform: translate3d(0, 0, 0);
+          backface-visibility: hidden;
         }
 
         .kaoss-touchpad.glow-red {
@@ -2231,11 +2247,17 @@
 .range-compact {
   flex-grow: 1;
   height: 6px;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
 }
 
 .range-compact-8 {
   flex-grow: 1;
   height: 8px;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
 }
 
 /* Value readout */

@@ -245,6 +245,9 @@ export default function Knob({
           display: flex;
           align-items: center;
           justify-content: center;
+          will-change: transform;
+          transform: translate3d(0, 0, 0);
+          backface-visibility: hidden;
         }
 
         .knob-svg {

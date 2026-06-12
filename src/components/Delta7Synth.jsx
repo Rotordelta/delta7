@@ -2,6 +2,19 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Knob from './Knob.jsx';
 import './delta7-styles.css';
 
+// SharedArrayBuffer configuration constants
+const SAB_SIZE = 256; // 1024 bytes (256 float32s)
+const SAB_WRITE_IDX = 0;
+const SAB_READ_IDX = 1;
+const SAB_PLAYBACK_ACTIVE = 2;
+const SAB_PLAYBACK_START_TIME = 3;
+const SAB_PLAYBACK_BEAT_OFFSET = 4;
+const SAB_BPM = 5;
+const SAB_CURRENT_BEAT = 6;
+const SAB_QUEUE_START = 10;
+const SAB_EVENT_STRIDE = 8;
+const SAB_QUEUE_LIMIT = 30;
+
 // ==========================================
 // 1. FACTORY PRESETS & WAVEFORMS
 // ==========================================
@@ -571,10 +584,33 @@ export default function Delta7Synth() {
   const [ribbonVal, setRibbonVal] = useState(0.5); // 0.0 to 1.0 (defaults middle)
   const [ribbonTouched, setRibbonTouched] = useState(false);
 
-  // Kaoss Pad XY state
-  const [kaossPad, setKaossPad] = useState({ x: 0.5, y: 0.5, isHolding: false, holdActive: false, touchActive: false });
+  // SharedArrayBuffer Ref
+  const sharedBufferRef = useRef(null);
+  const sharedArrayRef = useRef(null);
+  
+  if (sharedBufferRef.current === null && typeof window.SharedArrayBuffer !== 'undefined') {
+    try {
+      const sab = new window.SharedArrayBuffer(SAB_SIZE * 4);
+      sharedBufferRef.current = sab;
+      sharedArrayRef.current = new Float32Array(sab);
+      sharedArrayRef.current[SAB_WRITE_IDX] = 0;
+      sharedArrayRef.current[SAB_READ_IDX] = 0;
+      sharedArrayRef.current[SAB_PLAYBACK_ACTIVE] = 0.0;
+    } catch (e) {
+      console.warn("SharedArrayBuffer not enabled/supported in this environment:", e);
+    }
+  }
+
+  // DOM Refs for GPU Animation target circles
+  const targetCirclesRefsA = useRef([]);
+  const targetCirclesRefsB = useRef([]);
+  const kaossReadoutRef = useRef(null);
+  const kaossContainerRef = useRef(null);
+  const kaossHoldButtonRef = useRef(null);
+
   const [kaossTargetX, setKaossTargetX] = useState('cutoff'); // cutoff, lfoRate, ifxMix, delayTime
   const [kaossTargetY, setKaossTargetY] = useState('resonance'); // resonance, reverbDecay, chorusRate, ringModMix
+  const [kaossPad, setKaossPad] = useState({ x: 0.5, y: 0.5, isHolding: false, holdActive: false, touchActive: false });
   const [padReturnMode, setPadReturnMode] = useState('hold'); // hold, snap, spring, throw
   const [isRecordingGesture, setIsRecordingGesture] = useState(false);
   const [isPlayingGesture, setIsPlayingGesture] = useState(false);
@@ -594,9 +630,15 @@ export default function Delta7Synth() {
     lastY: 0.5,
     lastTime: 0,
     isTouched: false,
+    holdActive: false,
+    touchActive: false,
     ripple: null,
     trails: [],
-    rafId: null
+    rafId: null,
+    lastDisplayX: -1,
+    lastDisplayY: -1,
+    lastTouchActive: null,
+    lastHoldActive: null
   });
 
   const gestureRef = useRef({
@@ -772,7 +814,7 @@ export default function Delta7Synth() {
   useEffect(() => { perfCountInRemainingRef.current = perfCountInRemaining; }, [perfCountInRemaining]);
   // Zero-waste: activePerfPads is ref-only — no useState re-renders from audio triggers
   const activePerfPadsRef = useRef({});
-  const perfPadsDirtyRef = useRef(false); // dirty flag for batched rAF visual sync
+  const perfPadsDirtyRef = useRef(true); // dirty flag for batched rAF visual sync
   // Zero-waste: direct mutation helpers — no spread allocation per trigger
   const setActivePerfPads = (updater) => {
     const prev = activePerfPadsRef.current;
@@ -1195,9 +1237,12 @@ export default function Delta7Synth() {
       // Concentric rings & timeline beat
       const ctx = audioCtxRef.current;
       if (ctx) {
-        // Timeline beat & auto-scroll
+        // Timeline beat & auto-scroll (prioritize SharedArrayBuffer beat tracking)
         let currentBeat = 0;
-        if (perfPlaybackActiveRef.current && perfPlayStartTimeRef.current > 0) {
+        if (sharedArrayRef.current && sharedArrayRef.current[SAB_PLAYBACK_ACTIVE] > 0.5) {
+          currentBeat = sharedArrayRef.current[SAB_CURRENT_BEAT];
+          seqCurrentBeatRef.current = currentBeat;
+        } else if (perfPlaybackActiveRef.current && perfPlayStartTimeRef.current > 0) {
           const elapsed = ctx.currentTime - perfPlayStartTimeRef.current;
           const bpm = paramsRef.current.arpBpm || 120;
           const beatDuration = 60 / bpm;
@@ -1218,13 +1263,13 @@ export default function Delta7Synth() {
           seqTimerDisplayRef.current.innerText = currentBeat.toFixed(1);
         }
 
-        // Translate Guitar Hero highways downwards (GPU transform)
+        // Translate Guitar Hero highways downwards (GPU 3D transform)
         const translatePx = currentBeat * highwayZoomRef.current;
         if (highwayEventsRefA.current) {
-          highwayEventsRefA.current.style.transform = `translateY(${translatePx}px)`;
+          highwayEventsRefA.current.style.transform = `translate3d(0, ${translatePx}px, 0)`;
         }
         if (highwayEventsRefB.current) {
-          highwayEventsRefB.current.style.transform = `translateY(${translatePx}px)`;
+          highwayEventsRefB.current.style.transform = `translate3d(0, ${translatePx}px, 0)`;
         }
 
         // Concentric Rings calculation
@@ -1367,18 +1412,31 @@ export default function Delta7Synth() {
         const pads = activePerfPadsRef.current;
         for (let pi = 0; pi < 8; pi++) {
           const elA = padDomRefsA.current[pi];
+          const isActiveA = !!pads[`A-slot-${pi}`];
           if (elA) {
-            const isActiveA = !!pads[`A-slot-${pi}`];
             const isPendingA = !!pads[`A-slot-${pi}-pending`];
             elA.setAttribute('data-active', isActiveA ? 'true' : 'false');
             elA.setAttribute('data-pending', isPendingA ? 'true' : 'false');
           }
+          // Update highway target circle A directly in DOM
+          const targetCircleA = targetCirclesRefsA.current[pi];
+          if (targetCircleA) {
+            targetCircleA.style.background = isActiveA ? ringColors[pi] : 'transparent';
+            targetCircleA.style.boxShadow = isActiveA ? `0 0 6px ${ringColors[pi]}` : 'none';
+          }
+
           const elB = padDomRefsB.current[pi];
+          const isActiveB = !!pads[`B-slot-${pi}`];
           if (elB) {
-            const isActiveB = !!pads[`B-slot-${pi}`];
             const isPendingB = !!pads[`B-slot-${pi}-pending`];
             elB.setAttribute('data-active', isActiveB ? 'true' : 'false');
             elB.setAttribute('data-pending', isPendingB ? 'true' : 'false');
+          }
+          // Update highway target circle B directly in DOM
+          const targetCircleB = targetCirclesRefsB.current[pi];
+          if (targetCircleB) {
+            targetCircleB.style.background = isActiveB ? ringColors[pi] : 'transparent';
+            targetCircleB.style.boxShadow = isActiveB ? `0 0 6px ${ringColors[pi]}` : 'none';
           }
         }
       }
@@ -3498,6 +3556,9 @@ export default function Delta7Synth() {
   const tapeStopFactorRef = useRef(1.0);
   useEffect(() => {
     paramsRef.current = params;
+    if (sharedArrayRef.current) {
+      sharedArrayRef.current[SAB_BPM] = params.arpBpm || 120;
+    }
     if (audioCtxRef.current) {
       const now = audioCtxRef.current.currentTime;
       
@@ -4224,11 +4285,16 @@ export default function Delta7Synth() {
           
           // Event queue for lookahead scheduling
           this.eventQueue = [];
+          this.sharedFloat32Array = null;
         }
 
         handleMessage(e) {
           const msg = e.data;
           switch (msg.type) {
+            case 'INIT_SHARED_BUFFER':
+              this.sharedFloat32Array = new Float32Array(msg.buffer);
+              break;
+
             case 'SET_PARAMS':
               if (msg.bpm !== undefined) this.bpm = msg.bpm;
               if (msg.timeSignature !== undefined) this.timeSignature = msg.timeSignature;
@@ -4346,6 +4412,79 @@ export default function Delta7Synth() {
 
         process(inputs, outputs, parameters) {
           const now = currentTime;
+          
+          if (this.sharedFloat32Array) {
+            const arr = this.sharedFloat32Array;
+            
+            // Sync playback active status
+            const pbActive = arr[2] > 0.5;
+            if (pbActive !== this.playbackActive) {
+              this.playbackActive = pbActive;
+              if (pbActive) {
+                this.playbackStartTime = arr[3];
+                this.playbackStartBeatOffset = arr[4];
+                this.playbackNextEventIdx = 0;
+              }
+            }
+            
+            // Sync BPM
+            const sharedBpm = arr[5];
+            if (sharedBpm > 0 && sharedBpm !== this.bpm) {
+              this.bpm = sharedBpm;
+            }
+            
+            // Write current beat position back to the shared buffer
+            if (this.playbackActive && this.playbackStartTime > 0) {
+              const elapsed = now - this.playbackStartTime;
+              const beatDuration = 60 / this.bpm;
+              arr[6] = elapsed / beatDuration + this.playbackStartBeatOffset;
+            } else {
+              arr[6] = 0.0;
+            }
+            
+            // Read and schedule queue events
+            let readIdx = Atomics.load(arr, 1); // SAB_READ_IDX = 1
+            const writeIdx = Atomics.load(arr, 0); // SAB_WRITE_IDX = 0
+            
+            while (readIdx !== writeIdx) {
+              const offset = 10 + readIdx * 8; // SAB_QUEUE_START = 10, SAB_EVENT_STRIDE = 8
+              
+              const deckVal = arr[offset];
+              const deck = deckVal === 65.0 ? 'A' : 'B';
+              const index = arr[offset + 1];
+              const velocity = arr[offset + 2];
+              const isNoteOn = arr[offset + 3] > 0.5;
+              const shouldRecord = arr[offset + 4] > 0.5;
+              const noteVal = arr[offset + 5];
+              const note = noteVal === -1.0 ? 'slot' : noteVal;
+              const gridVal = arr[offset + 6];
+              
+              let forceQuantizeGrid = 'None';
+              if (gridVal === 1.0) forceQuantizeGrid = '1/128';
+              else if (gridVal === 2.0) forceQuantizeGrid = '1/64';
+              else if (gridVal === 3.0) forceQuantizeGrid = '1/32';
+              else if (gridVal === 4.0) forceQuantizeGrid = '1/16';
+              else if (gridVal === 5.0) forceQuantizeGrid = '1/8';
+              else if (gridVal === 6.0) forceQuantizeGrid = '1/4';
+              else if (gridVal === 7.0) forceQuantizeGrid = '1/2';
+              else if (gridVal === 8.0) forceQuantizeGrid = 'Bar';
+              
+              const fakeMsg = {
+                deck,
+                index,
+                velocity,
+                isNoteOn,
+                shouldRecord,
+                note,
+                forceQuantizeGrid,
+                isNoteKey: note !== 'slot'
+              };
+              this.handleLiveTrigger(fakeMsg);
+              
+              readIdx = (readIdx + 1) % 30; // SAB_QUEUE_LIMIT = 30
+              Atomics.store(arr, 1, readIdx);
+            }
+          }
           const lookahead = 0.05; // 50ms look-ahead buffer
           const beatDuration = 60 / this.bpm;
           
@@ -4436,6 +4575,13 @@ export default function Delta7Synth() {
       await ctx.audioWorklet.addModule(schedulerBlobUrl);
       const schedulerNode = new AudioWorkletNode(ctx, 'scheduler-processor');
       schedulerNode.connect(ctx.destination);
+      
+      if (sharedBufferRef.current) {
+        schedulerNode.port.postMessage({
+          type: 'INIT_SHARED_BUFFER',
+          buffer: sharedBufferRef.current
+        });
+      }
       
       schedulerNode.port.onmessage = (e) => {
         const msg = e.data;
@@ -5621,8 +5767,8 @@ export default function Delta7Synth() {
     let kaossCutoffOffset = 0;
     let kaossResonanceOffset = 0;
     if (routeToXyPad) {
-      if (kaossTargetX === 'cutoff') kaossCutoffOffset = (kaossPad.x * 3000 - 1500);
-      if (kaossTargetY === 'resonance') kaossResonanceOffset = (kaossPad.y * 10);
+      if (kaossTargetX === 'cutoff') kaossCutoffOffset = (kaossPhysicsRef.current.x * 3000 - 1500);
+      if (kaossTargetY === 'resonance') kaossResonanceOffset = (kaossPhysicsRef.current.y * 10);
     }
 
     const baseFreq = getFreq(note) * pbFactor;
@@ -7116,6 +7262,68 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     });
   };
 
+  const writeEventToSab = (deck, index, velocity, isNoteOn, shouldRecord, note, forceQuantizeGrid) => {
+    if (!sharedArrayRef.current) return false;
+    
+    const arr = sharedArrayRef.current;
+    let writeIdx = Atomics.load(arr, SAB_WRITE_IDX);
+    let readIdx = Atomics.load(arr, SAB_READ_IDX);
+    
+    // Check if buffer is full
+    const nextWriteIdx = (writeIdx + 1) % SAB_QUEUE_LIMIT;
+    if (nextWriteIdx === readIdx) {
+      console.warn("SharedArrayBuffer trigger queue is full!");
+      return false;
+    }
+    
+    const offset = SAB_QUEUE_START + writeIdx * SAB_EVENT_STRIDE;
+    arr[offset] = deck === 'A' ? 65.0 : 66.0;
+    arr[offset + 1] = index;
+    arr[offset + 2] = velocity;
+    arr[offset + 3] = isNoteOn ? 1.0 : 0.0;
+    arr[offset + 4] = shouldRecord ? 1.0 : 0.0;
+    
+    arr[offset + 5] = note === 'slot' ? -1.0 : parseFloat(note);
+    arr[offset + 6] = forceQuantizeGrid;
+    arr[offset + 7] = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
+    
+    Atomics.store(arr, SAB_WRITE_IDX, nextWriteIdx);
+    return true;
+  };
+
+  const dispatchLiveTrigger = (deck, type, index, velocity, isNoteOn, shouldRecord, forceQuantizeGrid) => {
+    if (sharedArrayRef.current) {
+      let gridVal = 0.0;
+      if (forceQuantizeGrid === '1/128') gridVal = 1.0;
+      else if (forceQuantizeGrid === '1/64') gridVal = 2.0;
+      else if (forceQuantizeGrid === '1/32') gridVal = 3.0;
+      else if (forceQuantizeGrid === '1/16') gridVal = 4.0;
+      else if (forceQuantizeGrid === '1/8') gridVal = 5.0;
+      else if (forceQuantizeGrid === '1/4') gridVal = 6.0;
+      else if (forceQuantizeGrid === '1/2') gridVal = 7.0;
+      else if (forceQuantizeGrid === 'Bar') gridVal = 8.0;
+      
+      const success = writeEventToSab(deck, index, velocity, isNoteOn, shouldRecord, type, gridVal);
+      if (success) return;
+    }
+    
+    if (schedulerNodeRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'LIVE_TRIGGER',
+        deck,
+        index,
+        velocity,
+        isNoteOn,
+        isNoteKey: type !== 'slot',
+        shouldRecord,
+        note: type,
+        forceQuantizeGrid
+      });
+    } else {
+      triggerPerfPadDSP(deck, type, index, velocity, isNoteOn, shouldRecord, audioCtxRef.current ? audioCtxRef.current.currentTime : 0, 0);
+    }
+  };
+
   const triggerPerfPadInternal = (deck, type, index, velocity, isNoteOn, shouldRecord = false) => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
@@ -7136,62 +7344,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       if (!isNoteOn) return; // ignore release completely
       const padKey = `${deck}-${type}-${index}`;
       const isAlreadyActive = activePerfPadsRef.current[padKey] || activePerfPadsRef.current[`${padKey}-pending`];
-      
-      if (schedulerNodeRef.current) {
-        schedulerNodeRef.current.port.postMessage({
-          type: 'LIVE_TRIGGER',
-          deck,
-          index,
-          velocity,
-          isNoteOn: true,
-          isNoteKey: false,
-          shouldRecord,
-          note: type,
-          forceQuantizeGrid: isAlreadyActive ? 'None' : 'Bar' // Stop instantly, start on Bar boundary
-        });
-      } else {
-        triggerPerfPadDSP(deck, type, index, velocity, true, shouldRecord, ctx.currentTime, 0);
-      }
+      dispatchLiveTrigger(deck, type, index, velocity, true, shouldRecord, isAlreadyActive ? 'None' : 'Bar');
       return;
     }
 
     // 2. Free Mode Routing
     if (triggerMode === 'free') {
-      if (schedulerNodeRef.current) {
-        schedulerNodeRef.current.port.postMessage({
-          type: 'LIVE_TRIGGER',
-          deck,
-          index,
-          velocity,
-          isNoteOn,
-          isNoteKey: false,
-          shouldRecord,
-          note: type,
-          forceQuantizeGrid: isNoteOn ? 'Bar' : 'None' // Start on Bar boundary, release instantly
-        });
-      } else {
-        triggerPerfPadDSP(deck, type, index, velocity, isNoteOn, shouldRecord, ctx.currentTime, 0);
-      }
+      dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, shouldRecord, isNoteOn ? 'Bar' : 'None');
       return;
     }
 
     // 3. Hold and Flux Modes Routing (Default instant trigger)
-    if (schedulerNodeRef.current) {
-      schedulerNodeRef.current.port.postMessage({
-        type: 'LIVE_TRIGGER',
-        deck,
-        index,
-        velocity,
-        isNoteOn,
-        isNoteKey: false,
-        shouldRecord,
-        note: type,
-        forceQuantizeGrid: 'None'
-      });
-    } else {
-      // Fallback
-      triggerPerfPadDSP(deck, type, index, velocity, isNoteOn, shouldRecord, ctx.currentTime, 0);
-    }
+    dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, shouldRecord, 'None');
   };
 
   // -- Event-delegated pad grid handlers
@@ -7529,6 +7693,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
   };
 
+  const syncSabPlaybackState = (active, startTime, startBeatOffset, bpm) => {
+    if (sharedArrayRef.current) {
+      const arr = sharedArrayRef.current;
+      arr[SAB_PLAYBACK_START_TIME] = startTime;
+      arr[SAB_PLAYBACK_BEAT_OFFSET] = startBeatOffset;
+      arr[SAB_BPM] = bpm;
+      arr[SAB_PLAYBACK_ACTIVE] = active ? 1.0 : 0.0;
+    }
+  };
+
   const togglePerformanceRecord = (isDub = false) => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
@@ -7560,9 +7734,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPlaybackActive(true);
         perfPlayStartTimeRef.current = perfStartTimeRef.current;
         seqStartBeatOffsetRef.current = 0.0;
+        syncSabPlaybackState(true, perfStartTimeRef.current, 0.0, bpm);
         showEditorStatus(`Overdub Complete! Seamlessly Playing... ▶️`);
       } else {
         setPerfPlaybackActive(false);
+        syncSabPlaybackState(false, 0, 0, bpm);
         if (schedulerNodeRef.current) {
           schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
         }
@@ -7592,6 +7768,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         } else {
           // Clean Record from active playback: halt playback first
           setPerfPlaybackActive(false);
+          syncSabPlaybackState(false, 0, 0, bpm);
           if (schedulerNodeRef.current) {
             schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
           }
@@ -7648,6 +7825,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPlaybackActive(true);
         perfPlayStartTimeRef.current = startTime;
         seqStartBeatOffsetRef.current = 0.0;
+        syncSabPlaybackState(true, startTime, 0.0, bpm);
 
         if (schedulerNodeRef.current) {
           schedulerNodeRef.current.port.postMessage({
@@ -7660,6 +7838,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         showEditorStatus("Overdubbing Performance... 🎙️");
       } else {
         setPerfPlaybackActive(false);
+        syncSabPlaybackState(false, 0, 0, bpm);
         if (schedulerNodeRef.current) {
           schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
         }
@@ -7671,12 +7850,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   const togglePerformancePlayback = () => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
+    const bpm = paramsRef.current.arpBpm || 120;
 
     if (perfPlaybackActive) {
       setPerfPlaybackActive(false);
+      syncSabPlaybackState(false, 0, 0, bpm);
 
       const elapsed = ctx.currentTime - perfPlayStartTimeRef.current;
-      const bpm = paramsRef.current.arpBpm || 120;
       const beatDuration = 60 / bpm;
       seqCurrentBeatRef.current = elapsed / beatDuration + seqStartBeatOffsetRef.current;
       seqStartBeatOffsetRef.current = seqCurrentBeatRef.current;
@@ -7707,6 +7887,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       const startTime = ctx.currentTime;
       perfPlayStartTimeRef.current = startTime;
       seqStartBeatOffsetRef.current = seqCurrentBeatRef.current;
+      syncSabPlaybackState(true, startTime, seqStartBeatOffsetRef.current, bpm);
       
       if (schedulerNodeRef.current) {
         schedulerNodeRef.current.port.postMessage({
@@ -7723,6 +7904,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   const stopPerformancePlayback = () => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
+    const bpm = paramsRef.current.arpBpm || 120;
 
     // Finalize recording if active
     if (perfRecordActive) {
@@ -7736,6 +7918,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     setPerfIsDubbing(false);
     seqCurrentBeatRef.current = 0.0;
     seqStartBeatOffsetRef.current = 0.0;
+    syncSabPlaybackState(false, 0, 0, bpm);
     
     perfCountInActiveRef.current = false;
     setPerfCountInActive(false);
@@ -9550,6 +9733,280 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       return pills;
     };
 
+    const highwayA_JSX = useMemo(() => {
+      return (
+        <div 
+          className="vertical-highway deck-a-highway"
+          onMouseDown={(e) => handleHighwayMouseDown('A', e)}
+          onMouseMove={handleHighwayMouseMove}
+          onMouseUp={handleHighwayMouseUp}
+          onMouseLeave={handleHighwayMouseUp}
+          style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
+        >
+          {EIGHT_INDICES.map((_, idx) => (
+            <div 
+              key={`line-a-${idx}`} 
+              className="highway-lane-line" 
+              style={{ left: `${(idx + 0.5) * 31}px` }} 
+            />
+          ))}
+          <div className="highway-playhead-line" />
+          {EIGHT_INDICES.map((_, idx) => (
+            <div 
+              key={`target-a-${idx}`} 
+              ref={el => { targetCirclesRefsA.current[idx] = el; }}
+              className="highway-target-circle" 
+              style={{ 
+                left: `${idx * 31 + 11.5}px`, 
+                borderColor: ringColors[idx],
+                background: 'transparent',
+                boxShadow: 'none'
+              }} 
+            />
+          ))}
+          {EIGHT_INDICES.map((_, idx) => (
+            <div 
+              key={`lbl-a-${idx}`} 
+              className="highway-label" 
+              style={{ left: `${idx * 31 + 9.5}px`, color: ringColors[idx] }}
+            >
+              A{idx + 1}
+            </div>
+          ))}
+          <div 
+            ref={highwayEventsRefA} 
+            className="highway-events-container"
+          >
+            {/* Horizontal Grid lines (Tronesque Cyan) */}
+            {BEAT_INDICES_256.map((_, b) => {
+              const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
+              const isBarStart = b % beatsPerBar === 0;
+              const barNum = Math.floor(b / beatsPerBar) + 1;
+              const beatInBar = (b % beatsPerBar) + 1;
+              const startY = - (b * highwayZoom);
+              
+              return (
+                <div 
+                  key={`grid-line-a-${b}`}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: `${startY}px`,
+                    height: 0,
+                    borderBottom: isBarStart 
+                      ? '1px solid rgba(0, 243, 255, 0.45)' 
+                      : '1px dashed rgba(0, 243, 255, 0.18)',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  {/* Bar/Beat labels on the left and right sides */}
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: '4px',
+                      bottom: '2px',
+                      fontSize: '0.36rem',
+                      fontFamily: 'monospace',
+                      color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                      textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                      fontWeight: isBarStart ? 'bold' : 'normal',
+                      lineHeight: 1,
+                      userSelect: 'none'
+                    }}
+                  >
+                    {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                  </span>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      right: '4px',
+                      bottom: '2px',
+                      fontSize: '0.36rem',
+                      fontFamily: 'monospace',
+                      color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                      textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                      fontWeight: isBarStart ? 'bold' : 'normal',
+                      lineHeight: 1,
+                      userSelect: 'none'
+                    }}
+                  >
+                    {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                  </span>
+                </div>
+              );
+            })}
+            {EIGHT_INDICES.map((_, laneIdx) => {
+              const pills = getPillsForLane('A', laneIdx);
+              const color = ringColors[laneIdx];
+              return (
+                <div key={`hw-lane-a-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
+                  {pills.map((pill, pIdx) => {
+                    const startY = - (pill.start * highwayZoom);
+                    const endY = - (pill.end * highwayZoom);
+                    const height = startY - endY;
+                    return (
+                      <div
+                        key={`hw-pill-a-${laneIdx}-${pIdx}`}
+                        style={{
+                          position: 'absolute',
+                          left: '11.5px',
+                          width: '8px',
+                          bottom: `${startY}px`,
+                          height: `${Math.max(6, height)}px`,
+                          background: color,
+                          borderRadius: '4px',
+                          boxShadow: `0 0 6px ${color}`,
+                          border: `1.5px solid ${color}`
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget]);
+
+    const highwayB_JSX = useMemo(() => {
+      return (
+        <div 
+          className="vertical-highway deck-b-highway"
+          onMouseDown={(e) => handleHighwayMouseDown('B', e)}
+          onMouseMove={handleHighwayMouseMove}
+          onMouseUp={handleHighwayMouseUp}
+          onMouseLeave={handleHighwayMouseUp}
+          style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
+        >
+          {EIGHT_INDICES.map((_, idx) => (
+            <div 
+              key={`line-b-${idx}`} 
+              className="highway-lane-line" 
+              style={{ left: `${(idx + 0.5) * 31}px` }} 
+            />
+          ))}
+          <div className="highway-playhead-line" />
+          {EIGHT_INDICES.map((_, idx) => (
+            <div 
+              key={`target-b-${idx}`} 
+              ref={el => { targetCirclesRefsB.current[idx] = el; }}
+              className="highway-target-circle" 
+              style={{ 
+                left: `${idx * 31 + 11.5}px`, 
+                borderColor: ringColors[idx],
+                background: 'transparent',
+                boxShadow: 'none'
+              }} 
+            />
+          ))}
+          {EIGHT_INDICES.map((_, idx) => (
+            <div 
+              key={`lbl-b-${idx}`} 
+              className="highway-label" 
+              style={{ left: `${idx * 31 + 9.5}px`, color: ringColors[idx] }}
+            >
+              B{idx + 1}
+            </div>
+          ))}
+          <div 
+            ref={highwayEventsRefB} 
+            className="highway-events-container"
+          >
+            {/* Horizontal Grid lines (Tronesque Cyan) */}
+            {BEAT_INDICES_256.map((_, b) => {
+              const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
+              const isBarStart = b % beatsPerBar === 0;
+              const barNum = Math.floor(b / beatsPerBar) + 1;
+              const beatInBar = (b % beatsPerBar) + 1;
+              const startY = - (b * highwayZoom);
+              
+              return (
+                <div 
+                  key={`grid-line-b-${b}`}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: `${startY}px`,
+                    height: 0,
+                    borderBottom: isBarStart 
+                      ? '1px solid rgba(0, 243, 255, 0.45)' 
+                      : '1px dashed rgba(0, 243, 255, 0.18)',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  {/* Bar/Beat labels on the left and right sides */}
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: '4px',
+                      bottom: '2px',
+                      fontSize: '0.36rem',
+                      fontFamily: 'monospace',
+                      color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                      textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                      fontWeight: isBarStart ? 'bold' : 'normal',
+                      lineHeight: 1,
+                      userSelect: 'none'
+                    }}
+                  >
+                    {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                  </span>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      right: '4px',
+                      bottom: '2px',
+                      fontSize: '0.36rem',
+                      fontFamily: 'monospace',
+                      color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                      textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                      fontWeight: isBarStart ? 'bold' : 'normal',
+                      lineHeight: 1,
+                      userSelect: 'none'
+                    }}
+                  >
+                    {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                  </span>
+                </div>
+              );
+            })}
+            {EIGHT_INDICES.map((_, laneIdx) => {
+              const pills = getPillsForLane('B', laneIdx);
+              const color = ringColors[laneIdx];
+              return (
+                <div key={`hw-lane-b-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
+                  {pills.map((pill, pIdx) => {
+                    const startY = - (pill.start * highwayZoom);
+                    const endY = - (pill.end * highwayZoom);
+                    const height = startY - endY;
+                    return (
+                      <div
+                        key={`hw-pill-b-${laneIdx}-${pIdx}`}
+                        style={{
+                          position: 'absolute',
+                          left: '11.5px',
+                          width: '8px',
+                          bottom: `${startY}px`,
+                          height: `${Math.max(6, height)}px`,
+                          background: color,
+                          borderRadius: '4px',
+                          boxShadow: `0 0 6px ${color}`,
+                          border: `1.5px solid ${color}`
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget]);
+
     return (
       <div className="deck-layout-wrapper">
         {/* TOP ROW: DECKS & MIXER */}
@@ -10048,137 +10505,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Vertical Highway for Deck A (sitting below Cue Play Sync row) */}
-            <div 
-              className="vertical-highway deck-a-highway"
-              onMouseDown={(e) => handleHighwayMouseDown('A', e)}
-              onMouseMove={handleHighwayMouseMove}
-              onMouseUp={handleHighwayMouseUp}
-              onMouseLeave={handleHighwayMouseUp}
-              style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
-            >
-              {EIGHT_INDICES.map((_, idx) => (
-                <div 
-                  key={`line-a-${idx}`} 
-                  className="highway-lane-line" 
-                  style={{ left: `${(idx + 0.5) * 31}px` }} 
-                />
-              ))}
-              <div className="highway-playhead-line" />
-              {EIGHT_INDICES.map((_, idx) => (
-                <div 
-                  key={`target-a-${idx}`} 
-                  className="highway-target-circle" 
-                  style={{ 
-                    left: `${idx * 31 + 11.5}px`, 
-                    borderColor: ringColors[idx],
-                    background: activePerfPadsRef.current[`A-slot-${idx}`] ? ringColors[idx] : 'transparent',
-                    boxShadow: activePerfPadsRef.current[`A-slot-${idx}`] ? `0 0 6px ${ringColors[idx]}` : 'none'
-                  }} 
-                />
-              ))}
-              {EIGHT_INDICES.map((_, idx) => (
-                <div 
-                  key={`lbl-a-${idx}`} 
-                  className="highway-label" 
-                  style={{ left: `${idx * 31 + 9.5}px`, color: ringColors[idx] }}
-                >
-                  A{idx + 1}
-                </div>
-              ))}
-              <div 
-                ref={highwayEventsRefA} 
-                className="highway-events-container"
-              >
-                {/* Horizontal Grid lines (Tronesque Cyan) */}
-                {BEAT_INDICES_256.map((_, b) => {
-                  const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
-                  const isBarStart = b % beatsPerBar === 0;
-                  const barNum = Math.floor(b / beatsPerBar) + 1;
-                  const beatInBar = (b % beatsPerBar) + 1;
-                  const startY = - (b * highwayZoom);
-                  
-                  return (
-                    <div 
-                      key={`grid-line-a-${b}`}
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        bottom: `${startY}px`,
-                        height: 0,
-                        borderBottom: isBarStart 
-                          ? '1px solid rgba(0, 243, 255, 0.45)' 
-                          : '1px dashed rgba(0, 243, 255, 0.18)',
-                        pointerEvents: 'none'
-                      }}
-                    >
-                      {/* Bar/Beat labels on the left and right sides */}
-                      <span
-                        style={{
-                          position: 'absolute',
-                          left: '4px',
-                          bottom: '2px',
-                          fontSize: '0.36rem',
-                          fontFamily: 'monospace',
-                          color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
-                          textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
-                          fontWeight: isBarStart ? 'bold' : 'normal',
-                          lineHeight: 1,
-                          userSelect: 'none'
-                        }}
-                      >
-                        {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
-                      </span>
-                      <span
-                        style={{
-                          position: 'absolute',
-                          right: '4px',
-                          bottom: '2px',
-                          fontSize: '0.36rem',
-                          fontFamily: 'monospace',
-                          color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
-                          textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
-                          fontWeight: isBarStart ? 'bold' : 'normal',
-                          lineHeight: 1,
-                          userSelect: 'none'
-                        }}
-                      >
-                        {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
-                      </span>
-                    </div>
-                  );
-                })}
-                {EIGHT_INDICES.map((_, laneIdx) => {
-                  const pills = getPillsForLane('A', laneIdx);
-                  const color = ringColors[laneIdx];
-                  return (
-                    <div key={`hw-lane-a-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
-                      {pills.map((pill, pIdx) => {
-                        const startY = - (pill.start * highwayZoom);
-                        const endY = - (pill.end * highwayZoom);
-                        const height = startY - endY;
-                        return (
-                          <div
-                            key={`hw-pill-a-${laneIdx}-${pIdx}`}
-                            style={{
-                              position: 'absolute',
-                              left: '11.5px',
-                              width: '8px',
-                              bottom: `${startY}px`,
-                              height: `${Math.max(6, height)}px`,
-                              background: color,
-                              borderRadius: '4px',
-                              boxShadow: `0 0 6px ${color}`,
-                              border: `1.5px solid ${color}`
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            {highwayA_JSX}
           </div>
         </div>
 
@@ -11143,137 +11470,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Vertical Highway for Deck B (sitting below Cue Play Sync row) */}
-            <div 
-              className="vertical-highway deck-b-highway"
-              onMouseDown={(e) => handleHighwayMouseDown('B', e)}
-              onMouseMove={handleHighwayMouseMove}
-              onMouseUp={handleHighwayMouseUp}
-              onMouseLeave={handleHighwayMouseUp}
-              style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
-            >
-              {EIGHT_INDICES.map((_, idx) => (
-                <div 
-                  key={`line-b-${idx}`} 
-                  className="highway-lane-line" 
-                  style={{ left: `${(idx + 0.5) * 31}px` }} 
-                />
-              ))}
-              <div className="highway-playhead-line" />
-              {EIGHT_INDICES.map((_, idx) => (
-                <div 
-                  key={`target-b-${idx}`} 
-                  className="highway-target-circle" 
-                  style={{ 
-                    left: `${idx * 31 + 11.5}px`, 
-                    borderColor: ringColors[idx],
-                    background: activePerfPadsRef.current[`B-slot-${idx}`] ? ringColors[idx] : 'transparent',
-                    boxShadow: activePerfPadsRef.current[`B-slot-${idx}`] ? `0 0 6px ${ringColors[idx]}` : 'none'
-                  }} 
-                />
-              ))}
-              {EIGHT_INDICES.map((_, idx) => (
-                <div 
-                  key={`lbl-b-${idx}`} 
-                  className="highway-label" 
-                  style={{ left: `${idx * 31 + 9.5}px`, color: ringColors[idx] }}
-                >
-                  B{idx + 1}
-                </div>
-              ))}
-              <div 
-                ref={highwayEventsRefB} 
-                className="highway-events-container"
-              >
-                {/* Horizontal Grid lines (Tronesque Cyan) */}
-                {BEAT_INDICES_256.map((_, b) => {
-                  const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
-                  const isBarStart = b % beatsPerBar === 0;
-                  const barNum = Math.floor(b / beatsPerBar) + 1;
-                  const beatInBar = (b % beatsPerBar) + 1;
-                  const startY = - (b * highwayZoom);
-                  
-                  return (
-                    <div 
-                      key={`grid-line-b-${b}`}
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        bottom: `${startY}px`,
-                        height: 0,
-                        borderBottom: isBarStart 
-                          ? '1px solid rgba(0, 243, 255, 0.45)' 
-                          : '1px dashed rgba(0, 243, 255, 0.18)',
-                        pointerEvents: 'none'
-                      }}
-                    >
-                      {/* Bar/Beat labels on the left and right sides */}
-                      <span
-                        style={{
-                          position: 'absolute',
-                          left: '4px',
-                          bottom: '2px',
-                          fontSize: '0.36rem',
-                          fontFamily: 'monospace',
-                          color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
-                          textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
-                          fontWeight: isBarStart ? 'bold' : 'normal',
-                          lineHeight: 1,
-                          userSelect: 'none'
-                        }}
-                      >
-                        {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
-                      </span>
-                      <span
-                        style={{
-                          position: 'absolute',
-                          right: '4px',
-                          bottom: '2px',
-                          fontSize: '0.36rem',
-                          fontFamily: 'monospace',
-                          color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
-                          textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
-                          fontWeight: isBarStart ? 'bold' : 'normal',
-                          lineHeight: 1,
-                          userSelect: 'none'
-                        }}
-                      >
-                        {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
-                      </span>
-                    </div>
-                  );
-                })}
-                {EIGHT_INDICES.map((_, laneIdx) => {
-                  const pills = getPillsForLane('B', laneIdx);
-                  const color = ringColors[laneIdx];
-                  return (
-                    <div key={`hw-lane-b-${laneIdx}`} style={{ position: 'absolute', left: `${laneIdx * 31}px`, width: '31px', top: 0, bottom: 0 }}>
-                      {pills.map((pill, pIdx) => {
-                        const startY = - (pill.start * highwayZoom);
-                        const endY = - (pill.end * highwayZoom);
-                        const height = startY - endY;
-                        return (
-                          <div
-                            key={`hw-pill-b-${laneIdx}-${pIdx}`}
-                            style={{
-                              position: 'absolute',
-                              left: '11.5px',
-                              width: '8px',
-                              bottom: `${startY}px`,
-                              height: `${Math.max(6, height)}px`,
-                              background: color,
-                              borderRadius: '4px',
-                              boxShadow: `0 0 6px ${color}`,
-                              border: `1.5px solid ${color}`
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            {highwayB_JSX}
           </div>
         </div>
       </div>
