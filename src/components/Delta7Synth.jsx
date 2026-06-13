@@ -8550,6 +8550,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       // Issue 4: pre-sort once here so runPerfScheduler never sorts again
       sortedPerfEventsRef.current = [...recorded].sort((a, b) => a.beat - b.beat);
       setPerfRecordActive(false);
+      perfRecordActiveRef.current = false;
 
       const elapsed = ctx.currentTime - perfStartTimeRef.current;
       const bpm = paramsRef.current.arpBpm || 120;
@@ -8567,12 +8568,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       if (perfIsDubbing) {
         // Exiting dubbing transitions smoothly to standard playback
         setPerfPlaybackActive(true);
+        perfPlaybackActiveRef.current = true;
         perfPlayStartTimeRef.current = perfStartTimeRef.current;
         seqStartBeatOffsetRef.current = 0.0;
         syncSabPlaybackState(true, perfStartTimeRef.current, 0.0, bpm);
         showEditorStatus(`Overdub Complete! Seamlessly Playing... ▶️`);
       } else {
         setPerfPlaybackActive(false);
+        perfPlaybackActiveRef.current = false;
+        perfPlayStartTimeRef.current = 0;
+        perfStartTimeRef.current = 0;
         syncSabPlaybackState(false, 0, 0, bpm);
         if (schedulerNodeRef.current) {
           schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
@@ -8757,8 +8762,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
 
     setPerfPlaybackActive(false);
+    perfPlaybackActiveRef.current = false;
     setPerfRecordActive(false);
+    perfRecordActiveRef.current = false;
     setPerfIsDubbing(false);
+    perfPlayStartTimeRef.current = 0;
+    perfStartTimeRef.current = 0;
     seqCurrentBeatRef.current = 0.0;
     seqStartBeatOffsetRef.current = 0.0;
     syncSabPlaybackState(false, 0, 0, bpm);
