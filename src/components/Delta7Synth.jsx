@@ -957,6 +957,7 @@ export default function Delta7Synth() {
   }, []);
 
   const seqTimerDisplayRef = useRef(null);
+  const seqTimeDisplayRef = useRef(null);
   const seqCurrentBeatRef = useRef(0.0);
   const seqStartBeatOffsetRef = useRef(0.0);
   const highwayEventsRefA = useRef(null);
@@ -1019,6 +1020,18 @@ export default function Delta7Synth() {
   const perfTimeSignatureRef = useRef('4/4');
   useEffect(() => { perfQuantizeModeRef.current = perfQuantizeMode; }, [perfQuantizeMode]);
   useEffect(() => { perfTimeSignatureRef.current = perfTimeSignature; }, [perfTimeSignature]);
+
+  const [perfSeqLength, setPerfSeqLength] = useState('Auto');
+  const perfSeqLengthRef = useRef('Auto');
+  useEffect(() => {
+    perfSeqLengthRef.current = perfSeqLength;
+    if (schedulerNodeRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'SET_SEQ_LENGTH',
+        seqLength: perfSeqLength
+      });
+    }
+  }, [perfSeqLength]);
 
   // --- Central Event Bus ---
   const eventBusRef = useRef({
@@ -1378,9 +1391,21 @@ export default function Delta7Synth() {
           const bpm = paramsRef.current.arpBpm || 120;
           const beatDuration = 60 / bpm;
           let calculatedBeat = elapsed / beatDuration + seqStartBeatOffsetRef.current;
-          if (sortedPerfEventsRef.current.length > 0) {
-            const lastEvent = sortedPerfEventsRef.current[sortedPerfEventsRef.current.length - 1];
-            const endBeat = Math.max(16, Math.ceil(lastEvent.beat / 4) * 4);
+          
+          let endBeat = Infinity;
+          const setting = perfSeqLengthRef.current || 'Auto';
+          if (setting === 'Infinite') {
+            endBeat = Infinity;
+          } else if (setting === 'Auto') {
+            if (sortedPerfEventsRef.current.length > 0) {
+              const lastEvent = sortedPerfEventsRef.current[sortedPerfEventsRef.current.length - 1];
+              endBeat = Math.max(16, Math.ceil(lastEvent.beat / 4) * 4);
+            }
+          } else {
+            endBeat = parseFloat(setting) || 16.0;
+          }
+
+          if (endBeat !== Infinity) {
             calculatedBeat = calculatedBeat % endBeat;
           }
           currentBeat = calculatedBeat;
@@ -1398,6 +1423,18 @@ export default function Delta7Synth() {
         // Update timer display DOM element
         if (seqTimerDisplayRef.current) {
           seqTimerDisplayRef.current.innerText = currentBeat.toFixed(1);
+        }
+        if (seqTimeDisplayRef.current) {
+          const bpm = paramsRef.current.arpBpm || 120;
+          const beatDuration = 60 / bpm;
+          const totalSeconds = currentBeat * beatDuration;
+          const mins = Math.floor(totalSeconds / 60);
+          const secs = Math.floor(totalSeconds % 60);
+          const tenths = Math.floor((totalSeconds * 10) % 10);
+          
+          const minsStr = mins.toString().padStart(2, '0');
+          const secsStr = secs.toString().padStart(2, '0');
+          seqTimeDisplayRef.current.innerText = `${minsStr}:${secsStr}.${tenths}`;
         }
 
         // Translate Guitar Hero highways downwards (GPU 3D transform)
@@ -4691,6 +4728,7 @@ export default function Delta7Synth() {
           this.perfStartTime = 0;
           this.perfRecordActive = false;
           this.quantizeMode = 'None';
+          this.seqLength = 'Auto';
           
           // Event queue for lookahead scheduling
           this.eventQueue = [];
@@ -4768,6 +4806,10 @@ export default function Delta7Synth() {
               
             case 'LIVE_TRIGGER':
               this.handleLiveTrigger(msg);
+              break;
+
+            case 'SET_SEQ_LENGTH':
+              this.seqLength = msg.seqLength;
               break;
           }
         }
@@ -4968,14 +5010,23 @@ export default function Delta7Synth() {
             }
             
             // Handle playback loop wrap
-            if (this.playbackNextEventIdx >= this.sortedEvents.length && this.sortedEvents.length > 0) {
-              const lastEvent = this.sortedEvents[this.sortedEvents.length - 1];
-              const endBeat = Math.max(16, Math.ceil(lastEvent.beat / 4) * 4);
-              if (elapsedBeats >= endBeat) {
-                this.playbackStartTime = now;
-                this.playbackStartBeatOffset = 0.0;
-                this.playbackNextEventIdx = 0;
+            let endBeat = Infinity;
+            const setting = this.seqLength || 'Auto';
+            if (setting === 'Infinite') {
+              endBeat = Infinity;
+            } else if (setting === 'Auto') {
+              if (this.sortedEvents.length > 0) {
+                const lastEvent = this.sortedEvents[this.sortedEvents.length - 1];
+                endBeat = Math.max(16, Math.ceil(lastEvent.beat / 4) * 4);
               }
+            } else {
+              endBeat = parseFloat(setting) || 16.0;
+            }
+
+            if (endBeat !== Infinity && elapsedBeats >= endBeat) {
+              this.playbackStartTime = now;
+              this.playbackStartBeatOffset = 0.0;
+              this.playbackNextEventIdx = 0;
             }
           }
           
@@ -5092,6 +5143,10 @@ export default function Delta7Synth() {
       };
       
       schedulerNodeRef.current = schedulerNode;
+      schedulerNode.port.postMessage({
+        type: 'SET_SEQ_LENGTH',
+        seqLength: perfSeqLengthRef.current
+      });
     } catch (err) {
       console.warn("Failed to load Scheduler AudioWorklet module:", err);
       URL.revokeObjectURL(schedulerBlobUrl);
@@ -12225,6 +12280,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 <span ref={seqTimerDisplayRef} style={{ fontSize: '0.68rem', color: '#00f3ff', fontWeight: 'bold', minWidth: '40px', display: 'inline-block', textAlign: 'right' }}>0.0</span>
               </div>
 
+              {/* Digital Time display (Mins:Secs) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', borderRadius: '3px', padding: '2px 6px', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: '0.48rem', color: '#888' }}>TIME:</span>
+                <span ref={seqTimeDisplayRef} style={{ fontSize: '0.68rem', color: '#00f3ff', fontWeight: 'bold', minWidth: '48px', display: 'inline-block', textAlign: 'right' }}>00:00.0</span>
+              </div>
+
               {/* Highway Zoom Slider */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0, 0, 0, 0.4)', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: '4px', padding: '3px 8px', height: '26px' }}>
                 <span style={{ fontSize: '0.48rem', color: '#888', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>ZOOM:</span>
@@ -12381,6 +12442,30 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   <option value="1/16">1/16 Beat</option>
                   <option value="1">1 Beat</option>
                   <option value="4">4 Beats</option>
+                </select>
+              </div>
+
+              {/* Timeline wrap length selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '0.4rem', color: '#888', fontFamily: 'monospace' }}>LENGTH:</span>
+                <select
+                  value={perfSeqLength}
+                  onChange={(e) => setPerfSeqLength(e.target.value)}
+                  style={{
+                    background: '#0a101d', border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '2px', color: '#ffe600', fontSize: '0.42rem',
+                    padding: '1px 2px', outline: 'none', cursor: 'pointer', fontFamily: 'monospace',
+                    fontWeight: 'bold'
+                  }}
+                  title="Wrap performance sequencer loop length after this many beats"
+                >
+                  <option value="Auto">Auto (Grow)</option>
+                  <option value="16">16 Beats (4 Bars)</option>
+                  <option value="32">32 Beats (8 Bars)</option>
+                  <option value="64">64 Beats (16 Bars)</option>
+                  <option value="128">128 Beats (32 Bars)</option>
+                  <option value="256">256 Beats (64 Bars)</option>
+                  <option value="Infinite">Infinite</option>
                 </select>
               </div>
 
