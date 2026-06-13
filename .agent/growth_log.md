@@ -54,4 +54,6 @@
     - **Memory & Resource Conservation**: Cache decoded audio buffers, use zero-copy metadata references, and disconnect temporary voice nodes instantly when notes finish decay to keep system resources clear.
     - **Simplified Threads Communication**: Quantize and compute timing values (like beat grids) using numeric float values directly on the main thread and pass them across SAB boundaries instead of complex string-parsing layers.
 44. **High-Precision Time Readout & Dynamic Sequence Lengths**: Jimmy prefers having a direct, high-precision visual time display (minutes, seconds, and tenths of a second) next to the beat counter in the sequencer header bar, updated at 60fps in the rAF loop. Additionally, replacing rigid wrapping limits with user-selectable sequence wrap lengths (Auto, 16, 32, 64, 128, 256, and Infinite beats) provides total flexibility during live looping sessions, allowing the timeline to scroll indefinitely or loop at custom bar offsets.
+45. **Standard 48kHz Audio Resolution**: Jimmy prefers a default sample rate of 48000 Hz (48kHz) enforced directly in the AudioContext options, establishing an industry-standard audio resolution for all internal synthesis, live resampling, recording, and WAV export operations.
+
 

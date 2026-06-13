@@ -4218,7 +4218,7 @@ export default function Delta7Synth() {
     if (audioCtxRef.current) return;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioContextClass({ latencyHint: 'interactive' });
+    const ctx = new AudioContextClass({ latencyHint: 'interactive', sampleRate: 48000 });
     audioCtxRef.current = ctx;
 
     const now = ctx.currentTime;
