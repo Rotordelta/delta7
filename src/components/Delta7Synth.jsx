@@ -8156,8 +8156,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     // Intercept armed record state and start recording immediately on first pad hit
     if (perfRecordArmedRef.current && isNoteOn) {
       startRecordingFromArmed();
-      shouldRecord = true;
     }
+    const actualShouldRecord = shouldRecord || perfRecordActiveRef.current;
 
     // 1. Latch Mode Routing
     if (triggerMode === 'latch') {
@@ -8176,7 +8176,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPad(`${padKey}-pending`, true);
       }
       
-      dispatchLiveTrigger(deck, type, index, velocity, true, shouldRecord, isAlreadyActive ? 'None' : quantGrid);
+      dispatchLiveTrigger(deck, type, index, velocity, true, actualShouldRecord, isAlreadyActive ? 'None' : quantGrid);
       return;
     }
 
@@ -8196,18 +8196,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       
       setPerfPad(`${padKey}-pending`, true);
       
-      dispatchLiveTrigger(deck, type, index, velocity, !isAlreadyActive, shouldRecord, loopBeats);
+      dispatchLiveTrigger(deck, type, index, velocity, !isAlreadyActive, actualShouldRecord, loopBeats);
       return;
     }
 
     // 2. Free Mode Routing
     if (triggerMode === 'free') {
-      dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, shouldRecord, 'None');
+      dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, actualShouldRecord, 'None');
       return;
     }
 
     // 3. Hold and Flux Modes Routing (Default instant trigger)
-    dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, shouldRecord, 'None');
+    dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, actualShouldRecord, 'None');
   };
 
   // -- Event-delegated pad grid handlers
