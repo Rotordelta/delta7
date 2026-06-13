@@ -4929,6 +4929,7 @@ export default function Delta7Synth() {
               if (pbActive) {
                 this.playbackStartTime = arr[3];
                 this.playbackStartBeatOffset = arr[4];
+                this.perfStartTime = this.playbackStartTime - this.playbackStartBeatOffset * (60 / this.bpm);
                 this.playbackNextEventIdx = 0;
               }
             }
@@ -8484,6 +8485,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     
     setPerfRecordStartBpm(bpm);
     setPerfRecordActive(true);
+    perfRecordActiveRef.current = true;
     setPerfIsDubbing(isDub);
 
     if (schedulerNodeRef.current) {
@@ -8497,6 +8499,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (isDub) {
       // Start playing back existing events immediately during overdub
       setPerfPlaybackActive(true);
+      perfPlaybackActiveRef.current = true;
       perfPlayStartTimeRef.current = startTime;
       seqStartBeatOffsetRef.current = 0.0;
       syncSabPlaybackState(true, startTime, 0.0, bpm);
@@ -8512,6 +8515,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       showEditorStatus("Armed Trigger! Overdubbing Performance... 🎙️");
     } else {
       setPerfPlaybackActive(false);
+      perfPlaybackActiveRef.current = false;
       syncSabPlaybackState(false, 0, 0, bpm);
       if (schedulerNodeRef.current) {
         schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
@@ -8649,6 +8653,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       
       setPerfRecordStartBpm(bpm);
       setPerfRecordActive(true);
+      perfRecordActiveRef.current = true;
       setPerfIsDubbing(isDub);
 
       if (schedulerNodeRef.current) {
