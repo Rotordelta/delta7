@@ -8158,7 +8158,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPad(padKey, false);
         setPerfPad(`${padKey}-pending`, false);
         if (shouldRecord && perfRecordActiveRef.current) {
-          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode });
           setPerfEvents([...perfEventsRef.current]);
         }
         return;
@@ -8179,7 +8179,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPad(padKey, false);
         setPerfPad(`${padKey}-pending`, false);
         if (shouldRecord && perfRecordActiveRef.current) {
-          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode });
           setPerfEvents([...perfEventsRef.current]);
         }
         return;
@@ -8191,7 +8191,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       setPerfPad(`${padKey}-pending`, false);
       
       if (shouldRecord && perfRecordActiveRef.current) {
-        perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+        perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode });
         setPerfEvents([...perfEventsRef.current]);
       }
       return;
@@ -8207,7 +8207,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPad(padKey, false);
         setPerfPad(`${padKey}-pending`, false);
         if (shouldRecord && perfRecordActiveRef.current) {
-          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode });
           setPerfEvents([...perfEventsRef.current]);
         }
         return;
@@ -8266,7 +8266,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           }
           
           if (shouldRecord && perfRecordActiveRef.current) {
-            perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true });
+            perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true, triggerMode });
             setPerfEvents([...perfEventsRef.current]);
           }
           return;
@@ -8406,7 +8406,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
 
     if (shouldRecord && perfRecordActiveRef.current) {
-      perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true });
+      perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true, triggerMode });
       setPerfEvents([...perfEventsRef.current]);
     }
   };
@@ -10196,13 +10196,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const drawNote = (deck, laneIdx, startBeat, endBeat) => {
+    const slotId = (deck === 'A' ? 'a0' : 'b0') + (laneIdx + 1);
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    const triggerMode = slot ? (slot.triggerMode || 'hold') : 'hold';
+
     const noteOn = {
       beat: startBeat,
       deck,
       type: 'slot',
       index: laneIdx,
       velocity: 100,
-      isNoteOn: true
+      isNoteOn: true,
+      triggerMode
     };
     const noteOff = {
       beat: endBeat,
@@ -10210,7 +10215,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       type: 'slot',
       index: laneIdx,
       velocity: 100,
-      isNoteOn: false
+      isNoteOn: false,
+      triggerMode
     };
 
     const nextEvents = [...perfEvents, noteOn, noteOff];
@@ -10341,7 +10347,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             activePill.end = evt.beat;
             pills.push(activePill);
           }
-          activePill = { start: evt.beat, end: evt.beat + 1.0 };
+          activePill = { start: evt.beat, end: evt.beat + 1.0, triggerMode: evt.triggerMode || 'hold' };
         } else {
           if (activePill) {
             activePill.end = evt.beat;
@@ -10459,7 +10465,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             activePill.end = e.beat;
             pills.push(activePill);
           }
-          activePill = { start: e.beat, end: e.beat + 1.0 };
+          activePill = { start: e.beat, end: null, triggerMode: e.triggerMode || 'hold' };
         } else {
           if (activePill) {
             activePill.end = e.beat;
@@ -10469,6 +10475,19 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         }
       });
       if (activePill) {
+        let endBeat = 16.0;
+        const setting = perfSeqLengthRef.current || 'Auto';
+        if (setting === 'Auto') {
+          if (sortedPerfEventsRef.current.length > 0) {
+            const lastEvent = sortedPerfEventsRef.current[sortedPerfEventsRef.current.length - 1];
+            endBeat = Math.max(16, Math.ceil(lastEvent.beat / 4) * 4);
+          }
+        } else if (setting !== 'Infinite') {
+          endBeat = parseFloat(setting) || 16.0;
+        } else {
+          endBeat = Math.max(32.0, activePill.start + 16.0);
+        }
+        activePill.end = endBeat;
         pills.push(activePill);
       }
       return pills;
@@ -10608,6 +10627,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     const startY = pill.start * highwayZoom;
                     const endY = pill.end * highwayZoom;
                     const height = endY - startY;
+                    
+                    const mode = pill.triggerMode || 'hold';
+                    let borderStyle = 'solid';
+                    let background = '#000000';
+                    let borderWidth = '1.5px';
+                    let glowScale = '8px';
+                    
+                    if (mode === 'latch') {
+                      background = color + '2a'; // glowy semi-transparent filled block
+                      borderWidth = '2px';
+                      glowScale = '12px';
+                    } else if (mode === 'free') {
+                      borderStyle = 'dashed';
+                    } else if (mode === 'flux') {
+                      borderStyle = 'double';
+                      borderWidth = '3px';
+                    } else if (mode === 'queue') {
+                      borderStyle = 'dotted';
+                      borderWidth = '2px';
+                    }
+                    
                     return (
                       <div
                         key={`hw-pill-a-${laneIdx}-${pIdx}`}
@@ -10617,10 +10657,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           width: '22px',
                           bottom: `${startY}px`,
                           height: `${Math.max(6, height)}px`,
-                          background: '#000000',
+                          background,
                           borderRadius: '3px',
-                          border: `1.5px solid ${color}`,
-                          boxShadow: `0 0 8px ${color}, inset 0 0 8px ${color}`,
+                          border: `${borderWidth} ${borderStyle} ${color}`,
+                          boxShadow: `0 0 ${glowScale} ${color}, inset 0 0 ${glowScale} ${color}`,
                           zIndex: 2
                         }}
                       />
@@ -10768,6 +10808,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     const startY = pill.start * highwayZoom;
                     const endY = pill.end * highwayZoom;
                     const height = endY - startY;
+                    
+                    const mode = pill.triggerMode || 'hold';
+                    let borderStyle = 'solid';
+                    let background = '#000000';
+                    let borderWidth = '1.5px';
+                    let glowScale = '8px';
+                    
+                    if (mode === 'latch') {
+                      background = color + '2a'; // glowy semi-transparent filled block
+                      borderWidth = '2px';
+                      glowScale = '12px';
+                    } else if (mode === 'free') {
+                      borderStyle = 'dashed';
+                    } else if (mode === 'flux') {
+                      borderStyle = 'double';
+                      borderWidth = '3px';
+                    } else if (mode === 'queue') {
+                      borderStyle = 'dotted';
+                      borderWidth = '2px';
+                    }
+                    
                     return (
                       <div
                         key={`hw-pill-b-${laneIdx}-${pIdx}`}
@@ -10777,10 +10838,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           width: '22px',
                           bottom: `${startY}px`,
                           height: `${Math.max(6, height)}px`,
-                          background: '#000000',
+                          background,
                           borderRadius: '3px',
-                          border: `1.5px solid ${color}`,
-                          boxShadow: `0 0 8px ${color}, inset 0 0 8px ${color}`,
+                          border: `${borderWidth} ${borderStyle} ${color}`,
+                          boxShadow: `0 0 ${glowScale} ${color}, inset 0 0 ${glowScale} ${color}`,
                           zIndex: 2
                         }}
                       />
