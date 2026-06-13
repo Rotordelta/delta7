@@ -853,7 +853,7 @@ export default function Delta7Synth() {
 
 
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('a01'); // Target slot in Editor
-  const [uiScale, setUiScale] = useState(1.0);
+  const [uiScale, setUiScale] = useState(0.9);
   const [performanceViewActive, setPerformanceViewActive] = useState(false);
   const [perfRecordActive, setPerfRecordActive] = useState(false);
   const [perfIsDubbing, setPerfIsDubbing] = useState(false);
