@@ -9864,29 +9864,59 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   // ==========================================
 
   useEffect(() => {
-    if (navigator.requestMIDIAccess) {
-      navigator.requestMIDIAccess()
-        .then((access) => {
-          setIsMidiSupported(true);
-          const inputs = Array.from(access.inputs.values());
-          setMidiDevices(inputs);
-          if (inputs.length > 0) {
-            setSelectedMidiDevice(inputs[0].id);
-            setupMidiListeners(inputs[0]);
-          }
-          // Enumerate and cache MIDI outputs in midiOutputsRef
-          const outputs = Array.from(access.outputs.values());
-          midiOutputsRef.current = outputs;
-          
-          access.onstatechange = (e) => {
-            if (e.port && e.port.type === 'output') {
-              midiOutputsRef.current = Array.from(access.outputs.values());
-            }
-          };
-        })
-        .catch(() => setIsMidiSupported(false));
-    }
+    if (!navigator.requestMIDIAccess) return;
+
+    let midiAccessObj = null;
+
+    const updateDevices = () => {
+      if (!midiAccessObj) return;
+      const inputs = Array.from(midiAccessObj.inputs.values());
+      const outputs = Array.from(midiAccessObj.outputs.values());
+      setMidiDevices(inputs);
+      midiOutputsRef.current = outputs;
+    };
+
+    navigator.requestMIDIAccess()
+      .then((access) => {
+        setIsMidiSupported(true);
+        midiAccessObj = access;
+        updateDevices();
+        
+        // Default to 'all' if there are connected devices
+        if (access.inputs.size > 0) {
+          setSelectedMidiDevice('all');
+        }
+
+        access.onstatechange = (e) => {
+          updateDevices();
+        };
+      })
+      .catch(() => setIsMidiSupported(false));
+
+    return () => {
+      if (midiAccessObj) {
+        midiAccessObj.onstatechange = null;
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    // Clear all existing onmidimessage listeners to prevent duplicates/leaks
+    midiDevices.forEach(input => {
+      input.onmidimessage = null;
+    });
+
+    if (selectedMidiDevice === 'all') {
+      midiDevices.forEach(input => {
+        setupMidiListeners(input);
+      });
+    } else {
+      const activeInput = midiDevices.find(d => d.id === selectedMidiDevice);
+      if (activeInput) {
+        setupMidiListeners(activeInput);
+      }
+    }
+  }, [midiDevices, selectedMidiDevice]);
 
   // Continuous MIDI Clock Timing Messages (0xF8)
   useEffect(() => {
@@ -15508,14 +15538,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       <span style={{ color: '#ffe600', fontWeight: 'bold' }}>MIDI IN:</span>
                       <select 
                         value={selectedMidiDevice} 
-                        onChange={(e) => {
-                          setSelectedMidiDevice(e.target.value);
-                          const dev = midiDevices.find(d => d.id === e.target.value);
-                          if (dev) setupMidiListeners(dev);
-                        }}
+                        onChange={(e) => setSelectedMidiDevice(e.target.value)}
                         disabled={midiDevices.length === 0}
                         style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.52rem', padding: '1px', borderRadius: '3px', width: '150px' }}
                       >
+                        {midiDevices.length > 0 && <option value="all">All Connected Devices</option>}
                         {midiDevices.map((d) => (
                           <option key={d.id} value={d.id}>{d.name.slice(0, 25)}</option>
                         ))}
