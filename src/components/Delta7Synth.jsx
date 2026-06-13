@@ -3381,6 +3381,30 @@ export default function Delta7Synth() {
           }
         }
       }
+
+      if (param === 'lfoRate') {
+        if (voice.slotLfo && voice.slotLfo.frequency) {
+          voice.slotLfo.frequency.cancelScheduledValues(now);
+          voice.slotLfo.frequency.setValueAtTime(voice.slotLfo.frequency.value, now);
+          voice.slotLfo.frequency.linearRampToValueAtTime(val, now + 0.05);
+        }
+      }
+
+      if (param === 'lfoDepth') {
+        if (voice.slotLfoGain && voice.slotLfoGain.gain) {
+          const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+          if (slot) {
+            const target = slot.lfoTarget || 'None';
+            let totalDepth = val;
+            if (target === 'Filter Cutoff') {
+              totalDepth = val * 1500;
+            }
+            voice.slotLfoGain.gain.cancelScheduledValues(now);
+            voice.slotLfoGain.gain.setValueAtTime(voice.slotLfoGain.gain.value, now);
+            voice.slotLfoGain.gain.linearRampToValueAtTime(totalDepth, now + 0.05);
+          }
+        }
+      }
     });
   };
 
@@ -6591,7 +6615,16 @@ export default function Delta7Synth() {
     const gainBVol = oscBVol * Math.sqrt(oscBalance) * slotBVol;
 
     // Amp & Filter EG Setup
-    const vca = prog.vcaEG || { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.3, breakLevel: 0.7, slopeTime: 0.5, sustainLevel: 0.5, releaseTime: 0.3 };
+    const vca = (prog.perfPadAttack !== undefined) ? {
+      startLevel: 0,
+      attackTime: prog.perfPadAttack,
+      attackLevel: 1.0,
+      decayTime: 0.0,
+      breakLevel: 1.0,
+      slopeTime: 0.0,
+      sustainLevel: 1.0,
+      releaseTime: prog.perfPadDecay
+    } : (prog.vcaEG || { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.3, breakLevel: 0.7, slopeTime: 0.5, sustainLevel: 0.5, releaseTime: 0.3 });
     const vcf = prog.vcfEG || { startLevel: 0, attackTime: 0.01, attackLevel: 1.0, decayTime: 0.3, breakLevel: 0.7, slopeTime: 0.5, sustainLevel: 0.5, releaseTime: 0.3 };
     const vcaEnvAmt = (velocity / 127) * 0.45;
     
@@ -7623,6 +7656,38 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     voiceObj.slicePitchB = slicePitchB;
     voiceObj.pbFactor = pbFactor;
 
+    // Custom Slot-level LFO modulation for performance voices
+    if (isPerfVoice) {
+      const slotLfoTarget = prog.perfPadLfoTarget || 'None';
+      const slotLfoRate = prog.perfPadLfoRate !== undefined ? prog.perfPadLfoRate : 3.0;
+      const slotLfoDepth = prog.perfPadLfoDepth !== undefined ? prog.perfPadLfoDepth : 0.0;
+      
+      if (slotLfoTarget !== 'None' && slotLfoDepth > 0) {
+        const slotLfo = ctx.createOscillator();
+        slotLfo.frequency.setValueAtTime(slotLfoRate, now);
+        const slotLfoGain = ctx.createGain();
+        
+        let totalDepth = slotLfoDepth;
+        if (slotLfoTarget === 'Filter Cutoff') {
+          totalDepth = slotLfoDepth * 1500;
+          slotLfoGain.connect(filter1.frequency);
+        } else if (slotLfoTarget === 'Pan') {
+          totalDepth = slotLfoDepth;
+          slotLfoGain.connect(padPannerNode.pan);
+        } else if (slotLfoTarget === 'FX Send' && voiceObj.sendGainNode) {
+          totalDepth = slotLfoDepth;
+          slotLfoGain.connect(voiceObj.sendGainNode.gain);
+        }
+        
+        slotLfoGain.gain.setValueAtTime(totalDepth, now);
+        slotLfo.connect(slotLfoGain);
+        slotLfo.start(now);
+        
+        voiceObj.slotLfo = slotLfo;
+        voiceObj.slotLfoGain = slotLfoGain;
+      }
+    }
+
     if (prog.stutterOn) {
       startStutterModulation(voiceObj);
     }
@@ -7711,6 +7776,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       }
       if (voice.stutterTimeoutId) {
         clearTimeout(voice.stutterTimeoutId);
+      }
+
+      if (voice.slotLfo) {
+        try {
+          voice.slotLfo.stop(now);
+          voice.slotLfo.disconnect();
+        } catch (e) {}
+      }
+      if (voice.slotLfoGain) {
+        try {
+          voice.slotLfoGain.disconnect();
+        } catch (e) {}
       }
 
       // Cancel scheduled gain ramps and drop to zero over release duration
@@ -7809,6 +7886,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           if (voice.stutterGateNode) { try { voice.stutterGateNode.disconnect(); } catch {} }
           if (voice.stutterPannerNode) { try { voice.stutterPannerNode.disconnect(); } catch {} }
           if (voice.padPannerNode) { try { voice.padPannerNode.disconnect(); } catch {} }
+          if (voice.slotLfo) { try { voice.slotLfo.stop(); } catch {} }
+          if (voice.slotLfo) { try { voice.slotLfo.disconnect(); } catch {} }
+          if (voice.slotLfoGain) { try { voice.slotLfoGain.disconnect(); } catch {} }
         } catch {}
       }, (releaseTime + 0.1) * 1000);
     } catch (err) {
@@ -8372,7 +8452,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       oscBVol: deck === 'B' ? currentParams.oscBVol : 0,
       perfPadPan: slot ? (slot.pan !== undefined ? slot.pan : 0) : 0,
       perfPadFxType: slot ? (slot.fxType || 'None') : 'None',
-      perfPadFxSend: slot ? (slot.fxSend !== undefined ? slot.fxSend : 0) : 0
+      perfPadFxSend: slot ? (slot.fxSend !== undefined ? slot.fxSend : 0) : 0,
+      perfPadAttack: slot ? (slot.attack !== undefined ? slot.attack : 0.01) : 0.01,
+      perfPadDecay: slot ? (slot.decay !== undefined ? slot.decay : 0.3) : 0.3,
+      perfPadLfoTarget: slot ? (slot.lfoTarget || 'None') : 'None',
+      perfPadLfoRate: slot ? (slot.lfoRate !== undefined ? slot.lfoRate : 3.0) : 3.0,
+      perfPadLfoDepth: slot ? (slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0) : 0.0
     });
 
     // Flux mode logic: calculate fluxOffset
@@ -16225,6 +16310,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const pan = slot.pan !== undefined ? slot.pan : 0.0;
         const routeToXyPad = slot.routeToXyPad !== false;
         const tuning = slot.tuning !== undefined ? slot.tuning : 0;
+        const attack = slot.attack !== undefined ? slot.attack : 0.01;
+        const decay = slot.decay !== undefined ? slot.decay : 0.3;
+        const lfoTarget = slot.lfoTarget || 'None';
+        const lfoRate = slot.lfoRate !== undefined ? slot.lfoRate : 3.0;
+        const lfoDepth = slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0;
 
         const updateSlotParam = (key, value) => {
           // Mutate in-place on ref —  audio engine sees it immediately
@@ -16333,7 +16423,89 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 <div className="popover-reset-hint">Double-click slider to reset to 0</div>
               </div>
 
-              <div className="popover-field" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', padding: '0 4px' }}>
+              <div className="popover-field">
+                <label>Attack ({Math.round(attack * 1000)}ms)</label>
+                <div className="popover-slider-row">
+                  <input 
+                    type="range"
+                    min="0.0"
+                    max="2.0"
+                    step="0.01"
+                    value={attack}
+                    onChange={(e) => updateSlotParam('attack', parseFloat(e.target.value))}
+                    onDoubleClick={() => updateSlotParam('attack', 0.01)}
+                  />
+                  <span className="popover-val-span">{Math.round(attack * 1000)}ms</span>
+                </div>
+              </div>
+
+              <div className="popover-field">
+                <label>Decay / Release ({decay.toFixed(2)}s)</label>
+                <div className="popover-slider-row">
+                  <input 
+                    type="range"
+                    min="0.01"
+                    max="10.0"
+                    step="0.05"
+                    value={decay}
+                    onChange={(e) => updateSlotParam('decay', parseFloat(e.target.value))}
+                    onDoubleClick={() => updateSlotParam('decay', 0.3)}
+                  />
+                  <span className="popover-val-span">{decay.toFixed(2)}s</span>
+                </div>
+              </div>
+
+              <div className="popover-field" style={{ borderTop: '1px solid rgba(0, 243, 255, 0.15)', paddingTop: '6px', marginTop: '6px' }}>
+                <label>LFO Modulation Target</label>
+                <select 
+                  className="popover-select"
+                  value={lfoTarget}
+                  onChange={(e) => updateSlotParam('lfoTarget', e.target.value)}
+                >
+                  <option value="None">None</option>
+                  <option value="Pan">Stereo Pan</option>
+                  <option value="Filter Cutoff">Filter Cutoff</option>
+                  <option value="FX Send">FX Send Level</option>
+                </select>
+              </div>
+
+              {lfoTarget !== 'None' && (
+                <>
+                  <div className="popover-field">
+                    <label>LFO Rate ({lfoRate.toFixed(1)} Hz)</label>
+                    <div className="popover-slider-row">
+                      <input 
+                        type="range"
+                        min="0.1"
+                        max="20.0"
+                        step="0.1"
+                        value={lfoRate}
+                        onChange={(e) => updateSlotParam('lfoRate', parseFloat(e.target.value))}
+                        onDoubleClick={() => updateSlotParam('lfoRate', 3.0)}
+                      />
+                      <span className="popover-val-span">{lfoRate.toFixed(1)}Hz</span>
+                    </div>
+                  </div>
+
+                  <div className="popover-field">
+                    <label>LFO Depth ({Math.round(lfoDepth * 100)}%)</label>
+                    <div className="popover-slider-row">
+                      <input 
+                        type="range"
+                        min="0.0"
+                        max="1.0"
+                        step="0.01"
+                        value={lfoDepth}
+                        onChange={(e) => updateSlotParam('lfoDepth', parseFloat(e.target.value))}
+                        onDoubleClick={() => updateSlotParam('lfoDepth', 0.2)}
+                      />
+                      <span className="popover-val-span">{Math.round(lfoDepth * 100)}%</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="popover-field" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', padding: '0 4px', borderTop: '1px solid rgba(0, 243, 255, 0.15)', paddingTop: '6px' }}>
                 <label style={{ margin: 0, fontSize: '0.48rem', letterSpacing: '0.5px' }}>ROUTE TO DELTA XY</label>
                 <input 
                   type="checkbox"
