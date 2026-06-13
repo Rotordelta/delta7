@@ -15,6 +15,20 @@ const SAB_QUEUE_START = 10;
 const SAB_EVENT_STRIDE = 8;
 const SAB_QUEUE_LIMIT = 30;
 
+const resolveGridToBeats = (grid) => {
+  if (!grid || grid === 'None') return 0.0;
+  if (grid === '1/128') return 0.03125;
+  if (grid === '1/64') return 0.0625;
+  if (grid === '1/32') return 0.125;
+  if (grid === '1/16') return 0.25;
+  if (grid === '1/8') return 0.5;
+  if (grid === '1/4' || grid === '1') return 1.0;
+  if (grid === '1/2' || grid === '2') return 2.0;
+  if (grid === 'Bar' || grid === '4') return 4.0;
+  if (typeof grid === 'number') return grid;
+  return 0.0;
+};
+
 // ==========================================
 // 1. FACTORY PRESETS & WAVEFORMS
 // ==========================================
@@ -1006,6 +1020,71 @@ export default function Delta7Synth() {
   useEffect(() => { perfQuantizeModeRef.current = perfQuantizeMode; }, [perfQuantizeMode]);
   useEffect(() => { perfTimeSignatureRef.current = perfTimeSignature; }, [perfTimeSignature]);
 
+  // --- Central Event Bus ---
+  const eventBusRef = useRef({
+    listeners: {},
+    on(event, cb) {
+      if (!this.listeners[event]) this.listeners[event] = [];
+      this.listeners[event].push(cb);
+    },
+    off(event, cb) {
+      if (!this.listeners[event]) return;
+      this.listeners[event] = this.listeners[event].filter(x => x !== cb);
+    },
+    emit(event, data) {
+      if (!this.listeners[event]) return;
+      this.listeners[event].forEach(cb => cb(data));
+    }
+  });
+
+  // --- Macro State with localStorage persistence ---
+  const [macros, setMacros] = useState(() => {
+    try {
+      const saved = localStorage.getItem('delta7_macros');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn("Failed to load macros from localStorage", e);
+    }
+    return [
+      { id: 'm1', name: 'Macro 1', activePads: {} },
+      { id: 'm2', name: 'Macro 2', activePads: {} },
+      { id: 'm3', name: 'Macro 3', activePads: {} },
+      { id: 'm4', name: 'Macro 4', activePads: {} }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('delta7_macros', JSON.stringify(macros));
+  }, [macros]);
+
+  const [macroAssignMode, setMacroAssignMode] = useState(null);
+
+  // --- Dynamic Visual Pulse Refs for Platter Rings & Highway Targets ---
+  const ringPulsesRefA = useRef(new Float32Array(8).fill(1.0));
+  const ringPulsesRefB = useRef(new Float32Array(8).fill(1.0));
+  const targetPulsesRefA = useRef(new Float32Array(8).fill(1.0));
+  const targetPulsesRefB = useRef(new Float32Array(8).fill(1.0));
+
+  // --- Event Bus Voice Start subscription to trigger the visual pulses ---
+  useEffect(() => {
+    const bus = eventBusRef.current;
+    const handleVoiceStart = ({ deck, index }) => {
+      const pi = parseInt(index, 10);
+      if (isNaN(pi) || pi < 0 || pi >= 8) return;
+      if (deck === 'A') {
+        ringPulsesRefA.current[pi] = 1.35;
+        targetPulsesRefA.current[pi] = 1.5;
+      } else {
+        ringPulsesRefB.current[pi] = 1.35;
+        targetPulsesRefB.current[pi] = 1.5;
+      }
+    };
+    bus.on('voice-start', handleVoiceStart);
+    return () => {
+      bus.off('voice-start', handleVoiceStart);
+    };
+  }, []);
+
   const [liveRecBeats, setLiveRecBeats] = useState(8);
   const liveRecBeatsRef = useRef(8);
   useEffect(() => { liveRecBeatsRef.current = liveRecBeats; }, [liveRecBeats]);
@@ -1395,6 +1474,12 @@ export default function Delta7Synth() {
 
         // Mutate concentric playhead rings and satellite dots directly in the DOM
         for (let i = 0; i < 8; i++) {
+          // Decay pulses
+          ringPulsesRefA.current[i] = 1.0 + (ringPulsesRefA.current[i] - 1.0) * 0.90;
+          ringPulsesRefB.current[i] = 1.0 + (ringPulsesRefB.current[i] - 1.0) * 0.90;
+          targetPulsesRefA.current[i] = 1.0 + (targetPulsesRefA.current[i] - 1.0) * 0.88;
+          targetPulsesRefB.current[i] = 1.0 + (targetPulsesRefB.current[i] - 1.0) * 0.88;
+
           const angleA = getRingAngle('A', i);
           const voiceKeyA = `perf-a-slot-${i}`;
           const voicesA = activeVoicesRef.current.get(voiceKeyA);
@@ -1404,11 +1489,16 @@ export default function Delta7Synth() {
           const dotA = ringDotsRefA.current[i];
           
           if (trackA) {
-            trackA.style.transform = `translate3d(0, 0, 0) rotate(${angleA}deg)`;
+            trackA.style.transform = `translate3d(0, 0, 0) rotate(${angleA}deg) scale(${ringPulsesRefA.current[i]})`;
             trackA.style.opacity = isActiveA ? '0.9' : '0.18';
           }
           if (dotA) {
             dotA.style.opacity = isActiveA ? '1' : '0';
+          }
+
+          const targetCircleA = targetCirclesRefsA.current[i];
+          if (targetCircleA) {
+            targetCircleA.style.transform = `scale(${targetPulsesRefA.current[i]})`;
           }
 
           const angleB = getRingAngle('B', i);
@@ -1420,11 +1510,16 @@ export default function Delta7Synth() {
           const dotB = ringDotsRefB.current[i];
           
           if (trackB) {
-            trackB.style.transform = `translate3d(0, 0, 0) rotate(${angleB}deg)`;
+            trackB.style.transform = `translate3d(0, 0, 0) rotate(${angleB}deg) scale(${ringPulsesRefB.current[i]})`;
             trackB.style.opacity = isActiveB ? '0.9' : '0.18';
           }
           if (dotB) {
             dotB.style.opacity = isActiveB ? '1' : '0';
+          }
+
+          const targetCircleB = targetCirclesRefsB.current[i];
+          if (targetCircleB) {
+            targetCircleB.style.transform = `scale(${targetPulsesRefB.current[i]})`;
           }
         }
       }
@@ -4680,9 +4775,41 @@ export default function Delta7Synth() {
         handleLiveTrigger(msg) {
           const now = currentTime;
           const beatDuration = 60 / this.bpm;
-          const quantGrid = msg.forceQuantizeGrid || (msg.isNoteOn && this.perfRecordActive ? this.quantizeMode : 'None');
+          
+          let forceGrid = msg.forceQuantizeGrid;
+          if (typeof forceGrid === 'string') {
+            if (forceGrid === 'None') forceGrid = 0.0;
+            else if (forceGrid === '1/128') forceGrid = 0.03125;
+            else if (forceGrid === '1/64') forceGrid = 0.0625;
+            else if (forceGrid === '1/32') forceGrid = 0.125;
+            else if (forceGrid === '1/16') forceGrid = 0.25;
+            else if (forceGrid === '1/8') forceGrid = 0.5;
+            else if (forceGrid === '1/4' || forceGrid === '1') forceGrid = 1.0;
+            else if (forceGrid === '1/2' || forceGrid === '2') forceGrid = 2.0;
+            else if (forceGrid === 'Bar' || forceGrid === '4') forceGrid = 4.0;
+            else forceGrid = 0.0;
+          }
+          
+          let gridSize = 0.0;
+          if (typeof forceGrid === 'number' && forceGrid > 0) {
+            gridSize = forceGrid;
+          } else if (forceGrid === 0.0) {
+            gridSize = 0.0;
+          } else {
+            const mode = this.quantizeMode;
+            if (mode === '1/128') gridSize = 0.03125;
+            else if (mode === '1/64') gridSize = 0.0625;
+            else if (mode === '1/32') gridSize = 0.125;
+            else if (mode === '1/16') gridSize = 0.25;
+            else if (mode === '1/8') gridSize = 0.5;
+            else if (mode === '1/4' || mode === '1') gridSize = 1.0;
+            else if (mode === '1/2' || mode === '2') gridSize = 2.0;
+            else if (mode === 'Bar' || mode === '4') gridSize = 4.0;
+            else gridSize = 0.0;
+          }
+          
           const isTimelineRunning = this.playbackActive || this.perfRecordActive || this.metronomePlaying;
-          const shouldQuantize = quantGrid !== 'None' && isTimelineRunning && this.perfStartTime > 0;
+          const shouldQuantize = gridSize > 0.0 && isTimelineRunning && this.perfStartTime > 0;
           
           let targetTime = now;
           let targetBeat = 0;
@@ -4694,18 +4821,6 @@ export default function Delta7Synth() {
           if (shouldQuantize) {
             const elapsed = Math.max(0.0, now - this.perfStartTime);
             const currentBeat = elapsed / beatDuration;
-            
-            let gridSize = 1.0;
-            const mode = msg.forceQuantizeGrid || this.quantizeMode;
-            if (mode === '1/128') gridSize = 0.03125;
-            else if (mode === '1/64') gridSize = 0.0625;
-            else if (mode === '1/32') gridSize = 0.125;
-            else if (mode === '1/16') gridSize = 0.25;
-            else if (mode === '1/8') gridSize = 0.5;
-            else if (mode === '1/4') gridSize = 1.0;
-            else if (mode === '1/2') gridSize = 2.0;
-            else if (mode === 'Bar') gridSize = 4.0;
-            
             const nextGridBeat = Math.ceil(currentBeat / gridSize) * gridSize;
             targetBeat = nextGridBeat;
             targetTime = this.perfStartTime + nextGridBeat * beatDuration;
@@ -4776,15 +4891,7 @@ export default function Delta7Synth() {
               const note = noteVal === -1.0 ? 'slot' : noteVal;
               const gridVal = arr[offset + 6];
               
-              let forceQuantizeGrid = 'None';
-              if (gridVal === 1.0) forceQuantizeGrid = '1/128';
-              else if (gridVal === 2.0) forceQuantizeGrid = '1/64';
-              else if (gridVal === 3.0) forceQuantizeGrid = '1/32';
-              else if (gridVal === 4.0) forceQuantizeGrid = '1/16';
-              else if (gridVal === 5.0) forceQuantizeGrid = '1/8';
-              else if (gridVal === 6.0) forceQuantizeGrid = '1/4';
-              else if (gridVal === 7.0) forceQuantizeGrid = '1/2';
-              else if (gridVal === 8.0) forceQuantizeGrid = 'Bar';
+              const forceQuantizeGrid = gridVal;
               
               const fakeMsg = {
                 deck,
@@ -7656,6 +7763,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (voices) {
       voices.forEach(releaseVoice);
       activeVoicesRef.current.delete(voiceKey);
+      
+      const parts = voiceKey.split('-');
+      if (parts.length >= 4) {
+        eventBusRef.current.emit('voice-stop', {
+          deck: parts[1].toUpperCase(),
+          type: parts[2],
+          index: parseInt(parts[3], 10),
+          voiceKey
+        });
+      }
     }
   };
 
@@ -7676,7 +7793,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (e) e.stopPropagation();
     const slot = sampleSlotsRef.current.find(s => s.id === slotId);
     if (!slot) return;
-    const modes = ['hold', 'latch', 'free', 'flux'];
+    const modes = ['hold', 'latch', 'free', 'flux', 'queue'];
     const currentMode = slot.triggerMode || 'hold';
     const nextIdx = (modes.indexOf(currentMode) + 1) % modes.length;
     const nextMode = modes[nextIdx];
@@ -7734,14 +7851,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   const dispatchLiveTrigger = (deck, type, index, velocity, isNoteOn, shouldRecord, forceQuantizeGrid) => {
     if (sharedIntRef.current && schedulerNodeRef.current) {
       let gridVal = 0.0;
-      if (forceQuantizeGrid === '1/128') gridVal = 1.0;
-      else if (forceQuantizeGrid === '1/64') gridVal = 2.0;
-      else if (forceQuantizeGrid === '1/32') gridVal = 3.0;
-      else if (forceQuantizeGrid === '1/16') gridVal = 4.0;
-      else if (forceQuantizeGrid === '1/8') gridVal = 5.0;
-      else if (forceQuantizeGrid === '1/4') gridVal = 6.0;
-      else if (forceQuantizeGrid === '1/2') gridVal = 7.0;
-      else if (forceQuantizeGrid === 'Bar') gridVal = 8.0;
+      if (typeof forceQuantizeGrid === 'number') {
+        gridVal = forceQuantizeGrid;
+      } else {
+        gridVal = resolveGridToBeats(forceQuantizeGrid);
+      }
       
       const success = writeEventToSab(deck, index, velocity, isNoteOn, shouldRecord, type, gridVal);
       if (success) return;
@@ -7794,6 +7908,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') ctx.resume();
 
+    // 0. Macro Assignment Mode Check
+    if (macroAssignMode) {
+      if (!isNoteOn) return; // ignore releases for macro mapping
+      const padKey = `${deck}-${type}-${index}`;
+      setMacros(prev => prev.map(m => {
+        if (m.id === macroAssignMode) {
+          const nextPads = { ...m.activePads };
+          if (nextPads[padKey]) {
+            delete nextPads[padKey];
+          } else {
+            nextPads[padKey] = true;
+          }
+          return { ...m, activePads: nextPads };
+        }
+        return m;
+      }));
+      showEditorStatus(`Toggled pad ${deck}${index + 1} in Macro ${macroAssignMode.toUpperCase()} mapping`);
+      return;
+    }
+
     const currentParams = paramsRef.current;
     let slotId = '';
     if (type === 'slot') {
@@ -7822,6 +7956,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       }
       
       dispatchLiveTrigger(deck, type, index, velocity, true, shouldRecord, isAlreadyActive ? 'None' : quantGrid);
+      return;
+    }
+
+    // 1.5 Queue Mode Routing
+    if (triggerMode === 'queue') {
+      if (!isNoteOn) return; // ignore release completely
+      const padKey = `${deck}-${type}-${index}`;
+      const isAlreadyActive = activePerfPadsRef.current[padKey] || activePerfPadsRef.current[`${padKey}-pending`];
+      
+      // Get slot local loopbeats (defaulting to 4.0 beats if not warped or empty slot)
+      const loopBeats = slot && slot.warpBeats ? slot.warpBeats : 4.0;
+      
+      // Auto-start playback if not already active to scroll highways and align start
+      if (!isAlreadyActive && !perfPlaybackActiveRef.current) {
+        startPlaybackAutomatically();
+      }
+      
+      setPerfPad(`${padKey}-pending`, true);
+      
+      dispatchLiveTrigger(deck, type, index, velocity, !isAlreadyActive, shouldRecord, loopBeats);
       return;
     }
 
@@ -7940,6 +8094,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (!isNoteOn) {
       if (triggerMode === 'latch') {
         // Latch mode ignores key release
+        return;
+      }
+
+      if (triggerMode === 'queue') {
+        // Queue mode quantized stop
+        stopPerfVoice(voiceKey);
+        setPerfPad(padKey, false);
+        setPerfPad(`${padKey}-pending`, false);
+        if (shouldRecord && perfRecordActiveRef.current) {
+          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false });
+          setPerfEvents([...perfEventsRef.current]);
+        }
         return;
       }
 
@@ -8151,6 +8317,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       activeVoicesRef.current.set(voiceKey, [voice]);
       setPerfPad(padKey, true);
       setPerfPad(`${padKey}-pending`, false);
+      eventBusRef.current.emit('voice-start', { deck, type, index, voiceKey, targetTime, targetBeat });
 
       const dur = slot.buffer.duration * (slot.end - slot.start);
 
@@ -10678,6 +10845,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 const pan = slot?.pan !== undefined ? slot.pan : 0.0;
 
                 const ringColor = ringColors[idx];
+                const padKey = `A-slot-${idx}`;
 
                 return (
                   <div
@@ -10689,6 +10857,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     data-active="false"
                     data-pending="false"
                     data-loaded={isLoaded ? 'true' : 'false'}
+                    data-macro-mapped={macroAssignMode && macros.find(m => m.id === macroAssignMode)?.activePads[padKey] ? 'true' : 'false'}
                     style={{ '--pad-color': ringColor }}
                     title={isLoaded ? `${slot.name} (Right-click to route)` : 'Empty Slot'}
                   >
@@ -11643,6 +11812,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 const pan = slot?.pan !== undefined ? slot.pan : 0.0;
 
                 const ringColor = ringColors[idx];
+                const padKey = `B-slot-${idx}`;
 
                 return (
                   <div
@@ -11654,6 +11824,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     data-active="false"
                     data-pending="false"
                     data-loaded={isLoaded ? 'true' : 'false'}
+                    data-macro-mapped={macroAssignMode && macros.find(m => m.id === macroAssignMode)?.activePads[padKey] ? 'true' : 'false'}
                     style={{ '--pad-color': ringColor }}
                     title={isLoaded ? `${slot.name} (Right-click to route)` : 'Empty Slot'}
                   >
@@ -12223,6 +12394,80 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </button>
 
             </div>
+          </div>
+
+          {/* Macro Group Row */}
+          <div className="macro-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', borderTop: '1px solid rgba(0, 243, 255, 0.15)', paddingTop: '6px' }}>
+            <span style={{ fontSize: '0.48rem', color: '#ffe600', fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: '0.5px' }}>MACRO TRIGGERS:</span>
+            {macros.map((m) => {
+              const isAssigning = macroAssignMode === m.id;
+              const mappedKeys = Object.keys(m.activePads);
+              const hasPads = mappedKeys.length > 0;
+              
+              return (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(0, 0, 0, 0.3)', padding: '2px 4px', borderRadius: '3px', border: isAssigning ? '1px solid #ffaa00' : '1px solid rgba(255, 255, 255, 0.1)' }}>
+                  <button
+                    className="deck-btn-xs"
+                    onClick={() => {
+                      if (!hasPads) {
+                        showEditorStatus(`Macro ${m.name} has no mapped pads. Click MAP to assign some! ⚠️`);
+                        return;
+                      }
+                      mappedKeys.forEach(padKey => {
+                        const parts = padKey.split('-'); // e.g. ['A', 'slot', '0']
+                        if (parts.length === 3) {
+                          const deck = parts[0];
+                          const type = parts[1];
+                          const idx = parseInt(parts[2], 10);
+                          
+                          triggerPerfPadInternal(deck, type, idx, 100, true, true);
+                        }
+                      });
+                      showEditorStatus(`Triggered Macro ${m.name} (${mappedKeys.length} pads) 🚀`);
+                    }}
+                    style={{ 
+                      fontSize: '0.45rem', 
+                      padding: '2px 5px', 
+                      height: '16px', 
+                      background: hasPads ? 'rgba(0, 243, 255, 0.15)' : 'rgba(255,255,255,0.03)', 
+                      color: hasPads ? '#00f3ff' : '#666',
+                      border: hasPads ? '1px solid rgba(0, 243, 255, 0.4)' : '1px solid rgba(255,255,255,0.1)',
+                      cursor: hasPads ? 'pointer' : 'default',
+                      fontWeight: 'bold',
+                      borderRadius: '2px'
+                    }}
+                    title={hasPads ? `Trigger mapped pads: ${mappedKeys.join(', ')}` : "No pads mapped"}
+                  >
+                    {m.name.toUpperCase()}
+                  </button>
+                  
+                  <button
+                    className="deck-btn-xs"
+                    onClick={() => {
+                      setMacroAssignMode(prev => prev === m.id ? null : m.id);
+                    }}
+                    style={{ 
+                      fontSize: '0.4rem', 
+                      padding: '1px 3px', 
+                      height: '14px', 
+                      background: isAssigning ? '#ffaa00' : 'rgba(255,255,255,0.05)', 
+                      color: isAssigning ? '#000' : '#ffaa00',
+                      border: isAssigning ? '1px solid #ffaa00' : '1px solid rgba(255, 170, 0, 0.3)',
+                      borderRadius: '2px',
+                      cursor: 'pointer'
+                    }}
+                    title={isAssigning ? "Stop assigning pads" : `Map pads to ${m.name}`}
+                  >
+                    {isAssigning ? 'DONE' : 'MAP'}
+                  </button>
+                </div>
+              );
+            })}
+            {macroAssignMode && (
+              <span style={{ fontSize: '0.42rem', color: '#ffaa00', fontFamily: 'monospace', marginLeft: '6px', animation: 'pad-pending-pulse 1s infinite' }}>
+                [CLICK PADS TO MAP/UNMAP TO ACTIVE MACRO]
+              </span>
+            )}
           </div>
         </div>
       </div>

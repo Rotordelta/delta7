@@ -2095,6 +2095,16 @@
   color: #ff0080;
   box-shadow: 0 0 4px #ff0080;
 }
+.perf-pad-trigger-mode-badge[data-mode="queue"] {
+  background: rgba(255, 170, 0, 0.2);
+  border-color: #ffaa00;
+  color: #ffaa00;
+  box-shadow: 0 0 4px #ffaa00;
+}
+.perf-pad[data-macro-mapped="true"] {
+  outline: 2px dashed #ffaa00 !important;
+  outline-offset: -2px !important;
+}
 
 /* FX badge â€” uses --pad-color for dynamic tinting */
 .pad-badge-fx[data-has-color="true"] {
