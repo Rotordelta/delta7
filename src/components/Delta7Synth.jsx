@@ -8487,9 +8487,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const rootNote = slot.rootNote || 60;
     const triggerNote = type === 'slot' ? rootNote : rootNote + index;
 
-    // Use double mode but mute opposite channel to mix separately
-    // Zero-waste: reuse staging object instead of spread-allocating per trigger
-    const tempProg = Object.assign(perfTempProgRef.current, currentParams, {
+    const tempProg = {
+      ...currentParams,
       oscMode: 'double',
       oscAWave: deck === 'A' ? slotId : currentParams.oscAWave,
       oscBWave: deck === 'B' ? slotId : currentParams.oscBWave,
@@ -8505,7 +8504,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       perfPadLfoTarget: slot ? (slot.lfoTarget || 'None') : 'None',
       perfPadLfoRate: slot ? (slot.lfoRate !== undefined ? slot.lfoRate : 3.0) : 3.0,
       perfPadLfoDepth: slot ? (slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0) : 0.0
-    });
+    };
 
     // Flux mode logic: calculate fluxOffset
     if (triggerMode === 'flux') {
@@ -8628,32 +8627,23 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       });
     }
 
-    if (isDub) {
-      // Start playing back existing events immediately during overdub
-      setPerfPlaybackActive(true);
-      perfPlaybackActiveRef.current = true;
-      perfPlayStartTimeRef.current = startTime;
-      seqStartBeatOffsetRef.current = 0.0;
-      syncSabPlaybackState(true, startTime, 0.0, bpm);
+    // Start transport playback for metronome/scrolling/recording ticks
+    setPerfPlaybackActive(true);
+    perfPlaybackActiveRef.current = true;
+    perfPlayStartTimeRef.current = startTime;
+    seqStartBeatOffsetRef.current = 0.0;
+    syncSabPlaybackState(true, startTime, 0.0, bpm);
 
-      if (schedulerNodeRef.current) {
-        schedulerNodeRef.current.port.postMessage({
-          type: 'START_PLAYBACK',
-          startTime: startTime,
-          startBeatOffset: 0.0,
-          sortedEvents: sortedPerfEventsRef.current
-        });
-      }
-      showEditorStatus("Armed Trigger! Overdubbing Performance... 🎙️");
-    } else {
-      setPerfPlaybackActive(false);
-      perfPlaybackActiveRef.current = false;
-      syncSabPlaybackState(false, 0, 0, bpm);
-      if (schedulerNodeRef.current) {
-        schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
-      }
-      showEditorStatus("Armed Trigger! Recording Performance (Clean)... ⏺️");
+    if (schedulerNodeRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'START_PLAYBACK',
+        startTime: startTime,
+        startBeatOffset: 0.0,
+        sortedEvents: sortedPerfEventsRef.current
+      });
     }
+
+    showEditorStatus(isDub ? "Armed Trigger! Overdubbing Performance... 🎙️" : "Armed Trigger! Recording Performance (Clean)... ⏺️");
 
     // Automatically trigger metronome if enabled
     if (metronomeOn) {
