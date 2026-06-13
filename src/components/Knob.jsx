@@ -14,6 +14,7 @@ export default function Knob({
   displayFormat = (val) => val,
   glowColor = 'cyan', // 'cyan', 'pink', 'magenta', 'yellow', 'green'
   size = 50,
+  paramKey = null,
 }) {
   const knobRef = useRef(null);
   const dragStartRef = useRef({ y: 0, val: 0 });
@@ -98,8 +99,9 @@ export default function Knob({
   };
 
   // MIDI CC badges helper
-  const isLearning = midiLearnParam === label;
-  const cc = midiMappings[label];
+  const lookupKey = paramKey || label;
+  const isLearning = midiLearnParam === lookupKey;
+  const cc = midiMappings[lookupKey];
 
   return (
     <div className="knob-container" style={{ width: `${size + 15}px` }}>
@@ -110,7 +112,7 @@ export default function Knob({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            setMidiLearnParam(isLearning ? null : label);
+            setMidiLearnParam(isLearning ? null : lookupKey);
           }}
           className={`knob-midi-badge ${isLearning ? 'learning' : (cc !== null && cc !== undefined ? 'mapped' : '')}`}
           title="Map MIDI CC"

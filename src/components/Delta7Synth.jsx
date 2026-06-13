@@ -595,6 +595,7 @@ export default function Delta7Synth() {
   const [realtimeKnobMode, setRealtimeKnobMode] = useState('A'); // 'A' or 'B'
 
   // MIDI Learn State
+  const [midiMenuOpen, setMidiMenuOpen] = useState(false);
   const [midiLearnParam, setMidiLearnParam] = useState(null);
   const [midiMappings, setMidiMappings] = useState(() => {
     try {
@@ -7696,6 +7697,34 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const playVoice = (note, velocity) => {
+    // Intercept MIDI Note learn
+    if (midiLearnParam) {
+      setMidiMappings(prev => {
+        const next = { ...prev, [midiLearnParam]: `N${note}` };
+        localStorage.setItem('delta7_midi_mappings', JSON.stringify(next));
+        return next;
+      });
+      setMidiLearnParam(null);
+      return;
+    }
+
+    // Check if Note maps to performance pads
+    let padTriggered = false;
+    Object.keys(midiMappings).forEach(key => {
+      if (key.startsWith('pad-')) {
+        const val = midiMappings[key];
+        if (val === `N${note}`) {
+          padTriggered = true;
+          const parts = key.split('-');
+          const deck = parts[1].toUpperCase();
+          const index = parseInt(parts[2], 10);
+          triggerPerfPadInternal(deck, 'slot', index, velocity, false);
+        }
+      }
+    });
+
+    if (padTriggered) return;
+
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') ctx.resume();
@@ -7897,6 +7926,25 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const stopVoice = (note) => {
+    // Check if Note maps to performance pads
+    let padReleased = false;
+    Object.keys(midiMappings).forEach(key => {
+      if (key.startsWith('pad-')) {
+        const val = midiMappings[key];
+        if (val === `N${note}`) {
+          padReleased = true;
+          const parts = key.split('-');
+          const deck = parts[1].toLowerCase();
+          const index = parseInt(parts[2], 10);
+          
+          stopPerfVoice(`perf-${deck}-slot-${index}`);
+          stopPerfVoice(`perf-${deck}-slice-${index}`);
+        }
+      }
+    });
+
+    if (padReleased) return;
+
     if (!audioCtxRef.current) return;
 
     if (paramsRef.current.arpOn) {
@@ -10139,7 +10187,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     // 1. Learning system hook
     if (midiLearnParam) {
       setMidiMappings(prev => {
-        const next = { ...prev, [midiLearnParam]: cc };
+        const next = { ...prev, [midiLearnParam]: `C${cc}` };
         localStorage.setItem('delta7_midi_mappings', JSON.stringify(next));
         return next;
       });
@@ -10147,11 +10195,35 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       return;
     }
 
+    // Check pad CC mappings
+    let padHandled = false;
+    Object.keys(midiMappings).forEach(key => {
+      if (key.startsWith('pad-')) {
+        const mapping = midiMappings[key];
+        if (mapping === cc || mapping === `C${cc}`) {
+          padHandled = true;
+          const parts = key.split('-');
+          const deck = parts[1].toUpperCase();
+          const index = parseInt(parts[2], 10);
+          if (val >= 64) {
+            triggerPerfPadInternal(deck, 'slot', index, val, false);
+          } else {
+            const voiceKey = `perf-${deck.toLowerCase()}-slot-${index}`;
+            stopPerfVoice(voiceKey);
+            stopPerfVoice(`perf-${deck.toLowerCase()}-slice-${index}`);
+          }
+        }
+      }
+    });
+
+    if (padHandled) return;
+
     // 2. Control routings mapping
 
     // Check custom mappings
     Object.keys(midiMappings).forEach((paramName) => {
-      if (midiMappings[paramName] === cc) {
+      const mapping = midiMappings[paramName];
+      if (mapping === cc || mapping === `C${cc}`) {
         const now = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
         if (paramName === 'cutoff') {
           const cutVal = Math.round(valNormalized * 19980 + 20);
@@ -10239,6 +10311,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           }
         } else if (paramName === 'ifxMix') {
           setParams(prev => ({ ...prev, ifx1Mix: valNormalized, ifx2Mix: valNormalized }));
+        } else if (paramName === 'tempo') {
+          setParams(prev => ({ ...prev, arpBpm: Math.round(valNormalized * 210 + 40) }));
+        } else if (paramName === 'reverbMix') {
+          setParams(prev => ({ ...prev, reverbMix: valNormalized * 0.8 }));
+        } else if (paramName === 'reverbDecay') {
+          setParams(prev => ({ ...prev, reverbDecay: valNormalized * 7.9 + 0.1 }));
+        } else if (paramName === 'reverbPreDelay') {
+          setParams(prev => ({ ...prev, reverbPreDelay: valNormalized * 0.2 }));
         }
       }
     });
@@ -12038,7 +12118,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 fontFamily: 'monospace', letterSpacing: '1px', lineHeight: 1
               }}>Master Vol</span>
               <Knob
-                label=""
+                label="Master"
                 value={params.masterVolume}
                 min={0} max={100} step={1} defaultValue={80}
                 onChange={(v) => {
@@ -12047,6 +12127,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     masterGainRef.current.gain.setTargetAtTime(v / 100 * 0.5, audioCtxRef.current?.currentTime || 0, 0.02);
                   }
                 }}
+                midiLearnParam={midiLearnParam}
+                midiMappings={midiMappings}
+                setMidiLearnParam={setMidiLearnParam}
+                paramKey="masterVolume"
                 displayFormat={(v) => `${Math.round(v)}`}
                 glowColor="white"
                 size={32}
@@ -12081,6 +12165,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 value={params.arpBpm || 120}
                 min={40} max={250} step={0.1} defaultValue={120}
                 onChange={(v) => setParams(prev => ({ ...prev, arpBpm: v }))}
+                midiLearnParam={midiLearnParam}
+                midiMappings={midiMappings}
+                setMidiLearnParam={setMidiLearnParam}
+                paramKey="tempo"
                 displayFormat={(v) => `${v.toFixed(1)}`}
                 glowColor="yellow"
                 size={26}
@@ -13203,7 +13291,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       <div className="rack-header-bar">
         <div className="branding-title">delta7</div>
         <div className="branding-sub">HYPER INTEGRATED SYNTHESIS WORKSTATION</div>
-        <div className="ui-resize-slider-wrap" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.62rem', color: '#ff00ff', marginLeft: 'auto', marginRight: '24px' }}>
+        <button 
+          className="btn btn-xs" 
+          onClick={() => setMidiMenuOpen(true)}
+          style={{
+            marginLeft: 'auto',
+            marginRight: '16px',
+            borderColor: '#00f3ff',
+            color: '#00f3ff',
+            fontSize: '0.58rem',
+            padding: '2px 8px',
+            fontWeight: 'bold',
+            letterSpacing: '0.8px',
+            background: 'transparent',
+            boxShadow: '0 0 6px rgba(0, 243, 255, 0.15)',
+            cursor: 'pointer',
+            fontFamily: 'monospace'
+          }}
+        >
+          🎛️ MIDI MAPPINGS
+        </button>
+        <div className="ui-resize-slider-wrap" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.62rem', color: '#ff00ff', marginRight: '24px' }}>
           <span style={{ fontWeight: 'bold', letterSpacing: '0.5px' }}>UI RESIZE:</span>
           <input 
             type="range" min="0.6" max="1.4" step="0.05"
@@ -13314,7 +13422,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setSelectedDelayRatio('Free');
                   setSelectedEchoPresetIdx('');
                 }} 
-                midiLearnParam="spaceEchoTime" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="spaceEchoTime"
                 glowColor="cyan"
                 size={34}
               />
@@ -13326,7 +13434,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, spaceEchoFeedback: v }));
                   setSelectedEchoPresetIdx('');
                 }} 
-                midiLearnParam="spaceEchoFeedback" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="spaceEchoFeedback"
                 glowColor="cyan"
                 size={34}
               />
@@ -13338,7 +13446,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, spaceEchoWow: v }));
                   setSelectedEchoPresetIdx('');
                 }} 
-                midiLearnParam="spaceEchoWow" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="spaceEchoWow"
                 glowColor="cyan"
                 size={34}
               />
@@ -13350,7 +13458,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, spaceEchoSaturation: v }));
                   setSelectedEchoPresetIdx('');
                 }} 
-                midiLearnParam="spaceEchoSaturation" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="spaceEchoSaturation"
                 glowColor="cyan"
                 size={34}
               />
@@ -13362,7 +13470,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, spaceEchoSpring: v }));
                   setSelectedEchoPresetIdx('');
                 }} 
-                midiLearnParam="spaceEchoSpring" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="spaceEchoSpring"
                 glowColor="cyan"
                 size={34}
               />
@@ -13463,7 +13571,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, leslieDrive: v }));
                   setSelectedRotorPresetIdx('');
                 }} 
-                midiLearnParam="leslieDrive" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="leslieDrive"
                 glowColor="magenta"
                 size={34}
               />
@@ -13475,7 +13583,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, leslieWidth: v }));
                   setSelectedRotorPresetIdx('');
                 }} 
-                midiLearnParam="leslieWidth" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="leslieWidth"
                 glowColor="magenta"
                 size={34}
               />
@@ -13487,7 +13595,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, leslieCrossover: v }));
                   setSelectedRotorPresetIdx('');
                 }} 
-                midiLearnParam="leslieCrossover" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="leslieCrossover"
                 glowColor="magenta"
                 size={34}
               />
@@ -13611,7 +13719,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, reverbMix: v }));
                   setSelectedReverbPresetIdx('');
                 }} 
-                midiLearnParam="reverbMix" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="reverbMix"
                 glowColor="magenta"
                 size={34}
               />
@@ -13623,7 +13731,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, reverbDecay: v }));
                   setSelectedReverbPresetIdx('');
                 }} 
-                midiLearnParam="reverbDecay" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="reverbDecay"
                 glowColor="magenta"
                 size={34}
               />
@@ -13635,7 +13743,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setParams(prev => ({ ...prev, reverbPreDelay: v }));
                   setSelectedReverbPresetIdx('');
                 }} 
-                midiLearnParam="reverbPreDelay" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="reverbPreDelay"
                 glowColor="magenta"
                 size={34}
               />
@@ -15553,7 +15661,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               value={params.cutoff} 
               min={20} max={20000} step={10}
               onChange={(v) => setParams(prev => ({ ...prev, cutoff: v }))} 
-              midiLearnParam="cutoff" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="cutoff"
               glowColor="cyan"
               size={32}
             />
@@ -15562,7 +15670,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               value={params.resonance} 
               min={0.1} max={15} step={0.1}
               onChange={(v) => setParams(prev => ({ ...prev, resonance: v }))}
-              midiLearnParam="resonance" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="resonance"
               glowColor="magenta"
               size={32}
             />
@@ -15571,7 +15679,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               value={params.filterEnvAmt} 
               min={0} max={4000} step={50}
               onChange={(v) => setParams(prev => ({ ...prev, filterEnvAmt: v }))}
-              midiLearnParam="filterEnvAmt" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="filterEnvAmt"
               glowColor="green"
               size={32}
             />
@@ -15580,7 +15688,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               value={params.vcaEG.releaseTime} 
               min={0.01} max={4.0} step={0.02}
               onChange={(v) => updateEgParam('VCA', 'releaseTime', v)}
-              midiLearnParam="vcaRelease" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="vcaRelease"
               glowColor="yellow"
               size={32}
             />
@@ -15615,7 +15723,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               value={params.oscAVol} 
               min={0} max={1.0} step={0.01}
               onChange={(v) => setParams(prev => ({ ...prev, oscAVol: v }))}
-              midiLearnParam="oscAVol" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="oscAVol"
               glowColor="cyan"
               size={32}
             />
@@ -15624,7 +15732,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               value={params.oscBVol} 
               min={0} max={1.0} step={0.01}
               onChange={(v) => setParams(prev => ({ ...prev, oscBVol: v }))}
-              midiLearnParam="oscBVol" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="oscBVol"
               glowColor="pink"
               size={32}
             />
@@ -15633,7 +15741,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               value={params.lfo1Rate} 
               min={0.1} max={20} step={0.1}
               onChange={(v) => setParams(prev => ({ ...prev, lfo1Rate: v }))}
-              midiLearnParam="lfo1Rate" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="lfo1Rate"
               glowColor="green"
               size={32}
             />
@@ -15645,7 +15753,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 setParams(prev => ({ ...prev, ifx1Mix: v }));
                 if (ifx1MixRef.current) updateIFXMix(ifx1MixRef.current, v);
               }}
-              midiLearnParam="ifxMix" midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam}
+              midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="ifxMix"
               glowColor="magenta"
               size={32}
             />
@@ -16248,7 +16356,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     >
                       <span style={{ color: '#fff', fontSize: '0.44rem' }}>{item.name}</span>
                       <span style={{ color: isLearning ? '#ff0055' : ccVal !== undefined ? '#00f3ff' : '#888', fontSize: '0.4rem', fontWeight: 'bold' }}>
-                        {isLearning ? 'LEARN' : ccVal !== undefined ? `CC ${ccVal}` : '---'}
+                        {isLearning ? 'LEARN' : ccVal !== undefined ? (String(ccVal).startsWith('N') ? `N ${String(ccVal).substring(1)}` : String(ccVal).startsWith('C') ? `CC ${String(ccVal).substring(1)}` : `CC ${ccVal}`) : '---'}
                       </span>
                     </button>
                   );
@@ -16525,12 +16633,332 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         );
       })()}
 
+      {midiMenuOpen && (
+        <MidiMappingMenu 
+          midiMappings={midiMappings}
+          setMidiMappings={setMidiMappings}
+          midiLearnParam={midiLearnParam}
+          setMidiLearnParam={setMidiLearnParam}
+          onClose={() => setMidiMenuOpen(false)}
+        />
+      )}
+
     </div>
   );
 }
 
 // ==========================================
-// 10. COMPUTER KEYBOARD TRIGGER LISTENER
+// 10. MIDI MAPPING MENU COMPONENT
+// ==========================================
+function MidiMappingMenu({
+  midiMappings,
+  setMidiMappings,
+  midiLearnParam,
+  setMidiLearnParam,
+  onClose
+}) {
+  const groups = [
+    {
+      title: "Synthesizer Controls",
+      items: [
+        { key: "cutoff", name: "Filter Cutoff" },
+        { key: "resonance", name: "Filter Resonance" },
+        { key: "oscAVol", name: "Oscillator A Volume" },
+        { key: "oscBVol", name: "Oscillator B Volume" },
+        { key: "eqLow", name: "Deck EQ Low" },
+        { key: "eqMid", name: "Deck EQ Mid" },
+        { key: "eqHigh", name: "Deck EQ High" },
+        { key: "masterVolume", name: "Master Volume" },
+        { key: "ifxMix", name: "Insert FX Mix" },
+        { key: "lfo1Rate", name: "LFO 1 Rate" },
+        { key: "filterEnvAmt", name: "Filter EG Amount" },
+        { key: "vcaRelease", name: "VCA Release Time" },
+        { key: "kaossX", name: "Kaoss Pad X Axis" },
+        { key: "kaossY", name: "Kaoss Pad Y Axis" },
+        { key: "tempo", name: "Tempo BPM" }
+      ]
+    },
+    {
+      title: "Master FX (Echo / Leslie / Reverb)",
+      items: [
+        { key: "spaceEchoTime", name: "Space Echo Time" },
+        { key: "spaceEchoFeedback", name: "Space Echo Feedback" },
+        { key: "spaceEchoWow", name: "Space Echo Wow/Flutter" },
+        { key: "spaceEchoSaturation", name: "Space Echo Saturation" },
+        { key: "spaceEchoSpring", name: "Space Echo Spring Reverb" },
+        { key: "leslieDrive", name: "Rotor Cabinet Drive" },
+        { key: "leslieWidth", name: "Rotor Cabinet Width" },
+        { key: "leslieCrossover", name: "Rotor Cabinet Crossover" },
+        { key: "reverbMix", name: "Reverb Mix" },
+        { key: "reverbDecay", name: "Reverb Decay" },
+        { key: "reverbPreDelay", name: "Reverb Pre-Delay" }
+      ]
+    },
+    {
+      title: "Deck A Performance Pads",
+      items: Array.from({ length: 16 }, (_, i) => ({ key: `pad-a-${i}`, name: `Deck A Pad ${i + 1}` }))
+    },
+    {
+      title: "Deck B Performance Pads",
+      items: Array.from({ length: 16 }, (_, i) => ({ key: `pad-b-${i}`, name: `Deck B Pad ${i + 1}` }))
+    }
+  ];
+
+  const handleClear = (key) => {
+    setMidiMappings(prev => {
+      const next = { ...prev };
+      delete next[key];
+      localStorage.setItem('delta7_midi_mappings', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm("Are you sure you want to clear all MIDI mappings?")) {
+      setMidiMappings({});
+      localStorage.removeItem('delta7_midi_mappings');
+    }
+  };
+
+  const handleResetDefaults = () => {
+    const factory = {
+      cutoff: 74,
+      resonance: 71,
+      oscAVol: 7,
+      oscBVol: 8,
+      eqLow: 75,
+      eqMid: 76,
+      eqHigh: 77,
+      masterVolume: 72,
+      kaossX: 12,
+      kaossY: 13
+    };
+    setMidiMappings(factory);
+    localStorage.setItem('delta7_midi_mappings', JSON.stringify(factory));
+  };
+
+  const formatMapping = (val) => {
+    if (val === undefined || val === null) return "---";
+    const strVal = String(val);
+    if (strVal.startsWith("N")) {
+      return `NOTE ${strVal.substring(1)}`;
+    }
+    if (strVal.startsWith("C")) {
+      return `CC ${strVal.substring(1)}`;
+    }
+    return `CC ${strVal}`;
+  };
+
+  return (
+    <div className="midi-modal-overlay" onClick={onClose}>
+      <div className="midi-modal-window" onClick={(e) => e.stopPropagation()}>
+        <div className="midi-modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '1rem' }}>🎛️</span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#00f3ff', letterSpacing: '1px' }}>MIDI CONTROL CENTER</div>
+              <div style={{ fontSize: '0.55rem', color: '#888', textTransform: 'uppercase' }}>Assign external MIDI controllers to delta7 parameters</div>
+            </div>
+          </div>
+          <button className="midi-modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="midi-modal-actions">
+          <button className="btn btn-sm" onClick={handleResetDefaults} style={{ borderColor: 'rgba(0, 243, 255, 0.4)', color: '#00f3ff', fontSize: '0.55rem', padding: '2px 8px' }}>RESET DEFAULTS</button>
+          <button className="btn btn-sm btn-panic" onClick={handleClearAll} style={{ padding: '2px 8px', fontSize: '0.55rem' }}>CLEAR ALL</button>
+        </div>
+
+        <div className="midi-modal-body">
+          {groups.map((grp, gIdx) => (
+            <div key={gIdx} className="midi-group-section">
+              <div className="midi-group-header">{grp.title}</div>
+              <div className="midi-group-grid">
+                {grp.items.map((item) => {
+                  const mapping = midiMappings[item.key];
+                  const isLearning = midiLearnParam === item.key;
+                  return (
+                    <div key={item.key} className="midi-mapping-row">
+                      <div className="midi-param-name">{item.name}</div>
+                      <div className="midi-mapping-val font-mono">{formatMapping(mapping)}</div>
+                      <div className="midi-row-actions">
+                        <button
+                          className={`btn btn-xs ${isLearning ? 'learning-pulse' : ''}`}
+                          onClick={() => setMidiLearnParam(isLearning ? null : item.key)}
+                          style={{
+                            minWidth: '55px',
+                            background: isLearning ? '#00ff66' : 'transparent',
+                            color: isLearning ? '#000' : '#00f3ff',
+                            borderColor: isLearning ? '#00ff66' : 'rgba(0, 243, 255, 0.3)',
+                            fontWeight: 'bold',
+                            fontSize: '0.52rem',
+                            padding: '1px 4px'
+                          }}
+                        >
+                          {isLearning ? "LRN..." : "LEARN"}
+                        </button>
+                        {mapping !== undefined && (
+                          <button
+                            className="btn btn-xs"
+                            onClick={() => handleClear(item.key)}
+                            style={{
+                              borderColor: 'rgba(255, 0, 85, 0.4)',
+                              color: '#ff0055',
+                              fontSize: '0.52rem',
+                              padding: '1px 4px'
+                            }}
+                          >
+                            CLEAR
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .midi-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          background: rgba(0, 0, 0, 0.85);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 99999;
+          backdrop-filter: blur(4px);
+        }
+        .midi-modal-window {
+          width: 680px;
+          height: 520px;
+          background: #070a0f;
+          border: 1.5px solid #00f3ff;
+          box-shadow: 0 0 20px rgba(0, 243, 255, 0.25);
+          border-radius: 8px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          animation: scale-up-midi 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes scale-up-midi {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        .midi-modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 10px 14px;
+          background: #000;
+          border-bottom: 2px solid #00f3ff;
+        }
+        .midi-modal-close {
+          background: transparent;
+          border: none;
+          color: #c5c6c7;
+          font-size: 0.95rem;
+          cursor: pointer;
+          transition: color 0.15s;
+        }
+        .midi-modal-close:hover {
+          color: #ff0055;
+        }
+        .midi-modal-actions {
+          display: flex;
+          gap: 10px;
+          padding: 8px 14px;
+          background: rgba(0,0,0,0.3);
+          border-bottom: 1px solid rgba(0, 243, 255, 0.15);
+        }
+        .midi-modal-body {
+          flex: 1;
+          overflow-y: auto;
+          padding: 10px 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .midi-modal-body::-webkit-scrollbar {
+          width: 6px;
+        }
+        .midi-modal-body::-webkit-scrollbar-track {
+          background: rgba(0,0,0,0.3);
+        }
+        .midi-modal-body::-webkit-scrollbar-thumb {
+          background: #00f3ff;
+          border-radius: 3px;
+        }
+        .midi-group-section {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .midi-group-header {
+          font-size: 0.65rem;
+          font-weight: bold;
+          color: #ff00ff;
+          letter-spacing: 0.8px;
+          text-transform: uppercase;
+          border-bottom: 1px solid rgba(255, 0, 255, 0.15);
+          padding-bottom: 2px;
+          text-align: left;
+        }
+        .midi-group-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 6px 12px;
+        }
+        .midi-mapping-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(255,255,255,0.05);
+          padding: 3px 6px;
+          border-radius: 4px;
+          height: 28px;
+        }
+        .midi-param-name {
+          font-size: 0.58rem;
+          color: #fff;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 140px;
+          text-align: left;
+        }
+        .midi-mapping-val {
+          font-size: 0.55rem;
+          color: #ffe600;
+          font-weight: bold;
+          text-align: right;
+          flex: 1;
+          margin-right: 12px;
+        }
+        .midi-row-actions {
+          display: flex;
+          gap: 4px;
+        }
+        @keyframes learning-pulse-anim {
+          0% { box-shadow: 0 0 2px #00ff66; opacity: 0.8; }
+          100% { box-shadow: 0 0 8px #00ff66; opacity: 1.0; }
+        }
+        .learning-pulse {
+          animation: learning-pulse-anim 0.6s infinite alternate;
+        }
+      ` }} />
+    </div>
+  );
+}
+
+// ==========================================
+// 11. COMPUTER KEYBOARD TRIGGER LISTENER
 // ==========================================
 
 function KeyboardTrigger({ playVoice, stopVoice }) {
