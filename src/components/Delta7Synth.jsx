@@ -882,6 +882,11 @@ export default function Delta7Synth() {
   const perfCountInRemainingRef = useRef(4);
   const perfCountInIsDubRef = useRef(false);
 
+  const [perfRecordArmed, setPerfRecordArmed] = useState(false);
+  const perfRecordArmedRef = useRef(false);
+  const perfIsDubbingArmedRef = useRef(false);
+  useEffect(() => { perfRecordArmedRef.current = perfRecordArmed; }, [perfRecordArmed]);
+
   useEffect(() => { perfCountInActiveRef.current = perfCountInActive; }, [perfCountInActive]);
   useEffect(() => { perfCountInRemainingRef.current = perfCountInRemaining; }, [perfCountInRemaining]);
   // Zero-waste: activePerfPads is ref-only — no useState re-renders from audio triggers
@@ -8020,6 +8025,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const slot = sampleSlotsRef.current.find(s => s.id === slotId);
     const triggerMode = slot ? (slot.triggerMode || 'hold') : 'hold';
 
+    // Intercept armed record state and start recording immediately on first pad hit
+    if (perfRecordArmedRef.current && isNoteOn) {
+      startRecordingFromArmed();
+      shouldRecord = true;
+    }
+
     // 1. Latch Mode Routing
     if (triggerMode === 'latch') {
       if (!isNoteOn) return; // ignore release completely
@@ -8448,10 +8459,85 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
   };
 
+  const startRecordingFromArmed = () => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+
+    perfRecordArmedRef.current = false;
+    setPerfRecordArmed(false);
+
+    const isDub = perfIsDubbingArmedRef.current;
+    const bpm = paramsRef.current.arpBpm || 120;
+
+    if (!isDub) {
+      // Clean recording: wipe previous events
+      perfEventsRef.current = [];
+      sortedPerfEventsRef.current = [];
+      setPerfEvents([]);
+      seqCurrentBeatRef.current = 0.0;
+      seqStartBeatOffsetRef.current = 0.0;
+    }
+
+    const startTime = ctx.currentTime;
+    perfStartTimeRef.current = startTime;
+    
+    setPerfRecordStartBpm(bpm);
+    setPerfRecordActive(true);
+    setPerfIsDubbing(isDub);
+
+    if (schedulerNodeRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'SET_PARAMS',
+        perfStartTime: startTime,
+        perfRecordActive: true
+      });
+    }
+
+    if (isDub) {
+      // Start playing back existing events immediately during overdub
+      setPerfPlaybackActive(true);
+      perfPlayStartTimeRef.current = startTime;
+      seqStartBeatOffsetRef.current = 0.0;
+      syncSabPlaybackState(true, startTime, 0.0, bpm);
+
+      if (schedulerNodeRef.current) {
+        schedulerNodeRef.current.port.postMessage({
+          type: 'START_PLAYBACK',
+          startTime: startTime,
+          startBeatOffset: 0.0,
+          sortedEvents: sortedPerfEventsRef.current
+        });
+      }
+      showEditorStatus("Armed Trigger! Overdubbing Performance... 🎙️");
+    } else {
+      setPerfPlaybackActive(false);
+      syncSabPlaybackState(false, 0, 0, bpm);
+      if (schedulerNodeRef.current) {
+        schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
+      }
+      showEditorStatus("Armed Trigger! Recording Performance (Clean)... ⏺️");
+    }
+
+    // Automatically trigger metronome if enabled
+    if (metronomeOn) {
+      startMetronome();
+    }
+  };
+
   const togglePerformanceRecord = (isDub = false) => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
     if (!ctx) return;
+
+    // Disarm if currently armed
+    if (perfRecordArmed) {
+      perfRecordArmedRef.current = false;
+      setPerfRecordArmed(false);
+      setPerfIsDubbing(false);
+      showEditorStatus("Recording Disarmed ⏹️");
+      return;
+    }
     
     if (perfRecordActive) {
       // Issue 5: flush ref to state now that recording is done — one single setState call
@@ -8521,6 +8607,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       }
 
       if (perfCountInEnabled) {
+        // Arm recording and wait for first pad trigger instead of counting in
+        perfRecordArmedRef.current = true;
+        setPerfRecordArmed(true);
+        perfIsDubbingArmedRef.current = isDub;
+        setPerfIsDubbing(isDub);
+
         if (!isDub) {
           perfEventsRef.current = [];
           sortedPerfEventsRef.current = [];
@@ -8528,14 +8620,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           seqCurrentBeatRef.current = 0.0;
           seqStartBeatOffsetRef.current = 0.0;
         }
-        perfCountInRemainingRef.current = 4;
-        setPerfCountInRemaining(4);
-        perfCountInIsDubRef.current = isDub;
-        perfCountInActiveRef.current = true;
-        setPerfCountInActive(true);
+
+        // Halts current playheads while armed
+        setPerfPlaybackActive(false);
+        syncSabPlaybackState(false, 0, 0, bpm);
+        if (schedulerNodeRef.current) {
+          schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
+          schedulerNodeRef.current.port.postMessage({ type: 'STOP_METRONOME' });
+        }
         
-        showEditorStatus("Count-in Armed... Get Ready! ⏱️");
-        startMetronome();
+        showEditorStatus("Recording Armed! Press any performance pad or key to start... ⏱️");
         return;
       }
 
@@ -12832,38 +12926,38 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
                 {/* Record */}
                 <button
-                  className={`deck-btn ${perfRecordActive && !perfIsDubbing ? 'active' : ''}`}
+                  className={`deck-btn ${perfRecordActive && !perfIsDubbing || (perfRecordArmed && !perfIsDubbing) ? 'active' : ''} ${perfRecordArmed && !perfIsDubbing ? 'blinking' : ''}`}
                   onClick={() => togglePerformanceRecord(false)}
                   style={{ 
                     height: '18px', 
                     padding: '1px 6px', 
                     fontSize: '0.55rem', 
-                    color: perfRecordActive && !perfIsDubbing ? '#fff' : '#ff3333', 
-                    background: perfRecordActive && !perfIsDubbing ? '#ff3333' : 'rgba(255, 51, 51, 0.05)', 
-                    border: '1px solid rgba(255, 51, 51, 0.3)',
-                    boxShadow: perfRecordActive && !perfIsDubbing ? '0 0 8px #ff3333' : 'none'
+                    color: perfRecordActive && !perfIsDubbing || (perfRecordArmed && !perfIsDubbing) ? '#fff' : '#ff3333', 
+                    background: perfRecordActive && !perfIsDubbing ? '#ff3333' : (perfRecordArmed && !perfIsDubbing) ? 'rgba(255, 51, 51, 0.4)' : 'rgba(255, 51, 51, 0.05)', 
+                    border: `1px solid ${perfRecordArmed && !perfIsDubbing ? '#ff3333' : 'rgba(255, 51, 51, 0.3)'}`,
+                    boxShadow: perfRecordActive && !perfIsDubbing || (perfRecordArmed && !perfIsDubbing) ? '0 0 8px #ff3333' : 'none'
                   }}
-                  title={perfRecordActive && !perfIsDubbing ? "Stop Recording" : "Clean Record (clears sequence)"}
+                  title={perfRecordArmed && !perfIsDubbing ? "Disarm Record" : perfRecordActive && !perfIsDubbing ? "Stop Recording" : "Clean Record (clears sequence)"}
                 >
-                  {perfRecordActive && !perfIsDubbing ? '● REC...' : '● Record'}
+                  {perfRecordActive && !perfIsDubbing ? '● REC...' : perfRecordArmed && !perfIsDubbing ? '● ARMED' : '● Record'}
                 </button>
 
                 {/* Dub */}
                 <button
-                  className={`deck-btn ${perfRecordActive && perfIsDubbing ? 'active' : ''}`}
+                  className={`deck-btn ${perfRecordActive && perfIsDubbing || (perfRecordArmed && perfIsDubbing) ? 'active' : ''} ${perfRecordArmed && perfIsDubbing ? 'blinking' : ''}`}
                   onClick={() => togglePerformanceRecord(true)}
                   style={{ 
                     height: '18px', 
                     padding: '1px 6px', 
                     fontSize: '0.55rem', 
-                    color: perfRecordActive && perfIsDubbing ? '#fff' : '#ff00ff', 
-                    background: perfRecordActive && perfIsDubbing ? '#ff00ff' : 'rgba(255, 0, 255, 0.05)', 
-                    border: '1px solid rgba(255, 0, 255, 0.3)',
-                    boxShadow: perfRecordActive && perfIsDubbing ? '0 0 8px #ff00ff' : 'none'
+                    color: perfRecordActive && perfIsDubbing || (perfRecordArmed && perfIsDubbing) ? '#fff' : '#ff00ff', 
+                    background: perfRecordActive && perfIsDubbing ? '#ff00ff' : (perfRecordArmed && perfIsDubbing) ? 'rgba(255, 0, 255, 0.4)' : 'rgba(255, 0, 255, 0.05)', 
+                    border: `1px solid ${perfRecordArmed && perfIsDubbing ? '#ff00ff' : 'rgba(255, 0, 255, 0.3)'}`,
+                    boxShadow: perfRecordActive && perfIsDubbing || (perfRecordArmed && perfIsDubbing) ? '0 0 8px #ff00ff' : 'none'
                   }}
-                  title={perfRecordActive && perfIsDubbing ? "Stop Dubbing" : "Overdub (layers notes on top)"}
+                  title={perfRecordArmed && perfIsDubbing ? "Disarm Dubbing" : perfRecordActive && perfIsDubbing ? "Stop Dubbing" : "Overdub (layers notes on top)"}
                 >
-                  {perfRecordActive && perfIsDubbing ? '● DUBBING' : '● Dub'}
+                  {perfRecordActive && perfIsDubbing ? '● DUBBING' : perfRecordArmed && perfIsDubbing ? '● ARMED' : '● Dub'}
                 </button>
               </div>
 
@@ -15967,22 +16061,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   <option value="Bar">Bar</option>
                 </select>
 
-                <span className="font-mono" style={{ color: '#ffe600', fontSize: '0.52rem', marginLeft: '4px' }}>COUNT-IN:</span>
+                <span className="font-mono" style={{ color: '#ffe600', fontSize: '0.52rem', marginLeft: '4px' }}>ARM REC:</span>
                 <button
                   className={`segmented-btn btn-xs ${perfCountInEnabled ? 'active' : ''}`}
                   onClick={() => {
                     const nextEnabled = !perfCountInEnabled;
                     setPerfCountInEnabled(nextEnabled);
-                    showEditorStatus(`Record Count-in (1 Bar): ${nextEnabled ? 'ON' : 'OFF'} ⏱️`);
+                    showEditorStatus(`Auto-Record Arming on Pad Trigger: ${nextEnabled ? 'ON' : 'OFF'} ⏱️`);
                   }}
                   style={{ padding: '2px 6px', fontSize: '0.5rem', borderColor: '#ffe600', color: '#ffe600', textShadow: perfCountInEnabled ? '0 0 4px #ffe600' : 'none', minWidth: '40px' }}
                 >
-                  {perfCountInEnabled ? '1 BAR' : 'OFF'}
+                  {perfCountInEnabled ? 'ON' : 'OFF'}
                 </button>
                 
-                {perfCountInActive && (
+                {perfRecordArmed && (
                   <span className="font-mono" style={{ color: '#ff0055', fontSize: '0.55rem', fontWeight: 'bold', textShadow: '0 0 6px #ff0055', animation: 'pulse-red 0.5s infinite alternate', marginLeft: '4px' }}>
-                    {perfCountInRemaining}
+                    ARMED
                   </span>
                 )}
               </div>
