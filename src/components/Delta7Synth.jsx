@@ -854,6 +854,13 @@ export default function Delta7Synth() {
 
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('a01'); // Target slot in Editor
   const [uiScale, setUiScale] = useState(0.9);
+  const [selectedPill, setSelectedPill] = useState(null); // { deck, laneIdx, start, end, triggerMode }
+  const [copiedPill, setCopiedPill] = useState(null); // { duration, triggerMode }
+  const [moveDragTarget, setMoveDragTarget] = useState(null); // drag info for moving notes
+  const selectedPillRef = useRef(null);
+  const copiedPillRef = useRef(null);
+  useEffect(() => { selectedPillRef.current = selectedPill; }, [selectedPill]);
+  useEffect(() => { copiedPillRef.current = copiedPill; }, [copiedPill]);
   const [performanceViewActive, setPerformanceViewActive] = useState(false);
   const [perfRecordActive, setPerfRecordActive] = useState(false);
   const [perfIsDubbing, setPerfIsDubbing] = useState(false);
@@ -1233,6 +1240,26 @@ export default function Delta7Synth() {
         const tag = activeEl ? activeEl.tagName.toLowerCase() : '';
         const isEditable = activeEl ? (activeEl.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') : false;
         if (isEditable) return;
+
+        // Note Pill Selection Keyboard Shortcuts (Delete, Backspace, Ctrl+C, Ctrl+V)
+        if (selectedPillRef.current) {
+          const key = e.key.toLowerCase();
+          if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault();
+            deleteSelectedPill();
+            return;
+          }
+          if ((e.ctrlKey || e.metaKey) && key === 'c') {
+            e.preventDefault();
+            copySelectedPill();
+            return;
+          }
+          if ((e.ctrlKey || e.metaKey) && key === 'v') {
+            e.preventDefault();
+            pasteSelectedPill(selectedPillRef.current.deck, selectedPillRef.current.laneIdx);
+            return;
+          }
+        }
 
         if (e.repeat) return;
         const key = e.key.toLowerCase();
@@ -10256,6 +10283,74 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     showEditorStatus(`Erased Note at Beat ${pill.start.toFixed(2)} ❌`);
   };
 
+  const copySelectedPill = () => {
+    if (!selectedPill) return;
+    setCopiedPill({
+      duration: selectedPill.end - selectedPill.start,
+      triggerMode: selectedPill.triggerMode || 'hold'
+    });
+    showEditorStatus(`Copied selected note! 📋`);
+  };
+
+  const deleteSelectedPill = () => {
+    if (!selectedPill) return;
+    erasePill(selectedPill.deck, selectedPill.laneIdx, selectedPill);
+    setSelectedPill(null);
+  };
+
+  const pasteSelectedPill = (targetDeck, targetLaneIdx) => {
+    if (!copiedPill) return;
+    let gridSize = 0.25;
+    if (perfQuantizeMode === '1/128') gridSize = 0.03125;
+    else if (perfQuantizeMode === '1/64') gridSize = 0.0625;
+    else if (perfQuantizeMode === '1/32') gridSize = 0.125;
+    else if (perfQuantizeMode === '1/16') gridSize = 0.25;
+    else if (perfQuantizeMode === '1/8') gridSize = 0.5;
+    else if (perfQuantizeMode === '1/4') gridSize = 1.0;
+    else if (perfQuantizeMode === '1/2') gridSize = 2.0;
+    else if (perfQuantizeMode === 'Bar') gridSize = 4.0;
+
+    const snappedPlayhead = Math.round(seqCurrentBeatRef.current / gridSize) * gridSize;
+    
+    // Pass triggerMode as slot's triggerMode
+    const slotId = (targetDeck === 'A' ? 'a0' : 'b0') + (targetLaneIdx + 1);
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    const triggerMode = slot ? (slot.triggerMode || 'hold') : 'hold';
+
+    const noteOn = {
+      beat: snappedPlayhead,
+      deck: targetDeck,
+      type: 'slot',
+      index: targetLaneIdx,
+      velocity: 100,
+      isNoteOn: true,
+      triggerMode: copiedPill.triggerMode || triggerMode
+    };
+    const noteOff = {
+      beat: snappedPlayhead + copiedPill.duration,
+      deck: targetDeck,
+      type: 'slot',
+      index: targetLaneIdx,
+      velocity: 100,
+      isNoteOn: false,
+      triggerMode: copiedPill.triggerMode || triggerMode
+    };
+
+    const nextEvents = [...perfEvents, noteOn, noteOff];
+    setPerfEvents(nextEvents);
+    perfEventsRef.current = nextEvents;
+    sortedPerfEventsRef.current = [...nextEvents].sort((a, b) => a.beat - b.beat);
+    
+    if (schedulerNodeRef.current && perfPlaybackActiveRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'UPDATE_EVENTS',
+        sortedEvents: sortedPerfEventsRef.current
+      });
+    }
+
+    showEditorStatus(`Pasted note at Beat ${snappedPlayhead.toFixed(2)} 📋`);
+  };
+
   const handleCopyDeck = (deck) => {
     const eventsToCopy = perfEvents.filter(evt => evt.deck === deck);
     if (eventsToCopy.length === 0) {
@@ -10389,67 +10484,168 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           originalEndBeat: existingPill.end
         });
       }
+    } else if (highwayEditMode === 'select') {
+      const pills = getPillsForLane(deck, laneIdx);
+      const existingPill = pills.find(p => snappedBeat >= p.start - 0.05 && snappedBeat <= p.end + 0.05);
+      if (existingPill) {
+        setSelectedPill({
+          deck,
+          laneIdx,
+          start: existingPill.start,
+          end: existingPill.end,
+          triggerMode: existingPill.triggerMode || 'hold'
+        });
+        setMoveDragTarget({
+          deck,
+          laneIdx,
+          startBeat: existingPill.start,
+          endBeat: existingPill.end,
+          originalStartBeat: existingPill.start,
+          originalEndBeat: existingPill.end,
+          originalLaneIdx: laneIdx
+        });
+      } else {
+        setSelectedPill(null);
+      }
     }
   };
 
   const handleHighwayMouseMove = (e) => {
-    if (highwayEditMode !== 'resize' || !resizeDragTarget) return;
+    if (highwayEditMode === 'resize' && resizeDragTarget) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const playheadY = 170 - 35;
+      const distY = playheadY - y;
+      const beatOffset = distY / highwayZoom;
+      let hoverBeat = seqCurrentBeatRef.current + beatOffset;
+      if (hoverBeat < resizeDragTarget.startBeat + 0.05) {
+        hoverBeat = resizeDragTarget.startBeat + 0.05;
+      }
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    const playheadY = 170 - 35;
-    const distY = playheadY - y;
-    const beatOffset = distY / highwayZoom;
-    let hoverBeat = seqCurrentBeatRef.current + beatOffset;
-    if (hoverBeat < resizeDragTarget.startBeat + 0.05) {
-      hoverBeat = resizeDragTarget.startBeat + 0.05;
-    }
+      let gridSize = 0.25;
+      if (perfQuantizeMode === '1/128') gridSize = 0.03125;
+      else if (perfQuantizeMode === '1/64') gridSize = 0.0625;
+      else if (perfQuantizeMode === '1/32') gridSize = 0.125;
+      else if (perfQuantizeMode === '1/16') gridSize = 0.25;
+      else if (perfQuantizeMode === '1/8') gridSize = 0.5;
+      else if (perfQuantizeMode === '1/4') gridSize = 1.0;
+      else if (perfQuantizeMode === '1/2') gridSize = 2.0;
+      else if (perfQuantizeMode === 'Bar') gridSize = 4.0;
 
-    let gridSize = 0.25;
-    if (perfQuantizeMode === '1/128') gridSize = 0.03125;
-    else if (perfQuantizeMode === '1/64') gridSize = 0.0625;
-    else if (perfQuantizeMode === '1/32') gridSize = 0.125;
-    else if (perfQuantizeMode === '1/16') gridSize = 0.25;
-    else if (perfQuantizeMode === '1/8') gridSize = 0.5;
-    else if (perfQuantizeMode === '1/4') gridSize = 1.0;
-    else if (perfQuantizeMode === '1/2') gridSize = 2.0;
-    else if (perfQuantizeMode === 'Bar') gridSize = 4.0;
+      const snappedHoverBeat = Math.round(hoverBeat / gridSize) * gridSize;
+      const finalEndBeat = Math.max(resizeDragTarget.startBeat + gridSize, snappedHoverBeat);
 
-    const snappedHoverBeat = Math.round(hoverBeat / gridSize) * gridSize;
-    const finalEndBeat = Math.max(resizeDragTarget.startBeat + gridSize, snappedHoverBeat);
+      const updatedEvents = perfEvents.map(evt => {
+        if (evt.deck === resizeDragTarget.deck && 
+            evt.type === 'slot' && 
+            evt.index === resizeDragTarget.laneIdx) {
+          if (!evt.isNoteOn && Math.abs(evt.beat - resizeDragTarget.originalEndBeat) < 0.001) {
+            return { ...evt, beat: finalEndBeat };
+          }
+        }
+        return evt;
+      });
 
-    const updatedEvents = perfEvents.map(evt => {
-      if (evt.deck === resizeDragTarget.deck && 
-          evt.type === 'slot' && 
-          evt.index === resizeDragTarget.laneIdx) {
-        if (!evt.isNoteOn && Math.abs(evt.beat - resizeDragTarget.originalEndBeat) < 0.001) {
-          return { ...evt, beat: finalEndBeat };
+      setPerfEvents(updatedEvents);
+      perfEventsRef.current = updatedEvents;
+      sortedPerfEventsRef.current = [...updatedEvents].sort((a, b) => a.beat - b.beat);
+      
+      if (schedulerNodeRef.current && perfPlaybackActiveRef.current) {
+        schedulerNodeRef.current.port.postMessage({
+          type: 'UPDATE_EVENTS',
+          sortedEvents: sortedPerfEventsRef.current
+        });
+      }
+
+      setResizeDragTarget(prev => ({
+        ...prev,
+        originalEndBeat: finalEndBeat
+      }));
+    } else if (highwayEditMode === 'select' && moveDragTarget) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const laneIdx = Math.max(0, Math.min(7, Math.floor(x / 28)));
+      const playheadY = 170 - 35;
+      const distY = playheadY - y;
+      const beatOffset = distY / highwayZoom;
+      let hoverBeat = seqCurrentBeatRef.current + beatOffset;
+      if (hoverBeat < 0) hoverBeat = 0;
+
+      let gridSize = 0.25;
+      if (perfQuantizeMode === '1/128') gridSize = 0.03125;
+      else if (perfQuantizeMode === '1/64') gridSize = 0.0625;
+      else if (perfQuantizeMode === '1/32') gridSize = 0.125;
+      else if (perfQuantizeMode === '1/16') gridSize = 0.25;
+      else if (perfQuantizeMode === '1/8') gridSize = 0.5;
+      else if (perfQuantizeMode === '1/4') gridSize = 1.0;
+      else if (perfQuantizeMode === '1/2') gridSize = 2.0;
+      else if (perfQuantizeMode === 'Bar') gridSize = 4.0;
+
+      const deltaBeat = hoverBeat - moveDragTarget.originalStartBeat;
+      const snappedDeltaBeat = Math.round(deltaBeat / gridSize) * gridSize;
+      let targetStart = moveDragTarget.originalStartBeat + snappedDeltaBeat;
+      if (targetStart < 0) targetStart = 0;
+      const duration = moveDragTarget.originalEndBeat - moveDragTarget.originalStartBeat;
+      const targetEnd = targetStart + duration;
+
+      const deltaLane = laneIdx - moveDragTarget.originalLaneIdx;
+      const targetLane = Math.max(0, Math.min(7, moveDragTarget.originalLaneIdx + deltaLane));
+
+      if (targetStart !== moveDragTarget.startBeat || targetLane !== moveDragTarget.laneIdx) {
+        const updatedEvents = perfEvents.map(evt => {
+          if (evt.deck === moveDragTarget.deck && 
+              evt.type === 'slot' && 
+              evt.index === moveDragTarget.originalLaneIdx) {
+            if (evt.isNoteOn && Math.abs(evt.beat - moveDragTarget.startBeat) < 0.001) {
+              return { ...evt, beat: targetStart, index: targetLane };
+            }
+            if (!evt.isNoteOn && Math.abs(evt.beat - moveDragTarget.endBeat) < 0.001) {
+              return { ...evt, beat: targetEnd, index: targetLane };
+            }
+          }
+          return evt;
+        });
+
+        setMoveDragTarget(prev => ({
+          ...prev,
+          startBeat: targetStart,
+          endBeat: targetEnd,
+          laneIdx: targetLane
+        }));
+
+        setSelectedPill(prev => {
+          if (prev && prev.deck === moveDragTarget.deck && prev.laneIdx === moveDragTarget.laneIdx && Math.abs(prev.start - moveDragTarget.startBeat) < 0.001) {
+            return {
+              ...prev,
+              start: targetStart,
+              end: targetEnd,
+              laneIdx: targetLane
+            };
+          }
+          return prev;
+        });
+
+        setPerfEvents(updatedEvents);
+        perfEventsRef.current = updatedEvents;
+        sortedPerfEventsRef.current = [...updatedEvents].sort((a, b) => a.beat - b.beat);
+
+        if (schedulerNodeRef.current && perfPlaybackActiveRef.current) {
+          schedulerNodeRef.current.port.postMessage({
+            type: 'UPDATE_EVENTS',
+            sortedEvents: sortedPerfEventsRef.current
+          });
         }
       }
-      return evt;
-    });
-
-    setPerfEvents(updatedEvents);
-    perfEventsRef.current = updatedEvents;
-    sortedPerfEventsRef.current = [...updatedEvents].sort((a, b) => a.beat - b.beat);
-    
-    if (schedulerNodeRef.current && perfPlaybackActiveRef.current) {
-      schedulerNodeRef.current.port.postMessage({
-        type: 'UPDATE_EVENTS',
-        sortedEvents: sortedPerfEventsRef.current
-      });
     }
-
-    setResizeDragTarget(prev => ({
-      ...prev,
-      originalEndBeat: finalEndBeat
-    }));
   };
 
   const handleHighwayMouseUp = () => {
     setResizeDragTarget(null);
+    setMoveDragTarget(null);
   };
 
   const renderPerformanceDeck = () => {
@@ -10629,23 +10825,34 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     const height = endY - startY;
                     
                     const mode = pill.triggerMode || 'hold';
+                    const isSelected = selectedPill && 
+                                       selectedPill.deck === 'A' && 
+                                       selectedPill.laneIdx === laneIdx && 
+                                       Math.abs(selectedPill.start - pill.start) < 0.001;
+
+                    let pillColor = isSelected ? '#ffffff' : color;
+                    let pillGlowColor = isSelected ? '#ffe600' : color;
                     let borderStyle = 'solid';
                     let background = '#000000';
-                    let borderWidth = '1.5px';
-                    let glowScale = '8px';
+                    let borderWidth = isSelected ? '2.5px' : '1.5px';
+                    let glowScale = isSelected ? '14px' : '8px';
                     
-                    if (mode === 'latch') {
-                      background = color + '2a'; // glowy semi-transparent filled block
-                      borderWidth = '2px';
-                      glowScale = '12px';
-                    } else if (mode === 'free') {
-                      borderStyle = 'dashed';
-                    } else if (mode === 'flux') {
-                      borderStyle = 'double';
-                      borderWidth = '3px';
-                    } else if (mode === 'queue') {
-                      borderStyle = 'dotted';
-                      borderWidth = '2px';
+                    if (!isSelected) {
+                      if (mode === 'latch') {
+                        background = color + '2a'; // glowy semi-transparent filled block
+                        borderWidth = '2px';
+                        glowScale = '12px';
+                      } else if (mode === 'free') {
+                        borderStyle = 'dashed';
+                      } else if (mode === 'flux') {
+                        borderStyle = 'double';
+                        borderWidth = '3px';
+                      } else if (mode === 'queue') {
+                        borderStyle = 'dotted';
+                        borderWidth = '2px';
+                      }
+                    } else {
+                      background = 'rgba(255, 230, 0, 0.25)';
                     }
                     
                     return (
@@ -10659,9 +10866,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           height: `${Math.max(6, height)}px`,
                           background,
                           borderRadius: '3px',
-                          border: `${borderWidth} ${borderStyle} ${color}`,
-                          boxShadow: `0 0 ${glowScale} ${color}, inset 0 0 ${glowScale} ${color}`,
-                          zIndex: 2
+                          border: `${borderWidth} ${borderStyle} ${pillColor}`,
+                          boxShadow: `0 0 ${glowScale} ${pillGlowColor}, inset 0 0 ${glowScale} ${pillGlowColor}`,
+                          zIndex: 3
                         }}
                       />
                     );
@@ -10672,7 +10879,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           </div>
         </div>
       );
-    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget]);
+    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget, selectedPill]);
 
     const highwayB_JSX = useMemo(() => {
       return (
@@ -10810,23 +11017,34 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     const height = endY - startY;
                     
                     const mode = pill.triggerMode || 'hold';
+                    const isSelected = selectedPill && 
+                                       selectedPill.deck === 'B' && 
+                                       selectedPill.laneIdx === laneIdx && 
+                                       Math.abs(selectedPill.start - pill.start) < 0.001;
+
+                    let pillColor = isSelected ? '#ffffff' : color;
+                    let pillGlowColor = isSelected ? '#ffe600' : color;
                     let borderStyle = 'solid';
                     let background = '#000000';
-                    let borderWidth = '1.5px';
-                    let glowScale = '8px';
+                    let borderWidth = isSelected ? '2.5px' : '1.5px';
+                    let glowScale = isSelected ? '14px' : '8px';
                     
-                    if (mode === 'latch') {
-                      background = color + '2a'; // glowy semi-transparent filled block
-                      borderWidth = '2px';
-                      glowScale = '12px';
-                    } else if (mode === 'free') {
-                      borderStyle = 'dashed';
-                    } else if (mode === 'flux') {
-                      borderStyle = 'double';
-                      borderWidth = '3px';
-                    } else if (mode === 'queue') {
-                      borderStyle = 'dotted';
-                      borderWidth = '2px';
+                    if (!isSelected) {
+                      if (mode === 'latch') {
+                        background = color + '2a'; // glowy semi-transparent filled block
+                        borderWidth = '2px';
+                        glowScale = '12px';
+                      } else if (mode === 'free') {
+                        borderStyle = 'dashed';
+                      } else if (mode === 'flux') {
+                        borderStyle = 'double';
+                        borderWidth = '3px';
+                      } else if (mode === 'queue') {
+                        borderStyle = 'dotted';
+                        borderWidth = '2px';
+                      }
+                    } else {
+                      background = 'rgba(255, 230, 0, 0.25)';
                     }
                     
                     return (
@@ -10840,9 +11058,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           height: `${Math.max(6, height)}px`,
                           background,
                           borderRadius: '3px',
-                          border: `${borderWidth} ${borderStyle} ${color}`,
-                          boxShadow: `0 0 ${glowScale} ${color}, inset 0 0 ${glowScale} ${color}`,
-                          zIndex: 2
+                          border: `${borderWidth} ${borderStyle} ${pillColor}`,
+                          boxShadow: `0 0 ${glowScale} ${pillGlowColor}, inset 0 0 ${glowScale} ${pillGlowColor}`,
+                          zIndex: 3
                         }}
                       />
                     );
@@ -10853,7 +11071,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           </div>
         </div>
       );
-    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget]);
+    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget, selectedPill]);
 
     return (
       <div className="deck-layout-wrapper">
@@ -11218,7 +11436,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Highway Editor Controls for Deck A */}
-            <div className="deck-row" style={{ width: '250px', margin: '4px auto 2px auto', display: 'flex', gap: '3px', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '3px 4px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.15)' }}>
+            <div className="deck-row" style={{ width: '290px', margin: '4px auto 2px auto', display: 'flex', gap: '3px', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '3px 4px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.15)' }}>
               <div style={{ display: 'flex', gap: '2px' }}>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'perform' ? 'active' : ''}`}
@@ -11237,6 +11455,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                 >
                   Play
+                </button>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'select' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('select')}
+                  title="Select Mode (click notes to edit/move/copy/delete)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'select' ? 'rgba(255, 0, 255, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'select' ? '#ff00ff' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'select' ? '#ff00ff' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Sel
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'draw' ? 'active' : ''}`}
@@ -11272,7 +11508,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
- Size
+                  Size
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'erase' ? 'active' : ''}`}
@@ -11295,62 +11531,125 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </div>
 
               <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-                <button
-                  className="deck-btn-xs"
-                  onClick={() => handleCopyDeck('A')}
-                  title="Copy Deck A notes"
-                  style={{ 
-                    fontSize: '0.4rem', 
-                    padding: '2px 3px', 
-                    height: '16px', 
-                    lineHeight: 1,
-                    background: 'rgba(255,255,255,0.05)',
-                    color: '#ffe600',
-                    border: '1px solid rgba(255, 230, 0, 0.3)',
-                    borderRadius: '2px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Copy
-                </button>
-                <button
-                  className="deck-btn-xs"
-                  onClick={() => handlePasteDeck('A')}
-                  disabled={!highwayClipboard}
-                  title="Paste notes to Deck A"
-                  style={{ 
-                    fontSize: '0.4rem', 
-                    padding: '2px 3px', 
-                    height: '16px', 
-                    lineHeight: 1,
-                    background: 'rgba(255,255,255,0.05)',
-                    color: '#00f3ff',
-                    border: '1px solid rgba(0, 243, 255, 0.3)',
-                    borderRadius: '2px',
-                    cursor: highwayClipboard ? 'pointer' : 'default',
-                    opacity: highwayClipboard ? 1 : 0.4
-                  }}
-                >
-                  Paste
-                </button>
-                <button
-                  className="deck-btn-xs"
-                  onClick={() => handleClearDeck('A')}
-                  title="Clear all notes on Deck A"
-                  style={{ 
-                    fontSize: '0.4rem', 
-                    padding: '2px 3px', 
-                    height: '16px', 
-                    lineHeight: 1,
-                    background: 'rgba(255,255,255,0.05)',
-                    color: '#ff0055',
-                    border: '1px solid rgba(255, 0, 85, 0.3)',
-                    borderRadius: '2px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Clear
-                </button>
+                {selectedPill && selectedPill.deck === 'A' ? (
+                  <>
+                    <button
+                      className="deck-btn-xs"
+                      onClick={copySelectedPill}
+                      title="Copy selected note"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255, 230, 0, 0.25)',
+                        color: '#ffe600',
+                        border: '1px solid #ffe600',
+                        borderRadius: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Copy
+                    </button>
+                    {copiedPill && (
+                      <button
+                        className="deck-btn-xs"
+                        onClick={() => pasteSelectedPill('A', selectedPill.laneIdx)}
+                        title="Paste note at playhead"
+                        style={{ 
+                          fontSize: '0.4rem', 
+                          padding: '2px 3px', 
+                          height: '16px', 
+                          lineHeight: 1,
+                          background: 'rgba(0, 243, 255, 0.25)',
+                          color: '#00f3ff',
+                          border: '1px solid #00f3ff',
+                          borderRadius: '2px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Paste
+                      </button>
+                    )}
+                    <button
+                      className="deck-btn-xs"
+                      onClick={deleteSelectedPill}
+                      title="Delete selected note"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255, 0, 85, 0.25)',
+                        color: '#ff0055',
+                        border: '1px solid #ff0055',
+                        borderRadius: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cut
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="deck-btn-xs"
+                      onClick={() => handleCopyDeck('A')}
+                      title="Copy Deck A notes"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#ffe600',
+                        border: '1px solid rgba(255, 230, 0, 0.3)',
+                        borderRadius: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Copy
+                    </button>
+                    <button
+                      className="deck-btn-xs"
+                      onClick={() => handlePasteDeck('A')}
+                      disabled={!highwayClipboard}
+                      title="Paste notes to Deck A"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#00f3ff',
+                        border: '1px solid rgba(0, 243, 255, 0.3)',
+                        borderRadius: '2px',
+                        cursor: highwayClipboard ? 'pointer' : 'default',
+                        opacity: highwayClipboard ? 1.0 : 0.4
+                      }}
+                    >
+                      Paste
+                    </button>
+                    <button
+                      className="deck-btn-xs"
+                      onClick={() => handleClearDeck('A')}
+                      title="Clear all notes on Deck A"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#ff0055',
+                        border: '1px solid rgba(255, 0, 85, 0.3)',
+                        borderRadius: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -12185,7 +12484,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Highway Editor Controls for Deck B */}
-            <div className="deck-row" style={{ width: '250px', margin: '4px auto 2px auto', display: 'flex', gap: '3px', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '3px 4px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.15)' }}>
+            <div className="deck-row" style={{ width: '290px', margin: '4px auto 2px auto', display: 'flex', gap: '3px', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '3px 4px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.15)' }}>
               <div style={{ display: 'flex', gap: '2px' }}>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'perform' ? 'active' : ''}`}
@@ -12204,6 +12503,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   }}
                 >
                   Play
+                </button>
+                <button
+                  className={`deck-btn-xs ${highwayEditMode === 'select' ? 'active' : ''}`}
+                  onClick={() => setHighwayEditMode('select')}
+                  title="Select Mode (click notes to edit/move/copy/delete)"
+                  style={{ 
+                    fontSize: '0.42rem', 
+                    padding: '2px 3px', 
+                    height: '16px', 
+                    lineHeight: 1,
+                    background: highwayEditMode === 'select' ? 'rgba(255, 0, 255, 0.35)' : 'rgba(255,255,255,0.05)', 
+                    color: highwayEditMode === 'select' ? '#ff00ff' : '#aaa',
+                    border: `1px solid ${highwayEditMode === 'select' ? '#ff00ff' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Sel
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'draw' ? 'active' : ''}`}
@@ -12239,7 +12556,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     cursor: 'pointer'
                   }}
                 >
- Size
+                  Size
                 </button>
                 <button
                   className={`deck-btn-xs ${highwayEditMode === 'erase' ? 'active' : ''}`}
@@ -12262,62 +12579,125 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </div>
 
               <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-                <button
-                  className="deck-btn-xs"
-                  onClick={() => handleCopyDeck('B')}
-                  title="Copy Deck B notes"
-                  style={{ 
-                    fontSize: '0.4rem', 
-                    padding: '2px 3px', 
-                    height: '16px', 
-                    lineHeight: 1,
-                    background: 'rgba(255,255,255,0.05)',
-                    color: '#ffe600',
-                    border: '1px solid rgba(255, 230, 0, 0.3)',
-                    borderRadius: '2px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Copy
-                </button>
-                <button
-                  className="deck-btn-xs"
-                  onClick={() => handlePasteDeck('B')}
-                  disabled={!highwayClipboard}
-                  title="Paste notes to Deck B"
-                  style={{ 
-                    fontSize: '0.4rem', 
-                    padding: '2px 3px', 
-                    height: '16px', 
-                    lineHeight: 1,
-                    background: 'rgba(255,255,255,0.05)',
-                    color: '#00f3ff',
-                    border: '1px solid rgba(0, 243, 255, 0.3)',
-                    borderRadius: '2px',
-                    cursor: highwayClipboard ? 'pointer' : 'default',
-                    opacity: highwayClipboard ? 1 : 0.4
-                  }}
-                >
-                  Paste
-                </button>
-                <button
-                  className="deck-btn-xs"
-                  onClick={() => handleClearDeck('B')}
-                  title="Clear all notes on Deck B"
-                  style={{ 
-                    fontSize: '0.4rem', 
-                    padding: '2px 3px', 
-                    height: '16px', 
-                    lineHeight: 1,
-                    background: 'rgba(255,255,255,0.05)',
-                    color: '#ff0055',
-                    border: '1px solid rgba(255, 0, 85, 0.3)',
-                    borderRadius: '2px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Clear
-                </button>
+                {selectedPill && selectedPill.deck === 'B' ? (
+                  <>
+                    <button
+                      className="deck-btn-xs"
+                      onClick={copySelectedPill}
+                      title="Copy selected note"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255, 230, 0, 0.25)',
+                        color: '#ffe600',
+                        border: '1px solid #ffe600',
+                        borderRadius: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Copy
+                    </button>
+                    {copiedPill && (
+                      <button
+                        className="deck-btn-xs"
+                        onClick={() => pasteSelectedPill('B', selectedPill.laneIdx)}
+                        title="Paste note at playhead"
+                        style={{ 
+                          fontSize: '0.4rem', 
+                          padding: '2px 3px', 
+                          height: '16px', 
+                          lineHeight: 1,
+                          background: 'rgba(0, 243, 255, 0.25)',
+                          color: '#00f3ff',
+                          border: '1px solid #00f3ff',
+                          borderRadius: '2px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Paste
+                      </button>
+                    )}
+                    <button
+                      className="deck-btn-xs"
+                      onClick={deleteSelectedPill}
+                      title="Delete selected note"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255, 0, 85, 0.25)',
+                        color: '#ff0055',
+                        border: '1px solid #ff0055',
+                        borderRadius: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cut
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="deck-btn-xs"
+                      onClick={() => handleCopyDeck('B')}
+                      title="Copy Deck B notes"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#ffe600',
+                        border: '1px solid rgba(255, 230, 0, 0.3)',
+                        borderRadius: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Copy
+                    </button>
+                    <button
+                      className="deck-btn-xs"
+                      onClick={() => handlePasteDeck('B')}
+                      disabled={!highwayClipboard}
+                      title="Paste notes to Deck B"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#00f3ff',
+                        border: '1px solid rgba(0, 243, 255, 0.3)',
+                        borderRadius: '2px',
+                        cursor: highwayClipboard ? 'pointer' : 'default',
+                        opacity: highwayClipboard ? 1.0 : 0.4
+                      }}
+                    >
+                      Paste
+                    </button>
+                    <button
+                      className="deck-btn-xs"
+                      onClick={() => handleClearDeck('B')}
+                      title="Clear all notes on Deck B"
+                      style={{ 
+                        fontSize: '0.4rem', 
+                        padding: '2px 3px', 
+                        height: '16px', 
+                        lineHeight: 1,
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#ff0055',
+                        border: '1px solid rgba(255, 0, 85, 0.3)',
+                        borderRadius: '2px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
