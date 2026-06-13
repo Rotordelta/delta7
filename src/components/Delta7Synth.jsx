@@ -7718,7 +7718,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           const parts = key.split('-');
           const deck = parts[1].toUpperCase();
           const index = parseInt(parts[2], 10);
-          triggerPerfPadInternal(deck, 'slot', index, velocity, false);
+          triggerPerfPadInternal(deck, 'slot', index, velocity, true);
         }
       }
     });
@@ -7937,8 +7937,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           const deck = parts[1].toLowerCase();
           const index = parseInt(parts[2], 10);
           
-          stopPerfVoice(`perf-${deck}-slot-${index}`);
-          stopPerfVoice(`perf-${deck}-slice-${index}`);
+          triggerPerfPadInternal(deck.toUpperCase(), 'slot', index, 0, false);
         }
       }
     });
@@ -10236,11 +10235,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           const deck = parts[1].toUpperCase();
           const index = parseInt(parts[2], 10);
           if (val >= 64) {
-            triggerPerfPadInternal(deck, 'slot', index, val, false);
+            triggerPerfPadInternal(deck, 'slot', index, val, true);
           } else {
-            const voiceKey = `perf-${deck.toLowerCase()}-slot-${index}`;
-            stopPerfVoice(voiceKey);
-            stopPerfVoice(`perf-${deck.toLowerCase()}-slice-${index}`);
+            triggerPerfPadInternal(deck, 'slot', index, 0, false);
           }
         }
       }
@@ -16723,11 +16720,11 @@ function MidiMappingMenu({
     },
     {
       title: "Deck A Performance Pads",
-      items: Array.from({ length: 16 }, (_, i) => ({ key: `pad-a-${i}`, name: `Deck A Pad ${i + 1}` }))
+      items: Array.from({ length: 8 }, (_, i) => ({ key: `pad-a-${i}`, name: `Deck A Pad ${i + 1}` }))
     },
     {
       title: "Deck B Performance Pads",
-      items: Array.from({ length: 16 }, (_, i) => ({ key: `pad-b-${i}`, name: `Deck B Pad ${i + 1}` }))
+      items: Array.from({ length: 8 }, (_, i) => ({ key: `pad-b-${i}`, name: `Deck B Pad ${i + 1}` }))
     }
   ];
 
