@@ -3265,6 +3265,52 @@ export default function Delta7Synth() {
         }
       }
 
+      if (param === 'lfoTarget' || param === 'lfoRate' || param === 'lfoDepth') {
+        const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+        if (slot) {
+          const target = slot.lfoTarget || 'None';
+          const rate = slot.lfoRate !== undefined ? slot.lfoRate : 3.0;
+          const depth = slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0;
+
+          // Clean up existing LFO if any
+          if (voice.slotLfo) {
+            try { voice.slotLfo.stop(); } catch (e) {}
+            try { voice.slotLfo.disconnect(); } catch (e) {}
+            voice.slotLfo = null;
+          }
+          if (voice.slotLfoGain) {
+            try { voice.slotLfoGain.disconnect(); } catch (e) {}
+            voice.slotLfoGain = null;
+          }
+
+          // Create new LFO if target is not 'None' and depth > 0
+          if (target !== 'None' && depth > 0) {
+            const slotLfo = ctx.createOscillator();
+            slotLfo.frequency.setValueAtTime(rate, now);
+            const slotLfoGain = ctx.createGain();
+
+            let totalDepth = depth;
+            if (target === 'Filter Cutoff') {
+              totalDepth = depth * 1500;
+              slotLfoGain.connect(voice.filter1.frequency);
+            } else if (target === 'Pan' && voice.padPannerNode) {
+              totalDepth = depth;
+              slotLfoGain.connect(voice.padPannerNode.pan);
+            } else if (target === 'FX Send' && voice.sendGainNode) {
+              totalDepth = depth;
+              slotLfoGain.connect(voice.sendGainNode.gain);
+            }
+
+            slotLfoGain.gain.setValueAtTime(totalDepth, now);
+            slotLfo.connect(slotLfoGain);
+            slotLfo.start(now);
+
+            voice.slotLfo = slotLfo;
+            voice.slotLfoGain = slotLfoGain;
+          }
+        }
+      }
+
       if (param === 'routeToXyPad') {
         if (voice.voiceOutGain) {
           try {
