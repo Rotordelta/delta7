@@ -1183,6 +1183,27 @@ export default function Delta7Synth() {
   const sustainPedalPressedRef = useRef(false);
   const sustainPedalPressTimeRef = useRef(0);
 
+  const [recLatencyOffset, setRecLatencyOffset] = useState(() => {
+    const val = localStorage.getItem('recLatencyOffset');
+    return val !== null ? parseInt(val, 10) : 30;
+  });
+  const recLatencyOffsetRef = useRef(30);
+  useEffect(() => {
+    localStorage.setItem('recLatencyOffset', recLatencyOffset);
+    recLatencyOffsetRef.current = recLatencyOffset;
+  }, [recLatencyOffset]);
+
+  const [midiClockSync, setMidiClockSync] = useState(() => {
+    return localStorage.getItem('midiClockSync') === 'true';
+  });
+  const midiClockSyncRef = useRef(false);
+  useEffect(() => {
+    localStorage.setItem('midiClockSync', midiClockSync);
+    midiClockSyncRef.current = midiClockSync;
+  }, [midiClockSync]);
+
+  const midiTickTimesRef = useRef([]);
+
   const deckAPitchRef = useRef(0.0);
   const deckBPitchRef = useRef(0.0);
   useEffect(() => { deckAPitchRef.current = deckAPitch; }, [deckAPitch]);
@@ -2255,6 +2276,12 @@ export default function Delta7Synth() {
     const beatDuration = 60 / bpm;
     const totalSec = beatDuration * liveRecBeatsRef.current;
     liveRecTotalSamplesRef.current = Math.round(ctx.sampleRate * totalSec);
+    
+    // Calculate latency offset samples to record extra at the end
+    const latencyMs = recLatencyOffsetRef.current || 0;
+    const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
+    const limitSamples = liveRecTotalSamplesRef.current + latencySamples;
+
     liveRecCollectedSamplesRef.current = 0;
     recordedChunksL.current = [];
     recordedChunksR.current = [];
@@ -2276,7 +2303,7 @@ export default function Delta7Synth() {
         recordingWorkletNodeRef.current.port.postMessage({
           type: 'ARM_LIVE_LOOP',
           startTime: nextBeatTime,
-          totalSamples: liveRecTotalSamplesRef.current
+          totalSamples: limitSamples
         });
       }
     } else {
@@ -2291,7 +2318,7 @@ export default function Delta7Synth() {
         recordingWorkletNodeRef.current.port.postMessage({
           type: 'ARM_LIVE_LOOP',
           startTime: ctx.currentTime,
-          totalSamples: liveRecTotalSamplesRef.current
+          totalSamples: limitSamples
         });
       }
     }
@@ -2310,16 +2337,30 @@ export default function Delta7Synth() {
       totalLength += chunksL[i].length;
     }
     
-    const buffer = ctx.createBuffer(2, totalLength, ctx.sampleRate);
-    const channelL = buffer.getChannelData(0);
-    const channelR = buffer.getChannelData(1);
-    
+    // Concatenate chunks to raw Float32Arrays first
+    const rawL = new Float32Array(totalLength);
+    const rawR = new Float32Array(totalLength);
     let offset = 0;
     for (let i = 0; i < chunksL.length; i++) {
-      channelL.set(chunksL[i], offset);
-      channelR.set(chunksR[i], offset);
+      rawL.set(chunksL[i], offset);
+      rawR.set(chunksR[i], offset);
       offset += chunksL[i].length;
     }
+
+    // Apply latency offset shifting
+    const latencyMs = recLatencyOffsetRef.current || 0;
+    const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
+
+    const targetLength = liveRecTotalSamplesRef.current || totalLength;
+    const startIdx = Math.min(latencySamples, Math.max(0, totalLength - targetLength));
+    const lengthToCopy = Math.min(targetLength, totalLength - startIdx);
+
+    const buffer = ctx.createBuffer(2, lengthToCopy, ctx.sampleRate);
+    const channelL = buffer.getChannelData(0);
+    const channelR = buffer.getChannelData(1);
+
+    channelL.set(rawL.subarray(startIdx, startIdx + lengthToCopy), 0);
+    channelR.set(rawR.subarray(startIdx, startIdx + lengthToCopy), 0);
     
     normalizeBuffer(buffer);
     
@@ -9105,6 +9146,58 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
   };
 
+  const startMidiClockPlayback = () => {
+    if (!audioCtxRef.current) initAudio();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const bpm = paramsRef.current.arpBpm || 120;
+    
+    setPerfRecordActive(false);
+    setPerfIsDubbing(false);
+    
+    setPerfPlaybackActive(true);
+    perfPlaybackActiveRef.current = true;
+    
+    const startTime = ctx.currentTime;
+    perfPlayStartTimeRef.current = startTime;
+    seqStartBeatOffsetRef.current = 0.0;
+    seqCurrentBeatRef.current = 0.0;
+    
+    syncSabPlaybackState(true, startTime, 0.0, bpm);
+    
+    if (schedulerNodeRef.current) {
+      schedulerNodeRef.current.port.postMessage({
+        type: 'START_PLAYBACK',
+        startTime: startTime,
+        startBeatOffset: 0.0,
+        sortedEvents: sortedPerfEventsRef.current
+      });
+    }
+    showEditorStatus("MIDI Clock Playback Started! ▶️");
+  };
+
+  const stopMidiClockPlayback = () => {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    const bpm = paramsRef.current.arpBpm || 120;
+    
+    setPerfPlaybackActive(false);
+    perfPlaybackActiveRef.current = false;
+    syncSabPlaybackState(false, 0, 0, bpm);
+    
+    seqCurrentBeatRef.current = 0.0;
+    seqStartBeatOffsetRef.current = 0.0;
+    
+    if (schedulerNodeRef.current) {
+      schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' });
+    }
+    for (const k of activeVoicesRef.current.keys()) {
+      if (typeof k === 'string' && k.startsWith('perf-')) stopPerfVoice(k);
+    }
+    setActivePerfPads({});
+    showEditorStatus("MIDI Clock Playback Stopped. ⏹️");
+  };
+
   const togglePerformanceRecord = (isDub = false) => {
     if (!audioCtxRef.current) initAudio();
     const ctx = audioCtxRef.current;
@@ -10526,6 +10619,55 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   const setupMidiListeners = (input) => {
     input.onmidimessage = (message) => {
       const [status, data1, data2] = message.data;
+
+      // Handle MIDI Clock System Real-Time Messages
+      if (status === 0xF8) {
+        if (!midiClockSyncRef.current) return;
+        const now = performance.now();
+        const history = midiTickTimesRef.current;
+        history.push(now);
+        if (history.length > 25) {
+          history.shift();
+        }
+        
+        if (history.length >= 24) {
+          const firstTick = history[history.length - 24];
+          const lastTick = history[history.length - 1];
+          const deltaSec = (lastTick - firstTick) / 1000;
+          
+          if (deltaSec > 0) {
+            const rawBpm = 60 / deltaSec;
+            if (rawBpm >= 40 && rawBpm <= 250) {
+              const currentBpm = paramsRef.current.arpBpm || 120;
+              const diff = Math.abs(rawBpm - currentBpm);
+              
+              if (diff > 0.04) {
+                const nextBpm = Math.round((currentBpm * 0.85 + rawBpm * 0.15) * 10) / 10;
+                if (nextBpm !== currentBpm) {
+                  setParams(prev => ({ ...prev, arpBpm: nextBpm }));
+                  setTempoInputVal(String(nextBpm));
+                }
+              }
+            }
+          }
+        }
+        return;
+      }
+
+      if (status === 0xFA || status === 0xFB) {
+        if (midiClockSyncRef.current) {
+          startMidiClockPlayback();
+        }
+        return;
+      }
+
+      if (status === 0xFC) {
+        if (midiClockSyncRef.current) {
+          stopMidiClockPlayback();
+        }
+        return;
+      }
+
       const cmd = status >> 4;
       const channel = status & 0xf;
 
@@ -17034,6 +17176,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </span>
               </div>
 
+              {/* External Midi Clock Sync Row */}
+              <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', borderTop: '1px dashed rgba(255, 0, 255, 0.15)', paddingTop: '4px' }}>
+                <span className="font-mono" style={{ color: '#ff9f00', fontSize: '0.55rem' }}>SYNC:</span>
+                <div className="segmented-strip" style={{ display: 'inline-flex', flexGrow: 1, justifyContent: 'flex-end' }}>
+                  <button
+                    className={`segmented-btn btn-xs ${!midiClockSync ? 'active' : ''}`}
+                    onClick={() => setMidiClockSync(false)}
+                    style={{ fontSize: '0.52rem', padding: '1px 8px', border: '1px solid rgba(255, 159, 0, 0.4)', borderRadius: '2px 0 0 2px', background: !midiClockSync ? 'rgba(255, 159, 0, 0.2)' : 'transparent', color: !midiClockSync ? '#fff' : '#aaa' }}
+                  >
+                    INT
+                  </button>
+                  <button
+                    className={`segmented-btn btn-xs ${midiClockSync ? 'active' : ''}`}
+                    onClick={() => setMidiClockSync(true)}
+                    style={{ fontSize: '0.52rem', padding: '1px 8px', border: '1px solid rgba(255, 159, 0, 0.4)', borderRadius: '0 2px 2px 0', background: midiClockSync ? 'rgba(255, 159, 0, 0.2)' : 'transparent', color: midiClockSync ? '#fff' : '#aaa' }}
+                  >
+                    EXT MIDI
+                  </button>
+                </div>
+              </div>
+
               {/* Sequencer Settings (Quantize & Count-in) */}
               <div className="flex-row-sub" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', borderTop: '1px dashed rgba(0, 243, 255, 0.15)', paddingTop: '4px', marginTop: '4px' }}>
                 <span className="font-mono" style={{ color: '#00f3ff', fontSize: '0.52rem' }}>GRID:</span>
@@ -17372,6 +17535,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               ))}
             </select>
           </div>
+
+          {/* Latency Compensation Offset (Only shown if source is MIC/LINE or MONITOR) */}
+          {(recordingInputMode === 'mic' || recordingInputMode === 'monitor') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <span style={{ fontSize: '0.36rem', color: '#ff9f00', fontWeight: 'bold' }} title="Compensate for audio interface round-trip delay">LAT:</span>
+              <input 
+                type="range" min="0" max="150" step="1"
+                value={recLatencyOffset}
+                onChange={(e) => setRecLatencyOffset(parseInt(e.target.value))}
+                style={{ width: '40px', height: '4px', accentColor: '#ff9f00', cursor: 'pointer', margin: 0 }}
+              />
+              <span className="font-mono" style={{ color: '#fff', fontSize: '0.42rem', minWidth: '28px', textAlign: 'right' }}>
+                {recLatencyOffset}ms
+              </span>
+            </div>
+          )}
 
           {/* Start/Stop Rec Trigger Button */}
           <button
