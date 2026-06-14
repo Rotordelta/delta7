@@ -50,22 +50,69 @@
         .vertical-highway {
           position: relative;
           width: 226px;
-          height: 170px;
+          height: 180px;
           background: #000000;
-          border-radius: 6px;
+          border-radius: 6px 6px 0 0;
           overflow: hidden;
           box-shadow: inset 0 0 15px rgba(0,0,0,0.95);
           user-select: none;
           flex-shrink: 0;
-          margin: 6px auto;
+          margin: 0;
         }
         .deck-a-highway {
           border: 1px solid rgba(0, 243, 255, 0.45);
-          box-shadow: 0 0 12px rgba(0, 243, 255, 0.25), inset 0 0 15px rgba(0,0,0,0.95);
+          border-bottom: none;
+          box-shadow: 0 -4px 12px rgba(0, 243, 255, 0.15), inset 0 0 15px rgba(0,0,0,0.95);
         }
         .deck-b-highway {
           border: 1px solid rgba(255, 0, 255, 0.45);
-          box-shadow: 0 0 12px rgba(255, 0, 255, 0.25), inset 0 0 15px rgba(0,0,0,0.95);
+          border-bottom: none;
+          box-shadow: 0 -4px 12px rgba(255, 0, 255, 0.15), inset 0 0 15px rgba(0,0,0,0.95);
+        }
+        .highway-block-container {
+          display: flex;
+          flex-direction: column;
+          width: 226px;
+          margin: 6px auto;
+          flex-shrink: 0;
+        }
+        .highway-mixing-row {
+          position: relative;
+          width: 226px;
+          height: 70px;
+          background: #030812;
+          border-radius: 0 0 6px 6px;
+          flex-shrink: 0;
+          margin: 0;
+        }
+        .deck-a-mixing-row {
+          border: 1px solid rgba(0, 243, 255, 0.45);
+          border-top: 1px solid rgba(0, 243, 255, 0.2);
+          box-shadow: 0 4px 12px rgba(0, 243, 255, 0.15), inset 0 0 10px rgba(0,0,0,0.8);
+        }
+        .deck-b-mixing-row {
+          border: 1px solid rgba(255, 0, 255, 0.45);
+          border-top: 1px solid rgba(255, 0, 255, 0.2);
+          box-shadow: 0 4px 12px rgba(255, 0, 255, 0.15), inset 0 0 10px rgba(0,0,0,0.8);
+        }
+        .highway-mixing-col {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 28px;
+        }
+        .highway-mix-label {
+          position: absolute;
+          left: 0;
+          width: 28px;
+          top: 56px;
+          height: 12px;
+          font-size: 0.44rem;
+          font-weight: bold;
+          font-family: monospace;
+          text-align: center;
+          user-select: none;
+          pointer-events: none;
         }
         .highway-lane-line {
           position: absolute;

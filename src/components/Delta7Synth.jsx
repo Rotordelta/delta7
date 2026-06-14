@@ -822,28 +822,66 @@ export default function Delta7Synth() {
   const animationFrameIdRef = useRef(null);
 
   // --- Sampler States & Slots ---
-  const [sampleSlots, setSampleSlots] = useState([
-    { id: 'a01', name: 'Bank A Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a02', name: 'Bank A Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a03', name: 'Bank A Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a04', name: 'Bank A Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a05', name: 'Bank A Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a06', name: 'Bank A Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a07', name: 'Bank A Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'a08', name: 'Bank A Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b01', name: 'Bank B Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b02', name: 'Bank B Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b03', name: 'Bank B Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b04', name: 'Bank B Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b05', name: 'Bank B Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b06', name: 'Bank B Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b07', name: 'Bank B Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-    { id: 'b08', name: 'Bank B Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
-  ]);
+  const [sampleSlots, setSampleSlots] = useState(() => {
+    const rawSlots = [
+      { id: 'a01', name: 'Bank A Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'a02', name: 'Bank A Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'a03', name: 'Bank A Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'a04', name: 'Bank A Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'a05', name: 'Bank A Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'a06', name: 'Bank A Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'a07', name: 'Bank A Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'a08', name: 'Bank A Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'b01', name: 'Bank B Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'b02', name: 'Bank B Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'b03', name: 'Bank B Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'b04', name: 'Bank B Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'b05', name: 'Bank B Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'b06', name: 'Bank B Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'b07', name: 'Bank B Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'b08', name: 'Bank B Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'c01', name: 'Bank C Slot 1', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'c02', name: 'Bank C Slot 2', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'c03', name: 'Bank C Slot 3', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'c04', name: 'Bank C Slot 4', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'c05', name: 'Bank C Slot 5', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'c06', name: 'Bank C Slot 6', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'c07', name: 'Bank C Slot 7', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+      { id: 'c08', name: 'Bank C Slot 8', buffer: null, revBuffer: null, rootNote: 60, volume: 1.0, sliceCount: 16, start: 0.0, end: 1.0, loopStart: 0.0, loopEnd: 1.0, loopOn: false, reverseOn: false, warpOn: false, warpBeats: 4, tuning: 0, triggerMode: 'hold', sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })) },
+    ];
+    return rawSlots.map(s => ({
+      ...s,
+      attack: 0.01,
+      decay: 0.3,
+      lfoType: 'sine',
+      lfoRateMode: 'hz',
+      lfoFade: 0,
+      lfoRetrigger: true,
+      randomPan: 0.0
+    }));
+  });
   const sampleSlotsRef = useRef(sampleSlots);
+  const [activeBankCSlotId, setActiveBankCSlotId] = useState('c01');
+  const activeBankCSlotIdRef = useRef('c01');
+  useEffect(() => { activeBankCSlotIdRef.current = activeBankCSlotId; }, [activeBankCSlotId]);
+
+  const [keyboardMapBankC, setKeyboardMapBankC] = useState(false);
+  const keyboardMapBankCRef = useRef(false);
+  useEffect(() => { keyboardMapBankCRef.current = keyboardMapBankC; }, [keyboardMapBankC]);
+  const freeLfosRef = useRef(new Map());
   useEffect(() => {
     sampleSlotsRef.current = sampleSlots;
   }, [sampleSlots]);
+
+  useEffect(() => {
+    return () => {
+      freeLfosRef.current.forEach(shared => {
+        try { shared.lfo.stop(); } catch (e) {}
+        try { shared.lfo.disconnect(); } catch (e) {}
+      });
+      freeLfosRef.current.clear();
+    };
+  }, []);
 
   // O(1) slot lookups â€” replaces sampleSlots.find() in render loops
   const slotMap = useMemo(() => {
@@ -1209,6 +1247,7 @@ export default function Delta7Synth() {
   };
   const [bankAPreset, setBankAPreset] = useState(1);
   const [bankBPreset, setBankBPreset] = useState(1);
+  const [bankCPreset, setBankCPreset] = useState(1);
   const [isRecording, setIsRecording] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
   const [recordingInputGain, setRecordingInputGain] = useState(1.0);
@@ -1813,9 +1852,10 @@ export default function Delta7Synth() {
 
   const getSlotLabel = (slotId) => {
     if (!slotId) return '';
-    if (slotId.startsWith('a')) return `A${parseInt(slotId.slice(1))}`;
-    if (slotId.startsWith('b')) return `B${parseInt(slotId.slice(1))}`;
-    const num = parseInt(slotId.slice(2));
+    if (slotId.startsWith('a')) return `A${parseInt(slotId.slice(1), 10)}`;
+    if (slotId.startsWith('b')) return `B${parseInt(slotId.slice(1), 10)}`;
+    if (slotId.startsWith('c')) return `C${parseInt(slotId.slice(1), 10)}`;
+    const num = parseInt(slotId.slice(2), 10);
     return `U${num}`;
   };
 
@@ -1908,7 +1948,7 @@ export default function Delta7Synth() {
               voice.driftLfo, voice.vibratoLfo, voice.filterLfo,
               voice.gainA, voice.gainB, voice.gainA_L, voice.gainA_R, voice.subGain, voice.noiseGain,
               voice.vibratoLfoGain, voice.filterLfoGain, voice.filter1, voice.filter2,
-              voice.eqLowNode, voice.eqMidNode, voice.eqHighNode, voice.sendGainNode, voice.voiceOutGain
+              voice.eqLowNode, voice.eqMidNode, voice.eqHighNode, voice.sendGainNode, voice.slotGainNode, voice.voiceOutGain
             ];
             nodes.forEach(node => {
               if (node && typeof node.disconnect === 'function') {
@@ -2169,7 +2209,22 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') ctx.resume();
     
-    if (!streamRef.current) {
+    if (recordingInputMode === 'resample') {
+      if (!resamplerGainNodeRef.current) {
+        const resamplerGainNode = ctx.createGain();
+        resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+        resamplerGainNodeRef.current = resamplerGainNode;
+        if (analyserRef.current) {
+          analyserRef.current.connect(resamplerGainNode);
+        }
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        micAnalyserRef.current = analyser;
+        resamplerGainNode.connect(analyser);
+      }
+      setupLosslessRecorderNode(ctx, resamplerGainNodeRef.current);
+      triggerLiveLoopRecInternal();
+    } else if (!streamRef.current) {
       showEditorStatus("Arming mic/instrument input... 🎤");
       armMicrophone()
         .then(() => {
@@ -2188,6 +2243,14 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     
+    // Feedback prevention: Stop the target pad playback and mute its UI state
+    const targetSlot = liveRecTargetSlotRef.current;
+    const targetDeck = targetSlot[0].toUpperCase();
+    const targetIndex = parseInt(targetSlot.slice(2), 10) - 1;
+    stopPerfVoice(`perf-${targetDeck.toLowerCase()}-slot-${targetIndex}`);
+    setPerfPad(`${targetDeck}-slot-${targetIndex}`, false);
+    setPerfPad(`${targetDeck}-slot-${targetIndex}-pending`, false);
+
     const bpm = paramsRef.current.arpBpm || 120;
     const beatDuration = 60 / bpm;
     const totalSec = beatDuration * liveRecBeatsRef.current;
@@ -3188,6 +3251,15 @@ export default function Delta7Synth() {
                 routeToXyPad: saved.routeToXyPad ?? slot.routeToXyPad,
                 tuning: saved.tuning ?? slot.tuning,
                 triggerMode: saved.triggerMode ?? slot.triggerMode,
+                attack: saved.attack ?? slot.attack,
+                decay: saved.decay ?? slot.decay,
+                lfoType: saved.lfoType ?? slot.lfoType,
+                lfoRateMode: saved.lfoRateMode ?? slot.lfoRateMode,
+                lfoFade: saved.lfoFade ?? slot.lfoFade,
+                lfoRetrigger: saved.lfoRetrigger ?? slot.lfoRetrigger,
+                randomPan: saved.randomPan ?? slot.randomPan,
+                sliceMasterKey: saved.sliceMasterKey ?? slot.sliceMasterKey,
+                sliceMasterOctave: saved.sliceMasterOctave ?? slot.sliceMasterOctave,
               };
             }
             return slot;
@@ -3221,10 +3293,21 @@ export default function Delta7Synth() {
 
     const deck = slotId.startsWith('a') ? 'a' : 'b';
     const index = parseInt(slotId.slice(1)) - 1;
-    const voiceKey = `perf-${deck}-slot-${index}`;
 
-    const voices = activeVoicesRef.current.get(voiceKey);
-    if (!voices || voices.length === 0) return;
+    const voices = [];
+    activeVoicesRef.current.forEach((voicesList, key) => {
+      const isLoopKey = key === `perf-${deck}-slot-${index}`;
+      const isSliceKey = key.startsWith(`perf-${deck}-slice-${index}-`);
+      if (isLoopKey || isSliceKey) {
+        if (Array.isArray(voicesList)) {
+          voicesList.forEach(v => {
+            if (v) voices.push(v);
+          });
+        }
+      }
+    });
+
+    if (voices.length === 0) return;
 
     voices.forEach(voice => {
       if (!voice) return;
@@ -3265,49 +3348,19 @@ export default function Delta7Synth() {
         }
       }
 
-      if (param === 'lfoTarget' || param === 'lfoRate' || param === 'lfoDepth') {
+      if (param === 'volume') {
+        if (voice.slotGainNode) {
+          voice.slotGainNode.gain.cancelScheduledValues(now);
+          voice.slotGainNode.gain.setValueAtTime(voice.slotGainNode.gain.value, now);
+          voice.slotGainNode.gain.linearRampToValueAtTime(val, now + 0.015);
+        }
+      }
+
+      if (param === 'lfoTarget' || param === 'lfoRate' || param === 'lfoDepth' ||
+          param === 'lfoType' || param === 'lfoRateMode' || param === 'lfoFade' || param === 'lfoRetrigger') {
         const slot = sampleSlotsRef.current.find(s => s.id === slotId);
         if (slot) {
-          const target = slot.lfoTarget || 'None';
-          const rate = slot.lfoRate !== undefined ? slot.lfoRate : 3.0;
-          const depth = slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0;
-
-          // Clean up existing LFO if any
-          if (voice.slotLfo) {
-            try { voice.slotLfo.stop(); } catch (e) {}
-            try { voice.slotLfo.disconnect(); } catch (e) {}
-            voice.slotLfo = null;
-          }
-          if (voice.slotLfoGain) {
-            try { voice.slotLfoGain.disconnect(); } catch (e) {}
-            voice.slotLfoGain = null;
-          }
-
-          // Create new LFO if target is not 'None' and depth > 0
-          if (target !== 'None' && depth > 0) {
-            const slotLfo = ctx.createOscillator();
-            slotLfo.frequency.setValueAtTime(rate, now);
-            const slotLfoGain = ctx.createGain();
-
-            let totalDepth = depth;
-            if (target === 'Filter Cutoff') {
-              totalDepth = depth * 1500;
-              slotLfoGain.connect(voice.filter1.frequency);
-            } else if (target === 'Pan' && voice.padPannerNode) {
-              totalDepth = depth;
-              slotLfoGain.connect(voice.padPannerNode.pan);
-            } else if (target === 'FX Send' && voice.sendGainNode) {
-              totalDepth = depth;
-              slotLfoGain.connect(voice.sendGainNode.gain);
-            }
-
-            slotLfoGain.gain.setValueAtTime(totalDepth, now);
-            slotLfo.connect(slotLfoGain);
-            slotLfo.start(now);
-
-            voice.slotLfo = slotLfo;
-            voice.slotLfoGain = slotLfoGain;
-          }
+          setupVoiceLfo(voice, slot, ctx, now);
         }
       }
 
@@ -3330,7 +3383,7 @@ export default function Delta7Synth() {
         }
       }
 
-      if (param === 'tuning') {
+      if (param === 'tuning' || param === 'sliceMasterKey' || param === 'sliceMasterOctave') {
         const isDeckA = deck === 'a';
         const stopFactor = tapeStopFactorRef.current;
 
@@ -3338,12 +3391,26 @@ export default function Delta7Synth() {
           const slotA = sampleSlotsRef.current.find(s => s.id === slotId);
           if (!slotA) return;
 
+          let tuningA = voice.tuningA !== undefined ? voice.tuningA : 0;
+          if (param === 'tuning') {
+            tuningA = val;
+            voice.tuningA = val;
+          } else if (param === 'sliceMasterKey') {
+            voice.sliceMasterKeyA = val;
+            voice.slicePitchA = (voice.sliceIndividualPitchA || 0) + val + (voice.sliceMasterOctaveA || 0) * 12;
+            voice.notePitchFactorA = Math.pow(2, voice.oscAOctave || 0) * Math.pow(2, (voice.oscAPitch || 0) / 12) * Math.pow(2, voice.slicePitchA / 12);
+          } else if (param === 'sliceMasterOctave') {
+            voice.sliceMasterOctaveA = val;
+            voice.slicePitchA = (voice.sliceIndividualPitchA || 0) + (voice.sliceMasterKeyA || 0) + val * 12;
+            voice.notePitchFactorA = Math.pow(2, voice.oscAOctave || 0) * Math.pow(2, (voice.oscAPitch || 0) / 12) * Math.pow(2, voice.slicePitchA / 12);
+          }
+
           let warpBaseRateA = 1.0;
           if (voice.type === 'slice') {
-            warpBaseRateA = Math.pow(2, voice.oscAOctave || 0) * Math.pow(2, (voice.oscAPitch || 0) / 12) * Math.pow(2, (voice.slicePitchA || 0) / 12) * Math.pow(2, val / 12);
+            warpBaseRateA = Math.pow(2, voice.oscAOctave || 0) * Math.pow(2, (voice.oscAPitch || 0) / 12) * Math.pow(2, (voice.slicePitchA || 0) / 12) * Math.pow(2, tuningA / 12);
           } else {
             const rootNoteA = slotA.rootNote || 60;
-            warpBaseRateA = Math.pow(2, (voice.note - rootNoteA + (voice.oscAPitch || 0) + (voice.oscAOctave || 0) * 12 + val) / 12) * (voice.pbFactor || 1.0);
+            warpBaseRateA = Math.pow(2, (voice.note - rootNoteA + (voice.oscAPitch || 0) + (voice.oscAOctave || 0) * 12 + tuningA) / 12) * (voice.pbFactor || 1.0);
           }
 
           voice.warpBaseRateA = warpBaseRateA;
@@ -3363,7 +3430,6 @@ export default function Delta7Synth() {
           voice.orig_oscA_rate = freqScaleA;
           voice.orig_oscA_L_rate = freqScaleA;
           voice.orig_oscA_R_rate = freqScaleA;
-          voice.tuningA = val;
 
           if (voice.oscA && voice.oscA.playbackRate) {
             voice.oscA.playbackRate.cancelScheduledValues(now);
@@ -3384,12 +3450,26 @@ export default function Delta7Synth() {
           const slotB = sampleSlotsRef.current.find(s => s.id === slotId);
           if (!slotB) return;
 
+          let tuningB = voice.tuningB !== undefined ? voice.tuningB : 0;
+          if (param === 'tuning') {
+            tuningB = val;
+            voice.tuningB = val;
+          } else if (param === 'sliceMasterKey') {
+            voice.sliceMasterKeyB = val;
+            voice.slicePitchB = (voice.sliceIndividualPitchB || 0) + val + (voice.sliceMasterOctaveB || 0) * 12;
+            voice.notePitchFactorB = Math.pow(2, voice.oscBOctave || 0) * Math.pow(2, (voice.oscBPitch || 0) / 12) * Math.pow(2, voice.slicePitchB / 12);
+          } else if (param === 'sliceMasterOctave') {
+            voice.sliceMasterOctaveB = val;
+            voice.slicePitchB = (voice.sliceIndividualPitchB || 0) + (voice.sliceMasterKeyB || 0) + val * 12;
+            voice.notePitchFactorB = Math.pow(2, voice.oscBOctave || 0) * Math.pow(2, (voice.oscBPitch || 0) / 12) * Math.pow(2, voice.slicePitchB / 12);
+          }
+
           let warpBaseRateB = 1.0;
           if (voice.type === 'slice') {
-            warpBaseRateB = Math.pow(2, voice.oscBOctave || 0) * Math.pow(2, (voice.oscBPitch || 0) / 12) * Math.pow(2, (voice.slicePitchB || 0) / 12) * Math.pow(2, val / 12);
+            warpBaseRateB = Math.pow(2, voice.oscBOctave || 0) * Math.pow(2, (voice.oscBPitch || 0) / 12) * Math.pow(2, (voice.slicePitchB || 0) / 12) * Math.pow(2, tuningB / 12);
           } else {
             const rootNoteB = slotB.rootNote || 60;
-            warpBaseRateB = Math.pow(2, (voice.note - rootNoteB + (voice.oscBPitch || 0) + (voice.oscBOctave || 0) * 12 + val) / 12) * (voice.pbFactor || 1.0);
+            warpBaseRateB = Math.pow(2, (voice.note - rootNoteB + (voice.oscBPitch || 0) + (voice.oscBOctave || 0) * 12 + tuningB) / 12) * (voice.pbFactor || 1.0);
           }
 
           voice.warpBaseRateB = warpBaseRateB;
@@ -3409,7 +3489,6 @@ export default function Delta7Synth() {
           voice.orig_oscB_rate = freqScaleB;
           voice.orig_oscB_L_rate = freqScaleB;
           voice.orig_oscB_R_rate = freqScaleB;
-          voice.tuningB = val;
 
           if (voice.oscB && voice.oscB.playbackRate) {
             voice.oscB.playbackRate.cancelScheduledValues(now);
@@ -3455,6 +3534,124 @@ export default function Delta7Synth() {
     });
   };
 
+  const setupVoiceLfo = (voice, slot, ctx, now) => {
+    if (voice.slotLfo) {
+      try { voice.slotLfo.stop(); } catch (e) {}
+      try { voice.slotLfo.disconnect(); } catch (e) {}
+      voice.slotLfo = null;
+    }
+    if (voice.slotLfoTimer) {
+      clearTimeout(voice.slotLfoTimer);
+      voice.slotLfoTimer = null;
+    }
+    if (voice.slotLfoGain) {
+      try { voice.slotLfoGain.disconnect(); } catch (e) {}
+      voice.slotLfoGain = null;
+    }
+
+    const target = slot.lfoTarget || 'None';
+    const depth = slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0;
+
+    if (target === 'None' || depth <= 0) return;
+
+    const rate = slot.lfoRate !== undefined ? slot.lfoRate : 3.0;
+    const rateMode = slot.lfoRateMode || 'hz';
+    const type = slot.lfoType || 'sine';
+    const fade = slot.lfoFade !== undefined ? slot.lfoFade : 0;
+    const retrigger = slot.lfoRetrigger !== false;
+
+    let freqHz = rate;
+    const bpm = paramsRef.current.arpBpm || 120;
+    if (rateMode === 'bpm') {
+      const beatDuration = 60 / bpm;
+      const cycleDuration = rate * beatDuration;
+      freqHz = 1 / Math.max(0.001, cycleDuration);
+    }
+
+    const fadeDuration = fade * (60 / bpm);
+
+    const slotLfoGain = ctx.createGain();
+    let totalDepth = depth;
+    if (target === 'Filter Cutoff') {
+      totalDepth = depth * 1500;
+      if (voice.filter1) {
+        slotLfoGain.connect(voice.filter1.frequency);
+      }
+    } else if (target === 'Pan') {
+      totalDepth = depth;
+      if (voice.padPannerNode) {
+        slotLfoGain.connect(voice.padPannerNode.pan);
+      }
+    } else if (target === 'FX Send') {
+      totalDepth = depth;
+      if (voice.sendGainNode) {
+        slotLfoGain.connect(voice.sendGainNode.gain);
+      }
+    }
+
+    if (fadeDuration > 0) {
+      slotLfoGain.gain.setValueAtTime(0, now);
+      slotLfoGain.gain.linearRampToValueAtTime(totalDepth, now + fadeDuration);
+    } else {
+      slotLfoGain.gain.setValueAtTime(totalDepth, now);
+    }
+
+    voice.slotLfoGain = slotLfoGain;
+
+    if (type === 'random') {
+      const shSource = ctx.createConstantSource();
+      shSource.offset.setValueAtTime(0, now);
+      shSource.start(now);
+      shSource.connect(slotLfoGain);
+      voice.slotLfo = shSource;
+
+      const periodMs = 1000 / freqHz;
+      const scheduleNext = () => {
+        const nextVal = Math.random() * 2 - 1;
+        try {
+          shSource.offset.setValueAtTime(nextVal, ctx.currentTime);
+        } catch (e) {}
+        voice.slotLfoTimer = setTimeout(scheduleNext, periodMs);
+      };
+
+      shSource.offset.setValueAtTime(Math.random() * 2 - 1, now);
+      voice.slotLfoTimer = setTimeout(scheduleNext, periodMs);
+    } else {
+      let slotLfoNode = null;
+      if (retrigger === false) {
+        let shared = freeLfosRef.current.get(slot.id);
+        if (!shared || !shared.lfo) {
+          const lfoNode = ctx.createOscillator();
+          lfoNode.type = type;
+          lfoNode.frequency.setValueAtTime(freqHz, now);
+          lfoNode.start(now);
+          shared = { lfo: lfoNode, type: type, rate: rate, rateMode: rateMode };
+          freeLfosRef.current.set(slot.id, shared);
+        } else {
+          if (shared.type !== type) {
+            shared.lfo.type = type;
+            shared.type = type;
+          }
+          if (shared.rate !== rate || shared.rateMode !== rateMode) {
+            shared.lfo.frequency.cancelScheduledValues(now);
+            shared.lfo.frequency.setValueAtTime(freqHz, now);
+            shared.rate = rate;
+            shared.rateMode = rateMode;
+          }
+        }
+        slotLfoNode = shared.lfo;
+      } else {
+        const localLfoNode = ctx.createOscillator();
+        localLfoNode.type = type;
+        localLfoNode.frequency.setValueAtTime(freqHz, now);
+        localLfoNode.start(now);
+        slotLfoNode = localLfoNode;
+        voice.slotLfo = localLfoNode;
+      }
+      slotLfoNode.connect(slotLfoGain);
+    }
+  };
+
   // --- Waveform Editor Actions ---
   const updateSlotParam = (slotId, param, val) => {
     const nextSlots = sampleSlotsRef.current.map(s => {
@@ -3466,6 +3663,7 @@ export default function Delta7Synth() {
     sampleSlotsRef.current = nextSlots;
     setSampleSlots(nextSlots);
     syncActiveVoiceParams(slotId, param, val);
+    saveSlotMetadataToDb(slotId, { [param]: val }).catch(() => {});
   };
 
   const handleStartChange = (val) => {
@@ -4980,7 +5178,8 @@ export default function Delta7Synth() {
             velocity: msg.velocity,
             isNoteOn: msg.isNoteOn,
             note: msg.note,
-            shouldRecord: msg.shouldRecord
+            shouldRecord: msg.shouldRecord,
+            sliceIdx: msg.sliceIdx
           };
           
           this.eventQueue.push(event);
@@ -5034,8 +5233,9 @@ export default function Delta7Synth() {
               const isNoteOn = arr[offset + 3] > 0.5;
               const shouldRecord = arr[offset + 4] > 0.5;
               const noteVal = arr[offset + 5];
-              const note = noteVal === -1.0 ? 'slot' : noteVal;
+              const note = noteVal === -1.0 ? 'slot' : noteVal === -2.0 ? 'slice' : noteVal;
               const gridVal = arr[offset + 6];
+              const sliceIdxVal = arr[offset + 7];
               
               const forceQuantizeGrid = gridVal;
               
@@ -5047,7 +5247,8 @@ export default function Delta7Synth() {
                 shouldRecord,
                 note,
                 forceQuantizeGrid,
-                isNoteKey: note !== 'slot'
+                isNoteKey: note !== 'slot' && note !== 'slice',
+                sliceIdx: sliceIdxVal >= 0 ? sliceIdxVal : undefined
               };
               this.handleLiveTrigger(fakeMsg);
               
@@ -5230,18 +5431,22 @@ export default function Delta7Synth() {
             msg.event.isNoteOn,
             false,
             msg.time,
-            msg.event.beat
+            msg.event.beat,
+            msg.event.sliceIdx,
+            true
           );
         } else if (msg.type === 'SCHEDULE_PAD') {
           triggerPerfPadDSP(
             msg.deck,
-            msg.note, // note holds type
+            msg.note,
             msg.index,
             msg.velocity,
             msg.isNoteOn,
             msg.shouldRecord,
             msg.targetTime,
-            msg.beat
+            msg.beat,
+            msg.sliceIdx,
+            false
           );
         }
       };
@@ -5376,6 +5581,8 @@ export default function Delta7Synth() {
           routeToXyPad: slot.routeToXyPad,
           tuning: slot.tuning,
           triggerMode: slot.triggerMode || 'hold',
+          sliceMasterKey: slot.sliceMasterKey !== undefined ? slot.sliceMasterKey : 0,
+          sliceMasterOctave: slot.sliceMasterOctave !== undefined ? slot.sliceMasterOctave : 0,
           channels: channels,
           sampleRate: sampleRate
         });
@@ -5467,7 +5674,7 @@ export default function Delta7Synth() {
           `Bank ${bankType.toUpperCase()} Preset ${presetNum} is empty. Would you like to load the factory default kit?`
         );
         if (loadDefault) {
-          const defaultKit = bankType === 'a' ? 'DRUMS' : 'AMBIENT';
+          const defaultKit = bankType === 'a' ? 'DRUMS' : (bankType === 'b' ? 'AMBIENT' : 'CHIPTUNE');
           await loadKitPreset(defaultKit, bankType);
         } else {
           showEditorStatus("Load cancelled.");
@@ -5517,7 +5724,9 @@ export default function Delta7Synth() {
               fxSend: savedSlot.fxSend ?? slot.fxSend,
               routeToXyPad: savedSlot.routeToXyPad ?? slot.routeToXyPad,
               tuning: savedSlot.tuning ?? slot.tuning,
-              triggerMode: savedSlot.triggerMode ?? slot.triggerMode
+              triggerMode: savedSlot.triggerMode ?? slot.triggerMode,
+              sliceMasterKey: savedSlot.sliceMasterKey ?? slot.sliceMasterKey,
+              sliceMasterOctave: savedSlot.sliceMasterOctave ?? slot.sliceMasterOctave
             };
           }
         }
@@ -6429,7 +6638,10 @@ export default function Delta7Synth() {
       const sliceCountA = slotA.sliceCount || 16;
       const sliceIndexA = ((note - rootNoteA) % sliceCountA + sliceCountA) % sliceCountA;
       sliceEnvA = slotA.sliceParams[sliceIndexA] || { attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false };
-      slicePitchA = sliceEnvA.pitch !== undefined ? sliceEnvA.pitch : 0;
+      const individualPitchA = sliceEnvA.pitch !== undefined ? sliceEnvA.pitch : 0;
+      const mKeyA = slotA.sliceMasterKey !== undefined ? slotA.sliceMasterKey : 0;
+      const mOctA = slotA.sliceMasterOctave !== undefined ? slotA.sliceMasterOctave : 0;
+      slicePitchA = individualPitchA + mKeyA + mOctA * 12;
       sliceStretchA = sliceEnvA.stretch !== undefined ? sliceEnvA.stretch : 0;
       sliceLoopA = sliceEnvA.loop !== undefined ? sliceEnvA.loop : false;
       sliceReverseA = sliceEnvA.reverse !== undefined ? sliceEnvA.reverse : false;
@@ -6446,7 +6658,10 @@ export default function Delta7Synth() {
       const sliceCountB = slotB.sliceCount || 16;
       const sliceIndexB = ((note - rootNoteB) % sliceCountB + sliceCountB) % sliceCountB;
       sliceEnvB = slotB.sliceParams[sliceIndexB] || { attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false };
-      slicePitchB = sliceEnvB.pitch !== undefined ? sliceEnvB.pitch : 0;
+      const individualPitchB = sliceEnvB.pitch !== undefined ? sliceEnvB.pitch : 0;
+      const mKeyB = slotB.sliceMasterKey !== undefined ? slotB.sliceMasterKey : 0;
+      const mOctB = slotB.sliceMasterOctave !== undefined ? slotB.sliceMasterOctave : 0;
+      slicePitchB = individualPitchB + mKeyB + mOctB * 12;
       sliceStretchB = sliceEnvB.stretch !== undefined ? sliceEnvB.stretch : 0;
       sliceLoopB = sliceEnvB.loop !== undefined ? sliceEnvB.loop : false;
       sliceReverseB = sliceEnvB.reverse !== undefined ? sliceEnvB.reverse : false;
@@ -6658,8 +6873,8 @@ export default function Delta7Synth() {
     const oscBVol = prog.oscBVol !== undefined ? prog.oscBVol : 0.5;
     const slotAVol = slotA && slotA.volume !== undefined ? slotA.volume : 1.0;
     const slotBVol = slotB && slotB.volume !== undefined ? slotB.volume : 1.0;
-    const gainAVol = oscAVol * Math.sqrt(1 - oscBalance) * slotAVol;
-    const gainBVol = oscBVol * Math.sqrt(oscBalance) * slotBVol;
+    const gainAVol = oscAVol * Math.sqrt(1 - oscBalance);
+    const gainBVol = oscBVol * Math.sqrt(oscBalance);
 
     // Amp & Filter EG Setup
     const vca = (prog.perfPadAttack !== undefined) ? {
@@ -7364,8 +7579,25 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const stutterPannerNode = ctx.createStereoPanner();
     stutterPannerNode.pan.setValueAtTime(0.0, now);
 
+    let finalPadPan = padPan;
+    if (voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
+      const randomPanDepth = prog.perfPadRandomPan !== undefined ? prog.perfPadRandomPan : 0.0;
+      if (randomPanDepth > 0) {
+        const randPanVal = (Math.random() * 2 - 1) * randomPanDepth;
+        finalPadPan = Math.max(-1.0, Math.min(1.0, padPan + randPanVal));
+      }
+    }
+
     const padPannerNode = ctx.createStereoPanner();
-    padPannerNode.pan.setValueAtTime(padPan, now);
+    padPannerNode.pan.setValueAtTime(finalPadPan, now);
+
+    const isPerfVoice = voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-');
+    const slotGainNode = ctx.createGain();
+    const initialSlotVol = isPerfVoice
+      ? (voiceKey.includes('perf-a') ? slotAVol : slotBVol)
+      : 1.0;
+    slotGainNode.gain.setValueAtTime(initialSlotVol, now);
+    voiceObj.slotGainNode = slotGainNode;
 
     if (prog.filterMode === 'Double Series') {
       filter1.connect(filter2);
@@ -7375,6 +7607,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
     stutterGateNode.connect(stutterPannerNode);
     stutterPannerNode.connect(padPannerNode);
+    padPannerNode.connect(slotGainNode);
     
     if (voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
       const isDeckA = voiceKey.includes('perf-a');
@@ -7399,7 +7632,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       const initialHigh = isDeckA ? deckAEqHighValRef.current : deckBEqHighValRef.current;
       vEqHigh.gain.setValueAtTime(initialHigh < 0 ? initialHigh * 26.0 : initialHigh * 6.0, now);
 
-      padPannerNode.connect(vEqLow);
+      slotGainNode.connect(vEqLow);
       vEqLow.connect(vEqMid);
       vEqMid.connect(vEqHigh);
       vEqHigh.connect(voiceOutGain);
@@ -7408,16 +7641,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       voiceObj.eqMidNode = vEqMid;
       voiceObj.eqHighNode = vEqHigh;
     } else {
-      padPannerNode.connect(voiceOutGain);
+      slotGainNode.connect(voiceOutGain);
     }
 
     // Always create sendGainNode for performance voices to allow real-time send automation
-    const isPerfVoice = voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-');
     if (isPerfVoice || (padFxType !== 'None' && padFxSend > 0)) {
       const sendGainNode = ctx.createGain();
       const initialSendGain = (padFxType !== 'None') ? padFxSend : 0.0;
       sendGainNode.gain.setValueAtTime(initialSendGain, now);
-      padPannerNode.connect(sendGainNode);
+      slotGainNode.connect(sendGainNode);
 
       if (padFxType === 'Space Echo' && delayInputRef.current) {
         sendGainNode.connect(delayInputRef.current);
@@ -7697,41 +7929,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     voiceObj.oscAOctave = oscAOctave;
     voiceObj.oscAPitch = oscAPitch;
+    voiceObj.sliceIndividualPitchA = slotA && sliceEnvA ? (sliceEnvA.pitch !== undefined ? sliceEnvA.pitch : 0) : 0;
+    voiceObj.sliceMasterKeyA = slotA ? (slotA.sliceMasterKey !== undefined ? slotA.sliceMasterKey : 0) : 0;
+    voiceObj.sliceMasterOctaveA = slotA ? (slotA.sliceMasterOctave !== undefined ? slotA.sliceMasterOctave : 0) : 0;
     voiceObj.slicePitchA = slicePitchA;
+
     voiceObj.oscBOctave = oscBOctave;
     voiceObj.oscBPitch = oscBPitch;
+    voiceObj.sliceIndividualPitchB = slotB && sliceEnvB ? (sliceEnvB.pitch !== undefined ? sliceEnvB.pitch : 0) : 0;
+    voiceObj.sliceMasterKeyB = slotB ? (slotB.sliceMasterKey !== undefined ? slotB.sliceMasterKey : 0) : 0;
+    voiceObj.sliceMasterOctaveB = slotB ? (slotB.sliceMasterOctave !== undefined ? slotB.sliceMasterOctave : 0) : 0;
     voiceObj.slicePitchB = slicePitchB;
     voiceObj.pbFactor = pbFactor;
 
     // Custom Slot-level LFO modulation for performance voices
     if (isPerfVoice) {
-      const slotLfoTarget = prog.perfPadLfoTarget || 'None';
-      const slotLfoRate = prog.perfPadLfoRate !== undefined ? prog.perfPadLfoRate : 3.0;
-      const slotLfoDepth = prog.perfPadLfoDepth !== undefined ? prog.perfPadLfoDepth : 0.0;
-      
-      if (slotLfoTarget !== 'None' && slotLfoDepth > 0) {
-        const slotLfo = ctx.createOscillator();
-        slotLfo.frequency.setValueAtTime(slotLfoRate, now);
-        const slotLfoGain = ctx.createGain();
-        
-        let totalDepth = slotLfoDepth;
-        if (slotLfoTarget === 'Filter Cutoff') {
-          totalDepth = slotLfoDepth * 1500;
-          slotLfoGain.connect(filter1.frequency);
-        } else if (slotLfoTarget === 'Pan') {
-          totalDepth = slotLfoDepth;
-          slotLfoGain.connect(padPannerNode.pan);
-        } else if (slotLfoTarget === 'FX Send' && voiceObj.sendGainNode) {
-          totalDepth = slotLfoDepth;
-          slotLfoGain.connect(voiceObj.sendGainNode.gain);
-        }
-        
-        slotLfoGain.gain.setValueAtTime(totalDepth, now);
-        slotLfo.connect(slotLfoGain);
-        slotLfo.start(now);
-        
-        voiceObj.slotLfo = slotLfo;
-        voiceObj.slotLfoGain = slotLfoGain;
+      const deckLetter = voiceKey.includes('perf-a') ? 'A' : 'B';
+      const slotId = deckLetter === 'A' ? prog.oscAWave : prog.oscBWave;
+      const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+      if (slot) {
+        setupVoiceLfo(voiceObj, slot, ctx, now);
       }
     }
 
@@ -7751,6 +7968,78 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         return next;
       });
       setMidiLearnParam(null);
+      return;
+    }
+
+    // Intercept Bank C keyboard slice mapping
+    if (keyboardMapBankCRef.current && note >= 48 && note <= 63) {
+      const sliceIndex = note - 48;
+      const slotId = activeBankCSlotIdRef.current;
+      const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+      if (slot && slot.buffer) {
+        stopVoice(note);
+        
+        const tempProg = {
+          ...paramsRef.current,
+          oscAWave: slotId,
+          oscATriggerMode: 'slice',
+          oscAVol: 1.0,
+          oscBVol: 0.0,
+          oscMode: 'single',
+        };
+        
+        if (!audioCtxRef.current) initAudio();
+        const ctx = audioCtxRef.current;
+        if (ctx.state === 'suspended') ctx.resume();
+        
+        const noteToPlay = slot.rootNote + sliceIndex;
+        const voice = playProgramVoice(ctx, noteToPlay, velocity, tempProg, `${note}-bankc`);
+        activeVoicesRef.current.set(note, [voice]);
+        
+        setActiveNotes(prev => {
+          const next = new Set(prev);
+          next.add(note);
+          return next;
+        });
+
+        // Record the slice event to looper target pad if live recording is active
+        if (isLiveRecordingRef.current) {
+          const targetDeck = liveRecTargetSlotRef.current[0].toUpperCase();
+          const targetIndex = parseInt(liveRecTargetSlotRef.current.slice(2), 10) - 1;
+          
+          if (schedulerNodeRef.current) {
+            schedulerNodeRef.current.port.postMessage({
+              type: 'LIVE_TRIGGER',
+              deck: targetDeck,
+              index: targetIndex,
+              velocity: velocity,
+              isNoteOn: true,
+              isNoteKey: false,
+              shouldRecord: true,
+              note: 'slice',
+              sliceIdx: sliceIndex,
+              forceQuantizeGrid: 'None'
+            });
+          } else {
+            const now = ctx.currentTime;
+            const elapsedSec = now - liveRecStartTimeRef.current;
+            const bpm = paramsRef.current.arpBpm || 120;
+            const targetBeat = elapsedSec / (60 / bpm);
+            
+            perfEventsRef.current.push({
+              beat: targetBeat,
+              deck: targetDeck,
+              type: 'slice',
+              index: targetIndex,
+              sliceIdx: sliceIndex,
+              velocity,
+              isNoteOn: true,
+              triggerMode: 'hold'
+            });
+            setPerfEvents([...perfEventsRef.current]);
+          }
+        }
+      }
       return;
     }
 
@@ -7853,6 +8142,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         clearTimeout(voice.stutterTimeoutId);
       }
 
+      if (voice.slotLfoTimer) {
+        clearTimeout(voice.slotLfoTimer);
+      }
       if (voice.slotLfo) {
         try {
           voice.slotLfo.stop(now);
@@ -7956,11 +8248,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           if (voice.eqMidNode) { try { voice.eqMidNode.disconnect(); } catch {} }
           if (voice.eqHighNode) { try { voice.eqHighNode.disconnect(); } catch {} }
           if (voice.sendGainNode) { try { voice.sendGainNode.disconnect(); } catch {} }
+          if (voice.slotGainNode) { try { voice.slotGainNode.disconnect(); } catch {} }
           if (voice.voiceOutGain) { try { voice.voiceOutGain.disconnect(); } catch {} }
           // Previously leaked nodes — now properly disconnected
           if (voice.stutterGateNode) { try { voice.stutterGateNode.disconnect(); } catch {} }
           if (voice.stutterPannerNode) { try { voice.stutterPannerNode.disconnect(); } catch {} }
           if (voice.padPannerNode) { try { voice.padPannerNode.disconnect(); } catch {} }
+          if (voice.slotLfoTimer) { clearTimeout(voice.slotLfoTimer); }
           if (voice.slotLfo) { try { voice.slotLfo.stop(); } catch {} }
           if (voice.slotLfo) { try { voice.slotLfo.disconnect(); } catch {} }
           if (voice.slotLfoGain) { try { voice.slotLfoGain.disconnect(); } catch {} }
@@ -7972,6 +8266,62 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const stopVoice = (note) => {
+    // Intercept Bank C keyboard slice mapping
+    if (keyboardMapBankCRef.current && note >= 48 && note <= 63) {
+      const sliceIndex = note - 48;
+      
+      const voices = activeVoicesRef.current.get(note);
+      if (voices) {
+        voices.forEach(releaseVoice);
+        activeVoicesRef.current.delete(note);
+      }
+      
+      setActiveNotes(prev => {
+        const next = new Set(prev);
+        next.delete(note);
+        return next;
+      });
+
+      if (isLiveRecordingRef.current) {
+        const targetDeck = liveRecTargetSlotRef.current[0].toUpperCase();
+        const targetIndex = parseInt(liveRecTargetSlotRef.current.slice(2), 10) - 1;
+        
+        if (schedulerNodeRef.current) {
+          schedulerNodeRef.current.port.postMessage({
+            type: 'LIVE_TRIGGER',
+            deck: targetDeck,
+            index: targetIndex,
+            velocity: 0,
+            isNoteOn: false,
+            isNoteKey: false,
+            shouldRecord: true,
+            note: 'slice',
+            sliceIdx: sliceIndex,
+            forceQuantizeGrid: 'None'
+          });
+        } else {
+          const ctx = audioCtxRef.current;
+          const now = ctx ? ctx.currentTime : performance.now() / 1000;
+          const elapsedSec = now - liveRecStartTimeRef.current;
+          const bpm = paramsRef.current.arpBpm || 120;
+          const targetBeat = elapsedSec / (60 / bpm);
+          
+          perfEventsRef.current.push({
+            beat: targetBeat,
+            deck: targetDeck,
+            type: 'slice',
+            index: targetIndex,
+            sliceIdx: sliceIndex,
+            velocity: 0,
+            isNoteOn: false,
+            triggerMode: 'hold'
+          });
+          setPerfEvents([...perfEventsRef.current]);
+        }
+      }
+      return;
+    }
+
     // Check if Note maps to performance pads
     let padReleased = false;
     Object.keys(midiMappings).forEach(key => {
@@ -8079,7 +8429,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     });
   };
 
-  const writeEventToSab = (deck, index, velocity, isNoteOn, shouldRecord, note, forceQuantizeGrid) => {
+  const writeEventToSab = (deck, index, velocity, isNoteOn, shouldRecord, note, forceQuantizeGrid, sliceIdx = undefined) => {
     if (!sharedIntRef.current || !sharedFloatRef.current) return false;
     
     const arrInt = sharedIntRef.current;
@@ -8101,15 +8451,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     arrFloat[offset + 3] = isNoteOn ? 1.0 : 0.0;
     arrFloat[offset + 4] = shouldRecord ? 1.0 : 0.0;
     
-    arrFloat[offset + 5] = note === 'slot' ? -1.0 : parseFloat(note);
+    arrFloat[offset + 5] = note === 'slot' ? -1.0 : note === 'slice' ? -2.0 : parseFloat(note);
     arrFloat[offset + 6] = forceQuantizeGrid;
-    arrFloat[offset + 7] = audioCtxRef.current ? audioCtxRef.current.currentTime : 0;
+    arrFloat[offset + 7] = sliceIdx !== undefined ? sliceIdx : -1.0;
     
     Atomics.store(arrInt, SAB_WRITE_IDX, nextWriteIdx);
     return true;
   };
 
-  const dispatchLiveTrigger = (deck, type, index, velocity, isNoteOn, shouldRecord, forceQuantizeGrid) => {
+  const dispatchLiveTrigger = (deck, type, index, velocity, isNoteOn, shouldRecord, forceQuantizeGrid, sliceIdx = undefined) => {
     if (sharedIntRef.current && schedulerNodeRef.current) {
       let gridVal = 0.0;
       if (typeof forceQuantizeGrid === 'number') {
@@ -8118,7 +8468,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         gridVal = resolveGridToBeats(forceQuantizeGrid);
       }
       
-      const success = writeEventToSab(deck, index, velocity, isNoteOn, shouldRecord, type, gridVal);
+      const success = writeEventToSab(deck, index, velocity, isNoteOn, shouldRecord, type, gridVal, sliceIdx);
       if (success) return;
     }
     
@@ -8129,13 +8479,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         index,
         velocity,
         isNoteOn,
-        isNoteKey: type !== 'slot',
+        isNoteKey: type !== 'slot' && type !== 'slice',
         shouldRecord,
         note: type,
+        sliceIdx,
         forceQuantizeGrid
       });
     } else {
-      triggerPerfPadDSP(deck, type, index, velocity, isNoteOn, shouldRecord, audioCtxRef.current ? audioCtxRef.current.currentTime : 0, 0);
+      triggerPerfPadDSP(deck, type, index, velocity, isNoteOn, shouldRecord, audioCtxRef.current ? audioCtxRef.current.currentTime : 0, 0, sliceIdx, false);
     }
   };
 
@@ -8209,20 +8560,28 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (triggerMode === 'latch') {
       if (!isNoteOn) return; // ignore release completely
       const padKey = `${deck}-${type}-${index}`;
-      const isAlreadyActive = activePerfPadsRef.current[padKey] || activePerfPadsRef.current[`${padKey}-pending`];
+      const isActive = activePerfPadsRef.current[padKey];
+      const isPending = activePerfPadsRef.current[`${padKey}-pending`];
+      
+      if (isPending) {
+        // Cancel pending start
+        setPerfPad(`${padKey}-pending`, false);
+        showEditorStatus("Pending Latch Cancelled ⏹️");
+        return;
+      }
       
       const quantGrid = perfQuantizeModeRef.current !== 'None' ? perfQuantizeModeRef.current : '1/4';
       
       // Auto-start playback if not already active to scroll highways and align start
-      if (!isAlreadyActive && !perfPlaybackActiveRef.current) {
+      if (!isActive && !perfPlaybackActiveRef.current) {
         startPlaybackAutomatically();
       }
       
-      if (!isAlreadyActive) {
+      if (!isActive) {
         setPerfPad(`${padKey}-pending`, true);
       }
       
-      dispatchLiveTrigger(deck, type, index, velocity, true, actualShouldRecord, isAlreadyActive ? 'None' : quantGrid);
+      dispatchLiveTrigger(deck, type, index, velocity, true, actualShouldRecord, isActive ? 'None' : quantGrid);
       return;
     }
 
@@ -8337,7 +8696,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     cycleTriggerMode(slotId, e);
   }, []);
 
-  const triggerPerfPadDSP = (deck, type, index, velocity, isNoteOn, shouldRecord, targetTime, targetBeat) => {
+  const triggerPerfPadDSP = (deck, type, index, velocity, isNoteOn, shouldRecord, targetTime, targetBeat, sliceIdx = undefined, isPlayback = false) => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     const now = ctx.currentTime;
@@ -8346,6 +8705,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     let slotId = '';
     if (type === 'slot') {
       slotId = (deck === 'A' ? 'a0' : 'b0') + (index + 1);
+    } else if (type === 'slice') {
+      slotId = activeBankCSlotIdRef.current;
     } else {
       slotId = deck === 'A' ? currentParams.oscAWave : currentParams.oscBWave;
     }
@@ -8354,13 +8715,21 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (!slot || !slot.buffer) return;
 
     const triggerMode = slot.triggerMode || 'hold';
-    const voiceKey = `perf-${deck.toLowerCase()}-${type}-${index}`;
-    const padKey = `${deck}-${type}-${index}`;
+    const voiceKey = type === 'slice' ? `perf-${deck.toLowerCase()}-slice-${index}-${sliceIdx}` : `perf-${deck.toLowerCase()}-${type}-${index}`;
+    const padKey = type === 'slice' ? `${deck}-slice-${index}-${sliceIdx}` : `${deck}-${type}-${index}`;
 
     // 1. Handle Key Release (Note Off)
     if (!isNoteOn) {
       if (triggerMode === 'latch') {
-        // Latch mode ignores key release
+        if (isPlayback) {
+          // Playback stop event: stop the voice!
+          stopPerfVoice(voiceKey);
+          setPerfPad(padKey, false);
+          setPerfPad(`${padKey}-pending`, false);
+          if (type === 'slice') setPerfPad(`${deck}-slot-${index}`, false);
+          return;
+        }
+        // Latch mode ignores key release from UI/hardware
         return;
       }
 
@@ -8369,8 +8738,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         stopPerfVoice(voiceKey);
         setPerfPad(padKey, false);
         setPerfPad(`${padKey}-pending`, false);
+        if (type === 'slice') setPerfPad(`${deck}-slot-${index}`, false);
         if (shouldRecord && perfRecordActiveRef.current) {
-          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode });
+          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode, sliceIdx });
           setPerfEvents([...perfEventsRef.current]);
         }
         return;
@@ -8390,8 +8760,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         }
         setPerfPad(padKey, false);
         setPerfPad(`${padKey}-pending`, false);
+        if (type === 'slice') setPerfPad(`${deck}-slot-${index}`, false);
         if (shouldRecord && perfRecordActiveRef.current) {
-          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode });
+          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode, sliceIdx });
           setPerfEvents([...perfEventsRef.current]);
         }
         return;
@@ -8401,9 +8772,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       stopPerfVoice(voiceKey);
       setPerfPad(padKey, false);
       setPerfPad(`${padKey}-pending`, false);
+      if (type === 'slice') setPerfPad(`${deck}-slot-${index}`, false);
       
       if (shouldRecord && perfRecordActiveRef.current) {
-        perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode });
+        perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode, sliceIdx });
         setPerfEvents([...perfEventsRef.current]);
       }
       return;
@@ -8411,18 +8783,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     // 2. Handle Key Press (Note On)
     if (triggerMode === 'latch') {
-      // Toggle logic
-      const isAlreadyActive = activePerfPadsRef.current[padKey];
-      if (isAlreadyActive) {
-        // Stop it
-        stopPerfVoice(voiceKey);
-        setPerfPad(padKey, false);
-        setPerfPad(`${padKey}-pending`, false);
-        if (shouldRecord && perfRecordActiveRef.current) {
-          perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode });
-          setPerfEvents([...perfEventsRef.current]);
+      if (!isPlayback) {
+        const isAlreadyActive = activePerfPadsRef.current[padKey];
+        if (isAlreadyActive) {
+          // Stop active loop trigger
+          stopPerfVoice(voiceKey);
+          setPerfPad(padKey, false);
+          setPerfPad(`${padKey}-pending`, false);
+          if (type === 'slice') setPerfPad(`${deck}-slot-${index}`, false);
+          if (shouldRecord && perfRecordActiveRef.current) {
+            perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: false, triggerMode, sliceIdx });
+            setPerfEvents([...perfEventsRef.current]);
+          }
+          return;
         }
-        return;
       }
     }
 
@@ -8460,6 +8834,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           });
           
           setPerfPad(padKey, true);
+          if (type === 'slice') setPerfPad(`${deck}-slot-${index}`, true);
           
           if (deck === 'A') {
             setDeckAPlaying(true);
@@ -8478,7 +8853,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           }
           
           if (shouldRecord && perfRecordActiveRef.current) {
-            perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true, triggerMode });
+            perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true, triggerMode, sliceIdx });
             setPerfEvents([...perfEventsRef.current]);
           }
           return;
@@ -8531,15 +8906,37 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
 
     const rootNote = slot.rootNote || 60;
-    const triggerNote = type === 'slot' ? rootNote : rootNote + index;
+    const triggerNote = type === 'slice' ? rootNote + (sliceIdx !== undefined ? sliceIdx : 0) : (type === 'slot' ? rootNote : rootNote + index);
 
-    const tempProg = {
+    const tempProg = type === 'slice' ? {
+      ...currentParams,
+      oscMode: 'single',
+      oscAWave: slotId,
+      oscBWave: currentParams.oscBWave,
+      oscATriggerMode: 'slice',
+      oscBTriggerMode: 'normal',
+      oscAVol: 1.0,
+      oscBVol: 0.0,
+      perfPadPan: slot ? (slot.pan !== undefined ? slot.pan : 0) : 0,
+      perfPadFxType: slot ? (slot.fxType || 'None') : 'None',
+      perfPadFxSend: slot ? (slot.fxSend !== undefined ? slot.fxSend : 0) : 0,
+      perfPadAttack: slot ? (slot.attack !== undefined ? slot.attack : 0.01) : 0.01,
+      perfPadDecay: slot ? (slot.decay !== undefined ? slot.decay : 0.3) : 0.3,
+      perfPadLfoTarget: slot ? (slot.lfoTarget || 'None') : 'None',
+      perfPadLfoRate: slot ? (slot.lfoRate !== undefined ? slot.lfoRate : 3.0) : 3.0,
+      perfPadLfoDepth: slot ? (slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0) : 0.0,
+      perfPadLfoType: slot ? (slot.lfoType || 'sine') : 'sine',
+      perfPadLfoRateMode: slot ? (slot.lfoRateMode || 'hz') : 'hz',
+      perfPadLfoFade: slot ? (slot.lfoFade !== undefined ? slot.lfoFade : 0) : 0,
+      perfPadLfoRetrigger: slot ? (slot.lfoRetrigger !== undefined ? slot.lfoRetrigger : true) : true,
+      perfPadRandomPan: slot ? (slot.randomPan !== undefined ? slot.randomPan : 0.0) : 0.0
+    } : {
       ...currentParams,
       oscMode: 'double',
       oscAWave: deck === 'A' ? slotId : currentParams.oscAWave,
       oscBWave: deck === 'B' ? slotId : currentParams.oscBWave,
-      oscATriggerMode: type === 'slice' ? 'slice' : 'normal',
-      oscBTriggerMode: type === 'slice' ? 'slice' : 'normal',
+      oscATriggerMode: 'normal',
+      oscBTriggerMode: 'normal',
       oscAVol: deck === 'A' ? currentParams.oscAVol : 0,
       oscBVol: deck === 'B' ? currentParams.oscBVol : 0,
       perfPadPan: slot ? (slot.pan !== undefined ? slot.pan : 0) : 0,
@@ -8549,7 +8946,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       perfPadDecay: slot ? (slot.decay !== undefined ? slot.decay : 0.3) : 0.3,
       perfPadLfoTarget: slot ? (slot.lfoTarget || 'None') : 'None',
       perfPadLfoRate: slot ? (slot.lfoRate !== undefined ? slot.lfoRate : 3.0) : 3.0,
-      perfPadLfoDepth: slot ? (slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0) : 0.0
+      perfPadLfoDepth: slot ? (slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0) : 0.0,
+      perfPadLfoType: slot ? (slot.lfoType || 'sine') : 'sine',
+      perfPadLfoRateMode: slot ? (slot.lfoRateMode || 'hz') : 'hz',
+      perfPadLfoFade: slot ? (slot.lfoFade !== undefined ? slot.lfoFade : 0) : 0,
+      perfPadLfoRetrigger: slot ? (slot.lfoRetrigger !== undefined ? slot.lfoRetrigger : true) : true,
+      perfPadRandomPan: slot ? (slot.randomPan !== undefined ? slot.randomPan : 0.0) : 0.0
     };
 
     // Flux mode logic: calculate fluxOffset
@@ -8588,6 +8990,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       activeVoicesRef.current.set(voiceKey, [voice]);
       setPerfPad(padKey, true);
       setPerfPad(`${padKey}-pending`, false);
+      if (type === 'slice') setPerfPad(`${deck}-slot-${index}`, true);
       eventBusRef.current.emit('voice-start', { deck, type, index, voiceKey, targetTime, targetBeat });
 
       const dur = slot.buffer.duration * (slot.end - slot.start);
@@ -8607,6 +9010,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setTimeout(() => {
           setPerfPad(padKey, false);
           setPerfPad(`${padKey}-pending`, false);
+          if (type === 'slice') setPerfPad(`${deck}-slot-${index}`, false);
         }, dur * 1000);
       }
     };
@@ -8614,6 +9018,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (delayOffset > 0.03) {
       setPerfPad(`${padKey}-pending`, true);
       setTimeout(() => {
+        // Double check if pending start was cancelled during the delay
+        if (triggerMode === 'latch' && !activePerfPadsRef.current[`${padKey}-pending`] && !activePerfPadsRef.current[padKey]) {
+          return; // cancelled!
+        }
         setPerfPad(`${padKey}-pending`, false);
         startVoiceTrigger();
       }, delayOffset * 1000 - 15);
@@ -8622,7 +9030,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
 
     if (shouldRecord && perfRecordActiveRef.current) {
-      perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true, triggerMode });
+      perfEventsRef.current.push({ beat: targetBeat, deck, type, index, velocity, isNoteOn: true, triggerMode, sliceIdx });
       setPerfEvents([...perfEventsRef.current]);
     }
   };
@@ -10598,7 +11006,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
   const erasePill = (deck, laneIdx, pill) => {
     const nextEvents = perfEvents.filter(evt => {
-      const matchLane = evt.deck === deck && evt.type === 'slot' && evt.index === laneIdx;
+      const matchLane = evt.deck === deck && (evt.type === 'slot' || evt.type === 'slice') && evt.index === laneIdx;
       if (matchLane) {
         if (evt.isNoteOn && Math.abs(evt.beat - pill.start) < 0.001) return false;
         if (!evt.isNoteOn && Math.abs(evt.beat - pill.end) < 0.001) return false;
@@ -10768,7 +11176,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     // Helper to get pills
     const getPillsForLane = (d, index) => {
       const pills = [];
-      const events = perfEvents.filter(evt => evt.deck === d && evt.type === 'slot' && evt.index === index);
+      const events = perfEvents.filter(evt => evt.deck === d && (evt.type === 'slot' || evt.type === 'slice') && evt.index === index);
       const sorted = [...events].sort((a, b) => a.beat - b.beat);
       
       let activePill = null;
@@ -10778,7 +11186,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             activePill.end = evt.beat;
             pills.push(activePill);
           }
-          activePill = { start: evt.beat, end: evt.beat + 1.0, triggerMode: evt.triggerMode || 'hold' };
+          activePill = { start: evt.beat, end: evt.beat + 1.0, triggerMode: evt.triggerMode || 'hold', type: evt.type, sliceIdx: evt.sliceIdx };
         } else {
           if (activePill) {
             activePill.end = evt.beat;
@@ -10875,7 +11283,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
       const updatedEvents = perfEvents.map(evt => {
         if (evt.deck === resizeDragTarget.deck && 
-            evt.type === 'slot' && 
+            (evt.type === 'slot' || evt.type === 'slice') && 
             evt.index === resizeDragTarget.laneIdx) {
           if (!evt.isNoteOn && Math.abs(evt.beat - resizeDragTarget.originalEndBeat) < 0.001) {
             return { ...evt, beat: finalEndBeat };
@@ -10934,7 +11342,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       if (targetStart !== moveDragTarget.startBeat || targetLane !== moveDragTarget.laneIdx) {
         const updatedEvents = perfEvents.map(evt => {
           if (evt.deck === moveDragTarget.deck && 
-              evt.type === 'slot' && 
+              (evt.type === 'slot' || evt.type === 'slice') && 
               evt.index === moveDragTarget.originalLaneIdx) {
             if (evt.isNoteOn && Math.abs(evt.beat - moveDragTarget.startBeat) < 0.001) {
               return { ...evt, beat: targetStart, index: targetLane };
@@ -10987,7 +11395,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   const renderPerformanceDeck = () => {
     const getPillsForLane = (deck, index) => {
       const pills = [];
-      const events = perfEvents.filter(e => e.deck === deck && e.type === 'slot' && e.index === index);
+      const events = perfEvents.filter(e => e.deck === deck && (e.type === 'slot' || e.type === 'slice') && e.index === index);
       const sorted = [...events].sort((a, b) => a.beat - b.beat);
       
       let activePill = null;
@@ -10997,7 +11405,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             activePill.end = e.beat;
             pills.push(activePill);
           }
-          activePill = { start: e.beat, end: null, triggerMode: e.triggerMode || 'hold' };
+          activePill = { start: e.beat, end: null, triggerMode: e.triggerMode || 'hold', type: e.type, sliceIdx: e.sliceIdx };
         } else {
           if (activePill) {
             activePill.end = e.beat;
@@ -11027,387 +11435,585 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     const highwayA_JSX = useMemo(() => {
       return (
-        <div 
-          className="vertical-highway deck-a-highway"
-          onMouseDown={(e) => handleHighwayMouseDown('A', e)}
-          onMouseMove={handleHighwayMouseMove}
-          onMouseUp={handleHighwayMouseUp}
-          onMouseLeave={handleHighwayMouseUp}
-          style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
-        >
-          {EIGHT_INDICES.map((_, idx) => (
-            <div 
-              key={`line-a-${idx}`} 
-              className="highway-lane-line" 
-              style={{ left: `${(idx + 0.5) * 28}px` }} 
-            />
-          ))}
-          <div className="highway-playhead-line" />
-          {EIGHT_INDICES.map((_, idx) => (
-            <div 
-              key={`target-a-${idx}`} 
-              ref={el => { targetCirclesRefsA.current[idx] = el; }}
-              className="highway-target-circle" 
-              style={{ 
-                left: `${idx * 28 + 10}px`, 
-                borderColor: ringColors[idx],
-                background: 'transparent',
-                boxShadow: 'none'
-              }} 
-            />
-          ))}
-          {EIGHT_INDICES.map((_, idx) => (
-            <div 
-              key={`lbl-a-${idx}`} 
-              className="highway-label" 
-              style={{ left: `${idx * 28 + 8}px`, color: ringColors[idx] }}
-            >
-              A{idx + 1}
-            </div>
-          ))}
+        <div className="highway-block-container">
           <div 
-            ref={highwayEventsRefA} 
-            className="highway-events-container"
+            className="vertical-highway deck-a-highway"
+            onMouseDown={(e) => handleHighwayMouseDown('A', e)}
+            onMouseMove={handleHighwayMouseMove}
+            onMouseUp={handleHighwayMouseUp}
+            onMouseLeave={handleHighwayMouseUp}
+            style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
           >
-            {/* Horizontal Grid lines (Tronesque Cyan) */}
-            {BEAT_INDICES_256.map((_, b) => {
-              const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
-              const isBarStart = b % beatsPerBar === 0;
-              const barNum = Math.floor(b / beatsPerBar) + 1;
-              const beatInBar = (b % beatsPerBar) + 1;
-              const startY = b * highwayZoom;
+            {EIGHT_INDICES.map((_, idx) => (
+              <div 
+                key={`line-a-${idx}`} 
+                className="highway-lane-line" 
+                style={{ left: `${(idx + 0.5) * 28}px` }} 
+              />
+            ))}
+            <div className="highway-playhead-line" style={{ bottom: '12px' }} />
+            {EIGHT_INDICES.map((_, idx) => (
+              <div 
+                key={`target-a-${idx}`} 
+                ref={el => { targetCirclesRefsA.current[idx] = el; }}
+                className="highway-target-circle" 
+                style={{ 
+                  left: `${idx * 28 + 10}px`, 
+                  bottom: '8px',
+                  borderColor: ringColors[idx],
+                  background: 'transparent',
+                  boxShadow: 'none'
+                }} 
+              />
+            ))}
+            <div 
+              ref={highwayEventsRefA} 
+              className="highway-events-container"
+              style={{ bottom: '12px' }}
+            >
+              {/* Horizontal Grid lines (Tronesque Cyan) */}
+              {BEAT_INDICES_256.map((_, b) => {
+                const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
+                const isBarStart = b % beatsPerBar === 0;
+                const barNum = Math.floor(b / beatsPerBar) + 1;
+                const beatInBar = (b % beatsPerBar) + 1;
+                const startY = b * highwayZoom;
+                
+                return (
+                  <div 
+                    key={`grid-line-a-${b}`}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: `${startY}px`,
+                      height: '1px',
+                      background: isBarStart 
+                        ? 'rgba(0, 243, 255, 0.65)' 
+                        : 'rgba(0, 243, 255, 0.25)',
+                      boxShadow: isBarStart
+                        ? '0 0 6px rgba(0, 243, 255, 0.4)'
+                        : 'none',
+                      pointerEvents: 'none',
+                      zIndex: 1
+                    }}
+                  >
+                    {/* Bar/Beat labels on the left and right sides */}
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: '4px',
+                        bottom: '2px',
+                        fontSize: '0.36rem',
+                        fontFamily: 'monospace',
+                        color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                        textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                        fontWeight: isBarStart ? 'bold' : 'normal',
+                        lineHeight: 1,
+                        userSelect: 'none'
+                      }}
+                    >
+                      {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                    </span>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        right: '4px',
+                        bottom: '2px',
+                        fontSize: '0.36rem',
+                        fontFamily: 'monospace',
+                        color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                        textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                        fontWeight: isBarStart ? 'bold' : 'normal',
+                        lineHeight: 1,
+                        userSelect: 'none'
+                      }}
+                    >
+                      {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                    </span>
+                  </div>
+                );
+              })}
+              {EIGHT_INDICES.map((_, laneIdx) => {
+                const pills = getPillsForLane('A', laneIdx);
+                const color = ringColors[laneIdx];
+                return (
+                  <div 
+                    key={`hw-lane-a-${laneIdx}`} 
+                    style={{ position: 'absolute', left: `${laneIdx * 28}px`, width: '28px', top: 0, bottom: 0, zIndex: 2 }}
+                  >
+                    {/* Dynamic lane highlight background */}
+                    <div
+                      ref={el => { laneBgsRefsA.current[laneIdx] = el; }}
+                      style={{
+                        position: 'absolute',
+                        left: '2px',
+                        right: '2px',
+                        top: 0,
+                        bottom: 0,
+                        background: 'transparent',
+                        pointerEvents: 'none',
+                        transition: 'background 0.15s, opacity 0.15s',
+                        zIndex: 0
+                      }}
+                    />
+                    {pills.map((pill, pIdx) => {
+                      const startY = pill.start * highwayZoom;
+                      const endY = pill.end * highwayZoom;
+                      const height = endY - startY;
+                      
+                      const mode = pill.triggerMode || 'hold';
+                      const isSelected = selectedPill && 
+                                         selectedPill.deck === 'A' && 
+                                         selectedPill.laneIdx === laneIdx && 
+                                         Math.abs(selectedPill.start - pill.start) < 0.001;
+
+                      let pillColor = isSelected ? '#ffffff' : color;
+                      let pillGlowColor = isSelected ? '#ffe600' : color;
+                      let borderStyle = 'solid';
+                      let background = '#000000';
+                      let borderWidth = isSelected ? '2.5px' : '1.5px';
+                      let glowScale = isSelected ? '14px' : '8px';
+                      
+                      if (!isSelected) {
+                        if (mode === 'latch') {
+                          background = color + '2a'; // glowy semi-transparent filled block
+                          borderWidth = '2px';
+                          glowScale = '12px';
+                        } else if (mode === 'free') {
+                          borderStyle = 'dashed';
+                        } else if (mode === 'flux') {
+                          borderStyle = 'double';
+                          borderWidth = '3px';
+                        } else if (mode === 'queue') {
+                          borderStyle = 'dotted';
+                          borderWidth = '2px';
+                        }
+                      } else {
+                        background = 'rgba(255, 230, 0, 0.25)';
+                      }
+                      
+                      return (
+                        <div
+                          key={`hw-pill-a-${laneIdx}-${pIdx}`}
+                          style={{
+                            position: 'absolute',
+                            left: '3px',
+                            width: '22px',
+                            bottom: `${startY}px`,
+                            height: `${Math.max(6, height)}px`,
+                            background,
+                            borderRadius: '3px',
+                            border: `${borderWidth} ${borderStyle} ${pillColor}`,
+                            boxShadow: `0 0 ${glowScale} ${pillGlowColor}, inset 0 0 ${glowScale} ${pillGlowColor}`,
+                            zIndex: 3,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {pill.type === 'slice' && (
+                            <span style={{ fontSize: '7px', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                              S{pill.sliceIdx !== undefined ? pill.sliceIdx : ''}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Mixing controls row */}
+          <div className="highway-mixing-row deck-a-mixing-row">
+            {EIGHT_INDICES.map((_, idx) => {
+              const slotId = `a0${idx + 1}`;
+              const slot = sampleSlots.find(s => s.id === slotId);
+              const isLoaded = slot && slot.buffer;
+              const ringColor = ringColors[idx];
+              
+              if (!isLoaded) {
+                return (
+                  <div key={`ctrl-a-${idx}`} className="highway-mixing-col" style={{ left: `${idx * 28}px` }}>
+                    <div className="highway-mix-label" style={{ color: 'rgba(255,255,255,0.15)' }}>A{idx + 1}</div>
+                  </div>
+                );
+              }
+              
+              const vol = slot.volume !== undefined ? slot.volume : 1.0;
+              const pan = slot.pan !== undefined ? slot.pan : 0.0;
               
               return (
-                <div 
-                  key={`grid-line-a-${b}`}
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    bottom: `${startY}px`,
-                    height: '1px',
-                    background: isBarStart 
-                      ? 'rgba(0, 243, 255, 0.65)' 
-                      : 'rgba(0, 243, 255, 0.25)',
-                    boxShadow: isBarStart
-                      ? '0 0 6px rgba(0, 243, 255, 0.4)'
-                      : 'none',
-                    pointerEvents: 'none',
-                    zIndex: 1
-                  }}
-                >
-                  {/* Bar/Beat labels on the left and right sides */}
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: '4px',
-                      bottom: '2px',
-                      fontSize: '0.36rem',
-                      fontFamily: 'monospace',
-                      color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
-                      textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
-                      fontWeight: isBarStart ? 'bold' : 'normal',
-                      lineHeight: 1,
-                      userSelect: 'none'
+                <div key={`ctrl-a-${idx}`} className="highway-mixing-col" style={{ left: `${idx * 28}px` }}>
+                  {/* Volume slider (Vertical) */}
+                  <input 
+                    type="range"
+                    min="0.0"
+                    max="1.5"
+                    step="0.05"
+                    value={vol}
+                    title={`A${idx+1} Vol: ${Math.round(vol * 100)}%`}
+                    onMouseDown={stopProp}
+                    onMouseUp={stopProp}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      updateSlotParam(slotId, 'volume', val);
+                      saveSlotMetadataToDb(slotId, { volume: val }).catch(() => {});
                     }}
-                  >
-                    {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
-                  </span>
-                  <span
                     style={{
                       position: 'absolute',
-                      right: '4px',
-                      bottom: '2px',
-                      fontSize: '0.36rem',
-                      fontFamily: 'monospace',
-                      color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
-                      textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
-                      fontWeight: isBarStart ? 'bold' : 'normal',
-                      lineHeight: 1,
-                      userSelect: 'none'
-                    }}
-                  >
-                    {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
-                  </span>
-                </div>
-              );
-            })}
-            {EIGHT_INDICES.map((_, laneIdx) => {
-              const pills = getPillsForLane('A', laneIdx);
-              const color = ringColors[laneIdx];
-              return (
-                <div 
-                  key={`hw-lane-a-${laneIdx}`} 
-                  style={{ position: 'absolute', left: `${laneIdx * 28}px`, width: '28px', top: 0, bottom: 0, zIndex: 2 }}
-                >
-                  {/* Dynamic lane highlight background */}
-                  <div
-                    ref={el => { laneBgsRefsA.current[laneIdx] = el; }}
-                    style={{
-                      position: 'absolute',
-                      left: '2px',
-                      right: '2px',
-                      top: 0,
-                      bottom: 0,
-                      background: 'transparent',
-                      pointerEvents: 'none',
-                      transition: 'background 0.15s, opacity 0.15s',
-                      zIndex: 0
+                      left: '10px',
+                      top: '8px',
+                      width: '8px',
+                      height: '32px',
+                      WebkitAppearance: 'slider-vertical',
+                      appearance: 'slider-vertical',
+                      background: 'rgba(255,255,255,0.15)',
+                      accentColor: ringColor,
+                      cursor: 'ns-resize',
+                      outline: 'none',
+                      border: 'none',
+                      padding: 0,
+                      margin: 0
                     }}
                   />
-                  {pills.map((pill, pIdx) => {
-                    const startY = pill.start * highwayZoom;
-                    const endY = pill.end * highwayZoom;
-                    const height = endY - startY;
-                    
-                    const mode = pill.triggerMode || 'hold';
-                    const isSelected = selectedPill && 
-                                       selectedPill.deck === 'A' && 
-                                       selectedPill.laneIdx === laneIdx && 
-                                       Math.abs(selectedPill.start - pill.start) < 0.001;
-
-                    let pillColor = isSelected ? '#ffffff' : color;
-                    let pillGlowColor = isSelected ? '#ffe600' : color;
-                    let borderStyle = 'solid';
-                    let background = '#000000';
-                    let borderWidth = isSelected ? '2.5px' : '1.5px';
-                    let glowScale = isSelected ? '14px' : '8px';
-                    
-                    if (!isSelected) {
-                      if (mode === 'latch') {
-                        background = color + '2a'; // glowy semi-transparent filled block
-                        borderWidth = '2px';
-                        glowScale = '12px';
-                      } else if (mode === 'free') {
-                        borderStyle = 'dashed';
-                      } else if (mode === 'flux') {
-                        borderStyle = 'double';
-                        borderWidth = '3px';
-                      } else if (mode === 'queue') {
-                        borderStyle = 'dotted';
-                        borderWidth = '2px';
-                      }
-                    } else {
-                      background = 'rgba(255, 230, 0, 0.25)';
-                    }
-                    
-                    return (
-                      <div
-                        key={`hw-pill-a-${laneIdx}-${pIdx}`}
-                        style={{
-                          position: 'absolute',
-                          left: '3px',
-                          width: '22px',
-                          bottom: `${startY}px`,
-                          height: `${Math.max(6, height)}px`,
-                          background,
-                          borderRadius: '3px',
-                          border: `${borderWidth} ${borderStyle} ${pillColor}`,
-                          boxShadow: `0 0 ${glowScale} ${pillGlowColor}, inset 0 0 ${glowScale} ${pillGlowColor}`,
-                          zIndex: 3
-                        }}
-                      />
-                    );
-                  })}
+                  {/* Pan slider (Horizontal) */}
+                  <input 
+                    type="range"
+                    min="-1.0"
+                    max="1.0"
+                    step="0.1"
+                    value={pan}
+                    title={`A${idx+1} Pan: ${pan === 0 ? 'C' : pan > 0 ? 'R' + Math.round(pan*100) : 'L' + Math.abs(Math.round(pan*100))}`}
+                    onMouseDown={stopProp}
+                    onMouseUp={stopProp}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      updateSlotParam(slotId, 'pan', val);
+                      saveSlotMetadataToDb(slotId, { pan: val }).catch(() => {});
+                    }}
+                    onDoubleClick={() => {
+                      updateSlotParam(slotId, 'pan', 0.0);
+                      saveSlotMetadataToDb(slotId, { pan: 0.0 }).catch(() => {});
+                    }}
+                    style={{
+                      position: 'absolute',
+                      left: '3px',
+                      top: '46px',
+                      width: '22px',
+                      height: '6px',
+                      background: 'rgba(255,255,255,0.15)',
+                      accentColor: ringColor,
+                      cursor: 'ew-resize',
+                      outline: 'none',
+                      border: 'none',
+                      padding: 0,
+                      margin: 0
+                    }}
+                  />
+                  {/* Label */}
+                  <div className="highway-mix-label" style={{ color: ringColor }}>A{idx + 1}</div>
                 </div>
               );
             })}
           </div>
         </div>
       );
-    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget, selectedPill]);
+    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget, selectedPill, sampleSlots]);
 
     const highwayB_JSX = useMemo(() => {
       return (
-        <div 
-          className="vertical-highway deck-b-highway"
-          onMouseDown={(e) => handleHighwayMouseDown('B', e)}
-          onMouseMove={handleHighwayMouseMove}
-          onMouseUp={handleHighwayMouseUp}
-          onMouseLeave={handleHighwayMouseUp}
-          style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
-        >
-          {EIGHT_INDICES.map((_, idx) => (
-            <div 
-              key={`line-b-${idx}`} 
-              className="highway-lane-line" 
-              style={{ left: `${(idx + 0.5) * 28}px` }} 
-            />
-          ))}
-          <div className="highway-playhead-line" />
-          {EIGHT_INDICES.map((_, idx) => (
-            <div 
-              key={`target-b-${idx}`} 
-              ref={el => { targetCirclesRefsB.current[idx] = el; }}
-              className="highway-target-circle" 
-              style={{ 
-                left: `${idx * 28 + 10}px`, 
-                borderColor: ringColors[idx],
-                background: 'transparent',
-                boxShadow: 'none'
-              }} 
-            />
-          ))}
-          {EIGHT_INDICES.map((_, idx) => (
-            <div 
-              key={`lbl-b-${idx}`} 
-              className="highway-label" 
-              style={{ left: `${idx * 28 + 8}px`, color: ringColors[idx] }}
-            >
-              B{idx + 1}
-            </div>
-          ))}
+        <div className="highway-block-container">
           <div 
-            ref={highwayEventsRefB} 
-            className="highway-events-container"
+            className="vertical-highway deck-b-highway"
+            onMouseDown={(e) => handleHighwayMouseDown('B', e)}
+            onMouseMove={handleHighwayMouseMove}
+            onMouseUp={handleHighwayMouseUp}
+            onMouseLeave={handleHighwayMouseUp}
+            style={{ cursor: highwayEditMode === 'perform' ? 'default' : highwayEditMode === 'draw' ? 'crosshair' : highwayEditMode === 'resize' ? 'ns-resize' : 'pointer' }}
           >
-            {/* Horizontal Grid lines (Tronesque Cyan) */}
-            {BEAT_INDICES_256.map((_, b) => {
-              const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
-              const isBarStart = b % beatsPerBar === 0;
-              const barNum = Math.floor(b / beatsPerBar) + 1;
-              const beatInBar = (b % beatsPerBar) + 1;
-              const startY = b * highwayZoom;
+            {EIGHT_INDICES.map((_, idx) => (
+              <div 
+                key={`line-b-${idx}`} 
+                className="highway-lane-line" 
+                style={{ left: `${(idx + 0.5) * 28}px` }} 
+              />
+            ))}
+            <div className="highway-playhead-line" style={{ bottom: '12px' }} />
+            {EIGHT_INDICES.map((_, idx) => (
+              <div 
+                key={`target-b-${idx}`} 
+                ref={el => { targetCirclesRefsB.current[idx] = el; }}
+                className="highway-target-circle" 
+                style={{ 
+                  left: `${idx * 28 + 10}px`, 
+                  bottom: '8px',
+                  borderColor: ringColors[idx],
+                  background: 'transparent',
+                  boxShadow: 'none'
+                }} 
+              />
+            ))}
+            <div 
+              ref={highwayEventsRefB} 
+              className="highway-events-container"
+              style={{ bottom: '12px' }}
+            >
+              {/* Horizontal Grid lines (Tronesque Cyan) */}
+              {BEAT_INDICES_256.map((_, b) => {
+                const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
+                const isBarStart = b % beatsPerBar === 0;
+                const barNum = Math.floor(b / beatsPerBar) + 1;
+                const beatInBar = (b % beatsPerBar) + 1;
+                const startY = b * highwayZoom;
+                
+                return (
+                  <div 
+                    key={`grid-line-b-${b}`}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: `${startY}px`,
+                      height: '1px',
+                      background: isBarStart 
+                        ? 'rgba(0, 243, 255, 0.65)' 
+                        : 'rgba(0, 243, 255, 0.25)',
+                      boxShadow: isBarStart
+                        ? '0 0 6px rgba(0, 243, 255, 0.4)'
+                        : 'none',
+                      pointerEvents: 'none',
+                      zIndex: 1
+                    }}
+                  >
+                    {/* Bar/Beat labels on the left and right sides */}
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: '4px',
+                        bottom: '2px',
+                        fontSize: '0.36rem',
+                        fontFamily: 'monospace',
+                        color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                        textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                        fontWeight: isBarStart ? 'bold' : 'normal',
+                        lineHeight: 1,
+                        userSelect: 'none'
+                      }}
+                    >
+                      {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                    </span>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        right: '4px',
+                        bottom: '2px',
+                        fontSize: '0.36rem',
+                        fontFamily: 'monospace',
+                        color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
+                        textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
+                        fontWeight: isBarStart ? 'bold' : 'normal',
+                        lineHeight: 1,
+                        userSelect: 'none'
+                      }}
+                    >
+                      {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
+                    </span>
+                  </div>
+                );
+              })}
+              {EIGHT_INDICES.map((_, laneIdx) => {
+                const pills = getPillsForLane('B', laneIdx);
+                const color = ringColors[laneIdx];
+                return (
+                  <div 
+                    key={`hw-lane-b-${laneIdx}`} 
+                    style={{ position: 'absolute', left: `${laneIdx * 28}px`, width: '28px', top: 0, bottom: 0, zIndex: 2 }}
+                  >
+                    {/* Dynamic lane highlight background */}
+                    <div
+                      ref={el => { laneBgsRefsB.current[laneIdx] = el; }}
+                      style={{
+                        position: 'absolute',
+                        left: '2px',
+                        right: '2px',
+                        top: 0,
+                        bottom: 0,
+                        background: 'transparent',
+                        pointerEvents: 'none',
+                        transition: 'background 0.15s, opacity 0.15s',
+                        zIndex: 0
+                      }}
+                    />
+                    {pills.map((pill, pIdx) => {
+                      const startY = pill.start * highwayZoom;
+                      const endY = pill.end * highwayZoom;
+                      const height = endY - startY;
+                      
+                      const mode = pill.triggerMode || 'hold';
+                      const isSelected = selectedPill && 
+                                         selectedPill.deck === 'B' && 
+                                         selectedPill.laneIdx === laneIdx && 
+                                         Math.abs(selectedPill.start - pill.start) < 0.001;
+
+                      let pillColor = isSelected ? '#ffffff' : color;
+                      let pillGlowColor = isSelected ? '#ffe600' : color;
+                      let borderStyle = 'solid';
+                      let background = '#000000';
+                      let borderWidth = isSelected ? '2.5px' : '1.5px';
+                      let glowScale = isSelected ? '14px' : '8px';
+                      
+                      if (!isSelected) {
+                        if (mode === 'latch') {
+                          background = color + '2a'; // glowy semi-transparent filled block
+                          borderWidth = '2px';
+                          glowScale = '12px';
+                        } else if (mode === 'free') {
+                          borderStyle = 'dashed';
+                        } else if (mode === 'flux') {
+                          borderStyle = 'double';
+                          borderWidth = '3px';
+                        } else if (mode === 'queue') {
+                          borderStyle = 'dotted';
+                          borderWidth = '2px';
+                        }
+                      } else {
+                        background = 'rgba(255, 230, 0, 0.25)';
+                      }
+                      
+                      return (
+                        <div
+                          key={`hw-pill-b-${laneIdx}-${pIdx}`}
+                          style={{
+                            position: 'absolute',
+                            left: '3px',
+                            width: '22px',
+                            bottom: `${startY}px`,
+                            height: `${Math.max(6, height)}px`,
+                            background,
+                            borderRadius: '3px',
+                            border: `${borderWidth} ${borderStyle} ${pillColor}`,
+                            boxShadow: `0 0 ${glowScale} ${pillGlowColor}, inset 0 0 ${glowScale} ${pillGlowColor}`,
+                            zIndex: 3,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {pill.type === 'slice' && (
+                            <span style={{ fontSize: '7px', color: '#fff', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                              S{pill.sliceIdx !== undefined ? pill.sliceIdx : ''}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Mixing controls row */}
+          <div className="highway-mixing-row deck-b-mixing-row">
+            {EIGHT_INDICES.map((_, idx) => {
+              const slotId = `b0${idx + 1}`;
+              const slot = sampleSlots.find(s => s.id === slotId);
+              const isLoaded = slot && slot.buffer;
+              const ringColor = ringColors[idx];
+              
+              if (!isLoaded) {
+                return (
+                  <div key={`ctrl-b-${idx}`} className="highway-mixing-col" style={{ left: `${idx * 28}px` }}>
+                    <div className="highway-mix-label" style={{ color: 'rgba(255,255,255,0.15)' }}>B{idx + 1}</div>
+                  </div>
+                );
+              }
+              
+              const vol = slot.volume !== undefined ? slot.volume : 1.0;
+              const pan = slot.pan !== undefined ? slot.pan : 0.0;
               
               return (
-                <div 
-                  key={`grid-line-b-${b}`}
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    bottom: `${startY}px`,
-                    height: '1px',
-                    background: isBarStart 
-                      ? 'rgba(0, 243, 255, 0.65)' 
-                      : 'rgba(0, 243, 255, 0.25)',
-                    boxShadow: isBarStart
-                      ? '0 0 6px rgba(0, 243, 255, 0.4)'
-                      : 'none',
-                    pointerEvents: 'none',
-                    zIndex: 1
-                  }}
-                >
-                  {/* Bar/Beat labels on the left and right sides */}
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: '4px',
-                      bottom: '2px',
-                      fontSize: '0.36rem',
-                      fontFamily: 'monospace',
-                      color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
-                      textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
-                      fontWeight: isBarStart ? 'bold' : 'normal',
-                      lineHeight: 1,
-                      userSelect: 'none'
+                <div key={`ctrl-b-${idx}`} className="highway-mixing-col" style={{ left: `${idx * 28}px` }}>
+                  {/* Volume slider (Vertical) */}
+                  <input 
+                    type="range"
+                    min="0.0"
+                    max="1.5"
+                    step="0.05"
+                    value={vol}
+                    title={`B${idx+1} Vol: ${Math.round(vol * 100)}%`}
+                    onMouseDown={stopProp}
+                    onMouseUp={stopProp}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      updateSlotParam(slotId, 'volume', val);
+                      saveSlotMetadataToDb(slotId, { volume: val }).catch(() => {});
                     }}
-                  >
-                    {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
-                  </span>
-                  <span
                     style={{
                       position: 'absolute',
-                      right: '4px',
-                      bottom: '2px',
-                      fontSize: '0.36rem',
-                      fontFamily: 'monospace',
-                      color: isBarStart ? '#00f3ff' : 'rgba(0, 243, 255, 0.6)',
-                      textShadow: isBarStart ? '0 0 3px rgba(0, 243, 255, 0.8)' : 'none',
-                      fontWeight: isBarStart ? 'bold' : 'normal',
-                      lineHeight: 1,
-                      userSelect: 'none'
-                    }}
-                  >
-                    {isBarStart ? `BAR ${barNum}` : `${barNum}.${beatInBar}`}
-                  </span>
-                </div>
-              );
-            })}
-            {EIGHT_INDICES.map((_, laneIdx) => {
-              const pills = getPillsForLane('B', laneIdx);
-              const color = ringColors[laneIdx];
-              return (
-                <div 
-                  key={`hw-lane-b-${laneIdx}`} 
-                  style={{ position: 'absolute', left: `${laneIdx * 28}px`, width: '28px', top: 0, bottom: 0, zIndex: 2 }}
-                >
-                  {/* Dynamic lane highlight background */}
-                  <div
-                    ref={el => { laneBgsRefsB.current[laneIdx] = el; }}
-                    style={{
-                      position: 'absolute',
-                      left: '2px',
-                      right: '2px',
-                      top: 0,
-                      bottom: 0,
-                      background: 'transparent',
-                      pointerEvents: 'none',
-                      transition: 'background 0.15s, opacity 0.15s',
-                      zIndex: 0
+                      left: '10px',
+                      top: '8px',
+                      width: '8px',
+                      height: '32px',
+                      WebkitAppearance: 'slider-vertical',
+                      appearance: 'slider-vertical',
+                      background: 'rgba(255,255,255,0.15)',
+                      accentColor: ringColor,
+                      cursor: 'ns-resize',
+                      outline: 'none',
+                      border: 'none',
+                      padding: 0,
+                      margin: 0
                     }}
                   />
-                  {pills.map((pill, pIdx) => {
-                    const startY = pill.start * highwayZoom;
-                    const endY = pill.end * highwayZoom;
-                    const height = endY - startY;
-                    
-                    const mode = pill.triggerMode || 'hold';
-                    const isSelected = selectedPill && 
-                                       selectedPill.deck === 'B' && 
-                                       selectedPill.laneIdx === laneIdx && 
-                                       Math.abs(selectedPill.start - pill.start) < 0.001;
-
-                    let pillColor = isSelected ? '#ffffff' : color;
-                    let pillGlowColor = isSelected ? '#ffe600' : color;
-                    let borderStyle = 'solid';
-                    let background = '#000000';
-                    let borderWidth = isSelected ? '2.5px' : '1.5px';
-                    let glowScale = isSelected ? '14px' : '8px';
-                    
-                    if (!isSelected) {
-                      if (mode === 'latch') {
-                        background = color + '2a'; // glowy semi-transparent filled block
-                        borderWidth = '2px';
-                        glowScale = '12px';
-                      } else if (mode === 'free') {
-                        borderStyle = 'dashed';
-                      } else if (mode === 'flux') {
-                        borderStyle = 'double';
-                        borderWidth = '3px';
-                      } else if (mode === 'queue') {
-                        borderStyle = 'dotted';
-                        borderWidth = '2px';
-                      }
-                    } else {
-                      background = 'rgba(255, 230, 0, 0.25)';
-                    }
-                    
-                    return (
-                      <div
-                        key={`hw-pill-b-${laneIdx}-${pIdx}`}
-                        style={{
-                          position: 'absolute',
-                          left: '3px',
-                          width: '22px',
-                          bottom: `${startY}px`,
-                          height: `${Math.max(6, height)}px`,
-                          background,
-                          borderRadius: '3px',
-                          border: `${borderWidth} ${borderStyle} ${pillColor}`,
-                          boxShadow: `0 0 ${glowScale} ${pillGlowColor}, inset 0 0 ${glowScale} ${pillGlowColor}`,
-                          zIndex: 3
-                        }}
-                      />
-                    );
-                  })}
+                  {/* Pan slider (Horizontal) */}
+                  <input 
+                    type="range"
+                    min="-1.0"
+                    max="1.0"
+                    step="0.1"
+                    value={pan}
+                    title={`B${idx+1} Pan: ${pan === 0 ? 'C' : pan > 0 ? 'R' + Math.round(pan*100) : 'L' + Math.abs(Math.round(pan*100))}`}
+                    onMouseDown={stopProp}
+                    onMouseUp={stopProp}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      updateSlotParam(slotId, 'pan', val);
+                      saveSlotMetadataToDb(slotId, { pan: val }).catch(() => {});
+                    }}
+                    onDoubleClick={() => {
+                      updateSlotParam(slotId, 'pan', 0.0);
+                      saveSlotMetadataToDb(slotId, { pan: 0.0 }).catch(() => {});
+                    }}
+                    style={{
+                      position: 'absolute',
+                      left: '3px',
+                      top: '46px',
+                      width: '22px',
+                      height: '6px',
+                      background: 'rgba(255,255,255,0.15)',
+                      accentColor: ringColor,
+                      cursor: 'ew-resize',
+                      outline: 'none',
+                      border: 'none',
+                      padding: 0,
+                      margin: 0
+                    }}
+                  />
+                  {/* Label */}
+                  <div className="highway-mix-label" style={{ color: ringColor }}>B{idx + 1}</div>
                 </div>
               );
             })}
           </div>
         </div>
       );
-    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget, selectedPill]);
+    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget, selectedPill, sampleSlots]);
 
     return (
       <div className="deck-layout-wrapper">
@@ -14619,7 +15225,48 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             );
                           })}
                         </div>
-                        
+
+                        {/* Slice Master Transpose & Octave Control Row */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '3px 8px', marginBottom: '8px', gap: '16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexGrow: 1 }}>
+                            <span style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#00f3ff', minWidth: '88px' }}>SLICE MASTER KEY:</span>
+                            <input
+                              type="range" min="-12" max="12" step="1"
+                              value={slot.sliceMasterKey !== undefined ? slot.sliceMasterKey : 0}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                updateSlotParam(selectedEditSlotId, 'sliceMasterKey', val);
+                              }}
+                              onDoubleClick={() => {
+                                updateSlotParam(selectedEditSlotId, 'sliceMasterKey', 0);
+                              }}
+                              style={{ flexGrow: 1, height: '6px', accentColor: '#00f3ff' }}
+                              title="Double-click to reset to 0"
+                            />
+                            <span className="font-mono" style={{ color: '#fff', fontSize: '0.52rem', width: '28px', textAlign: 'right' }}>
+                              {(slot.sliceMasterKey > 0 ? '+' : '') + (slot.sliceMasterKey || 0)}st
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#ffe600' }}>OCTAVE:</span>
+                            <div className="segmented-strip" style={{ display: 'inline-flex' }}>
+                              {[-2, -1, 0, 1, 2].map(oct => (
+                                <button
+                                  key={oct}
+                                  className={`segmented-btn btn-xs ${ (slot.sliceMasterOctave !== undefined ? slot.sliceMasterOctave : 0) === oct ? 'active' : '' }`}
+                                  onClick={() => {
+                                    updateSlotParam(selectedEditSlotId, 'sliceMasterOctave', oct);
+                                  }}
+                                  style={{ padding: '1px 5px', fontSize: '0.5rem', minWidth: '22px', height: '14px', lineHeight: '12px' }}
+                                >
+                                  {oct > 0 ? `+${oct}` : oct}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Slice Envelopes Sliders */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
                           {/* Row 1: Attack and Decay */}
@@ -16109,9 +16756,48 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </div>
             </div>
 
+            <span className="knob-label" style={{ color: '#ffe600', marginTop: '6px', display: 'block' }}>BANK C (AUX LOOP) PATCH PRESET</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', gap: '4px' }}>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {[1, 2, 3, 4].map(num => (
+                  <button
+                    key={num}
+                    className={`segmented-btn btn-xs ${bankCPreset === num ? 'active' : ''}`}
+                    onClick={() => setBankCPreset(num)}
+                    style={{ padding: '2px 5px', fontSize: '0.55rem' }}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                <button 
+                  className="btn btn-xs" 
+                  style={{ fontSize: '0.52rem', padding: '2px 4px', borderColor: '#ffe600', color: '#ffe600', margin: 0 }}
+                  onClick={() => loadBankPreset('c', bankCPreset)}
+                >
+                  LOAD
+                </button>
+                <button 
+                  className="btn btn-xs" 
+                  style={{ fontSize: '0.52rem', padding: '2px 4px', borderColor: '#ffe600', color: '#ffe600', margin: 0 }}
+                  onClick={() => saveBankPreset('c', bankCPreset)}
+                >
+                  SAVE
+                </button>
+                <button 
+                  className="btn btn-xs" 
+                  style={{ fontSize: '0.52rem', padding: '2px 4px', borderColor: '#ff4444', color: '#ff4444', margin: 0 }}
+                  onClick={() => clearBank('c')}
+                >
+                  CLEAR
+                </button>
+              </div>
+            </div>
+
             {/* Active Directory List of loaded slot names */}
             <span className="knob-label" style={{ marginTop: '8px', display: 'block' }}>Sample Slot Registry</span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '4px', maxHeight: '110px', overflowY: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '4px', maxHeight: '110px', overflowY: 'auto' }}>
               {/* Bank A Column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#00f3ff', borderBottom: '1px solid rgba(0, 243, 255, 0.2)', paddingBottom: '2px', textAlign: 'center', fontFamily: 'monospace' }}>BANK A</div>
@@ -16183,6 +16869,48 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         borderRadius: '2px',
                         background: isSelected ? 'rgba(255, 0, 255, 0.15)' : 'transparent',
                         border: isSelected ? '1px solid rgba(255, 0, 255, 0.3)' : '1px solid transparent',
+                        color: isSelected ? '#ffe600' : '#88ccee',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span style={{ fontWeight: 'bold' }}>{getSlotLabel(slot.id)}:</span>
+                      <span style={{ 
+                        textOverflow: 'ellipsis', 
+                        overflow: 'hidden', 
+                        whiteSpace: 'nowrap', 
+                        maxWidth: '55px',
+                        color: slot.buffer ? '#fff' : '#555'
+                      }} title={slot.name}>
+                        {slot.buffer ? slot.name : 'empty'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Bank C Column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ fontSize: '0.55rem', fontWeight: 'bold', color: '#ff9f00', borderBottom: '1px solid rgba(255, 159, 0, 0.2)', paddingBottom: '2px', textAlign: 'center', fontFamily: 'monospace' }}>BANK C</div>
+                {sampleSlots.filter(s => s.id.startsWith('c')).map((slot) => {
+                  const isSelected = slot.id === selectedEditSlotId;
+                  return (
+                    <div 
+                      key={slot.id}
+                      onClick={() => {
+                        setSelectedEditSlotId(slot.id);
+                        setActiveBankCSlotId(slot.id);
+                      }}
+                      style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        padding: '1px 3px', 
+                        fontSize: '0.48rem', 
+                        fontFamily: 'monospace',
+                        cursor: 'pointer',
+                        borderRadius: '2px',
+                        background: isSelected ? 'rgba(255, 159, 0, 0.15)' : 'transparent',
+                        border: isSelected ? '1px solid rgba(255, 159, 0, 0.3)' : '1px solid transparent',
                         color: isSelected ? '#ffe600' : '#88ccee',
                         transition: 'all 0.15s ease'
                       }}
@@ -16429,6 +17157,247 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
       </div>
 
+      {/* Bank C & Resampling Looper Glassmorphism Control Strip */}
+      <div 
+        className="bank-c-looper-strip font-mono"
+        style={{
+          background: 'rgba(10, 16, 26, 0.75)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderTop: '1px solid rgba(255, 159, 0, 0.25)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '6px 12px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '12px',
+          boxShadow: '0 4px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          zIndex: 10,
+          position: 'relative'
+        }}
+      >
+        {/* Left Section: Bank C Selection */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '0.45rem', color: '#ff9f00', fontWeight: 'bold', textShadow: '0 0 4px rgba(255, 159, 0, 0.3)' }}>
+            BANK C SLOT:
+          </span>
+          <div style={{ display: 'flex', gap: '2px' }}>
+            {['c01', 'c02', 'c03', 'c04', 'c05', 'c06', 'c07', 'c08'].map(id => {
+              const isSelected = activeBankCSlotId === id;
+              const slotNum = id.slice(2);
+              return (
+                <button
+                  key={id}
+                  onClick={() => {
+                    setActiveBankCSlotId(id);
+                    setSelectedEditSlotId(id);
+                  }}
+                  className="btn btn-xs"
+                  style={{
+                    fontSize: '0.45rem',
+                    padding: '1px 5px',
+                    borderColor: isSelected ? '#ff9f00' : 'rgba(255,255,255,0.15)',
+                    color: isSelected ? '#fff' : '#888',
+                    background: isSelected ? 'rgba(255, 159, 0, 0.25)' : 'rgba(0,0,0,0.3)',
+                    boxShadow: isSelected ? '0 0 6px rgba(255, 159, 0, 0.3)' : 'none',
+                    fontWeight: isSelected ? 'bold' : 'normal',
+                    minWidth: '22px'
+                  }}
+                >
+                  C{slotNum}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Middle Section: Keyboard Map Toggle & Slice Transposition */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => setKeyboardMapBankC(prev => !prev)}
+            className="btn btn-xs"
+            style={{
+              fontSize: '0.44rem',
+              padding: '2px 8px',
+              borderColor: keyboardMapBankC ? '#ff9f00' : 'rgba(255,255,255,0.15)',
+              color: keyboardMapBankC ? '#fff' : '#aaa',
+              background: keyboardMapBankC ? 'rgba(255, 159, 0, 0.2)' : 'rgba(0,0,0,0.3)',
+              boxShadow: keyboardMapBankC ? '0 0 6px rgba(255, 159, 0, 0.3)' : 'none',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              borderRadius: '3px'
+            }}
+          >
+            <span style={{
+              display: 'inline-block',
+              width: '5px',
+              height: '5px',
+              borderRadius: '50%',
+              background: keyboardMapBankC ? '#ff9f00' : '#444',
+              boxShadow: keyboardMapBankC ? '0 0 6px #ff9f00' : 'none'
+            }} />
+            ROUTE KEYBOARD (C3-D#4) TO SLICES
+          </button>
+
+          {(() => {
+            const activeSlot = slotMap.get(activeBankCSlotId);
+            if (!activeSlot) return null;
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.2)', padding: '1px 6px', borderRadius: '3px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize: '0.42rem', color: '#ff9f00', fontWeight: 'bold' }}>TRANSPOSE:</span>
+                <input
+                  type="range" min="-12" max="12" step="1"
+                  value={activeSlot.sliceMasterKey !== undefined ? activeSlot.sliceMasterKey : 0}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    updateSlotParam(activeBankCSlotId, 'sliceMasterKey', val);
+                  }}
+                  onDoubleClick={() => {
+                    updateSlotParam(activeBankCSlotId, 'sliceMasterKey', 0);
+                  }}
+                  style={{ width: '40px', height: '4px', accentColor: '#ff9f00', cursor: 'pointer', margin: 0 }}
+                  title="Double-click to reset key to 0"
+                />
+                <span className="font-mono text-center" style={{ color: '#fff', fontSize: '0.45rem', minWidth: '22px' }}>
+                  {(activeSlot.sliceMasterKey > 0 ? '+' : '') + (activeSlot.sliceMasterKey || 0)}st
+                </span>
+
+                <span style={{ fontSize: '0.42rem', color: '#ffe600', fontWeight: 'bold', marginLeft: '4px' }}>OCT:</span>
+                <div className="segmented-strip" style={{ display: 'inline-flex' }}>
+                  {[-2, -1, 0, 1, 2].map(oct => (
+                    <button
+                      key={oct}
+                      className={`segmented-btn btn-xs ${(activeSlot.sliceMasterOctave !== undefined ? activeSlot.sliceMasterOctave : 0) === oct ? 'active' : ''}`}
+                      onClick={() => {
+                        updateSlotParam(activeBankCSlotId, 'sliceMasterOctave', oct);
+                      }}
+                      style={{ padding: '0px 3px', fontSize: '0.45rem', minWidth: '15px', height: '11px', lineHeight: '9px' }}
+                    >
+                      {oct > 0 ? `+${oct}` : oct}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Right Section: Resampling Looper Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '0.45rem', color: '#00f3ff', fontWeight: 'bold' }}>
+            RESAMPLE LOOPER:
+          </span>
+
+          {/* Source Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.4)', borderRadius: '3px', padding: '1px', border: '1px solid rgba(255,255,255,0.08)' }}>
+            {[
+              { mode: 'resample', label: 'INTERNAL' },
+              { mode: 'mic', label: 'MIC/LINE' },
+              { mode: 'monitor', label: 'MONITOR' }
+            ].map(item => {
+              const isSel = recordingInputMode === item.mode;
+              return (
+                <button
+                  key={item.mode}
+                  onClick={() => setRecordingInputMode(item.mode)}
+                  style={{
+                    fontSize: '0.38rem',
+                    padding: '1px 4px',
+                    border: 'none',
+                    background: isSel ? 'rgba(0, 243, 255, 0.2)' : 'transparent',
+                    color: isSel ? '#00f3ff' : '#666',
+                    cursor: 'pointer',
+                    borderRadius: '2px',
+                    fontFamily: 'monospace',
+                    fontWeight: isSel ? 'bold' : 'normal'
+                  }}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Target Pad Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <span style={{ fontSize: '0.36rem', color: '#666' }}>TGT:</span>
+            <select
+              value={liveRecTargetSlot}
+              onChange={(e) => setLiveRecTargetSlot(e.target.value)}
+              style={{
+                background: 'rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#ffe600',
+                fontSize: '0.42rem',
+                borderRadius: '3px',
+                padding: '1px 3px',
+                fontFamily: 'monospace',
+                cursor: 'pointer',
+                outline: 'none',
+                height: '18px'
+              }}
+            >
+              {Array.from({ length: 8 }).map((_, i) => (
+                <option key={`a-${i}`} value={`a0${i+1}`}>A{i+1}</option>
+              ))}
+              {Array.from({ length: 8 }).map((_, i) => (
+                <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Length Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <span style={{ fontSize: '0.36rem', color: '#666' }}>LEN:</span>
+            <select
+              value={liveRecBeats}
+              onChange={(e) => setLiveRecBeats(parseInt(e.target.value))}
+              style={{
+                background: 'rgba(0, 0, 0, 0.5)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#00f3ff',
+                fontSize: '0.42rem',
+                borderRadius: '3px',
+                padding: '1px 3px',
+                fontFamily: 'monospace',
+                cursor: 'pointer',
+                outline: 'none',
+                height: '18px'
+              }}
+            >
+              {[2, 4, 8, 12, 16, 32, 64].map(b => (
+                <option key={b} value={b}>{b}b</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Start/Stop Rec Trigger Button */}
+          <button
+            onClick={toggleLiveLoopRecording}
+            className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : '')}`}
+            style={{
+              fontSize: '0.44rem',
+              padding: '2px 8px',
+              fontWeight: 'bold',
+              minWidth: '70px',
+              color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : '#aaa'),
+              borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : 'rgba(255,255,255,0.15)'),
+              background: isLiveRecording 
+                ? 'rgba(255, 0, 85, 0.25)' 
+                : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.8)' : 'rgba(0,0,0,0.3)'),
+              boxShadow: isLiveRecording 
+                ? '0 0 6px rgba(255, 0, 85, 0.4)' 
+                : (liveRecPendingStart ? '0 0 6px rgba(255, 230, 0, 0.4)' : 'none'),
+              animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none'
+            }}
+          >
+            {isLiveRecording ? 'REC ACTIVE' : (liveRecPendingStart ? 'PENDING...' : 'LIVE REC')}
+          </button>
+        </div>
+      </div>
+
       {/* Interactive Piano Keyboard on bottom */}
       <div className="keyboard-section-bezel">
         <div className="white-black-keys-row">
@@ -16436,10 +17405,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             const baseNote = 48; // starting note C3
             const midiNote = baseNote + i;
             const isBlack = [1, 3, 6, 8, 10].includes(midiNote % 12);
+            const isSliceMapped = keyboardMapBankC && midiNote >= 48 && midiNote <= 63;
+            const sliceIdx = midiNote - 48;
+            const sliceGlowStyle = isSliceMapped ? {
+              borderBottom: '3px solid #ff9f00',
+              boxShadow: '0 0 6px rgba(255, 159, 0, 0.4), inset 0 0 6px rgba(255, 159, 0, 0.4)',
+              borderColor: '#ff9f00'
+            } : {};
             return (
               <button
                 key={midiNote}
                 className={`piano-key ${isBlack ? 'black-key' : 'white-key'}`}
+                style={sliceGlowStyle}
                 ref={(el) => { if (el) { if (!pianoKeyRefsArr.current) pianoKeyRefsArr.current = []; pianoKeyRefsArr.current[i] = el; } }}
                 data-midi={midiNote}
                 onMouseDown={() => playVoice(midiNote, 100)}
@@ -16449,6 +17426,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 }}
               >
                 {midiNote % 12 === 0 && <span className="label-key-c font-mono">C{3 + i/12}</span>}
+                {isSliceMapped && (
+                  <span 
+                    style={{ 
+                      position: 'absolute', 
+                      bottom: '2px', 
+                      left: '50%', 
+                      transform: 'translateX(-50%)', 
+                      fontSize: '7px', 
+                      color: '#ff9f00', 
+                      fontWeight: 'bold', 
+                      fontFamily: 'monospace',
+                      zIndex: 5,
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    S{sliceIdx}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -16483,6 +17478,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const lfoTarget = slot.lfoTarget || 'None';
         const lfoRate = slot.lfoRate !== undefined ? slot.lfoRate : 3.0;
         const lfoDepth = slot.lfoDepth !== undefined ? slot.lfoDepth : 0.0;
+        const lfoType = slot.lfoType || 'sine';
+        const lfoRateMode = slot.lfoRateMode || 'hz';
+        const lfoFade = slot.lfoFade !== undefined ? slot.lfoFade : 0;
+        const lfoRetrigger = slot.lfoRetrigger !== false;
+        const randomPan = slot.randomPan !== undefined ? slot.randomPan : 0.0;
 
         const updateSlotParam = (key, value) => {
           // Mutate in-place on ref —  audio engine sees it immediately
@@ -16573,6 +17573,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </div>
 
               <div className="popover-field">
+                <label>Random Pan Depth ({Math.round(randomPan * 100)}%)</label>
+                <div className="popover-slider-row">
+                  <input 
+                    type="range"
+                    min="0.0"
+                    max="1.0"
+                    step="0.01"
+                    value={randomPan}
+                    onChange={(e) => updateSlotParam('randomPan', parseFloat(e.target.value))}
+                    onDoubleClick={() => updateSlotParam('randomPan', 0.0)}
+                  />
+                  <span className="popover-val-span">{Math.round(randomPan * 100)}%</span>
+                </div>
+              </div>
+
+              <div className="popover-field">
                 <label>Tuning ({tuning > 0 ? '+' : ''}{tuning.toFixed(1)} semitones)</label>
                 <div className="popover-slider-row">
                   <input 
@@ -16589,6 +17605,41 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   </span>
                 </div>
                 <div className="popover-reset-hint">Double-click slider to reset to 0</div>
+              </div>
+
+              <div className="popover-field" style={{ borderTop: '1px solid rgba(0, 243, 255, 0.1)', paddingTop: '6px' }}>
+                <label>Slice Master Key ({slot.sliceMasterKey > 0 ? '+' : ''}{slot.sliceMasterKey || 0} st)</label>
+                <div className="popover-slider-row">
+                  <input 
+                    type="range"
+                    min="-12"
+                    max="12"
+                    step="1"
+                    value={slot.sliceMasterKey !== undefined ? slot.sliceMasterKey : 0}
+                    onChange={(e) => updateSlotParam('sliceMasterKey', parseInt(e.target.value))}
+                    onDoubleClick={() => updateSlotParam('sliceMasterKey', 0)}
+                  />
+                  <span className="popover-val-span">
+                    {(slot.sliceMasterKey > 0 ? '+' : '') + (slot.sliceMasterKey || 0)}st
+                  </span>
+                </div>
+                <div className="popover-reset-hint">Double-click slider to reset to 0</div>
+              </div>
+
+              <div className="popover-field">
+                <label>Slice Octave</label>
+                <div className="segmented-strip" style={{ display: 'flex', width: '100%', marginTop: '2px' }}>
+                  {[-2, -1, 0, 1, 2].map(oct => (
+                    <button
+                      key={oct}
+                      className={`segmented-btn btn-xs ${(slot.sliceMasterOctave !== undefined ? slot.sliceMasterOctave : 0) === oct ? 'active' : ''}`}
+                      onClick={() => updateSlotParam('sliceMasterOctave', oct)}
+                      style={{ flexGrow: 1, padding: '2px 0', fontSize: '0.55rem' }}
+                    >
+                      {oct > 0 ? `+${oct}` : oct}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="popover-field">
@@ -16640,20 +17691,77 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               {lfoTarget !== 'None' && (
                 <>
                   <div className="popover-field">
-                    <label>LFO Rate ({lfoRate.toFixed(1)} Hz)</label>
-                    <div className="popover-slider-row">
-                      <input 
-                        type="range"
-                        min="0.1"
-                        max="20.0"
-                        step="0.1"
+                    <label>LFO Waveform</label>
+                    <select 
+                      className="popover-select"
+                      value={lfoType}
+                      onChange={(e) => updateSlotParam('lfoType', e.target.value)}
+                    >
+                      <option value="sine">Sine</option>
+                      <option value="triangle">Triangle</option>
+                      <option value="sawtooth">Sawtooth</option>
+                      <option value="square">Square</option>
+                      <option value="random">Random (S&H)</option>
+                    </select>
+                  </div>
+
+                  <div className="popover-field">
+                    <label>LFO Rate Mode</label>
+                    <select 
+                      className="popover-select"
+                      value={lfoRateMode}
+                      onChange={(e) => {
+                        const newMode = e.target.value;
+                        updateSlotParam('lfoRateMode', newMode);
+                        if (newMode === 'bpm') {
+                          updateSlotParam('lfoRate', 1.0);
+                        } else {
+                          updateSlotParam('lfoRate', 3.0);
+                        }
+                      }}
+                    >
+                      <option value="hz">Hertz (Free-run)</option>
+                      <option value="bpm">BPM (Tempo Sync)</option>
+                    </select>
+                  </div>
+
+                  {lfoRateMode === 'hz' ? (
+                    <div className="popover-field">
+                      <label>LFO Rate ({lfoRate.toFixed(1)} Hz)</label>
+                      <div className="popover-slider-row">
+                        <input 
+                          type="range"
+                          min="0.1"
+                          max="20.0"
+                          step="0.1"
+                          value={lfoRate}
+                          onChange={(e) => updateSlotParam('lfoRate', parseFloat(e.target.value))}
+                          onDoubleClick={() => updateSlotParam('lfoRate', 3.0)}
+                        />
+                        <span className="popover-val-span">{lfoRate.toFixed(1)}Hz</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="popover-field">
+                      <label>LFO Sync Rate</label>
+                      <select
+                        className="popover-select"
                         value={lfoRate}
                         onChange={(e) => updateSlotParam('lfoRate', parseFloat(e.target.value))}
-                        onDoubleClick={() => updateSlotParam('lfoRate', 3.0)}
-                      />
-                      <span className="popover-val-span">{lfoRate.toFixed(1)}Hz</span>
+                      >
+                        <option value="0.03125">1/32 Beat</option>
+                        <option value="0.0625">1/16 Beat</option>
+                        <option value="0.125">1/8 Beat</option>
+                        <option value="0.25">1/4 Beat</option>
+                        <option value="0.5">1/2 Beat</option>
+                        <option value="1.0">1 Beat</option>
+                        <option value="2.0">2 Beats</option>
+                        <option value="4.0">4 Beats (1 Bar)</option>
+                        <option value="8.0">8 Beats (2 Bars)</option>
+                        <option value="16.0">16 Beats (4 Bars)</option>
+                      </select>
                     </div>
-                  </div>
+                  )}
 
                   <div className="popover-field">
                     <label>LFO Depth ({Math.round(lfoDepth * 100)}%)</label>
@@ -16669,6 +17777,38 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       />
                       <span className="popover-val-span">{Math.round(lfoDepth * 100)}%</span>
                     </div>
+                  </div>
+
+                  <div className="popover-field">
+                    <label>LFO Crescendo / Fade ({lfoFade} beats)</label>
+                    <div className="popover-slider-row">
+                      <input 
+                        type="range"
+                        min="0"
+                        max="16"
+                        step="0.5"
+                        value={lfoFade}
+                        onChange={(e) => updateSlotParam('lfoFade', parseFloat(e.target.value))}
+                        onDoubleClick={() => updateSlotParam('lfoFade', 0)}
+                      />
+                      <span className="popover-val-span">{lfoFade} beats</span>
+                    </div>
+                  </div>
+
+                  <div className="popover-field" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', padding: '0 4px' }}>
+                    <label style={{ margin: 0, fontSize: '0.48rem', letterSpacing: '0.5px' }}>PHASE RETRIGGER</label>
+                    <input 
+                      type="checkbox"
+                      checked={lfoRetrigger}
+                      onChange={(e) => updateSlotParam('lfoRetrigger', e.target.checked)}
+                      style={{
+                        accentColor: '#00f3ff',
+                        cursor: 'pointer',
+                        width: '14px',
+                        height: '14px',
+                        margin: 0
+                      }}
+                    />
                   </div>
                 </>
               )}
@@ -17126,6 +18266,15 @@ export const saveSampleToDb = async (slot) => {
     routeToXyPad: slot.routeToXyPad,
     tuning: slot.tuning,
     triggerMode: slot.triggerMode || 'hold',
+    attack: slot.attack !== undefined ? slot.attack : 0.01,
+    decay: slot.decay !== undefined ? slot.decay : 0.3,
+    lfoType: slot.lfoType || 'sine',
+    lfoRateMode: slot.lfoRateMode || 'hz',
+    lfoFade: slot.lfoFade !== undefined ? slot.lfoFade : 0,
+    lfoRetrigger: slot.lfoRetrigger !== undefined ? slot.lfoRetrigger : true,
+    randomPan: slot.randomPan !== undefined ? slot.randomPan : 0.0,
+    sliceMasterKey: slot.sliceMasterKey !== undefined ? slot.sliceMasterKey : 0,
+    sliceMasterOctave: slot.sliceMasterOctave !== undefined ? slot.sliceMasterOctave : 0,
     channels: channels,
     sampleRate: slot.buffer.sampleRate
   };
