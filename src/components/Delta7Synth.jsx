@@ -2281,7 +2281,7 @@ export default function Delta7Synth() {
     // Calculate latency offset samples to record extra at the end
     const latencyMs = recLatencyOffsetRef.current || 0;
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
-    const limitSamples = liveRecTotalSamplesRef.current + latencySamples;
+    const limitSamples = liveRecTotalSamplesRef.current + Math.max(0, latencySamples);
 
     liveRecCollectedSamplesRef.current = 0;
     recordedChunksL.current = [];
@@ -2353,15 +2353,27 @@ export default function Delta7Synth() {
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
 
     const targetLength = liveRecTotalSamplesRef.current || totalLength;
-    const startIdx = Math.min(latencySamples, Math.max(0, totalLength - targetLength));
-    const lengthToCopy = Math.min(targetLength, totalLength - startIdx);
-
-    const buffer = ctx.createBuffer(2, lengthToCopy, ctx.sampleRate);
+    const buffer = ctx.createBuffer(2, targetLength, ctx.sampleRate);
     const channelL = buffer.getChannelData(0);
     const channelR = buffer.getChannelData(1);
 
-    channelL.set(rawL.subarray(startIdx, startIdx + lengthToCopy), 0);
-    channelR.set(rawR.subarray(startIdx, startIdx + lengthToCopy), 0);
+    if (latencySamples >= 0) {
+      // Shift earlier by cropping startIdx
+      const startIdx = Math.min(latencySamples, totalLength);
+      const lengthToCopy = Math.min(targetLength, totalLength - startIdx);
+      if (lengthToCopy > 0) {
+        channelL.set(rawL.subarray(startIdx, startIdx + lengthToCopy), 0);
+        channelR.set(rawR.subarray(startIdx, startIdx + lengthToCopy), 0);
+      }
+    } else {
+      // Shift later by inserting silence at start
+      const destIdx = Math.min(Math.abs(latencySamples), targetLength);
+      const lengthToCopy = Math.min(targetLength - destIdx, totalLength);
+      if (lengthToCopy > 0) {
+        channelL.set(rawL.subarray(0, lengthToCopy), destIdx);
+        channelR.set(rawR.subarray(0, lengthToCopy), destIdx);
+      }
+    }
     
     normalizeBuffer(buffer);
     
@@ -17577,7 +17589,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
               <span style={{ fontSize: '0.36rem', color: '#ff9f00', fontWeight: 'bold' }} title="Compensate for audio interface round-trip delay">LAT:</span>
               <input 
-                type="range" min="0" max="150" step="1"
+                type="range" min="-150" max="150" step="1"
                 value={recLatencyOffset}
                 onChange={(e) => setRecLatencyOffset(parseInt(e.target.value))}
                 style={{ width: '40px', height: '4px', accentColor: '#ff9f00', cursor: 'pointer', margin: 0 }}
