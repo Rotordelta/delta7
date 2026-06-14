@@ -10646,6 +10646,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
   const setupMidiListeners = (input) => {
     input.onmidimessage = (message) => {
+      const isDrumMachine = input.name && (
+        input.name.toUpperCase().includes('TR-8') || 
+        input.name.toUpperCase().includes('TR8') || 
+        input.name.toUpperCase().includes('TR-08') || 
+        input.name.toUpperCase().includes('TR-09')
+      );
+      if (isDrumMachine) return;
+
       const [status, data1, data2] = message.data;
 
       // Handle MIDI Clock System Real-Time Messages
@@ -10702,18 +10710,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       setMidiActivity(true);
       setTimeout(() => setMidiActivity(false), 80);
 
-      const isDrumMachine = input.name && (
-        input.name.toUpperCase().includes('TR-8') || 
-        input.name.toUpperCase().includes('TR8') || 
-        input.name.toUpperCase().includes('TR-08') || 
-        input.name.toUpperCase().includes('TR-09')
-      );
-
       if (cmd === 9 && data2 > 0) { // Note On
-        if (isDrumMachine) return;
         if (playVoiceRef.current) playVoiceRef.current(data1, data2);
       } else if (cmd === 8 || (cmd === 9 && data2 === 0)) { // Note Off
-        if (isDrumMachine) return;
         if (stopVoiceRef.current) stopVoiceRef.current(data1);
       } else if (cmd === 11) { // Control Change (CC)
         if (handleMidiCCRef.current) handleMidiCCRef.current(data1, data2);
