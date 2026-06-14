@@ -1203,6 +1203,7 @@ export default function Delta7Synth() {
   }, [midiClockSync]);
 
   const midiTickTimesRef = useRef([]);
+  const nextMidiTickTimeRef = useRef(0);
 
   const deckAPitchRef = useRef(0.0);
   const deckBPitchRef = useRef(0.0);
@@ -10454,24 +10455,51 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
   }, [midiDevices, selectedMidiDevice]);
 
-  // Continuous MIDI Clock Timing Messages (0xF8)
+  // High-Precision Continuous MIDI Clock Timing Messages (0xF8) Scheduler
   useEffect(() => {
-    const bpm = params.arpBpm || 120;
-    const intervalMs = 2500 / bpm;
+    nextMidiTickTimeRef.current = performance.now();
+    
     const intervalId = setInterval(() => {
-      if (midiOutputsRef.current && midiOutputsRef.current.length > 0) {
-        midiOutputsRef.current.forEach(output => {
-          try {
-            output.send([0xF8]);
-          } catch (e) {
-            // Ignore closed port errors
-          }
-        });
+      const now = performance.now();
+      const bpm = paramsRef.current.arpBpm || 120;
+      const tickDurationMs = 2500 / bpm; // 60000 / (BPM * 24)
+      
+      if (nextMidiTickTimeRef.current < now) {
+        nextMidiTickTimeRef.current = now;
       }
-    }, intervalMs);
+      
+      // Schedule ticks in advance for the next 150ms
+      while (nextMidiTickTimeRef.current < now + 150) {
+        const scheduledTime = nextMidiTickTimeRef.current;
+        if (midiOutputsRef.current && midiOutputsRef.current.length > 0) {
+          midiOutputsRef.current.forEach(output => {
+            try {
+              output.send([0xF8], scheduledTime);
+            } catch (e) {
+              // Ignore closed port errors
+            }
+          });
+        }
+        nextMidiTickTimeRef.current += tickDurationMs;
+      }
+    }, 50); // Run scheduler every 50ms
 
     return () => clearInterval(intervalId);
-  }, [params.arpBpm]);
+  }, []);
+
+  // MIDI Start (0xFA) / Stop (0xFC) on Sequencer Play/Stop transport toggles
+  useEffect(() => {
+    if (midiOutputsRef.current && midiOutputsRef.current.length > 0) {
+      const msg = perfPlaybackActive ? 0xFA : 0xFC;
+      midiOutputsRef.current.forEach(output => {
+        try {
+          output.send([msg]);
+        } catch (e) {
+          // Ignore closed port errors
+        }
+      });
+    }
+  }, [perfPlaybackActive]);
 
   // Update playbackRate of warped active voices in real-time when master tempo changes
   useEffect(() => {
