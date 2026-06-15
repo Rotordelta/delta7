@@ -77,3 +77,11 @@
   - **Tactile Performance Controls**: Adding dedicated "STUTTER A" and "STUTTER B" buttons underneath the performance pad columns provides clear, immediate access to momentary stutter fills on active loops.
   - **Momentary Control Styling**: Styling stutter buttons with a glowing red scheme that pulses when active, and supporting mouse-down (on) / mouse-up (off) behaviors, matches the physical hardware experience.
   - **Dynamic MIDI Mapping**: Exposing both "Stut A" and "Stut B" in the MIDI learn dashboard allows users to bind hardware pads or momentary keys on standard controllers to stutter fills.
+
+## Session: 2026-06-15 (Part 6)
+- **Task**: Fixed Sampler Slices triggering, routing, and silencing bugs.
+- **Jimmy's Preferences**:
+  - **Accurate Slot Routing for Slices**: Performance pad triggers in slice mode must play the pad's own sample buffer (resolving to its slot ID based on deck A/B and index) rather than falling back to Bank C's slot.
+  - **Offline Renderer Parity**: WAV stem and mix exports must match the live voice slot-resolution path exactly, mapping slice events to the respective target pad slots to prevent empty audio bounces.
+  - **Zero-Bypass Balance Control**: When launching temporary slice programs (which force single-oscillator play), overriding `oscBalance: 0.0` prevents the active program's balance setting from scaling down or completely silencing the slice playback.
+
