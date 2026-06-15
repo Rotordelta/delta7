@@ -21196,3 +21196,5 @@ export function EqEditorModal({
     </div>
   );
 }
+// Trigger Vercel rebuild - June 15, 2026
+
