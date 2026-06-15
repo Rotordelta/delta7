@@ -3174,6 +3174,46 @@ export default function Delta7Synth() {
     setSampleSlots(nextSlots);
   };
 
+  const handleClearActiveSlot = async () => {
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot) return;
+    
+    const activeNum = selectedEditSlotId.slice(2);
+    const prefix = selectedEditSlotId[0];
+    const bankLabel = prefix.toUpperCase();
+    
+    const confirmClear = window.confirm(`Are you sure you want to clear and delete the sample in slot ${bankLabel}${parseInt(activeNum)}?`);
+    if (!confirmClear) return;
+    
+    try {
+      await deleteSampleFromDb(selectedEditSlotId);
+      
+      const nextSlots = sampleSlotsRef.current.map(s => {
+        if (s.id === selectedEditSlotId) {
+          return {
+            ...s,
+            name: `${bankLabel} Slot ${parseInt(activeNum)}`,
+            buffer: null,
+            revBuffer: null,
+            start: 0.0,
+            end: 1.0,
+            loopStart: 0.0,
+            loopEnd: 1.0
+          };
+        }
+        return s;
+      });
+      sampleSlotsRef.current = nextSlots;
+      setSampleSlots(nextSlots);
+      
+      stopAllNotes();
+      showEditorStatus(`Cleared slot ${bankLabel}${parseInt(activeNum)}! 🗑️`);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to clear database record.');
+    }
+  };
+
   const handleSaveActiveSlotToDb = async () => {
     const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
     if (!slot) return;
@@ -16882,6 +16922,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           <button
                             className="btn btn-xs"
                             disabled={!slot.buffer}
+                            onClick={handleClearActiveSlot}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ff4b4b', color: '#ff4b4b' }}
+                            title="Clear and delete sample in active slot"
+                          >
+                            🗑️ CLEAR
+                          </button>
+                          <button
+                            className="btn btn-xs"
+                            disabled={!slot.buffer}
                             onClick={handleExportActiveSlotWav}
                             style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ff00ff', color: '#ff00ff' }}
                             title="Export sample as WAV file"
@@ -17901,6 +17950,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                               });
                             } catch (err) {
                               console.error(err);
+                            } finally {
+                              e.target.value = '';
                             }
                           }}
                         />
