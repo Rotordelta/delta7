@@ -1200,6 +1200,34 @@ export default function Delta7Synth() {
   const liveRecTotalSamplesRef = useRef(0);
   const liveRecCollectedSamplesRef = useRef(0);
 
+  const [liveRecOverdub, setLiveRecOverdub] = useState(false);
+  const liveRecOverdubRef = useRef(false);
+  useEffect(() => { liveRecOverdubRef.current = liveRecOverdub; }, [liveRecOverdub]);
+
+  const [liveRecProgress, setLiveRecProgress] = useState(0);
+
+  useEffect(() => {
+    if (!isLiveRecording) {
+      setLiveRecProgress(0);
+      return;
+    }
+    let animId;
+    const updateProgress = () => {
+      const ctx = audioCtxRef.current;
+      if (ctx && liveRecStartTimeRef.current) {
+        const elapsed = ctx.currentTime - liveRecStartTimeRef.current;
+        const bpm = paramsRef.current.arpBpm || 120;
+        const beatDuration = 60 / bpm;
+        const totalSec = beatDuration * liveRecBeatsRef.current;
+        const pct = Math.min(100, Math.max(0, (elapsed / totalSec) * 100));
+        setLiveRecProgress(pct);
+      }
+      animId = requestAnimationFrame(updateProgress);
+    };
+    animId = requestAnimationFrame(updateProgress);
+    return () => cancelAnimationFrame(animId);
+  }, [isLiveRecording]);
+
   const [manualRecPendingStart, setManualRecPendingStart] = useState(false);
   const manualRecPendingStartRef = useRef(false);
   useEffect(() => { manualRecPendingStartRef.current = manualRecPendingStart; }, [manualRecPendingStart]);
@@ -2332,13 +2360,16 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     
-    // Feedback prevention: Stop the target pad playback and mute its UI state
     const targetSlot = liveRecTargetSlotRef.current;
     const targetDeck = targetSlot[0].toUpperCase();
     const targetIndex = parseInt(targetSlot.slice(2), 10) - 1;
-    stopPerfVoice(`perf-${targetDeck.toLowerCase()}-slot-${targetIndex}`);
-    setPerfPad(`${targetDeck}-slot-${targetIndex}`, false);
-    setPerfPad(`${targetDeck}-slot-${targetIndex}-pending`, false);
+
+    if (!liveRecOverdubRef.current) {
+      // Feedback prevention: Stop the target pad playback and mute its UI state
+      stopPerfVoice(`perf-${targetDeck.toLowerCase()}-slot-${targetIndex}`);
+      setPerfPad(`${targetDeck}-slot-${targetIndex}`, false);
+      setPerfPad(`${targetDeck}-slot-${targetIndex}-pending`, false);
+    }
 
     const bpm = paramsRef.current.arpBpm || 120;
     const beatDuration = 60 / bpm;
@@ -2442,17 +2473,24 @@ export default function Delta7Synth() {
       }
     }
     
-    normalizeBuffer(buffer);
+    const targetSlotId = liveRecTargetSlotRef.current;
+    let finalBuffer = buffer;
+    if (liveRecOverdubRef.current) {
+      const existingSlot = sampleSlotsRef.current.find(s => s.id === targetSlotId);
+      if (existingSlot && existingSlot.buffer) {
+        finalBuffer = mixAudioBuffers(existingSlot.buffer, buffer);
+      }
+    }
+    normalizeBuffer(finalBuffer);
     
     let updatedSlot = null;
-    const targetSlotId = liveRecTargetSlotRef.current;
     const nextSlots = sampleSlotsRef.current.map(slot => {
       if (slot.id === targetSlotId) {
         updatedSlot = {
           ...slot,
           name: `Live Loop (${liveRecBeatsRef.current}b)`,
-          buffer: buffer,
-          revBuffer: getReversedBuffer(ctx, buffer),
+          buffer: finalBuffer,
+          revBuffer: getReversedBuffer(ctx, finalBuffer),
           start: 0.0,
           end: 1.0,
           loopStart: 0.0,
@@ -2733,6 +2771,32 @@ export default function Delta7Synth() {
         }
       }
     }
+  };
+
+  const mixAudioBuffers = (bufferA, bufferB) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return bufferB;
+    if (!bufferA) return bufferB;
+    if (!bufferB) return bufferA;
+    
+    const channels = Math.max(bufferA.numberOfChannels, bufferB.numberOfChannels);
+    const length = Math.max(bufferA.length, bufferB.length);
+    const sampleRate = bufferA.sampleRate;
+    
+    const mixed = ctx.createBuffer(channels, length, sampleRate);
+    
+    for (let c = 0; c < channels; c++) {
+      const outputData = mixed.getChannelData(c);
+      const dataA = c < bufferA.numberOfChannels ? bufferA.getChannelData(c) : null;
+      const dataB = c < bufferB.numberOfChannels ? bufferB.getChannelData(c) : null;
+      
+      for (let i = 0; i < length; i++) {
+        const valA = dataA && i < bufferA.length ? dataA[i] : 0.0;
+        const valB = dataB && i < bufferB.length ? dataB[i] : 0.0;
+        outputData[i] = valA + valB;
+      }
+    }
+    return mixed;
   };
 
   const saveResampledAudio = () => {
@@ -12010,6 +12074,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       }
       return true;
     }
+    if (key === 'liveRecOverdubToggle') {
+      if (valNormalized >= 0.5) {
+        setLiveRecOverdub(prev => !prev);
+        showEditorStatus(`Looper Overdub: ${!liveRecOverdubRef.current ? 'ON' : 'OFF'} 🔄`);
+      }
+      return true;
+    }
     if (key === 'deckASolo') {
       if (valNormalized >= 0.5) {
         const nextSolo = !deckASoloActive;
@@ -12331,6 +12402,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           handleMidiButtonPress('chordToggle', valNormalized);
         } else if (paramName === 'keyboardMapBankCToggle') {
           handleMidiButtonPress('keyboardMapBankCToggle', valNormalized);
+        } else if (paramName === 'liveRecOverdubToggle') {
+          handleMidiButtonPress('liveRecOverdubToggle', valNormalized);
         } else if (paramName === 'playPause') {
           handleMidiButtonPress('playPause', valNormalized);
         } else if (paramName === 'stop') {
@@ -19069,7 +19142,214 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
           </div>
 
+          {/* Live Sampler / Loop Recorder Panel */}
+          <div className="patches-quick-category font-mono" style={{ marginTop: '8px' }}>
+            <span className="knob-label" style={{ color: '#00f3ff' }}>Live Sampler / Loop Rec</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '8px' }}>
+              
+              {/* Visual Feedback Status Ring/Indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ position: 'relative', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {/* Status Circle */}
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    background: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#222'),
+                    boxShadow: isLiveRecording 
+                      ? '0 0 10px #ff0055' 
+                      : (liveRecPendingStart ? '0 0 10px #ffe600' : 'none'),
+                    animation: isLiveRecording 
+                      ? 'pulse-red 0.5s infinite alternate' 
+                      : (liveRecPendingStart ? 'pulse-yellow 0.5s infinite alternate' : 'none')
+                  }} />
+                  {/* Rotating progress border if active */}
+                  {isLiveRecording && (
+                    <div style={{
+                      position: 'absolute',
+                      top: 0, left: 0, right: 0, bottom: 0,
+                      border: '2px solid transparent',
+                      borderTopColor: '#ff0055',
+                      borderRadius: '50%',
+                      animation: 'spin 1.5s linear infinite'
+                    }} />
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.52rem', fontWeight: 'bold', color: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#888') }}>
+                    {isLiveRecording ? '● RECORDING' : (liveRecPendingStart ? '⏳ ARMED (WAITING)' : 'STANDBY')}
+                  </span>
+                  <span style={{ fontSize: '0.44rem', color: '#fff', opacity: 0.7 }}>
+                    {isLiveRecording || liveRecPendingStart ? `Target: Pad ${liveRecTargetSlot.toUpperCase()} (${liveRecBeats} Beats)` : 'Resampler ready'}
+                  </span>
+                </div>
+              </div>
 
+              {/* Source Selector */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.4rem', color: '#888' }}>SOURCE:</span>
+                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.4)', borderRadius: '3px', padding: '1.5px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {[
+                    { mode: 'resample', label: 'INTERNAL' },
+                    { mode: 'mic', label: 'MIC/LINE' },
+                    { mode: 'monitor', label: 'MONITOR' }
+                  ].map(item => {
+                    const isSel = recordingInputMode === item.mode;
+                    return (
+                      <button
+                        key={item.mode}
+                        onClick={() => setRecordingInputMode(item.mode)}
+                        style={{
+                          flex: 1,
+                          fontSize: '0.42rem',
+                          padding: '2.5px 0',
+                          border: 'none',
+                          background: isSel ? 'rgba(0, 243, 255, 0.2)' : 'transparent',
+                          color: isSel ? '#00f3ff' : '#aaa',
+                          cursor: 'pointer',
+                          borderRadius: '2px',
+                          fontWeight: isSel ? 'bold' : 'normal',
+                          textAlign: 'center'
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Target Pad & Beats Row */}
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {/* Target Pad Selector */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '0.4rem', color: '#888' }}>TARGET PAD:</span>
+                  <select
+                    value={liveRecTargetSlot}
+                    onChange={(e) => setLiveRecTargetSlot(e.target.value)}
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      color: '#ffe600',
+                      fontSize: '0.48rem',
+                      borderRadius: '3px',
+                      padding: '2px 4px',
+                      fontFamily: 'monospace',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      height: '22px',
+                      width: '100%'
+                    }}
+                  >
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <option key={`a-${i}`} value={`a0${i+1}`}>A{i+1}</option>
+                    ))}
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Length Selector */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontSize: '0.4rem', color: '#888' }}>LENGTH:</span>
+                  <select
+                    value={liveRecBeats}
+                    onChange={(e) => setLiveRecBeats(parseInt(e.target.value))}
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      color: '#00f3ff',
+                      fontSize: '0.48rem',
+                      borderRadius: '3px',
+                      padding: '2px 4px',
+                      fontFamily: 'monospace',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      height: '22px',
+                      width: '100%'
+                    }}
+                  >
+                    {[2, 4, 8, 12, 16, 32, 64].map(b => (
+                      <option key={b} value={b}>{b} Beats</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Overdub Toggle */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', position: 'relative' }}>
+                  <span style={{ fontSize: '0.4rem', color: '#888', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    OVERDUB:
+                    <MidiBadge paramKey="liveRecOverdubToggle" style={{ fontSize: '0.28rem', padding: '0px 1px' }} />
+                  </span>
+                  <button
+                    onClick={() => setLiveRecOverdub(prev => !prev)}
+                    className="btn btn-xs"
+                    style={{
+                      background: liveRecOverdub ? 'rgba(0, 243, 255, 0.2)' : 'rgba(0, 0, 0, 0.5)',
+                      border: liveRecOverdub ? '1px solid #00f3ff' : '1px solid rgba(255,255,255,0.15)',
+                      color: liveRecOverdub ? '#00f3ff' : '#aaa',
+                      fontSize: '0.42rem',
+                      fontWeight: liveRecOverdub ? 'bold' : 'normal',
+                      borderRadius: '3px',
+                      height: '22px',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {liveRecOverdub ? 'ON 🔄' : 'OFF'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Latency Compensation Slider */}
+              {(recordingInputMode === 'mic' || recordingInputMode === 'monitor') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.4rem', color: '#888' }} title="Compensate for audio interface round-trip delay">LATENCY OFFSET:</span>
+                    <span style={{ color: '#ff9f00', fontSize: '0.48rem', fontFamily: 'monospace' }}>
+                      {recLatencyOffset}ms
+                    </span>
+                  </div>
+                  <input 
+                    type="range" min="-150" max="150" step="1"
+                    value={recLatencyOffset}
+                    onChange={(e) => setRecLatencyOffset(parseInt(e.target.value))}
+                    style={{ width: '100%', height: '8px', accentColor: '#ff9f00', cursor: 'pointer', margin: 0 }}
+                  />
+                </div>
+              )}
+
+              {/* Trigger Button */}
+              <button
+                onClick={toggleLiveLoopRecording}
+                className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : '')}`}
+                style={{
+                  fontSize: '0.52rem',
+                  padding: '5px 0',
+                  fontWeight: 'bold',
+                  width: '100%',
+                  marginTop: '4px',
+                  color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : '#aaa'),
+                  borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : 'rgba(255,255,255,0.15)'),
+                  background: isLiveRecording 
+                    ? 'rgba(255, 0, 85, 0.25)' 
+                    : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.8)' : 'rgba(0,0,0,0.3)'),
+                  boxShadow: isLiveRecording 
+                    ? '0 0 8px rgba(255, 0, 85, 0.4)' 
+                    : (liveRecPendingStart ? '0 0 8px rgba(255, 230, 0, 0.4)' : 'none'),
+                  animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none'
+                }}
+              >
+                {isLiveRecording ? '⏹️ STOP RECORDING' : (liveRecPendingStart ? '⏳ ARMED...' : '🔴 START LIVE REC')}
+              </button>
+
+            </div>
+          </div>
 
         </div>
 
@@ -19203,133 +19483,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           })()}
         </div>
 
-        {/* Right Section: Resampling Looper Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.45rem', color: '#00f3ff', fontWeight: 'bold' }}>
-            RESAMPLE LOOPER:
-          </span>
-
-          {/* Source Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.4)', borderRadius: '3px', padding: '1px', border: '1px solid rgba(255,255,255,0.08)' }}>
-            {[
-              { mode: 'resample', label: 'INTERNAL' },
-              { mode: 'mic', label: 'MIC/LINE' },
-              { mode: 'monitor', label: 'MONITOR' }
-            ].map(item => {
-              const isSel = recordingInputMode === item.mode;
-              return (
-                <button
-                  key={item.mode}
-                  onClick={() => setRecordingInputMode(item.mode)}
-                  style={{
-                    fontSize: '0.38rem',
-                    padding: '1px 4px',
-                    border: 'none',
-                    background: isSel ? 'rgba(0, 243, 255, 0.2)' : 'transparent',
-                    color: isSel ? '#00f3ff' : '#666',
-                    cursor: 'pointer',
-                    borderRadius: '2px',
-                    fontFamily: 'monospace',
-                    fontWeight: isSel ? 'bold' : 'normal'
-                  }}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Target Pad Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-            <span style={{ fontSize: '0.36rem', color: '#666' }}>TGT:</span>
-            <select
-              value={liveRecTargetSlot}
-              onChange={(e) => setLiveRecTargetSlot(e.target.value)}
-              style={{
-                background: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                color: '#ffe600',
-                fontSize: '0.42rem',
-                borderRadius: '3px',
-                padding: '1px 3px',
-                fontFamily: 'monospace',
-                cursor: 'pointer',
-                outline: 'none',
-                height: '18px'
-              }}
-            >
-              {Array.from({ length: 8 }).map((_, i) => (
-                <option key={`a-${i}`} value={`a0${i+1}`}>A{i+1}</option>
-              ))}
-              {Array.from({ length: 8 }).map((_, i) => (
-                <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Length Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-            <span style={{ fontSize: '0.36rem', color: '#666' }}>LEN:</span>
-            <select
-              value={liveRecBeats}
-              onChange={(e) => setLiveRecBeats(parseInt(e.target.value))}
-              style={{
-                background: 'rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                color: '#00f3ff',
-                fontSize: '0.42rem',
-                borderRadius: '3px',
-                padding: '1px 3px',
-                fontFamily: 'monospace',
-                cursor: 'pointer',
-                outline: 'none',
-                height: '18px'
-              }}
-            >
-              {[2, 4, 8, 12, 16, 32, 64].map(b => (
-                <option key={b} value={b}>{b}b</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Latency Compensation Offset (Only shown if source is MIC/LINE or MONITOR) */}
-          {(recordingInputMode === 'mic' || recordingInputMode === 'monitor') && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <span style={{ fontSize: '0.36rem', color: '#ff9f00', fontWeight: 'bold' }} title="Compensate for audio interface round-trip delay">LAT:</span>
-              <input 
-                type="range" min="-150" max="150" step="1"
-                value={recLatencyOffset}
-                onChange={(e) => setRecLatencyOffset(parseInt(e.target.value))}
-                style={{ width: '40px', height: '4px', accentColor: '#ff9f00', cursor: 'pointer', margin: 0 }}
-              />
-              <span className="font-mono" style={{ color: '#fff', fontSize: '0.42rem', minWidth: '28px', textAlign: 'right' }}>
-                {recLatencyOffset}ms
-              </span>
-            </div>
-          )}
-
-          {/* Start/Stop Rec Trigger Button */}
-          <button
-            onClick={toggleLiveLoopRecording}
-            className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : '')}`}
-            style={{
-              fontSize: '0.44rem',
-              padding: '2px 8px',
-              fontWeight: 'bold',
-              minWidth: '70px',
-              color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : '#aaa'),
-              borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : 'rgba(255,255,255,0.15)'),
-              background: isLiveRecording 
-                ? 'rgba(255, 0, 85, 0.25)' 
-                : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.8)' : 'rgba(0,0,0,0.3)'),
-              boxShadow: isLiveRecording 
-                ? '0 0 6px rgba(255, 0, 85, 0.4)' 
-                : (liveRecPendingStart ? '0 0 6px rgba(255, 230, 0, 0.4)' : 'none'),
-              animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none'
-            }}
-          >
-            {isLiveRecording ? 'REC ACTIVE' : (liveRecPendingStart ? 'PENDING...' : 'LIVE REC')}
-          </button>
+        {/* Right Section: Spacer for Layout (Controls are now in the bottom-right sidebar) */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
         </div>
       </div>
 
@@ -20064,6 +20219,7 @@ function MidiMappingMenu({
         { key: "arpToggle", name: "Arpeggiator On/Off" },
         { key: "chordToggle", name: "Chord Mode On/Off" },
         { key: "keyboardMapBankCToggle", name: "Bank C Mapping Toggle" },
+        { key: "liveRecOverdubToggle", name: "Looper Overdub On/Off" },
         { key: "stutterAToggle", name: "Deck A Stutter On/Off" },
         { key: "stutterBToggle", name: "Deck B Stutter On/Off" }
       ]
