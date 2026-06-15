@@ -97,5 +97,12 @@
 - **Jimmy's Preferences**:
   - **Order of MIDI Note Handling**: Ensure performance pad mapping checks are not short-circuited by global custom button/transport note-handling loops, by explicitly skipping keys starting with `pad-` during general key interceptors.
 
+## Session: 2026-06-15 (Part 9)
+- **Task**: Added sample slot CLEAR action and fixed duplicate file upload bug.
+- **Jimmy's Preferences**:
+  - **Explicit Slot Deletion**: Provide a red-themed `🗑️ CLEAR` button in the waveform editor to delete the active sample from IndexedDB and reset the slot state to empty, rather than requiring saving an empty slot.
+  - **File Selector State Reset**: Reset `e.target.value = ''` at the end of the file input's `onChange` event to allow re-importing the same file if a slot is cleared or changed.
+
+
 
 
