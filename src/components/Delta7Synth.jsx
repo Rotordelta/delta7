@@ -16826,44 +16826,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           </button>
                           <button
                             className="btn btn-xs"
-                            disabled={!slot.buffer || selectionStart === null || selectionEnd === null}
-                            onClick={() => {
-                              const buffer = slot.buffer;
-                              if (!buffer) return;
-                              pushUndoState(slot);
-                              const totalSamples = buffer.length;
-                              const startPct = Math.min(selectionStart, selectionEnd);
-                              const endPct = Math.max(selectionStart, selectionEnd);
-                              const startSample = Math.floor(startPct * totalSamples);
-                              const endSample = Math.floor(endPct * totalSamples);
-                              const selectionLength = endSample - startSample;
-                              if (selectionLength <= 0) return;
-
-                              const newLength = totalSamples - selectionLength;
-                              if (newLength <= 0) {
-                                updateBufferForSlot(selectedEditSlotId, null, "Deleted (Empty)");
-                              } else {
-                                const ctx = audioCtxRef.current;
-                                const newBuffer = ctx.createBuffer(buffer.numberOfChannels, newLength, buffer.sampleRate);
-                                for (let c = 0; c < buffer.numberOfChannels; c++) {
-                                  const orig = buffer.getChannelData(c);
-                                  const dest = newBuffer.getChannelData(c);
-                                  dest.set(orig.subarray(0, startSample), 0);
-                                  dest.set(orig.subarray(endSample, totalSamples), startSample);
-                                }
-                                updateBufferForSlot(selectedEditSlotId, newBuffer, `Delete: ${slot.name}`);
-                              }
-                              setSelectionStart(null);
-                              setSelectionEnd(null);
-                              if (activePreviewNodeRef.current) {
-                                try { activePreviewNodeRef.current.stop(); } catch {}
-                                activePreviewNodeRef.current = null;
-                                setIsPlayingPreview(false);
-                              }
-                            }}
-                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ff0055', color: '#ff0055' }}
+                            disabled={!slot.buffer}
+                            onClick={handleClearActiveSlot}
+                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ff4b4b', color: '#ff4b4b' }}
+                            title="Clear and delete sample in active slot"
                           >
-                            DELETE
+                            🗑️ CLEAR
                           </button>
                           <button
                             className="btn btn-xs"
@@ -16918,15 +16886,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             title="Save sample buffer and settings to browser database"
                           >
                             💾 SAVE
-                          </button>
-                          <button
-                            className="btn btn-xs"
-                            disabled={!slot.buffer}
-                            onClick={handleClearActiveSlot}
-                            style={{ margin: 0, padding: '2px 6px', fontSize: '0.55rem', borderColor: '#ff4b4b', color: '#ff4b4b' }}
-                            title="Clear and delete sample in active slot"
-                          >
-                            🗑️ CLEAR
                           </button>
                           <button
                             className="btn btn-xs"
