@@ -1926,6 +1926,8 @@ export default function Delta7Synth() {
 
   // --- Waveform selection, clipboard, history & recording states ---
   const [recordingInputMode, setRecordingInputMode] = useState('mic'); // 'mic', 'monitor', or 'resample'
+  const recordingInputModeRef = useRef('mic');
+  useEffect(() => { recordingInputModeRef.current = recordingInputMode; }, [recordingInputMode]);
   const [selectionStart, setSelectionStart] = useState(null);
   const [selectionEnd, setSelectionEnd] = useState(null);
   const [clipboard, setClipboard] = useState(null);
@@ -2328,7 +2330,8 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') ctx.resume();
     
-    if (recordingInputMode === 'resample') {
+    const inputMode = recordingInputModeRef.current;
+    if (inputMode === 'resample') {
       if (!resamplerGainNodeRef.current) {
         const resamplerGainNode = ctx.createGain();
         resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
@@ -2344,13 +2347,15 @@ export default function Delta7Synth() {
       setupLosslessRecorderNode(ctx, resamplerGainNodeRef.current);
       triggerLiveLoopRecInternal();
     } else if (!streamRef.current) {
-      showEditorStatus("Arming mic/instrument input... 🎤");
-      armMicrophone()
+      const isMonitor = inputMode === 'monitor';
+      showEditorStatus(isMonitor ? "Arming browser audio monitor... 🖥️" : "Arming mic/instrument input... 🎤");
+      const armFunc = isMonitor ? armMonitor : armMicrophone;
+      armFunc()
         .then(() => {
           triggerLiveLoopRecInternal();
         })
         .catch(err => {
-          console.error("Arming microphone failed:", err);
+          console.error("Arming input failed:", err);
           showEditorStatus("Failed to arm input source! ❌");
         });
     } else {
