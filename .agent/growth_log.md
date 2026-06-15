@@ -112,9 +112,9 @@
 - **Task**: Removed the static MIDI CC Learn Matrix panel from the right sidebar.
 - **Jimmy's Preferences**:
   - **Maximize Sidebar Real Estate**: Avoid rendering duplicate layout elements (like the MIDI CC Learn Matrix) in sidebar panels when they are already fully configurable in a global mapping modal. This saves screen space and keeps the panel layout neat.
-
-
-
-
-
-
+## Session: 2026-06-15 (Part 12)
+- **Task**: Resolved Resample Looper target slot routing and fixed stale closures on the looper's recording input mode.
+- **Jimmy's Preferences**:
+  - **Asynchronous AudioWorklet Message Routing**: When processing asynchronous thread callbacks (such as `RECORDING_COMPLETE`), use persistent refs (`liveLoopInProgressRef.current`) to track the operation's origin rather than transient state variables (`isLiveRecordingRef.current`) that get cleared before the thread message is handled. This prevents the looper from defaulting to resampler fallback behaviors (saving to `A1`).
+  - **Ref-Synced Recording Modes**: Synchronize interactive selector states (such as `recordingInputMode`) to active refs (`recordingInputModeRef`) to eliminate stale closures when triggers are fired from external MIDI CC events (sustain pedals) or keyboard hook listeners.
+  - **Dynamic Arming Selection**: Ensure that arming the looper checks the active input source and invokes the correct capture helper (`armMicrophone` or `armMonitor`) rather than falling back to the microphone by default.
