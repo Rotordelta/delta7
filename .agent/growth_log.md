@@ -103,6 +103,12 @@
   - **Explicit Slot Deletion**: Provide a red-themed `🗑️ CLEAR` button in the waveform editor to delete the active sample from IndexedDB and reset the slot state to empty, rather than requiring saving an empty slot.
   - **File Selector State Reset**: Reset `e.target.value = ''` at the end of the file input's `onChange` event to allow re-importing the same file if a slot is cleared or changed.
 
+## Session: 2026-06-15 (Part 10)
+- **Task**: Replaced the waveform selection delete button with the slot clearing CLEAR button.
+- **Jimmy's Preferences**:
+  - **Streamlined Toolbar Actions**: Place the slot-level `🗑️ CLEAR` action as a primary action in the main toolbar group of the Waveform Editor, completely replacing the specific selection-only range deletion to simplify the interface.
+
+
 
 
 
