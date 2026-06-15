@@ -15338,7 +15338,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 <span style={{ fontSize: '0.48rem', color: '#888', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>ZOOM:</span>
                 <input
                   type="range"
-                  min="30"
+                  min="10"
                   max="150"
                   value={highwayZoom}
                   onChange={(e) => setHighwayZoom(parseInt(e.target.value))}
