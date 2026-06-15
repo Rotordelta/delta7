@@ -85,6 +85,8 @@ const DEFAULT_PARAMS = {
   mfx2SendA: 0.0,
   mfx2SendB: 0.0,
   stutterOn: false,
+  stutterAOn: false,
+  stutterBOn: false,
   stutterRate: '1/16',
   stutterGate: 1.0,
   stutterSweepDir: 'None',
@@ -3977,7 +3979,7 @@ export default function Delta7Synth() {
                 ...slot,
                 name: saved.name,
                 rootNote: saved.rootNote ?? slot.rootNote,
-                volume: saved.volume ?? slot.volume,
+                volume: (saved.volume !== undefined && !isNaN(saved.volume) && isFinite(saved.volume)) ? Math.max(0.0, saved.volume) : slot.volume,
                 sliceCount: saved.sliceCount ?? slot.sliceCount,
                 start: saved.start ?? slot.start,
                 end: saved.end ?? slot.end,
@@ -3988,7 +3990,7 @@ export default function Delta7Synth() {
                 sliceParams: saved.sliceParams ?? slot.sliceParams,
                 warpOn: saved.warpOn ?? slot.warpOn,
                 warpBeats: saved.warpBeats ?? slot.warpBeats,
-                pan: saved.pan ?? slot.pan,
+                pan: (saved.pan !== undefined && !isNaN(saved.pan) && isFinite(saved.pan)) ? Math.max(-1.0, Math.min(1.0, saved.pan)) : slot.pan,
                 fxType: saved.fxType ?? slot.fxType,
                 fxSend: saved.fxSend ?? slot.fxSend,
                 routeToXyPad: saved.routeToXyPad ?? slot.routeToXyPad,
@@ -4112,6 +4114,8 @@ export default function Delta7Synth() {
         const currentFxSend = slot.fxSend !== undefined ? slot.fxSend : 0.0;
         const sendGainNode = voice.sendGainNode;
 
+        voice.fxType = currentFxType;
+
         if (sendGainNode) {
           try {
             sendGainNode.disconnect();
@@ -4125,26 +4129,57 @@ export default function Delta7Synth() {
             sendGainNode.connect(leslieInputRef.current);
           }
 
-          const targetGain = currentFxType === 'None' ? 0.0 : currentFxSend;
+          const targetGain = (currentFxType === 'None' || currentFxType === 'Stutter') ? 0.0 : currentFxSend;
           sendGainNode.gain.cancelScheduledValues(now);
           sendGainNode.gain.setValueAtTime(sendGainNode.gain.value, now);
           sendGainNode.gain.linearRampToValueAtTime(targetGain, now + 0.015);
+        }
+
+        if (currentFxType === 'Stutter') {
+          const isDeckA = voice.isDeckA;
+          const isStutterActive = isDeckA ? paramsRef.current.stutterAOn : paramsRef.current.stutterBOn;
+          if (isStutterActive) {
+            if (!voice.stutterTimeoutId) {
+              startStutterModulation(voice);
+            }
+          } else {
+            if (voice.stutterTimeoutId) {
+              stopVoiceStutter(voice, ctx);
+            }
+          }
+        } else {
+          if (voice.stutterTimeoutId && !paramsRef.current.stutterOn) {
+            stopVoiceStutter(voice, ctx);
+          }
         }
       }
 
       if (param === 'pan') {
         if (voice.padPannerNode) {
+          let safeVal = val;
+          if (isNaN(safeVal) || !isFinite(safeVal)) {
+            safeVal = 0.0;
+          }
+          safeVal = Math.max(-1.0, Math.min(1.0, safeVal));
           voice.padPannerNode.pan.cancelScheduledValues(now);
-          voice.padPannerNode.pan.setValueAtTime(voice.padPannerNode.pan.value, now);
-          voice.padPannerNode.pan.linearRampToValueAtTime(val, now + 0.015);
+          try {
+            voice.padPannerNode.pan.setValueAtTime(voice.padPannerNode.pan.value, now);
+            voice.padPannerNode.pan.linearRampToValueAtTime(safeVal, now + 0.015);
+          } catch (e) {}
         }
       }
 
       if (param === 'volume') {
         if (voice.slotGainNode) {
+          let safeVal = val;
+          if (isNaN(safeVal) || !isFinite(safeVal) || safeVal < 0) {
+            safeVal = 1.0;
+          }
           voice.slotGainNode.gain.cancelScheduledValues(now);
-          voice.slotGainNode.gain.setValueAtTime(voice.slotGainNode.gain.value, now);
-          voice.slotGainNode.gain.linearRampToValueAtTime(val, now + 0.015);
+          try {
+            voice.slotGainNode.gain.setValueAtTime(voice.slotGainNode.gain.value, now);
+            voice.slotGainNode.gain.linearRampToValueAtTime(safeVal, now + 0.015);
+          } catch (e) {}
         }
       }
 
@@ -5128,60 +5163,31 @@ export default function Delta7Synth() {
     if (!audioCtxRef.current) return;
     const ctx = audioCtxRef.current;
     
-    if (params.stutterOn) {
-      activeVoicesRef.current.forEach(vList => {
-        const triggerStutter = (v) => {
-          if (v && !v.stutterTimeoutId) {
-            startStutterModulation(v);
-          }
-        };
-        if (Array.isArray(vList)) vList.forEach(triggerStutter); else triggerStutter(vList);
-      });
-    } else {
-      activeVoicesRef.current.forEach(vList => {
-        const stopStutter = (v) => {
-          if (v) {
+    activeVoicesRef.current.forEach((vList, key) => {
+      const isDeckA = typeof key === 'string' && (key.includes('perf-a') || key.includes('-a-'));
+      const isStutterActive = isDeckA ? params.stutterAOn : params.stutterBOn;
+
+      const processStutter = (v) => {
+        if (v && v.fxType === 'Stutter') {
+          if (isStutterActive) {
+            if (!v.stutterTimeoutId) {
+              startStutterModulation(v);
+            }
+          } else {
             if (v.stutterTimeoutId) {
-              clearTimeout(v.stutterTimeoutId);
-              v.stutterTimeoutId = null;
+              stopVoiceStutter(v, ctx);
             }
-            const now = ctx.currentTime;
-            [v.oscA, v.oscA_L, v.oscA_R].forEach(osc => {
-              if (osc) {
-                osc.loop = v.isLoopA || false;
-                if (v.isLoopA) {
-                  osc.loopStart = v.origLoopStartA || 0;
-                  osc.loopEnd = v.origLoopEndA || 0;
-                } else {
-                  osc.loopStart = 0;
-                  osc.loopEnd = 0;
-                }
-                osc.playbackRate.setValueAtTime(v.freqScaleA || 1.0, now);
-              }
-            });
-            if (v.oscB) {
-              v.oscB.loop = v.isLoopB || false;
-              if (v.isLoopB) {
-                v.oscB.loopStart = v.origLoopStartB || 0;
-                v.oscB.loopEnd = v.origLoopEndB || 0;
-              } else {
-                v.oscB.loopStart = 0;
-                v.oscB.loopEnd = 0;
-              }
-              v.oscB.playbackRate.setValueAtTime(v.freqScaleB || 1.0, now);
-            }
-            if (v.stutterGateNode) {
-              v.stutterGateNode.gain.cancelScheduledValues(now);
-              v.stutterGateNode.gain.setValueAtTime(1.0, now);
-            }
-            v.stutterLoopStart = undefined;
-            v.stutterLoopStartB = undefined;
           }
-        };
-        if (Array.isArray(vList)) vList.forEach(stopStutter); else stopStutter(vList);
-      });
-    }
-  }, [params.stutterOn]);
+        }
+      };
+
+      if (Array.isArray(vList)) {
+        vList.forEach(processStutter);
+      } else {
+        processStutter(vList);
+      }
+    });
+  }, [params.stutterAOn, params.stutterBOn]);
 
   // Synced Parameters Ref (for low-latency access in loop)
   const paramsRef = useRef(params);
@@ -6618,7 +6624,7 @@ export default function Delta7Synth() {
               buffer,
               revBuffer,
               rootNote: savedSlot.rootNote ?? slot.rootNote,
-              volume: savedSlot.volume ?? slot.volume,
+              volume: (savedSlot.volume !== undefined && !isNaN(savedSlot.volume) && isFinite(savedSlot.volume)) ? Math.max(0.0, savedSlot.volume) : slot.volume,
               sliceCount: savedSlot.sliceCount ?? slot.sliceCount,
               start: savedSlot.start ?? slot.start,
               end: savedSlot.end ?? slot.end,
@@ -6629,7 +6635,7 @@ export default function Delta7Synth() {
               sliceParams: savedSlot.sliceParams ?? slot.sliceParams,
               warpOn: savedSlot.warpOn ?? slot.warpOn,
               warpBeats: savedSlot.warpBeats ?? slot.warpBeats,
-              pan: savedSlot.pan ?? slot.pan,
+              pan: (savedSlot.pan !== undefined && !isNaN(savedSlot.pan) && isFinite(savedSlot.pan)) ? Math.max(-1.0, Math.min(1.0, savedSlot.pan)) : slot.pan,
               fxType: savedSlot.fxType ?? slot.fxType,
               fxSend: savedSlot.fxSend ?? slot.fxSend,
               routeToXyPad: savedSlot.routeToXyPad ?? slot.routeToXyPad,
@@ -7289,7 +7295,10 @@ export default function Delta7Synth() {
       }
       
       const currentParams = paramsRef.current;
-      if (!currentParams.stutterOn) {
+      const isStutterActive = voice.isDeckA ? currentParams.stutterAOn : currentParams.stutterBOn;
+      const shouldStutter = (voice.fxType === 'Stutter' ? isStutterActive : currentParams.stutterOn);
+
+      if (!shouldStutter) {
         const now = ctx.currentTime;
         [voice.oscA, voice.oscA_L, voice.oscA_R].forEach(osc => {
           if (osc) {
@@ -7343,9 +7352,15 @@ export default function Delta7Synth() {
       }
 
       let rate = currentParams.stutterRate || '1/16';
-      const elapsed = ctx.currentTime - voice.startTime;
+      let elapsed = ctx.currentTime - (voice.startTime || ctx.currentTime);
+      if (isNaN(elapsed) || !isFinite(elapsed)) {
+        elapsed = 0.0;
+      }
       const sweepDuration = currentParams.stutterSweepTime || 1.0;
-      const progress = Math.min(1.0, elapsed / sweepDuration);
+      let progress = Math.min(1.0, elapsed / sweepDuration);
+      if (isNaN(progress) || !isFinite(progress)) {
+        progress = 0.0;
+      }
 
       if (currentParams.stutterSweepDir !== 'None') {
         const rates = ['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'];
@@ -7380,14 +7395,11 @@ export default function Delta7Synth() {
       let skipStep = false;
       const pattern = currentParams.stutterPattern || 'None';
       if (pattern === 'BouncingBall') {
-        // Exponentially decrease step duration on each step to sound like a bouncing ball
         stepDur = stepDur * Math.pow(0.85, stepIndex);
       } else if (pattern === 'Swing') {
-        // Shuffle alternate steps
         const swingRatio = 1.33;
         stepDur = (stepIndex % 2 === 0) ? (stepDur * 2 / (1 + swingRatio)) : (stepDur * 2 * swingRatio / (1 + swingRatio));
       } else if (pattern === 'RandomSkip') {
-        // 30% chance to mute the step entirely for a glitch breakbeat feel
         if (Math.random() < 0.3) {
           skipStep = true;
         }
@@ -7395,14 +7407,25 @@ export default function Delta7Synth() {
 
       if (currentParams.stutterJitter > 0) {
         const jitterAmount = (Math.random() * 2 - 1) * currentParams.stutterJitter * 0.3 * stepDur;
-        stepDur = Math.max(0.005, stepDur + jitterAmount);
+        stepDur = stepDur + jitterAmount;
       }
 
-      const gateDur = stepDur * (currentParams.stutterGate !== undefined ? currentParams.stutterGate : 1.0);
+      if (isNaN(stepDur) || !isFinite(stepDur) || stepDur <= 0.0) {
+        stepDur = 0.1;
+      }
+
+      const gateMultiplier = currentParams.stutterGate !== undefined ? currentParams.stutterGate : 1.0;
+      let gateDur = stepDur * gateMultiplier;
+      if (isNaN(gateDur) || !isFinite(gateDur) || gateDur <= 0.0) {
+        gateDur = stepDur;
+      }
 
       let pitchOffset = 0;
       if (currentParams.stutterPitchSweep !== 0) {
         pitchOffset = progress * currentParams.stutterPitchSweep;
+      }
+      if (isNaN(pitchOffset) || !isFinite(pitchOffset)) {
+        pitchOffset = 0;
       }
 
       const now = ctx.currentTime;
@@ -7432,13 +7455,20 @@ export default function Delta7Synth() {
         } else if (panMode === 'Sine') {
           panVal = Math.sin(elapsed * Math.PI); // cycles every 2s
         }
+        if (isNaN(panVal) || !isFinite(panVal)) {
+          panVal = 0.0;
+        }
+        panVal = Math.max(-1.0, Math.min(1.0, panVal));
         voice.stutterPannerNode.pan.cancelScheduledValues(now);
         voice.stutterPannerNode.pan.linearRampToValueAtTime(panVal, now + 0.005);
       }
 
       // Sweep filter cutoff
       if (currentParams.stutterFilterSweep && currentParams.stutterFilterSweep !== 0) {
-        const filterOffset = progress * currentParams.stutterFilterSweep;
+        let filterOffset = progress * currentParams.stutterFilterSweep;
+        if (isNaN(filterOffset) || !isFinite(filterOffset)) {
+          filterOffset = 0;
+        }
         const baseCutoff = voice.baseCutoff !== undefined ? voice.baseCutoff : 1000;
         const targetCutoff = Math.max(20, Math.min(20000, baseCutoff + filterOffset));
         
@@ -7456,15 +7486,26 @@ export default function Delta7Synth() {
         if (voice.stutterLoopStart === undefined) {
           const elapsedBufTime = elapsed * (voice.freqScaleA || 1.0);
           const activeDurationA = (voice.endA - voice.startA) * voice.bufferA.duration;
-          voice.stutterLoopStart = voice.startOffsetA + (elapsedBufTime % Math.max(0.1, activeDurationA));
+          const safeActiveDuration = isNaN(activeDurationA) || activeDurationA <= 0 ? 0.1 : activeDurationA;
+          voice.stutterLoopStart = (voice.startOffsetA || 0) + (elapsedBufTime % safeActiveDuration);
+        }
+        if (isNaN(voice.stutterLoopStart) || !isFinite(voice.stutterLoopStart)) {
+          voice.stutterLoopStart = voice.startOffsetA || 0;
         }
 
         [voice.oscA, voice.oscA_L, voice.oscA_R].forEach(osc => {
           if (osc) {
             osc.loop = true;
             osc.loopStart = voice.stutterLoopStart;
-            osc.loopEnd = Math.min(voice.bufferA.duration, voice.stutterLoopStart + stepDur * (voice.freqScaleA || 1.0));
-            const finalPitchScale = (voice.freqScaleA || 1.0) * Math.pow(2, pitchOffset / 12);
+            let endVal = voice.stutterLoopStart + stepDur * (voice.freqScaleA || 1.0);
+            if (isNaN(endVal) || !isFinite(endVal)) {
+              endVal = voice.stutterLoopStart + 0.1;
+            }
+            osc.loopEnd = Math.min(voice.bufferA.duration, endVal);
+            let finalPitchScale = (voice.freqScaleA || 1.0) * Math.pow(2, pitchOffset / 12);
+            if (isNaN(finalPitchScale) || !isFinite(finalPitchScale)) {
+              finalPitchScale = voice.freqScaleA || 1.0;
+            }
             osc.playbackRate.setValueAtTime(finalPitchScale, now);
           }
         });
@@ -7474,13 +7515,24 @@ export default function Delta7Synth() {
         if (voice.stutterLoopStartB === undefined) {
           const elapsedBufTimeB = elapsed * (voice.freqScaleB || 1.0);
           const activeDurationB = (voice.endB - voice.startB) * voice.bufferB.duration;
-          voice.stutterLoopStartB = voice.startOffsetB + (elapsedBufTimeB % Math.max(0.1, activeDurationB));
+          const safeActiveDurationB = isNaN(activeDurationB) || activeDurationB <= 0 ? 0.1 : activeDurationB;
+          voice.stutterLoopStartB = (voice.startOffsetB || 0) + (elapsedBufTimeB % safeActiveDurationB);
+        }
+        if (isNaN(voice.stutterLoopStartB) || !isFinite(voice.stutterLoopStartB)) {
+          voice.stutterLoopStartB = voice.startOffsetB || 0;
         }
 
         voice.oscB.loop = true;
         voice.oscB.loopStart = voice.stutterLoopStartB;
-        voice.oscB.loopEnd = Math.min(voice.bufferB.duration, voice.stutterLoopStartB + stepDur * (voice.freqScaleB || 1.0));
-        const finalPitchScaleB = (voice.freqScaleB || 1.0) * Math.pow(2, pitchOffset / 12);
+        let endValB = voice.stutterLoopStartB + stepDur * (voice.freqScaleB || 1.0);
+        if (isNaN(endValB) || !isFinite(endValB)) {
+          endValB = voice.stutterLoopStartB + 0.1;
+        }
+        voice.oscB.loopEnd = Math.min(voice.bufferB.duration, endValB);
+        let finalPitchScaleB = (voice.freqScaleB || 1.0) * Math.pow(2, pitchOffset / 12);
+        if (isNaN(finalPitchScaleB) || !isFinite(finalPitchScaleB)) {
+          finalPitchScaleB = voice.freqScaleB || 1.0;
+        }
         voice.oscB.playbackRate.setValueAtTime(finalPitchScaleB, now);
       }
 
@@ -7490,6 +7542,104 @@ export default function Delta7Synth() {
     };
 
     scheduleStutterStep(0);
+  };
+
+  const stopVoiceStutter = (voice, ctx) => {
+    if (!voice) return;
+    if (voice.stutterTimeoutId) {
+      clearTimeout(voice.stutterTimeoutId);
+      voice.stutterTimeoutId = null;
+    }
+    const now = ctx.currentTime;
+    [voice.oscA, voice.oscA_L, voice.oscA_R].forEach(osc => {
+      if (osc) {
+        osc.loop = voice.isLoopA || false;
+        if (voice.isLoopA) {
+          osc.loopStart = voice.origLoopStartA || 0;
+          osc.loopEnd = voice.origLoopEndA || 0;
+        } else {
+          osc.loopStart = 0;
+          osc.loopEnd = 0;
+        }
+        osc.playbackRate.cancelScheduledValues(now);
+        osc.playbackRate.setValueAtTime(voice.freqScaleA || 1.0, now);
+      }
+    });
+    if (voice.oscB) {
+      voice.oscB.loop = voice.isLoopB || false;
+      if (voice.isLoopB) {
+        voice.oscB.loopStart = voice.origLoopStartB || 0;
+        voice.oscB.loopEnd = voice.origLoopEndB || 0;
+      } else {
+        voice.oscB.loopStart = 0;
+        voice.oscB.loopEnd = 0;
+      }
+      voice.oscB.playbackRate.cancelScheduledValues(now);
+      voice.oscB.playbackRate.setValueAtTime(voice.freqScaleB || 1.0, now);
+    }
+    if (voice.stutterGateNode) {
+      voice.stutterGateNode.gain.cancelScheduledValues(now);
+      voice.stutterGateNode.gain.setValueAtTime(1.0, now);
+    }
+    if (voice.stutterPannerNode) {
+      voice.stutterPannerNode.pan.cancelScheduledValues(now);
+      voice.stutterPannerNode.pan.setValueAtTime(0.0, now);
+    }
+    if (voice.filter1) {
+      voice.filter1.frequency.cancelScheduledValues(now);
+      voice.filter1.frequency.setValueAtTime(voice.baseCutoff || 1000, now);
+    }
+    if (voice.filter2) {
+      voice.filter2.frequency.cancelScheduledValues(now);
+      voice.filter2.frequency.setValueAtTime(voice.baseCutoff || 1000, now);
+    }
+    voice.stutterLoopStart = undefined;
+    voice.stutterLoopStartB = undefined;
+  };
+
+  // Direct imperative stutter deck handlers — bypasses React render cycle for live audio.
+  // These MUST be declared after stopVoiceStutter and startStutterModulation to avoid TDZ.
+  const triggerStutterDeck = (deckIsA) => {
+    if (!audioCtxRef.current) return;
+    if (deckIsA) {
+      paramsRef.current = { ...paramsRef.current, stutterAOn: true };
+    } else {
+      paramsRef.current = { ...paramsRef.current, stutterBOn: true };
+    }
+    const keyPrefix = deckIsA ? 'perf-a' : 'perf-b';
+    activeVoicesRef.current.forEach((vList, key) => {
+      if (typeof key === 'string' && key.includes(keyPrefix)) {
+        const process = (v) => {
+          if (v && v.fxType === 'Stutter' && !v.stutterTimeoutId) {
+            startStutterModulation(v);
+          }
+        };
+        if (Array.isArray(vList)) vList.forEach(process);
+        else process(vList);
+      }
+    });
+  };
+
+  const releaseStutterDeck = (deckIsA) => {
+    if (!audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    if (deckIsA) {
+      paramsRef.current = { ...paramsRef.current, stutterAOn: false };
+    } else {
+      paramsRef.current = { ...paramsRef.current, stutterBOn: false };
+    }
+    const keyPrefix = deckIsA ? 'perf-a' : 'perf-b';
+    activeVoicesRef.current.forEach((vList, key) => {
+      if (typeof key === 'string' && key.includes(keyPrefix)) {
+        const process = (v) => {
+          if (v && v.stutterTimeoutId) {
+            stopVoiceStutter(v, ctx);
+          }
+        };
+        if (Array.isArray(vList)) vList.forEach(process);
+        else process(vList);
+      }
+    });
   };
 
   // Triggers one single program sound voice
@@ -8494,9 +8644,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       const randomPanDepth = prog.perfPadRandomPan !== undefined ? prog.perfPadRandomPan : 0.0;
       if (randomPanDepth > 0) {
         const randPanVal = (Math.random() * 2 - 1) * randomPanDepth;
-        finalPadPan = Math.max(-1.0, Math.min(1.0, padPan + randPanVal));
+        finalPadPan = padPan + randPanVal;
       }
     }
+    if (isNaN(finalPadPan) || !isFinite(finalPadPan)) {
+      finalPadPan = 0.0;
+    }
+    finalPadPan = Math.max(-1.0, Math.min(1.0, finalPadPan));
 
     const padPannerNode = ctx.createStereoPanner();
     padPannerNode.pan.setValueAtTime(finalPadPan, now);
@@ -8897,6 +9051,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     voiceObj.sliceMasterOctaveB = slotB ? (slotB.sliceMasterOctave !== undefined ? slotB.sliceMasterOctave : 0) : 0;
     voiceObj.slicePitchB = slicePitchB;
     voiceObj.pbFactor = pbFactor;
+    voiceObj.fxType = padFxType;
 
     // Custom Slot-level LFO modulation for performance voices
     if (isPerfVoice) {
@@ -8908,7 +9063,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       }
     }
 
-    if (prog.stutterOn) {
+    const isDeckA = voiceKey && typeof voiceKey === 'string' && voiceKey.includes('perf-a');
+    voiceObj.isDeckA = isDeckA; // critical: stored so scheduleStutterStep & syncActiveVoiceParams can read deck identity
+    const isStutterButtonActive = isDeckA ? paramsRef.current.stutterAOn : paramsRef.current.stutterBOn;
+    if (padFxType === 'Stutter' && isStutterButtonActive) {
       startStutterModulation(voiceObj);
     }
 
@@ -9096,6 +9254,21 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       }
       if (voice.stutterTimeoutId) {
         clearTimeout(voice.stutterTimeoutId);
+        voice.stutterTimeoutId = null;
+      }
+      // Restore stutter gate to 1.0 so the release tail isn't silenced if we
+      // stopped mid-stutter (gate gain was 0). Cancel any scheduled ramps first.
+      if (voice.stutterGateNode) {
+        try {
+          voice.stutterGateNode.gain.cancelScheduledValues(now);
+          voice.stutterGateNode.gain.setValueAtTime(1.0, now);
+        } catch {}
+      }
+      if (voice.stutterPannerNode) {
+        try {
+          voice.stutterPannerNode.pan.cancelScheduledValues(now);
+          voice.stutterPannerNode.pan.setValueAtTime(0.0, now);
+        } catch {}
       }
 
       if (voice.slotLfoTimer) {
@@ -9939,8 +10112,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           const beatDur = 60 / bpm;
           const fluxOffsetBeats = tempProg.fluxOffset / beatDur;
           voice.triggerBeat = targetBeat - fluxOffsetBeats;
-          const rate = deck === 'A' ? freqScaleA : freqScaleB;
-          voice.startTime = now - (tempProg.fluxOffset / rate);
+          const rateVal = deck === 'A' ? (voice.freqScaleA || 1.0) : (voice.freqScaleB || 1.0);
+          const safeRate = isNaN(rateVal) || rateVal <= 0 ? 1.0 : rateVal;
+          voice.startTime = now - (tempProg.fluxOffset / safeRate);
         } else {
           voice.triggerBeat = targetBeat;
         }
@@ -10649,7 +10823,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         if (!v) return;
         if (v.releasedRef) v.releasedRef.current = true;
         if (v.granularTimerId) clearTimeout(v.granularTimerId);
-        if (v.stutterTimeoutId) clearTimeout(v.stutterTimeoutId);
+        if (v.stutterTimeoutId) { clearTimeout(v.stutterTimeoutId); v.stutterTimeoutId = null; }
+        if (v.stutterGateNode) { try { v.stutterGateNode.gain.cancelScheduledValues(0); v.stutterGateNode.gain.setValueAtTime(1.0, 0); } catch {} }
+        if (v.stutterPannerNode) { try { v.stutterPannerNode.pan.cancelScheduledValues(0); v.stutterPannerNode.pan.setValueAtTime(0.0, 0); } catch {} }
         try { if (v.oscA) v.oscA.stop(); } catch {}
         try { if (v.oscB) v.oscB.stop(); } catch {}
         try { if (v.oscA_L) v.oscA_L.stop(); } catch {}
@@ -11849,6 +12025,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         } else if (paramName === 'stutterOn') {
           const isStut = valNormalized >= 0.5;
           setParams(prev => ({ ...prev, stutterOn: isStut }));
+        } else if (paramName === 'stutterAOn') {
+          const isStut = valNormalized >= 0.5;
+          setParams(prev => ({ ...prev, stutterAOn: isStut }));
+        } else if (paramName === 'stutterBOn') {
+          const isStut = valNormalized >= 0.5;
+          setParams(prev => ({ ...prev, stutterBOn: isStut }));
         } else if (paramName === 'stutterRate') {
           const rates = ['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'];
           const rateIdx = Math.min(rates.length - 1, Math.floor(valNormalized * rates.length));
@@ -13195,6 +13377,48 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   {slotMap.get(params.oscAWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
                 </text>
               </svg>
+              
+              {/* Momentary Stutter Button for Deck A */}
+              <button
+                className={`momentary-stutter-btn ${params.stutterAOn ? 'active' : ''}`}
+                onMouseDown={(e) => { e.stopPropagation(); triggerStutterDeck(true); setParams(prev => ({ ...prev, stutterAOn: true })); }}
+                onMouseUp={(e) => { e.stopPropagation(); releaseStutterDeck(true); setParams(prev => ({ ...prev, stutterAOn: false })); }}
+                onMouseLeave={(e) => { e.stopPropagation(); releaseStutterDeck(true); setParams(prev => ({ ...prev, stutterAOn: false })); }}
+                onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); triggerStutterDeck(true); setParams(prev => ({ ...prev, stutterAOn: true })); }}
+                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); releaseStutterDeck(true); setParams(prev => ({ ...prev, stutterAOn: false })); }}
+                style={{
+                  position: 'absolute',
+                  left: '8px',
+                  bottom: '8px',
+                  zIndex: 15,
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: params.stutterAOn ? 'radial-gradient(circle, #00f3ff 0%, #006688 100%)' : 'radial-gradient(circle, #041620 0%, #010910 100%)',
+                  border: params.stutterAOn ? '2px solid #00f3ff' : '1px solid rgba(0, 243, 255, 0.4)',
+                  boxShadow: params.stutterAOn 
+                    ? '0 0 15px rgba(0, 243, 255, 0.8), inset 0 0 8px rgba(255,255,255,0.4)' 
+                    : '0 4px 6px rgba(0,0,0,0.6), 0 0 4px rgba(0, 243, 255, 0.1)',
+                  color: params.stutterAOn ? '#fff' : '#00f3ff',
+                  textShadow: params.stutterAOn ? '0 0 5px #fff' : '0 0 3px rgba(0, 243, 255, 0.5)',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  fontSize: '0.42rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  lineHeight: '1.1',
+                  pointerEvents: 'auto',
+                  transition: 'all 0.1s ease',
+                  userSelect: 'none'
+                }}
+                title="Momentary Stutter Fill (Deck A) - Press & Hold"
+              >
+                <span style={{ fontSize: '0.3rem', opacity: 0.7, fontWeight: 'normal' }}>MOMENT</span>
+                <span>STUTTER</span>
+              </button>
             </div>
 
             {/* 2 Rows of 4 Pads (2x4 Grid) for Deck A */}
@@ -13244,8 +13468,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           </span>
                         )}
                         {fxType !== 'None' && (
-                          <span className="pad-badge-fx" data-has-color="true" style={{ '--pad-color': ringColor }} title={`FX: ${fxType} (${Math.round(fxSend * 100)}%)`}>
-                            {fxType === 'Space Echo' ? 'DLY' : fxType === 'Rotor Cabinet' ? 'ROT' : 'RVB'}: {Math.round(fxSend * 100)}%
+                          <span className="pad-badge-fx" data-has-color="true" style={{ '--pad-color': ringColor }} title={`FX: ${fxType}${fxType !== 'Stutter' ? ` (${Math.round(fxSend * 100)}%)` : ''}`}>
+                            {fxType === 'Space Echo' ? 'DLY' : fxType === 'Rotor Cabinet' ? 'ROT' : fxType === 'Stutter' ? 'STU' : 'RVB'}{fxType !== 'Stutter' ? `: ${Math.round(fxSend * 100)}%` : ''}
                           </span>
                         )}
                         {Math.abs(pan) > 0.02 && (
@@ -14269,6 +14493,48 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   {slotMap.get(params.oscBWave)?.name.substring(0, 6).toUpperCase() || 'EMPTY'}
                 </text>
               </svg>
+              
+              {/* Momentary Stutter Button for Deck B */}
+              <button
+                className={`momentary-stutter-btn ${params.stutterBOn ? 'active' : ''}`}
+                onMouseDown={(e) => { e.stopPropagation(); triggerStutterDeck(false); setParams(prev => ({ ...prev, stutterBOn: true })); }}
+                onMouseUp={(e) => { e.stopPropagation(); releaseStutterDeck(false); setParams(prev => ({ ...prev, stutterBOn: false })); }}
+                onMouseLeave={(e) => { e.stopPropagation(); releaseStutterDeck(false); setParams(prev => ({ ...prev, stutterBOn: false })); }}
+                onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); triggerStutterDeck(false); setParams(prev => ({ ...prev, stutterBOn: true })); }}
+                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); releaseStutterDeck(false); setParams(prev => ({ ...prev, stutterBOn: false })); }}
+                style={{
+                  position: 'absolute',
+                  left: '8px',
+                  bottom: '8px',
+                  zIndex: 15,
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: params.stutterBOn ? 'radial-gradient(circle, #ff00ff 0%, #880088 100%)' : 'radial-gradient(circle, #1e041a 0%, #09010a 100%)',
+                  border: params.stutterBOn ? '2px solid #ff00ff' : '1px solid rgba(255, 0, 255, 0.4)',
+                  boxShadow: params.stutterBOn 
+                    ? '0 0 15px rgba(255, 0, 255, 0.8), inset 0 0 8px rgba(255,255,255,0.4)' 
+                    : '0 4px 6px rgba(0,0,0,0.6), 0 0 4px rgba(255, 0, 255, 0.1)',
+                  color: params.stutterBOn ? '#fff' : '#ff00ff',
+                  textShadow: params.stutterBOn ? '0 0 5px #fff' : '0 0 3px rgba(255, 0, 255, 0.5)',
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  fontSize: '0.42rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  lineHeight: '1.1',
+                  pointerEvents: 'auto',
+                  transition: 'all 0.1s ease',
+                  userSelect: 'none'
+                }}
+                title="Momentary Stutter Fill (Deck B) - Press & Hold"
+              >
+                <span style={{ fontSize: '0.3rem', opacity: 0.7, fontWeight: 'normal' }}>MOMENT</span>
+                <span>STUTTER</span>
+              </button>
             </div>
 
             {/* 2 Rows of 4 Pads (2x4 Grid) for Deck B */}
@@ -14318,8 +14584,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           </span>
                         )}
                         {fxType !== 'None' && (
-                          <span className="pad-badge-fx" data-has-color="true" style={{ '--pad-color': ringColor }} title={`FX: ${fxType} (${Math.round(fxSend * 100)}%)`}>
-                            {fxType === 'Space Echo' ? 'DLY' : fxType === 'Rotor Cabinet' ? 'ROT' : 'RVB'}: {Math.round(fxSend * 100)}%
+                          <span className="pad-badge-fx" data-has-color="true" style={{ '--pad-color': ringColor }} title={`FX: ${fxType}${fxType !== 'Stutter' ? ` (${Math.round(fxSend * 100)}%)` : ''}`}>
+                            {fxType === 'Space Echo' ? 'DLY' : fxType === 'Rotor Cabinet' ? 'ROT' : fxType === 'Stutter' ? 'STU' : 'RVB'}{fxType !== 'Stutter' ? `: ${Math.round(fxSend * 100)}%` : ''}
                           </span>
                         )}
                         {Math.abs(pan) > 0.02 && (
@@ -15771,6 +16037,166 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               >
                 FREEZE
               </button>
+            </div>
+          </div>
+
+          {/* Stutter & Movement Section */}
+          <div className="stutter-unit-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255, 0, 85, 0.25)', paddingTop: '10px', marginTop: '10px' }}>
+            <span className="knob-label" style={{ color: '#ff0055', textShadow: '0 0 5px rgba(255, 0, 85, 0.5)', display: 'block', fontWeight: 'bold', fontSize: '0.62rem', letterSpacing: '0.5px' }}>STUTTER & MOVEMENT</span>
+            
+            {/* Stutter Active Toggle */}
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+              <label style={{ color: '#ff0055', fontWeight: 'bold', fontSize: '0.58rem' }}>STUTTER:</label>
+              <button 
+                className={`btn btn-xs ${params.stutterOn ? 'active-pink' : ''}`}
+                onClick={() => {
+                  setParams(prev => ({ ...prev, stutterOn: !prev.stutterOn }));
+                }}
+                style={{ fontSize: '0.52rem', padding: '2px 6px', margin: 0 }}
+              >
+                {params.stutterOn ? 'ON' : 'OFF'}
+              </button>
+            </div>
+
+            {/* Stutter Rate & Pattern Selector */}
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+              <label style={{ color: '#ff0055', fontWeight: 'bold', fontSize: '0.58rem' }}>RATE:</label>
+              <select
+                value={params.stutterRate}
+                onChange={(e) => setParams(prev => ({ ...prev, stutterRate: e.target.value }))}
+                style={{ 
+                  background: '#000', 
+                  border: '1px solid rgba(255, 0, 85, 0.3)', 
+                  color: '#ff0055', 
+                  fontSize: '0.55rem', 
+                  padding: '1px 3px', 
+                  borderRadius: '3px', 
+                  width: '95px',
+                  outline: 'none'
+                }}
+              >
+                {['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'].map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+              <label style={{ color: '#ff0055', fontWeight: 'bold', fontSize: '0.58rem' }}>PATTERN:</label>
+              <select
+                value={params.stutterPattern || 'None'}
+                onChange={(e) => setParams(prev => ({ ...prev, stutterPattern: e.target.value }))}
+                style={{ 
+                  background: '#000', 
+                  border: '1px solid rgba(255, 0, 85, 0.3)', 
+                  color: '#ff0055', 
+                  fontSize: '0.55rem', 
+                  padding: '1px 3px', 
+                  borderRadius: '3px', 
+                  width: '95px',
+                  outline: 'none'
+                }}
+              >
+                <option value="None">None</option>
+                <option value="BouncingBall">Bouncing Ball</option>
+                <option value="Swing">Swing Shuffle</option>
+                <option value="RandomSkip">Glitch Skip</option>
+              </select>
+            </div>
+
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+              <label style={{ color: '#ff0055', fontWeight: 'bold', fontSize: '0.58rem' }}>PAN MODE:</label>
+              <select
+                value={params.stutterPanMode || 'None'}
+                onChange={(e) => setParams(prev => ({ ...prev, stutterPanMode: e.target.value }))}
+                style={{ 
+                  background: '#000', 
+                  border: '1px solid rgba(255, 0, 85, 0.3)', 
+                  color: '#ff0055', 
+                  fontSize: '0.55rem', 
+                  padding: '1px 3px', 
+                  borderRadius: '3px', 
+                  width: '95px',
+                  outline: 'none'
+                }}
+              >
+                <option value="None">None</option>
+                <option value="Alternating">Alt L-R</option>
+                <option value="LCR">L-C-R</option>
+                <option value="Sine">Auto-Sweep</option>
+              </select>
+            </div>
+
+            {/* Knobs Grid */}
+            <div className="stutter-knobs-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px 6px', justifyItems: 'center', width: '100%', marginTop: '4px' }}>
+              <Knob 
+                label="Gate" 
+                value={params.stutterGate !== undefined ? params.stutterGate : 1.0} 
+                min={0.1} max={1.0} step={0.01}
+                onChange={(v) => setParams(prev => ({ ...prev, stutterGate: v }))} 
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="stutterGate"
+                glowColor="pink"
+                size={30}
+              />
+              <Knob 
+                label="Sweep T" 
+                value={params.stutterSweepTime !== undefined ? params.stutterSweepTime : 1.0} 
+                min={0.2} max={4.0} step={0.1}
+                onChange={(v) => setParams(prev => ({ ...prev, stutterSweepTime: v }))} 
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="stutterSweepTime"
+                glowColor="pink"
+                size={30}
+              />
+              <Knob 
+                label="Jitter" 
+                value={params.stutterJitter !== undefined ? params.stutterJitter : 0.0} 
+                min={0.0} max={1.0} step={0.01}
+                onChange={(v) => setParams(prev => ({ ...prev, stutterJitter: v }))} 
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="stutterJitter"
+                glowColor="pink"
+                size={30}
+              />
+              <Knob 
+                label="Pitch" 
+                value={params.stutterPitchSweep !== undefined ? params.stutterPitchSweep : 0} 
+                min={-24} max={24} step={1}
+                onChange={(v) => setParams(prev => ({ ...prev, stutterPitchSweep: v }))} 
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="stutterPitchSweep"
+                glowColor="pink"
+                size={30}
+              />
+            </div>
+
+            {/* Sweep Direction & Filter Sweep */}
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', borderTop: '1px dashed rgba(255, 0, 85, 0.15)', paddingTop: '6px', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#ff0055', fontSize: '0.48rem', fontWeight: 'bold' }}>SWEEP DIR:</span>
+                <div className="segmented-strip" style={{ display: 'inline-flex' }}>
+                  {['None', 'Up', 'Down'].map(dir => (
+                    <button
+                      key={dir}
+                      className={`segmented-btn btn-xs ${params.stutterSweepDir === dir ? 'active' : ''}`}
+                      onClick={() => setParams(prev => ({ ...prev, stutterSweepDir: dir }))}
+                      style={{ fontSize: '0.45rem', padding: '1px 4px', height: '14px', lineHeight: '12px' }}
+                    >
+                      {dir.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', width: '100%', marginTop: '2px' }}>
+                <span style={{ color: '#ff0055', fontSize: '0.48rem', fontWeight: 'bold', minWidth: '40px' }}>FILT SWEEP:</span>
+                <input 
+                  type="range" min="-8000" max="8000" step="100"
+                  value={params.stutterFilterSweep !== undefined ? params.stutterFilterSweep : 0}
+                  onChange={(e) => setParams(prev => ({ ...prev, stutterFilterSweep: parseInt(e.target.value) }))}
+                  style={{ flexGrow: 1, height: '8px', cursor: 'pointer' }}
+                />
+                <span className="font-mono text-cyan" style={{ fontSize: '0.45rem', minWidth: '28px', textAlign: 'right' }}>
+                  {params.stutterFilterSweep >= 0 ? `+${params.stutterFilterSweep}` : `${params.stutterFilterSweep}`}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -17391,88 +17817,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         </div>
                       </div>
 
-                      {/* Sub-column 2: Stutter & Movement */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ color: '#ff00ff', fontWeight: 'bold', fontSize: '0.55rem', borderBottom: '1px solid rgba(255,0,255,0.15)', paddingBottom: '2px', marginBottom: '2px' }}>
-                          STUTTER & MOVEMENT
-                        </div>
-                        
-                        <div className="flex-row-sub" style={{ justifyContent: 'space-between', marginBottom: '1px' }}>
-                          <button
-                            className={`btn btn-xs ${params.stutterOn ? 'active-pink' : ''}`}
-                            onClick={() => setParams(prev => ({ ...prev, stutterOn: !prev.stutterOn }))}
-                            style={{ flexGrow: 1, fontWeight: 'bold', fontSize: '0.52rem', height: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', margin: 0, padding: 0 }}
-                          >
-                            <span style={{ display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', background: params.stutterOn ? '#ff0055' : '#888', boxShadow: params.stutterOn ? '0 0 3px #ff0055' : 'none' }} />
-                            STUTTER
-                          </button>
-                        </div>
-
-                        <div className="flex-row-sub">
-                          <label>Rate:</label>
-                          <select
-                            value={params.stutterRate}
-                            onChange={(e) => setParams(prev => ({ ...prev, stutterRate: e.target.value }))}
-                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.45rem', padding: '0px 1px', borderRadius: '2px', width: '40px', outline: 'none' }}
-                          >
-                            {['1/4', '1/8', '1/12', '1/16', '1/24', '1/32', '1/64', '1/128'].map(r => (
-                              <option key={r} value={r}>{r}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex-row-sub">
-                          <label>Gate:</label>
-                          <input
-                            type="range" min="0.1" max="1.0" step="0.05"
-                            value={params.stutterGate}
-                            onChange={(e) => setParams(prev => ({ ...prev, stutterGate: parseFloat(e.target.value) }))}
-                            style={{ width: '40px', height: '8px' }}
-                          />
-                          <span className="font-mono text-cyan" style={{ fontSize: '0.45rem', width: '15px', textAlign: 'right' }}>{Math.round(params.stutterGate * 100)}%</span>
-                        </div>
-
-                        <div className="flex-row-sub">
-                          <label>Sweep:</label>
-                          <div className="segmented-strip" style={{ display: 'inline-flex' }}>
-                            {['None', 'Up', 'Down'].map(dir => (
-                              <button
-                                key={dir}
-                                className={`segmented-btn btn-xs ${params.stutterSweepDir === dir ? 'active' : ''}`}
-                                onClick={() => setParams(prev => ({ ...prev, stutterSweepDir: dir }))}
-                                style={{ fontSize: '0.42rem', padding: '0px 2px', height: '11px', lineHeight: '9px' }}
-                              >
-                                {dir.toUpperCase()}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex-row-sub">
-                          <label>Time:</label>
-                          <input
-                            type="range" min="0.2" max="4.0" step="0.2"
-                            value={params.stutterSweepTime}
-                            onChange={(e) => setParams(prev => ({ ...prev, stutterSweepTime: parseFloat(e.target.value) }))}
-                            style={{ width: '40px', height: '8px' }}
-                          />
-                          <span className="font-mono text-cyan" style={{ fontSize: '0.45rem', width: '15px', textAlign: 'right' }}>{params.stutterSweepTime}s</span>
-                        </div>
-
-                        <div className="flex-row-sub">
-                          <label>Pan:</label>
-                          <select
-                            value={params.stutterPanMode || 'None'}
-                            onChange={(e) => setParams(prev => ({ ...prev, stutterPanMode: e.target.value }))}
-                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.48rem', padding: '0px 1px', borderRadius: '2px', width: '40px', outline: 'none' }}
-                          >
-                            <option value="None">None</option>
-                            <option value="Alternating">Alt L-R</option>
-                            <option value="LCR">L-C-R</option>
-                            <option value="Sine">Sweep</option>
-                          </select>
-                        </div>
-                      </div>
 
                       {/* Sub-column 3: Global FX Mixer */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -18464,6 +18808,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   { name: 'Rotr Wid', key: 'leslieWidth' },
                   { name: 'Rotr Crs', key: 'leslieCrossover' },
                   { name: 'Stut On', key: 'stutterOn' },
+                  { name: 'Stut A', key: 'stutterAOn' },
+                  { name: 'Stut B', key: 'stutterBOn' },
                   { name: 'Stut Rate', key: 'stutterRate' },
                   { name: 'Stut Gate', key: 'stutterGate' },
                   { name: 'Stut Swp', key: 'stutterSweepTime' }
@@ -18896,11 +19242,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   <option value="Space Echo">Space Echo (Delay)</option>
                   <option value="Reverb">Reverb</option>
                   <option value="Rotor Cabinet">Rotor Cabinet</option>
+                  <option value="Stutter">Stutter (Pattern/Gate)</option>
                 </select>
               </div>
 
               <div className="popover-field">
-                <label>FX Send Level ({Math.round(fxSend * 100)}%)</label>
+                <label>FX Send Level ({fxType === 'Stutter' ? 'N/A' : `${Math.round(fxSend * 100)}%`})</label>
                 <div className="popover-slider-row">
                   <input 
                     type="range"
@@ -18909,9 +19256,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     step="0.01"
                     value={fxSend}
                     onChange={(e) => updateSlotParam('fxSend', parseFloat(e.target.value))}
-                    disabled={fxType === 'None'}
+                    disabled={fxType === 'None' || fxType === 'Stutter'}
                   />
-                  <span className="popover-val-span">{Math.round(fxSend * 100)}%</span>
+                  <span className="popover-val-span">{fxType === 'Stutter' ? 'N/A' : `${Math.round(fxSend * 100)}%`}</span>
                 </div>
               </div>
 

@@ -60,3 +60,20 @@
   - **Modular FX Presets**: Saving custom parameters for specific effects units (Space Echo, Leslie/Rotor, Reverb) separately maps to hardware panel thinking and allows modular sound design.
   - **Neat Select Grouping**: Using optgroups to separate Factory and User presets in the dropdown lists keeps preset navigation clean and scalable.
   - **Absolute Dropdown Layering**: Top-level menus and actions must carry active parent stacking contexts (position relative and elevated z-index) to float cleanly over other workstation panels.
+
+## Session: 2026-06-15 (Part 4)
+- **Task**: Relocated Stutter & Movement FX panel and Live Pad Routing.
+- **Jimmy's Preferences**:
+  - **Relocating Stutter & Movement**: Exposing all Stutter & Movement parameters on the main console strip under Reverb gives quick tactile access to active sequence-wide effects and makes them feel like true hardware controls.
+  - **Active Pad FX Insert Routing**: Selecting Stutter as a per-pad FX Target allows loops to trigger active stutter modulation independently of the global stutter latch, enabling live performance gating and stutter fills.
+  - **Send-Level Bypass for Modulation Effects**: Modulation/Insert effects like Stutter do not map to wet/dry send gains. Disabling and graying out the send level slider for Stutter prevents control confusion and keeps the UI clean.
+  - **Web Audio AudioParam NaN-Safety Guarding**: Web Audio parameters (specifically StereoPanner pan values or BiquadFilter frequency limits) must never receive `NaN` or `Infinite` inputs. Validating all scheduler inputs with local fallback limits prevents audio dropouts and channel blowouts when multiple voices play concurrently in custom slip/flux trigger states.
+  - **Ensuring Complete State Cleanup**: When halting a custom voice loop modulator (like the Stutter step scheduler), all parameters changed during the modulation (such as panning offsets, filter frequency sweeps, and playbackRate changes) must be explicitly cancelled and reset to their base values on the underlying AudioNodes to prevent parameter leakage.
+  - **Self-Healing Persistent Metadata**: To prevent corrupted database presets from locking the workstation into invalid states on reload, all parameters retrieved from IndexedDB (like slot volume and pan) must be parsed, validated against `NaN` boundaries, and clamped to nominal ranges before being initialized.
+
+## Session: 2026-06-15 (Part 5)
+- **Task**: Momentary Stutter triggers for Deck A and Deck B with dedicated hardware buttons, and MIDI learning/mappings support.
+- **Jimmy's Preferences**:
+  - **Tactile Performance Controls**: Adding dedicated "STUTTER A" and "STUTTER B" buttons underneath the performance pad columns provides clear, immediate access to momentary stutter fills on active loops.
+  - **Momentary Control Styling**: Styling stutter buttons with a glowing red scheme that pulses when active, and supporting mouse-down (on) / mouse-up (off) behaviors, matches the physical hardware experience.
+  - **Dynamic MIDI Mapping**: Exposing both "Stut A" and "Stut B" in the MIDI learn dashboard allows users to bind hardware pads or momentary keys on standard controllers to stutter fills.
