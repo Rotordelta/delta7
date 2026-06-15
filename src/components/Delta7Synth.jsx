@@ -1187,6 +1187,7 @@ export default function Delta7Synth() {
 
   const [liveRecTargetSlot, setLiveRecTargetSlot] = useState('a01');
   const liveRecTargetSlotRef = useRef('a01');
+  const liveLoopInProgressRef = useRef(false);
   useEffect(() => { liveRecTargetSlotRef.current = liveRecTargetSlot; }, [liveRecTargetSlot]);
 
   const [isLiveRecording, setIsLiveRecording] = useState(false);
@@ -2150,7 +2151,8 @@ export default function Delta7Synth() {
           recordedChunksL.current = [msg.bufferL];
           recordedChunksR.current = [msg.bufferR];
           
-          if (liveRecTargetSlotRef.current && liveRecBeatsRef.current > 0 && (isLiveRecordingRef.current || liveRecCollectedSamplesRef.current > 0 || liveRecPendingStartRef.current)) {
+          if (liveLoopInProgressRef.current) {
+            liveLoopInProgressRef.current = false;
             liveRecCollectedSamplesRef.current = msg.bufferL.length;
             isLiveRecordingRef.current = false;
             setIsLiveRecording(false);
@@ -2360,6 +2362,7 @@ export default function Delta7Synth() {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     
+    liveLoopInProgressRef.current = true;
     const targetSlot = liveRecTargetSlotRef.current;
     const targetDeck = targetSlot[0].toUpperCase();
     const targetIndex = parseInt(targetSlot.slice(2), 10) - 1;
@@ -2519,6 +2522,9 @@ export default function Delta7Synth() {
 
   const toggleLiveLoopRecording = () => {
     if (isLiveRecordingRef.current || liveRecPendingStartRef.current) {
+      if (liveRecPendingStartRef.current) {
+        liveLoopInProgressRef.current = false;
+      }
       isLiveRecordingRef.current = false;
       liveRecPendingStartRef.current = false;
       setIsLiveRecording(false);
@@ -2549,6 +2555,7 @@ export default function Delta7Synth() {
       } else {
         liveRecPendingStartRef.current = false;
         setLiveRecPendingStart(false);
+        liveLoopInProgressRef.current = false;
         showEditorStatus("Live Recording Aborted ⏹️");
       }
     }
