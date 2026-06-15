@@ -9154,6 +9154,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     // Intercept custom note mappings
     let noteMappedHandled = false;
     Object.keys(midiMappings).forEach(paramName => {
+      if (paramName.startsWith('pad-')) return;
       const mapping = midiMappings[paramName];
       if (mapping === `N${note}`) {
         noteMappedHandled = true;
