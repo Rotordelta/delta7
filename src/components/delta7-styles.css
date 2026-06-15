@@ -518,6 +518,8 @@
           padding: 0.5rem 1.25rem;
           color: #f1f5f9;
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 12px rgba(255, 0, 255, 0.15);
+          position: relative;
+          z-index: 1000;
         }
 
         .branding-title {
@@ -2079,7 +2081,8 @@
 /* Shared base for all pad corner badges */
 .perf-pad-rev-badge,
 .perf-pad-loop-badge,
-.perf-pad-trigger-mode-badge {
+.perf-pad-trigger-mode-badge,
+.perf-pad-eq-badge {
   position: absolute;
   font-size: 0.42rem;
   padding: 1px 3px;
@@ -2141,6 +2144,23 @@
   border-color: #ff0080;
   color: #ff0080;
   box-shadow: 0 0 4px #ff0080;
+}
+
+/* EQ badge — top left */
+.perf-pad-eq-badge {
+  top: 2px;
+  left: 2px;
+  font-size: 0.40rem;
+  font-weight: bold;
+  padding: 1px 3.5px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #888;
+}
+.perf-pad-eq-badge[data-active="true"] {
+  background: rgba(0, 243, 255, 0.2);
+  border-color: #00f3ff;
+  color: #00f3ff;
+  box-shadow: 0 0 4px #00f3ff;
 }
 .perf-pad-trigger-mode-badge[data-mode="queue"] {
   background: rgba(255, 170, 0, 0.2);
@@ -2387,4 +2407,261 @@
   opacity: 0;
   transform-origin: 125px 125px;
   transition: opacity 0.1s ease;
+}
+
+/* ==========================================
+   12. PER-PAD EQ EDITOR MODAL DIALOG
+   ========================================== */
+.eq-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(4, 7, 13, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.eq-modal-window {
+  width: 600px;
+  background: rgba(13, 18, 30, 0.88);
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  border-radius: 8px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 243, 255, 0.05);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.eq-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 10px;
+}
+
+.eq-global-toggle-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #888;
+  font-family: monospace;
+  font-size: 0.55rem;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.eq-global-toggle-btn[data-active="true"] {
+  background: rgba(0, 243, 255, 0.2);
+  border-color: #00f3ff;
+  color: #00f3ff;
+  box-shadow: 0 0 6px rgba(0, 243, 255, 0.4);
+}
+
+.eq-modal-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: color 0.1s ease;
+}
+
+.eq-modal-close:hover {
+  color: #ffffff;
+}
+
+.eq-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.eq-graph-container {
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
+}
+
+.eq-bands-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.eq-band-card {
+  background: rgba(21, 28, 43, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.eq-band-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.eq-band-card-title {
+  font-family: monospace;
+  font-size: 0.58rem;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.5px;
+}
+
+.eq-band-bypass-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #777;
+  font-family: monospace;
+  font-size: 0.45rem;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.eq-band-bypass-btn[data-active="true"] {
+  background: rgba(0, 255, 136, 0.15);
+  border-color: #00ff88;
+  color: #00ff88;
+}
+
+.eq-band-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eq-control-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.eq-label {
+  font-family: monospace;
+  font-size: 0.45rem;
+  color: #8c9ba5;
+  text-transform: uppercase;
+}
+
+.eq-select {
+  background: rgba(10, 14, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #00f3ff;
+  font-family: monospace;
+  font-size: 0.48rem;
+  border-radius: 3px;
+  padding: 1px 3px;
+  cursor: pointer;
+  outline: none;
+  height: 16px;
+}
+
+.eq-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eq-slider-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.eq-val {
+  font-size: 0.48rem;
+  color: #ffffff;
+}
+
+.eq-range-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.eq-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #00f3ff;
+  box-shadow: 0 0 4px rgba(0, 243, 255, 0.6);
+  transition: transform 0.1s ease;
+}
+
+.eq-range-input::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.btn-seg-sm {
+  background: transparent;
+  border: 1px solid rgba(0, 243, 255, 0.2);
+  color: #88ccee;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.1s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+.btn-seg-sm:hover {
+  background: rgba(0, 243, 255, 0.1);
+  color: #fff;
+  border-color: rgba(0, 243, 255, 0.45);
+}
+.btn-seg-pad0 {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #aaa;
+  padding: 3px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 0.5rem;
+  transition: all 0.1s ease;
+  box-sizing: border-box;
+}
+.btn-seg-pad0:hover {
+  background: rgba(0, 243, 255, 0.08);
+  color: #00f3ff;
+  border-color: rgba(0, 243, 255, 0.25);
 }

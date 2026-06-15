@@ -37,5 +37,26 @@
   - **Dynamic Transport Locking**: Sync the workstation's playhead start, pause, resume, and stop events directly to incoming real-time transport messages (0xFA/0xFB/0xFC) for seamless hardware-to-software hands-off integration.
   - **Deterministic Loop Latency Alignment**: Offset recorded buffers using a manual calibration latency slider (LAT) to trim off input round-trip delay, aligning recorded loop transients perfectly to the grid.
   - **Persistent Hardware Preferences**: Settings for MIDI sync source selection and recording latency calibration should persist across page refreshes via LocalStorage.
+## Session: 2026-06-15
+- **Task**: Per-Pad 6-Band Parametric EQ and Interactive Editor Modal.
+- **Jimmy's Preferences**:
+  - **Zero-Phase Click-Free Bypassing**: When bypassing EQ filter bands in real-time, the voice engine must maintain phase-coherent continuous signals. Transitioning bypassed filters to zero-gain peaking nodes with 15ms ramps eliminates digital pops or clicks, keeping loops pristine.
+  - **Premium SVG Visual Feedback**: Interactive graph canvas displays must represent exact composite magnitude curves (evaluated natively from Web Audio transfer functions) with logarithmic grid lines to enable precise frequency dialing.
+  - **Drag-to-Adjust Control Points**: Moving control nodes on the EQ graph should map directly to frequency and gain, locking gain movements on filters without a gain parameter (e.g. lowpass, highpass, notch).
+  - **Cohesive Interface Glassmorphism**: High-contrast editor overlays must feature blur backdrops and matching neon color themes linked to pad colors, maintaining the workstation's cyberpunk aesthetics.
 
+## Session: 2026-06-15 (Part 2)
+- **Task**: Local Project Directory picker/access, file/JSON serialization, WAV encoder export (16/24-bit PCM), and Offline Bounce Engine.
+- **Jimmy's Preferences**:
+  - **Local Folder Access**: Persisting directory handles to IndexedDB between sessions avoids redundant directory pick requests. Re-authorizing directories with single click and authorization state-awareness is essential for clean file flows.
+  - **Standardized Folder Structure**: Automatically creating `/banks`, `/samples`, and `/exports` keeps project assets organized and prevents manual file hunting on disk.
+  - **Offline Rendering & Stem Exporting**: Bouncing full mixes and multi-track stems offline at fast speeds prevents glitches/clicks and exports high-quality audio files directly into project subfolders.
+  - **High-Dynamic Range WAV Encoding**: Support for 24-bit PCM WAV rendering guarantees studio-quality bounces suitable for DAW imports.
+  - **Polished Glassmorphic Options**: Sleek, neon-colored export overlay settings (for format, sample rate, bit depth, bars) integrated nicely with the theme keeps the workstation feeling like a professional physical hardware unit.
 
+## Session: 2026-06-15 (Part 3)
+- **Task**: Custom User FX Presets, UI Layering adjustments, and relatedTarget Node safety check.
+- **Jimmy's Preferences**:
+  - **Modular FX Presets**: Saving custom parameters for specific effects units (Space Echo, Leslie/Rotor, Reverb) separately maps to hardware panel thinking and allows modular sound design.
+  - **Neat Select Grouping**: Using optgroups to separate Factory and User presets in the dropdown lists keeps preset navigation clean and scalable.
+  - **Absolute Dropdown Layering**: Top-level menus and actions must carry active parent stacking contexts (position relative and elevated z-index) to float cleanly over other workstation panels.

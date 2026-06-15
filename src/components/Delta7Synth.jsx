@@ -821,6 +821,18 @@ export default function Delta7Synth() {
   const canvasRef = useRef(null);
   const animationFrameIdRef = useRef(null);
 
+  const createDefaultEq = () => ({
+    enabled: false,
+    bands: [
+      { type: 'highpass', frequency: 80, Q: 0.707, gain: 0, bypass: false },
+      { type: 'lowshelf', frequency: 200, Q: 0.707, gain: 0, bypass: false },
+      { type: 'peaking', frequency: 500, Q: 1.0, gain: 0, bypass: false },
+      { type: 'peaking', frequency: 1500, Q: 1.0, gain: 0, bypass: false },
+      { type: 'highshelf', frequency: 5000, Q: 0.707, gain: 0, bypass: false },
+      { type: 'lowpass', frequency: 12000, Q: 0.707, gain: 0, bypass: false }
+    ]
+  });
+
   // --- Sampler States & Slots ---
   const [sampleSlots, setSampleSlots] = useState(() => {
     const rawSlots = [
@@ -857,13 +869,16 @@ export default function Delta7Synth() {
       lfoRateMode: 'hz',
       lfoFade: 0,
       lfoRetrigger: true,
-      randomPan: 0.0
+      randomPan: 0.0,
+      eq: createDefaultEq()
     }));
   });
   const sampleSlotsRef = useRef(sampleSlots);
   const [activeBankCSlotId, setActiveBankCSlotId] = useState('c01');
   const activeBankCSlotIdRef = useRef('c01');
   useEffect(() => { activeBankCSlotIdRef.current = activeBankCSlotId; }, [activeBankCSlotId]);
+
+  const [activeEqSlotId, setActiveEqSlotId] = useState(null);
 
   const [keyboardMapBankC, setKeyboardMapBankC] = useState(false);
   const keyboardMapBankCRef = useRef(false);
@@ -893,6 +908,19 @@ export default function Delta7Synth() {
 
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('a01'); // Target slot in Editor
   const [uiScale, setUiScale] = useState(0.9);
+  const [projectDirHandle, setProjectDirHandle] = useState(null);
+  const [projectDirName, setProjectDirName] = useState('');
+  const [localBanks, setLocalBanks] = useState([]);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [exportSettings, setExportSettings] = useState({
+    format: 'stereo-mix',
+    sampleRate: 48000,
+    bitDepth: 16,
+    barCount: 4
+  });
+  const projectDirHandleRef = useRef(null);
+  useEffect(() => { projectDirHandleRef.current = projectDirHandle; }, [projectDirHandle]);
   const [selectedPill, setSelectedPill] = useState(null); // { deck, laneIdx, start, end, triggerMode }
   const [copiedPill, setCopiedPill] = useState(null); // { duration, triggerMode }
   const [moveDragTarget, setMoveDragTarget] = useState(null); // drag info for moving notes
@@ -1256,6 +1284,18 @@ export default function Delta7Synth() {
   const [selectedEchoPresetIdx, setSelectedEchoPresetIdx] = useState(''); // Current echo preset index
   const [selectedRotorPresetIdx, setSelectedRotorPresetIdx] = useState(''); // Current rotor preset index
   const [selectedReverbPresetIdx, setSelectedReverbPresetIdx] = useState(''); // Current reverb preset index
+  const [userEchoPresets, setUserEchoPresets] = useState(() => {
+    const saved = localStorage.getItem('delta7_user_echo_presets');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [userRotorPresets, setUserRotorPresets] = useState(() => {
+    const saved = localStorage.getItem('delta7_user_rotor_presets');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [userReverbPresets, setUserReverbPresets] = useState(() => {
+    const saved = localStorage.getItem('delta7_user_reverb_presets');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [editorStatus, setEditorStatus] = useState('');
   const editorStatusTimeoutRef = useRef(null);
   const showEditorStatus = (msg) => {
@@ -2010,6 +2050,29 @@ export default function Delta7Synth() {
         audioCtxRef.current = null;
       }
     };
+  }, []);
+
+  // Load persisted project directory handle on mount
+  useEffect(() => {
+    const initProjectDir = async () => {
+      try {
+        const handle = await loadProjectDirHandle();
+        if (handle) {
+          setProjectDirHandle(handle);
+          setProjectDirName(handle.name);
+          
+          // Verify if permission is already granted
+          const status = await handle.queryPermission({ mode: 'readwrite' });
+          if (status === 'granted') {
+            const banks = await loadLocalBanksList(handle);
+            setLocalBanks(banks);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to initialize project directory on mount:", err);
+      }
+    };
+    initProjectDir();
   }, []);
 
   // --- Recorder Deck Action Handlers ---
@@ -3239,6 +3302,632 @@ export default function Delta7Synth() {
     }
   };
 
+  const handleSelectProjectDir = async () => {
+    try {
+      const handle = await window.showDirectoryPicker({
+        mode: 'readwrite'
+      });
+      setProjectDirHandle(handle);
+      setProjectDirName(handle.name);
+      await saveProjectDirHandle(handle);
+      
+      // Verify and create subdirectories
+      await handle.getDirectoryHandle('banks', { create: true });
+      await handle.getDirectoryHandle('samples', { create: true });
+      await handle.getDirectoryHandle('exports', { create: true });
+      
+      const banks = await loadLocalBanksList(handle);
+      setLocalBanks(banks);
+      showEditorStatus('Directory configured! 📁');
+    } catch (err) {
+      console.error('Failed to select directory:', err);
+    }
+  };
+
+  const handleReauthorizeDir = async () => {
+    if (!projectDirHandle) return;
+    try {
+      const hasPermission = await verifyDirectoryPermission(projectDirHandle, true);
+      if (hasPermission) {
+        const banks = await loadLocalBanksList(projectDirHandle);
+        setLocalBanks(banks);
+        showEditorStatus('Access authorized! ✅');
+      } else {
+        showEditorStatus('Access denied! ❌');
+      }
+    } catch (err) {
+      console.error('Failed to reauthorize directory:', err);
+    }
+  };
+
+  const handleSaveProjectLocal = async (nameInput = '') => {
+    let name = nameInput.trim();
+    if (!name) {
+      name = prompt('Enter Bank Name to Save:');
+    }
+    if (!name) return;
+    name = name.replace(/[^a-zA-Z0-9 _-]/g, '').trim().substring(0, 30);
+    if (!name) return;
+    
+    if (!projectDirHandle) {
+      alert('Please select a project directory first!');
+      return;
+    }
+    
+    try {
+      const hasPermission = await verifyDirectoryPermission(projectDirHandle, true);
+      if (!hasPermission) {
+        alert('Access to the project directory was not authorized.');
+        return;
+      }
+      
+      showEditorStatus('Saving project... ⏳');
+      
+      const serializedSlots = sampleSlots.map(s => {
+        const { buffer, revBuffer, ...metadata } = s;
+        const cleanSampleName = s.name ? s.name.replace(/[^a-zA-Z0-9 _-]/g, '').trim() : 'sample';
+        return {
+          ...metadata,
+          sampleFileName: buffer ? `samples/${s.id}_${cleanSampleName}.wav` : null
+        };
+      });
+      
+      const projectData = {
+        version: '1.0.0',
+        name: name,
+        tempo: params.arpBpm || 120,
+        masterParams: params,
+        perfSeqLength: perfSeqLengthRef.current,
+        perfEvents: perfEvents,
+        slotsMetadata: serializedSlots,
+        macros: {
+          m1: localStorage.getItem('delta7_macro_1') || '',
+          m2: localStorage.getItem('delta7_macro_2') || '',
+          m3: localStorage.getItem('delta7_macro_3') || '',
+          m4: localStorage.getItem('delta7_macro_4') || ''
+        }
+      };
+      
+      const banksDir = await projectDirHandle.getDirectoryHandle('banks', { create: true });
+      const jsonFileHandle = await banksDir.getFileHandle(`${name}.json`, { create: true });
+      const jsonWritable = await jsonFileHandle.createWritable();
+      await jsonWritable.write(JSON.stringify(projectData, null, 2));
+      await jsonWritable.close();
+      
+      const samplesDir = await projectDirHandle.getDirectoryHandle('samples', { create: true });
+      for (const slot of sampleSlots) {
+        if (slot.buffer) {
+          const cleanSampleName = slot.name ? slot.name.replace(/[^a-zA-Z0-9 _-]/g, '').trim() : 'sample';
+          const fileName = `${slot.id}_${cleanSampleName}.wav`;
+          const wavBlob = audioBufferToWav(slot.buffer);
+          
+          const sampleFileHandle = await samplesDir.getFileHandle(fileName, { create: true });
+          const sampleWritable = await sampleFileHandle.createWritable();
+          await sampleWritable.write(wavBlob);
+          await sampleWritable.close();
+        }
+      }
+      
+      const banks = await loadLocalBanksList(projectDirHandle);
+      setLocalBanks(banks);
+      
+      showEditorStatus('Saved Project Bank! 💾');
+    } catch (err) {
+      console.error('Failed to save project locally:', err);
+      alert('Error saving project to local directory.');
+    }
+  };
+
+  const handleLoadProjectLocal = async (name) => {
+    if (!projectDirHandle) return;
+    try {
+      const hasPermission = await verifyDirectoryPermission(projectDirHandle, true);
+      if (!hasPermission) {
+        alert('Access to the project directory was not authorized.');
+        return;
+      }
+      
+      showEditorStatus(`Loading project: ${name}... ⏳`);
+      
+      const banksDir = await projectDirHandle.getDirectoryHandle('banks');
+      const jsonFileHandle = await banksDir.getFileHandle(`${name}.json`);
+      const file = await jsonFileHandle.getFile();
+      const text = await file.text();
+      const projectData = JSON.parse(text);
+      
+      if (projectData.tempo) {
+        setTempoInputVal(String(projectData.tempo));
+        setParams(prev => ({ ...prev, arpBpm: projectData.tempo }));
+      }
+      if (projectData.masterParams) {
+        setParams(projectData.masterParams);
+      }
+      if (projectData.perfSeqLength) {
+        setPerfSeqLength(projectData.perfSeqLength);
+      }
+      if (projectData.perfEvents) {
+        setPerfEvents(projectData.perfEvents);
+        sortedPerfEventsRef.current = [...projectData.perfEvents].sort((a, b) => a.beat - b.beat);
+        
+        if (schedulerNodeRef.current) {
+          schedulerNodeRef.current.port.postMessage({
+            type: 'SET_EVENTS',
+            sortedEvents: sortedPerfEventsRef.current
+          });
+        }
+      }
+      
+      if (projectData.macros) {
+        if (projectData.macros.m1) localStorage.setItem('delta7_macro_1', projectData.macros.m1);
+        if (projectData.macros.m2) localStorage.setItem('delta7_macro_2', projectData.macros.m2);
+        if (projectData.macros.m3) localStorage.setItem('delta7_macro_3', projectData.macros.m3);
+        if (projectData.macros.m4) localStorage.setItem('delta7_macro_4', projectData.macros.m4);
+      }
+      
+      const samplesDir = await projectDirHandle.getDirectoryHandle('samples');
+      const ctx = audioCtxRef.current || new (window.AudioContext || window.webkitAudioContext)();
+      
+      const nextSlots = await Promise.all(sampleSlots.map(async (slot) => {
+        const metadata = projectData.slotsMetadata.find(m => m.id === slot.id);
+        if (!metadata) return slot;
+        
+        const updatedSlot = {
+          ...slot,
+          ...metadata
+        };
+        
+        if (metadata.sampleFileName) {
+          try {
+            const cleanSampleName = metadata.name ? metadata.name.replace(/[^a-zA-Z0-9 _-]/g, '').trim() : 'sample';
+            const fileName = `${metadata.id}_${cleanSampleName}.wav`;
+            const fileHandle = await samplesDir.getFileHandle(fileName);
+            const sampleFile = await fileHandle.getFile();
+            const arrayBuffer = await sampleFile.arrayBuffer();
+            
+            const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
+            updatedSlot.buffer = decodedBuffer;
+            updatedSlot.revBuffer = getReversedBuffer(ctx, decodedBuffer);
+            
+            await saveSampleToDb(updatedSlot);
+          } catch (err) {
+            console.error(`Failed to load wav file for slot ${slot.id}:`, err);
+            updatedSlot.buffer = null;
+            updatedSlot.revBuffer = null;
+          }
+        } else {
+          updatedSlot.buffer = null;
+          updatedSlot.revBuffer = null;
+        }
+        
+        return updatedSlot;
+      }));
+      
+      setSampleSlots(nextSlots);
+      sampleSlotsRef.current = nextSlots;
+      
+      showEditorStatus('Loaded Project Bank! 📂');
+    } catch (err) {
+      console.error('Failed to load project:', err);
+      alert('Error loading project.');
+    }
+  };
+
+  const handleExportSingleFile = async () => {
+    showEditorStatus('Packaging project... ⏳');
+    try {
+      const serializedSlots = await Promise.all(sampleSlots.map(async (slot) => {
+        const { buffer, revBuffer, ...metadata } = slot;
+        let base64Channels = null;
+        if (buffer) {
+          const channelsData = [];
+          for (let c = 0; c < buffer.numberOfChannels; c++) {
+            const rawData = buffer.getChannelData(c);
+            const uint8 = new Uint8Array(rawData.buffer);
+            let binary = '';
+            for (let i = 0; i < uint8.length; i++) {
+              binary += String.fromCharCode(uint8[i]);
+            }
+            channelsData.push(btoa(binary));
+          }
+          base64Channels = {
+            channels: channelsData,
+            sampleRate: buffer.sampleRate,
+            numberOfChannels: buffer.numberOfChannels
+          };
+        }
+        return {
+          ...metadata,
+          audioData: base64Channels
+        };
+      }));
+      
+      const projectData = {
+        version: '1.0.0',
+        tempo: params.arpBpm || 120,
+        masterParams: params,
+        perfSeqLength: perfSeqLengthRef.current,
+        perfEvents: perfEvents,
+        slotsMetadata: serializedSlots,
+        macros: {
+          m1: localStorage.getItem('delta7_macro_1') || '',
+          m2: localStorage.getItem('delta7_macro_2') || '',
+          m3: localStorage.getItem('delta7_macro_3') || '',
+          m4: localStorage.getItem('delta7_macro_4') || ''
+        }
+      };
+      
+      const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `delta7_project_${Date.now()}.d7p`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showEditorStatus('Exported Project File! 📤');
+    } catch (err) {
+      console.error('Failed to export single file project:', err);
+      alert('Error exporting project file.');
+    }
+  };
+
+  const handleImportSingleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    showEditorStatus('Unpacking project... ⏳');
+    try {
+      const text = await file.text();
+      const projectData = JSON.parse(text);
+      
+      if (projectData.tempo) {
+        setTempoInputVal(String(projectData.tempo));
+        setParams(prev => ({ ...prev, arpBpm: projectData.tempo }));
+      }
+      if (projectData.masterParams) {
+        setParams(projectData.masterParams);
+      }
+      if (projectData.perfSeqLength) {
+        setPerfSeqLength(projectData.perfSeqLength);
+      }
+      if (projectData.perfEvents) {
+        setPerfEvents(projectData.perfEvents);
+        sortedPerfEventsRef.current = [...projectData.perfEvents].sort((a, b) => a.beat - b.beat);
+        if (schedulerNodeRef.current) {
+          schedulerNodeRef.current.port.postMessage({
+            type: 'SET_EVENTS',
+            sortedEvents: sortedPerfEventsRef.current
+          });
+        }
+      }
+      
+      if (projectData.macros) {
+        if (projectData.macros.m1) localStorage.setItem('delta7_macro_1', projectData.macros.m1);
+        if (projectData.macros.m2) localStorage.setItem('delta7_macro_2', projectData.macros.m2);
+        if (projectData.macros.m3) localStorage.setItem('delta7_macro_3', projectData.macros.m3);
+        if (projectData.macros.m4) localStorage.setItem('delta7_macro_4', projectData.macros.m4);
+      }
+      
+      const ctx = audioCtxRef.current || new (window.AudioContext || window.webkitAudioContext)();
+      
+      const nextSlots = await Promise.all(sampleSlots.map(async (slot) => {
+        const metadata = projectData.slotsMetadata.find(m => m.id === slot.id);
+        if (!metadata) return slot;
+        
+        const { audioData, ...meta } = metadata;
+        const updatedSlot = { ...slot, ...meta };
+        
+        if (audioData) {
+          try {
+            const numChannels = audioData.numberOfChannels;
+            const sampleRate = audioData.sampleRate;
+            const channels = audioData.channels.map(b64 => {
+              const binaryString = atob(b64);
+              const len = binaryString.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              return new Float32Array(bytes.buffer);
+            });
+            
+            const length = channels[0].length;
+            const buffer = ctx.createBuffer(numChannels, length, sampleRate);
+            for (let c = 0; c < numChannels; c++) {
+              buffer.getChannelData(c).set(channels[c]);
+            }
+            
+            updatedSlot.buffer = buffer;
+            updatedSlot.revBuffer = getReversedBuffer(ctx, buffer);
+            await saveSampleToDb(updatedSlot);
+          } catch (err) {
+            console.error(`Error decoding imported audio data for slot ${slot.id}:`, err);
+            updatedSlot.buffer = null;
+            updatedSlot.revBuffer = null;
+          }
+        } else {
+          updatedSlot.buffer = null;
+          updatedSlot.revBuffer = null;
+        }
+        return updatedSlot;
+      }));
+      
+      setSampleSlots(nextSlots);
+      sampleSlotsRef.current = nextSlots;
+      
+      showEditorStatus('Imported Project! 📂');
+    } catch (err) {
+      console.error('Failed to import project:', err);
+      alert('Error loading project file. Make sure it is a valid .d7p archive.');
+    }
+  };
+
+  const handleBounceSequenceOffline = async (exportSettings) => {
+    const {
+      format = 'stereo-mix',
+      sampleRate = 48000,
+      bitDepth = 16,
+      barCount = 4
+    } = exportSettings;
+
+    const bpm = params.arpBpm || 120;
+    const beatDur = 60 / bpm;
+    const beatsToRender = barCount * 4;
+    const duration = beatsToRender * beatDur;
+
+    showEditorStatus('Rendering sequence offline... ⏳');
+
+    try {
+      const renderEvents = sortedPerfEventsRef.current.filter(e => e.beat >= 0 && e.beat < beatsToRender);
+
+      const performRenderRun = async (laneFilter = undefined) => {
+        const offlineCtx = new OfflineAudioContext(2, sampleRate * duration, sampleRate);
+
+        const offlineMasterGain = offlineCtx.createGain();
+        offlineMasterGain.gain.setValueAtTime((params.masterVolume !== undefined ? params.masterVolume : 80) / 100, 0);
+        offlineMasterGain.connect(offlineCtx.destination);
+
+        let offlineReverb = null;
+        if (params.reverbMix > 0 && mfx2Ref.current && mfx2Ref.current.convolver && mfx2Ref.current.convolver.buffer) {
+          offlineReverb = offlineCtx.createConvolver();
+          offlineReverb.buffer = mfx2Ref.current.convolver.buffer;
+          const reverbWet = offlineCtx.createGain();
+          reverbWet.gain.setValueAtTime(params.reverbMix, 0);
+          offlineReverb.connect(reverbWet);
+          reverbWet.connect(offlineMasterGain);
+        }
+
+        let offlineDelay = null;
+        if (params.spaceEchoActive && params.spaceEchoFeedback > 0) {
+          offlineDelay = offlineCtx.createDelay(2.0);
+          offlineDelay.delayTime.setValueAtTime(params.spaceEchoTime || 0.35, 0);
+          const feedbackNode = offlineCtx.createGain();
+          feedbackNode.gain.setValueAtTime(params.spaceEchoFeedback || 0.4, 0);
+          offlineDelay.connect(feedbackNode);
+          feedbackNode.connect(offlineDelay);
+
+          const delayWet = offlineCtx.createGain();
+          delayWet.gain.setValueAtTime(params.spaceEchoSpring || 0.3, 0);
+          offlineDelay.connect(delayWet);
+          delayWet.connect(offlineMasterGain);
+        }
+
+        const activeOfflineVoices = new Map();
+        const chronologicalEvents = [...renderEvents].sort((a, b) => a.beat - b.beat);
+
+        chronologicalEvents.forEach(evt => {
+          const eventTime = evt.beat * beatDur;
+
+          let slotId = '';
+          if (evt.type === 'slot') {
+            slotId = (evt.deck === 'A' ? 'a0' : 'b0') + (evt.index + 1);
+          } else if (evt.type === 'slice') {
+            slotId = activeBankCSlotIdRef.current || 'c01';
+          }
+          
+          if (laneFilter !== undefined && slotId !== laneFilter) {
+            return;
+          }
+
+          const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+          if (!slot || !slot.buffer) return;
+
+          const voiceKey = `${evt.deck}-${evt.type}-${evt.index}-${evt.sliceIdx || 0}`;
+
+          if (!evt.isNoteOn) {
+            const playing = activeOfflineVoices.get(voiceKey);
+            if (playing && playing.length > 0) {
+              const voice = playing.shift();
+              const releaseTime = slot.decay !== undefined ? slot.decay : 0.3;
+              voice.gainNode.gain.cancelScheduledValues(eventTime);
+              voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, eventTime);
+              voice.gainNode.gain.setTargetAtTime(0, eventTime, releaseTime / 4);
+              try {
+                voice.sourceNode.stop(eventTime + releaseTime * 1.5);
+              } catch (e) {}
+            }
+            return;
+          }
+
+          const buffer = slot.buffer;
+          const rootNote = slot.rootNote || 60;
+          const triggerNote = evt.type === 'slice' ? rootNote + (evt.sliceIdx !== undefined ? evt.sliceIdx : 0) : (evt.type === 'slot' ? rootNote : rootNote + evt.index);
+
+          const sourceNode = offlineCtx.createBufferSource();
+          sourceNode.buffer = slot.reverseOn && slot.revBuffer ? slot.revBuffer : buffer;
+
+          const baseFreq = getFreq(triggerNote);
+          const rootFreq = getFreq(rootNote);
+          let playbackRate = baseFreq / rootFreq;
+          
+          if (slot.tuning) {
+            playbackRate *= Math.pow(2, slot.tuning / 12);
+          }
+          
+          if (evt.type === 'slice' && slot.sliceParams) {
+            const sliceEnv = slot.sliceParams[evt.sliceIdx || 0] || {};
+            const slicePitch = (sliceEnv.pitch || 0) + (slot.sliceMasterKey || 0) + (slot.sliceMasterOctave || 0) * 12;
+            playbackRate *= Math.pow(2, slicePitch / 12);
+          }
+
+          sourceNode.playbackRate.setValueAtTime(playbackRate, eventTime);
+
+          const voiceGain = offlineCtx.createGain();
+          const mixVolume = slot.volume !== undefined ? slot.volume : 0.8;
+          const laneVolume = evt.deck === 'A' ? (deckAVolFaderRef.current || 1.0) : (deckBVolFaderRef.current || 1.0);
+          const faderMix = mixVolume * laneVolume;
+
+          const pannerNode = offlineCtx.createStereoPanner();
+          pannerNode.pan.setValueAtTime(slot.pan !== undefined ? slot.pan : 0.0, eventTime);
+
+          const attack = slot.attack !== undefined ? slot.attack : 0.01;
+          const decay = slot.decay !== undefined ? slot.decay : 0.3;
+
+          voiceGain.gain.setValueAtTime(0, eventTime);
+          voiceGain.gain.linearRampToValueAtTime(faderMix, eventTime + attack);
+          
+          const isLoop = slot.loopOn;
+          if (!isLoop) {
+            voiceGain.gain.setTargetAtTime(0, eventTime + attack, decay / 4);
+          }
+
+          let lastNode = voiceGain;
+          if (slot.eq && slot.eq.enabled) {
+            slot.eq.bands.forEach(band => {
+              if (band.bypass) return;
+              const filter = offlineCtx.createBiquadFilter();
+              filter.type = band.type;
+              filter.frequency.setValueAtTime(band.frequency, eventTime);
+              filter.Q.setValueAtTime(band.Q, eventTime);
+              if (filter.type !== 'lowpass' && filter.type !== 'highpass' && filter.type !== 'notch' && filter.type !== 'bandpass') {
+                filter.gain.setValueAtTime(band.gain, eventTime);
+              }
+              lastNode.connect(filter);
+              lastNode = filter;
+            });
+          }
+
+          const deckEqLow = offlineCtx.createBiquadFilter();
+          deckEqLow.type = 'lowshelf';
+          deckEqLow.frequency.setValueAtTime(200, eventTime);
+          const eqLowVal = evt.deck === 'A' ? deckAEqLowValRef.current : deckBEqLowValRef.current;
+          deckEqLow.gain.setValueAtTime(eqLowVal < 0 ? eqLowVal * 26.0 : eqLowVal * 6.0, eventTime);
+
+          const deckEqMid = offlineCtx.createBiquadFilter();
+          deckEqMid.type = 'peaking';
+          deckEqMid.Q.setValueAtTime(1.0, eventTime);
+          deckEqMid.frequency.setValueAtTime(1000, eventTime);
+          const eqMidVal = evt.deck === 'A' ? deckAEqMidValRef.current : deckBEqMidValRef.current;
+          deckEqMid.gain.setValueAtTime(eqMidVal < 0 ? eqMidVal * 26.0 : eqMidVal * 6.0, eventTime);
+
+          const deckEqHigh = offlineCtx.createBiquadFilter();
+          deckEqHigh.type = 'highshelf';
+          deckEqHigh.frequency.setValueAtTime(5000, eventTime);
+          const eqHighVal = evt.deck === 'A' ? deckAEqHighValRef.current : deckBEqHighValRef.current;
+          deckEqHigh.gain.setValueAtTime(eqHighVal < 0 ? eqHighVal * 26.0 : eqHighVal * 6.0, eventTime);
+
+          lastNode.connect(pannerNode);
+          pannerNode.connect(deckEqLow);
+          deckEqLow.connect(deckEqMid);
+          deckEqMid.connect(deckEqHigh);
+          deckEqHigh.connect(offlineMasterGain);
+
+          if (slot.fxType !== 'None' && slot.fxSend > 0) {
+            const sendGain = offlineCtx.createGain();
+            sendGain.gain.setValueAtTime(slot.fxSend, eventTime);
+            pannerNode.connect(sendGain);
+            if (slot.fxType === 'Space Echo' && offlineDelay) {
+              sendGain.connect(offlineDelay);
+            } else if (slot.fxType === 'Reverb' && offlineReverb) {
+              sendGain.connect(offlineReverb);
+            }
+          }
+
+          let startOffset = slot.start * buffer.duration;
+          let playDuration = (slot.end - slot.start) * buffer.duration;
+          
+          if (evt.type === 'slice' && slot.sliceParams) {
+            const sliceCount = slot.sliceCount || 16;
+            const sliceLen = buffer.duration / sliceCount;
+            startOffset = (evt.sliceIdx || 0) * sliceLen;
+            playDuration = sliceLen;
+          }
+
+          sourceNode.connect(voiceGain);
+
+          if (isLoop) {
+            sourceNode.start(eventTime, startOffset);
+          } else {
+            sourceNode.start(eventTime, startOffset, playDuration / playbackRate);
+            sourceNode.stop(eventTime + (playDuration / playbackRate) + 0.05);
+          }
+
+          const activeList = activeOfflineVoices.get(voiceKey) || [];
+          activeList.push({ sourceNode, gainNode: voiceGain });
+          activeOfflineVoices.set(voiceKey, activeList);
+        });
+
+        const renderedBuffer = await offlineCtx.startRendering();
+        return renderedBuffer;
+      };
+
+      if (format === 'stems') {
+        if (!projectDirHandle) {
+          alert('Stem export requires a project directory to save multiple tracks!');
+          return;
+        }
+
+        const exportsDir = await projectDirHandle.getDirectoryHandle('exports', { create: true });
+        
+        const activeSlotIds = new Set(renderEvents.map(e => {
+          if (e.type === 'slot') return (e.deck === 'A' ? 'a0' : 'b0') + (e.index + 1);
+          return activeBankCSlotIdRef.current || 'c01';
+        }));
+
+        for (const slotId of activeSlotIds) {
+          showEditorStatus(`Rendering stem for ${slotId.toUpperCase()}... ⏳`);
+          const renderedBuffer = await performRenderRun(slotId);
+          const wavBlob = audioBufferToWav(renderedBuffer, bitDepth);
+          
+          const filename = `stem_${slotId}_${Date.now()}_${sampleRate}hz_${bitDepth}bit.wav`;
+          const fileHandle = await exportsDir.getFileHandle(filename, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(wavBlob);
+          await writable.close();
+        }
+
+        showEditorStatus('Stem export complete! 📤');
+      } else {
+        const renderedBuffer = await performRenderRun();
+        const wavBlob = audioBufferToWav(renderedBuffer, bitDepth);
+
+        if (projectDirHandle) {
+          const exportsDir = await projectDirHandle.getDirectoryHandle('exports', { create: true });
+          const filename = `mix_${Date.now()}_${sampleRate}hz_${bitDepth}bit.wav`;
+          const fileHandle = await exportsDir.getFileHandle(filename, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(wavBlob);
+          await writable.close();
+          showEditorStatus('Exported mix to project! 📥');
+        } else {
+          const url = URL.createObjectURL(wavBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `delta7_render_${Date.now()}_${sampleRate}hz_${bitDepth}bit.wav`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          showEditorStatus('Downloaded mix WAV! 📥');
+        }
+      }
+    } catch (err) {
+      console.error('Offline bounce failed:', err);
+      alert('Error during offline rendering bounce.');
+    }
+  };
+
   const loadSavedBuffersIntoContext = async (ctx) => {
     try {
       const savedRecords = await loadSavedMetadata();
@@ -3314,6 +4003,7 @@ export default function Delta7Synth() {
                 randomPan: saved.randomPan ?? slot.randomPan,
                 sliceMasterKey: saved.sliceMasterKey ?? slot.sliceMasterKey,
                 sliceMasterOctave: saved.sliceMasterOctave ?? slot.sliceMasterOctave,
+                eq: saved.eq ?? slot.eq,
               };
             }
             return slot;
@@ -3339,6 +4029,54 @@ export default function Delta7Synth() {
       };
     }
   }, []);
+
+  const rebuildVoiceEqChain = (voice, slot, ctx, now) => {
+    if (!voice || !voice.slotGainNode || !voice.voiceOutGain) return;
+
+    try {
+      voice.slotGainNode.disconnect();
+    } catch (e) {}
+
+    if (voice.eqFilters) {
+      voice.eqFilters.forEach(f => {
+        try { f.disconnect(); } catch {}
+      });
+      voice.eqFilters = null;
+    }
+
+    let nextDestNode = voice.voiceOutGain;
+    if (voice.eqLowNode) {
+      nextDestNode = voice.eqLowNode;
+    }
+
+    if (slot && slot.eq && slot.eq.enabled) {
+      const eqFilters = [];
+      let lastNode = voice.slotGainNode;
+      slot.eq.bands.forEach((band) => {
+        const filter = ctx.createBiquadFilter();
+        const isBypassed = band.bypass;
+        filter.type = isBypassed ? 'peaking' : band.type;
+        filter.frequency.setValueAtTime(band.frequency, now);
+        filter.Q.setValueAtTime(band.Q, now);
+        if (filter.type !== 'lowpass' && filter.type !== 'highpass' && filter.type !== 'notch' && filter.type !== 'bandpass') {
+          filter.gain.setValueAtTime(isBypassed ? 0 : band.gain, now);
+        }
+        lastNode.connect(filter);
+        lastNode = filter;
+        eqFilters.push(filter);
+      });
+      lastNode.connect(nextDestNode);
+      voice.eqFilters = eqFilters;
+    } else {
+      voice.slotGainNode.connect(nextDestNode);
+    }
+
+    if (voice.sendGainNode) {
+      try {
+        voice.slotGainNode.connect(voice.sendGainNode);
+      } catch (e) {}
+    }
+  };
 
   const syncActiveVoiceParams = (slotId, param, val) => {
     const ctx = audioCtxRef.current;
@@ -3585,6 +4323,41 @@ export default function Delta7Synth() {
           }
         }
       }
+      if (param === 'eq-band-change') {
+        const { bandIdx, band } = val;
+        if (!voice.eqFilters || voice.eqFilters.length === 0) {
+          const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+          if (slot && slot.eq && slot.eq.enabled) {
+            rebuildVoiceEqChain(voice, slot, ctx, now);
+          }
+        } else if (voice.eqFilters[bandIdx]) {
+          const filter = voice.eqFilters[bandIdx];
+          const isBypassed = band.bypass;
+          
+          filter.type = isBypassed ? 'peaking' : band.type;
+          
+          filter.frequency.cancelScheduledValues(now);
+          filter.frequency.setValueAtTime(filter.frequency.value, now);
+          filter.frequency.exponentialRampToValueAtTime(Math.max(20, Math.min(20000, band.frequency)), now + 0.02);
+          
+          filter.Q.cancelScheduledValues(now);
+          filter.Q.setValueAtTime(filter.Q.value, now);
+          filter.Q.linearRampToValueAtTime(Math.max(0.1, Math.min(10.0, band.Q)), now + 0.02);
+          
+          if (filter.type !== 'lowpass' && filter.type !== 'highpass' && filter.type !== 'notch' && filter.type !== 'bandpass') {
+            filter.gain.cancelScheduledValues(now);
+            filter.gain.setValueAtTime(filter.gain.value, now);
+            filter.gain.linearRampToValueAtTime(isBypassed ? 0 : band.gain, now + 0.02);
+          }
+        }
+      }
+
+      if (param === 'eq-toggle') {
+        const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+        if (slot) {
+          rebuildVoiceEqChain(voice, slot, ctx, now);
+        }
+      }
     });
   };
 
@@ -3767,15 +4540,21 @@ export default function Delta7Synth() {
     });
   };
 
-  const handleLoadEchoPreset = (presetIdx) => {
-    if (presetIdx === '') {
+  const handleLoadEchoPreset = (presetKey) => {
+    if (presetKey === '') {
       setSelectedEchoPresetIdx('');
       return;
     }
-    const idx = parseInt(presetIdx, 10);
-    const prst = ECHO_PRESETS[idx];
+    let prst = null;
+    if (presetKey.startsWith('f-')) {
+      const idx = parseInt(presetKey.substring(2), 10);
+      prst = ECHO_PRESETS[idx];
+    } else if (presetKey.startsWith('u-')) {
+      const idx = parseInt(presetKey.substring(2), 10);
+      prst = userEchoPresets[idx];
+    }
     if (!prst) return;
-    setSelectedEchoPresetIdx(presetIdx);
+    setSelectedEchoPresetIdx(presetKey);
     setParams(prev => {
       const next = { ...prev, ...prst.params };
       if (prev.spaceEchoActive !== next.spaceEchoActive && audioCtxRef.current) {
@@ -3786,28 +4565,105 @@ export default function Delta7Synth() {
     setSelectedDelayRatio('Free');
   };
 
-  const handleLoadRotorPreset = (presetIdx) => {
-    if (presetIdx === '') {
+  const handleSaveEchoPreset = () => {
+    const name = prompt("Enter a name for your Space Echo Preset:");
+    if (!name) return;
+    const newPreset = {
+      name: name.trim(),
+      params: {
+        spaceEchoActive: paramsRef.current.spaceEchoActive,
+        spaceEchoTime: paramsRef.current.spaceEchoTime,
+        spaceEchoFeedback: paramsRef.current.spaceEchoFeedback,
+        spaceEchoWow: paramsRef.current.spaceEchoWow,
+        spaceEchoSaturation: paramsRef.current.spaceEchoSaturation,
+        spaceEchoSpring: paramsRef.current.spaceEchoSpring
+      }
+    };
+    setUserEchoPresets(prev => {
+      const next = [...prev, newPreset];
+      localStorage.setItem('delta7_user_echo_presets', JSON.stringify(next));
+      return next;
+    });
+    showEditorStatus(`Echo preset "${name}" saved! 💾`);
+  };
+
+  const handleLoadRotorPreset = (presetKey) => {
+    if (presetKey === '') {
       setSelectedRotorPresetIdx('');
       return;
     }
-    const idx = parseInt(presetIdx, 10);
-    const prst = ROTOR_PRESETS[idx];
+    let prst = null;
+    if (presetKey.startsWith('f-')) {
+      const idx = parseInt(presetKey.substring(2), 10);
+      prst = ROTOR_PRESETS[idx];
+    } else if (presetKey.startsWith('u-')) {
+      const idx = parseInt(presetKey.substring(2), 10);
+      prst = userRotorPresets[idx];
+    }
     if (!prst) return;
-    setSelectedRotorPresetIdx(presetIdx);
+    setSelectedRotorPresetIdx(presetKey);
     setParams(prev => ({ ...prev, ...prst.params }));
   };
 
-  const handleLoadReverbPreset = (presetIdx) => {
-    if (presetIdx === '') {
+  const handleSaveRotorPreset = () => {
+    const name = prompt("Enter a name for your Leslie/Rotor Preset:");
+    if (!name) return;
+    const newPreset = {
+      name: name.trim(),
+      params: {
+        leslieSpeed: paramsRef.current.leslieSpeed,
+        leslieDrive: paramsRef.current.leslieDrive,
+        leslieWidth: paramsRef.current.leslieWidth,
+        leslieCrossover: paramsRef.current.leslieCrossover
+      }
+    };
+    setUserRotorPresets(prev => {
+      const next = [...prev, newPreset];
+      localStorage.setItem('delta7_user_rotor_presets', JSON.stringify(next));
+      return next;
+    });
+    showEditorStatus(`Rotor preset "${name}" saved! 💾`);
+  };
+
+  const handleLoadReverbPreset = (presetKey) => {
+    if (presetKey === '') {
       setSelectedReverbPresetIdx('');
       return;
     }
-    const idx = parseInt(presetIdx, 10);
-    const prst = REVERB_PRESETS[idx];
+    let prst = null;
+    if (presetKey.startsWith('f-')) {
+      const idx = parseInt(presetKey.substring(2), 10);
+      prst = REVERB_PRESETS[idx];
+    } else if (presetKey.startsWith('u-')) {
+      const idx = parseInt(presetKey.substring(2), 10);
+      prst = userReverbPresets[idx];
+    }
     if (!prst) return;
-    setSelectedReverbPresetIdx(presetIdx);
+    setSelectedReverbPresetIdx(presetKey);
     setParams(prev => ({ ...prev, ...prst.params }));
+  };
+
+  const handleSaveReverbPreset = () => {
+    const name = prompt("Enter a name for your Reverb Preset:");
+    if (!name) return;
+    const newPreset = {
+      name: name.trim(),
+      params: {
+        reverbActive: paramsRef.current.reverbActive,
+        reverbType: paramsRef.current.reverbType,
+        reverbDecay: paramsRef.current.reverbDecay,
+        reverbPreDelay: paramsRef.current.reverbPreDelay,
+        reverbHighCut: paramsRef.current.reverbHighCut,
+        reverbFreeze: paramsRef.current.reverbFreeze,
+        reverbMix: paramsRef.current.reverbMix
+      }
+    };
+    setUserReverbPresets(prev => {
+      const next = [...prev, newPreset];
+      localStorage.setItem('delta7_user_reverb_presets', JSON.stringify(next));
+      return next;
+    });
+    showEditorStatus(`Reverb preset "${name}" saved! 💾`);
   };
 
   const togglePreviewSample = (slotId) => {
@@ -7663,30 +8519,53 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     stutterPannerNode.connect(padPannerNode);
     padPannerNode.connect(slotGainNode);
     
+    // Resolve active slot ID and check if per-pad EQ is enabled
+    let activeSlotId = null;
+    if (voiceKey && typeof voiceKey === 'string') {
+      if (voiceKey.startsWith('perf-')) {
+        const parts = voiceKey.split('-');
+        const deck = parts[1]; // 'a', 'b', 'c'
+        const idx = parts[3] !== undefined ? parseInt(parts[3], 10) : NaN;
+        if (!isNaN(idx)) {
+          activeSlotId = `${deck}${String(idx + 1).padStart(2, '0')}`;
+        }
+      } else if (voiceKey.includes('-bankc')) {
+        activeSlotId = activeBankCSlotIdRef.current;
+      }
+    }
+    if (!activeSlotId) {
+      activeSlotId = prog.oscAWave || 'a01';
+    }
+
+    const currentSlot = sampleSlotsRef.current.find(s => s.id === activeSlotId);
+    
+    // Determine the node that receives input from slotGainNode or EQ output
+    let nextDestNode = voiceOutGain;
+    let vEqLow = null, vEqMid = null, vEqHigh = null;
+
     if (voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
       const isDeckA = voiceKey.includes('perf-a');
       const now = ctx.currentTime;
       
-      const vEqLow = ctx.createBiquadFilter();
+      vEqLow = ctx.createBiquadFilter();
       vEqLow.type = 'lowshelf';
       vEqLow.frequency.setValueAtTime(200, now);
       const initialLow = isDeckA ? deckAEqLowValRef.current : deckBEqLowValRef.current;
       vEqLow.gain.setValueAtTime(initialLow < 0 ? initialLow * 26.0 : initialLow * 6.0, now);
       
-      const vEqMid = ctx.createBiquadFilter();
+      vEqMid = ctx.createBiquadFilter();
       vEqMid.type = 'peaking';
       vEqMid.Q.setValueAtTime(1.0, now);
       vEqMid.frequency.setValueAtTime(1000, now);
       const initialMid = isDeckA ? deckAEqMidValRef.current : deckBEqMidValRef.current;
       vEqMid.gain.setValueAtTime(initialMid < 0 ? initialMid * 26.0 : initialMid * 6.0, now);
 
-      const vEqHigh = ctx.createBiquadFilter();
+      vEqHigh = ctx.createBiquadFilter();
       vEqHigh.type = 'highshelf';
       vEqHigh.frequency.setValueAtTime(5000, now);
       const initialHigh = isDeckA ? deckAEqHighValRef.current : deckBEqHighValRef.current;
       vEqHigh.gain.setValueAtTime(initialHigh < 0 ? initialHigh * 26.0 : initialHigh * 6.0, now);
 
-      slotGainNode.connect(vEqLow);
       vEqLow.connect(vEqMid);
       vEqMid.connect(vEqHigh);
       vEqHigh.connect(voiceOutGain);
@@ -7694,8 +8573,31 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       voiceObj.eqLowNode = vEqLow;
       voiceObj.eqMidNode = vEqMid;
       voiceObj.eqHighNode = vEqHigh;
+
+      nextDestNode = vEqLow;
+    }
+
+    // Build the 6-band EQ chain if enabled and slot exists
+    if (currentSlot && currentSlot.eq && currentSlot.eq.enabled) {
+      const eqFilters = [];
+      let lastNode = slotGainNode;
+      currentSlot.eq.bands.forEach((band) => {
+        const filter = ctx.createBiquadFilter();
+        const isBypassed = band.bypass;
+        filter.type = isBypassed ? 'peaking' : band.type;
+        filter.frequency.setValueAtTime(band.frequency, now);
+        filter.Q.setValueAtTime(band.Q, now);
+        if (filter.type !== 'lowpass' && filter.type !== 'highpass' && filter.type !== 'notch' && filter.type !== 'bandpass') {
+          filter.gain.setValueAtTime(isBypassed ? 0 : band.gain, now);
+        }
+        lastNode.connect(filter);
+        lastNode = filter;
+        eqFilters.push(filter);
+      });
+      lastNode.connect(nextDestNode);
+      voiceObj.eqFilters = eqFilters;
     } else {
-      slotGainNode.connect(voiceOutGain);
+      slotGainNode.connect(nextDestNode);
     }
 
     // Always create sendGainNode for performance voices to allow real-time send automation
@@ -8304,6 +9206,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           if (voice.sendGainNode) { try { voice.sendGainNode.disconnect(); } catch {} }
           if (voice.slotGainNode) { try { voice.slotGainNode.disconnect(); } catch {} }
           if (voice.voiceOutGain) { try { voice.voiceOutGain.disconnect(); } catch {} }
+          if (voice.eqFilters) {
+            voice.eqFilters.forEach(f => { try { f.disconnect(); } catch {} });
+          }
           // Previously leaked nodes — now properly disconnected
           if (voice.stutterGateNode) { try { voice.stutterGateNode.disconnect(); } catch {} }
           if (voice.stutterPannerNode) { try { voice.stutterPannerNode.disconnect(); } catch {} }
@@ -8692,7 +9597,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const pad = e.target.closest('.perf-pad[data-deck]');
     if (!pad) return;
     const related = e.relatedTarget;
-    if (related && pad.contains(related)) return;
+    if (related && (related instanceof Node) && pad.contains(related)) return;
     // Only trigger release on mouse leave if left button is currently pressed
     if ((e.buttons & 1) === 0) return;
     const deck = pad.dataset.deck;
@@ -12353,6 +13258,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
                     {isLoaded && (
                       <button
+                        className="perf-pad-eq-badge"
+                        data-active={slot.eq && slot.eq.enabled ? 'true' : 'false'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedEditSlotId(slotId);
+                          setActiveEqSlotId(slotId);
+                        }}
+                        onMouseDown={stopProp}
+                        onMouseUp={stopProp}
+                        onTouchStart={stopProp}
+                        onTouchEnd={stopProp}
+                      >
+                        EQ
+                      </button>
+                    )}
+
+                    {isLoaded && (
+                      <button
                         className="perf-pad-rev-badge"
                         data-active={slot.reverseOn ? 'true' : 'false'}
                         onClick={handleRevBadgeClick}
@@ -13409,6 +14332,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
                     {isLoaded && (
                       <button
+                        className="perf-pad-eq-badge"
+                        data-active={slot.eq && slot.eq.enabled ? 'true' : 'false'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedEditSlotId(slotId);
+                          setActiveEqSlotId(slotId);
+                        }}
+                        onMouseDown={stopProp}
+                        onMouseUp={stopProp}
+                        onTouchStart={stopProp}
+                        onTouchEnd={stopProp}
+                      >
+                        EQ
+                      </button>
+                    )}
+
+                    {isLoaded && (
+                      <button
                         className="perf-pad-rev-badge"
                         data-active={slot.reverseOn ? 'true' : 'false'}
                         onClick={handleRevBadgeClick}
@@ -14150,11 +15091,161 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       <div className="rack-header-bar">
         <div className="branding-title">delta7</div>
         <div className="branding-sub">HYPER INTEGRATED SYNTHESIS WORKSTATION</div>
+        <div style={{ position: 'relative', marginLeft: 'auto', marginRight: '16px' }}>
+          <button
+            className="btn btn-xs"
+            onClick={() => setProjectMenuOpen(!projectMenuOpen)}
+            style={{
+              borderColor: projectDirHandle ? '#ffe600' : '#00f3ff',
+              color: projectDirHandle ? '#ffe600' : '#00f3ff',
+              fontSize: '0.58rem',
+              padding: '2px 8px',
+              fontWeight: 'bold',
+              letterSpacing: '0.8px',
+              background: 'transparent',
+              boxShadow: projectDirHandle ? '0 0 6px rgba(255, 230, 0, 0.15)' : '0 0 6px rgba(0, 243, 255, 0.15)',
+              cursor: 'pointer',
+              fontFamily: 'monospace'
+            }}
+          >
+            📁 {projectDirName ? `PROJECT: ${projectDirName.toUpperCase()}` : 'PROJECT / FILE'}
+          </button>
+          
+          {projectMenuOpen && (
+            <div 
+              className="project-dropdown-menu"
+              style={{
+                position: 'absolute',
+                top: '25px',
+                right: '0',
+                width: '240px',
+                background: 'rgba(13, 18, 30, 0.95)',
+                border: '1px solid rgba(0, 243, 255, 0.25)',
+                boxShadow: '0 8px 16px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 243, 255, 0.05)',
+                borderRadius: '4px',
+                padding: '8px',
+                zIndex: 999,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                animation: 'slide-up 0.15s ease-out'
+              }}
+            >
+              <div style={{ fontSize: '0.52rem', color: '#888', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', fontFamily: 'monospace' }}>
+                PROJECT ACTIONS
+              </div>
+              
+              <button 
+                className="btn btn-seg-sm" 
+                onClick={() => {
+                  if (projectDirHandle) {
+                    handleSaveProjectLocal();
+                  } else {
+                    handleExportSingleFile();
+                  }
+                  setProjectMenuOpen(false);
+                }}
+                style={{ textAlign: 'left', fontSize: '0.55rem', color: '#ffe600', borderColor: 'rgba(255, 230, 0, 0.2)' }}
+              >
+                💾 Save Project {projectDirHandle ? 'to Folder...' : 'as File (.d7p)...'}
+              </button>
+              
+              <label 
+                className="btn btn-seg-sm" 
+                style={{ textAlign: 'left', fontSize: '0.55rem', cursor: 'pointer', display: 'block' }}
+              >
+                📂 Load Project File (.d7p)...
+                <input 
+                  type="file" 
+                  accept=".d7p" 
+                  onChange={(e) => { handleImportSingleFile(e); setProjectMenuOpen(false); }} 
+                  style={{ display: 'none' }} 
+                />
+              </label>
+
+              <button 
+                className="btn btn-seg-sm" 
+                onClick={() => { setShowExportModal(true); setProjectMenuOpen(false); }}
+                style={{ textAlign: 'left', fontSize: '0.55rem', color: '#00f3ff', borderColor: 'rgba(0, 243, 255, 0.2)' }}
+              >
+                🚀 Bounce / Export Mix...
+              </button>
+
+              <div style={{ fontSize: '0.52rem', color: '#888', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', marginTop: '4px', fontFamily: 'monospace' }}>
+                LOCAL PROJECT DIRECTORY
+              </div>
+              
+              {!projectDirHandle ? (
+                <>
+                  <button 
+                    className="btn btn-seg-sm" 
+                    onClick={() => { handleSelectProjectDir(); setProjectMenuOpen(false); }}
+                    style={{ textAlign: 'left', fontSize: '0.55rem' }}
+                  >
+                    Set Project Directory...
+                  </button>
+                  <span style={{ fontSize: '0.48rem', color: '#666', fontFamily: 'monospace', padding: '2px', lineHeight: '1.2' }}>
+                    Connect a local folder to enable background project saving and direct stem exports.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: '0.5rem', color: '#ffe600', fontFamily: 'monospace', padding: '2px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    📁 {projectDirName.toUpperCase()}
+                  </div>
+                  
+                  <button 
+                    className="btn btn-seg-sm" 
+                    onClick={() => { handleReauthorizeDir(); setProjectMenuOpen(false); }}
+                    style={{ textAlign: 'left', fontSize: '0.55rem', color: '#00ff88', borderColor: 'rgba(0, 255, 136, 0.2)' }}
+                  >
+                    Authorize Directory Access
+                  </button>
+
+                  <div style={{ fontSize: '0.5rem', color: '#888', fontFamily: 'monospace', marginTop: '2px' }}>
+                    Saved Local Banks:
+                  </div>
+                  <div style={{ maxHeight: '100px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '3px', padding: '2px', background: 'rgba(0,0,0,0.3)', borderRadius: '3px' }}>
+                    {localBanks.length === 0 ? (
+                      <span style={{ fontSize: '0.52rem', color: '#666', fontFamily: 'monospace', padding: '2px' }}>No banks saved yet.</span>
+                    ) : (
+                      localBanks.map(bank => (
+                        <button
+                          key={bank}
+                          className="btn btn-seg-pad0"
+                          onClick={() => { handleLoadProjectLocal(bank); setProjectMenuOpen(false); }}
+                          style={{ textAlign: 'left', width: '100%' }}
+                        >
+                          📂 {bank.toUpperCase()}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  
+                  <button 
+                    className="btn btn-seg-sm" 
+                    onClick={async () => {
+                      await deleteProjectDirHandle();
+                      setProjectDirHandle(null);
+                      setProjectDirName('');
+                      setLocalBanks([]);
+                      setProjectMenuOpen(false);
+                      showEditorStatus('Directory disconnected! 📁');
+                    }}
+                    style={{ textAlign: 'left', fontSize: '0.55rem', color: '#ff4444', borderColor: 'rgba(255, 70, 70, 0.2)', marginTop: '4px' }}
+                  >
+                    Disconnect Directory
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        
         <button 
           className="btn btn-xs" 
           onClick={() => setMidiMenuOpen(true)}
           style={{
-            marginLeft: 'auto',
             marginRight: '16px',
             borderColor: '#00f3ff',
             color: '#00f3ff',
@@ -14248,7 +15339,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Echo Preset Selector */}
-            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '0.2rem 0', justifyContent: 'space-between', display: 'flex' }}>
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '0.2rem 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <label style={{ color: '#00f3ff', fontWeight: 'bold' }}>PRST:</label>
               <select
                 value={selectedEchoPresetIdx}
@@ -14260,14 +15351,41 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   fontSize: '0.55rem', 
                   padding: '1px', 
                   borderRadius: '3px', 
-                  width: '90px' 
+                  flex: 1,
+                  minWidth: '60px',
+                  outline: 'none'
                 }}
               >
                 <option value="">-- CUSTOM --</option>
-                {ECHO_PRESETS.map((prst, idx) => (
-                  <option key={idx} value={idx}>{prst.name}</option>
-                ))}
+                <optgroup label="FACTORY">
+                  {ECHO_PRESETS.map((prst, idx) => (
+                    <option key={`f-${idx}`} value={`f-${idx}`}>{prst.name}</option>
+                  ))}
+                </optgroup>
+                {userEchoPresets.length > 0 && (
+                  <optgroup label="USER">
+                    {userEchoPresets.map((prst, idx) => (
+                      <option key={`u-${idx}`} value={`u-${idx}`}>{prst.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
+              <button
+                className="btn btn-xs"
+                onClick={handleSaveEchoPreset}
+                style={{
+                  padding: '1px 4px',
+                  fontSize: '0.5rem',
+                  borderColor: '#00f3ff',
+                  color: '#00f3ff',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+                title="Save current Echo settings"
+              >
+                SAVE
+              </button>
             </div>
 
             {/* Space Echo Knobs Grid */}
@@ -14398,7 +15516,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Leslie Preset Selector */}
-            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '0.2rem 0', justifyContent: 'space-between', display: 'flex' }}>
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '0.2rem 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <label style={{ color: '#ff00ff', fontWeight: 'bold' }}>PRST:</label>
               <select
                 value={selectedRotorPresetIdx}
@@ -14410,14 +15528,41 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   fontSize: '0.55rem', 
                   padding: '1px', 
                   borderRadius: '3px', 
-                  width: '90px' 
+                  flex: 1,
+                  minWidth: '60px',
+                  outline: 'none'
                 }}
               >
                 <option value="">-- CUSTOM --</option>
-                {ROTOR_PRESETS.map((prst, idx) => (
-                  <option key={idx} value={idx}>{prst.name}</option>
-                ))}
+                <optgroup label="FACTORY">
+                  {ROTOR_PRESETS.map((prst, idx) => (
+                    <option key={`f-${idx}`} value={`f-${idx}`}>{prst.name}</option>
+                  ))}
+                </optgroup>
+                {userRotorPresets.length > 0 && (
+                  <optgroup label="USER">
+                    {userRotorPresets.map((prst, idx) => (
+                      <option key={`u-${idx}`} value={`u-${idx}`}>{prst.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
+              <button
+                className="btn btn-xs"
+                onClick={handleSaveRotorPreset}
+                style={{
+                  padding: '1px 4px',
+                  fontSize: '0.5rem',
+                  borderColor: '#ff00ff',
+                  color: '#ff00ff',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+                title="Save current Leslie settings"
+              >
+                SAVE
+              </button>
             </div>
 
             {/* Leslie Knobs Grid */}
@@ -14545,7 +15690,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Reverb Preset Selector */}
-            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+            <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <label style={{ color: '#d000ff', fontWeight: 'bold', fontSize: '0.58rem' }}>PRESET:</label>
               <select
                 value={selectedReverbPresetIdx}
@@ -14557,15 +15702,41 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   fontSize: '0.55rem', 
                   padding: '1px 3px', 
                   borderRadius: '3px', 
-                  width: '95px',
+                  flex: 1,
+                  minWidth: '60px',
                   outline: 'none'
                 }}
               >
                 <option value="">-- CUSTOM --</option>
-                {REVERB_PRESETS.map((prst, idx) => (
-                  <option key={idx} value={idx}>{prst.name}</option>
-                ))}
+                <optgroup label="FACTORY">
+                  {REVERB_PRESETS.map((prst, idx) => (
+                    <option key={`f-${idx}`} value={`f-${idx}`}>{prst.name}</option>
+                  ))}
+                </optgroup>
+                {userReverbPresets.length > 0 && (
+                  <optgroup label="USER">
+                    {userReverbPresets.map((prst, idx) => (
+                      <option key={`u-${idx}`} value={`u-${idx}`}>{prst.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
+              <button
+                className="btn btn-xs"
+                onClick={handleSaveReverbPreset}
+                style={{
+                  padding: '1px 4px',
+                  fontSize: '0.5rem',
+                  borderColor: '#d000ff',
+                  color: '#d000ff',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+                title="Save current Reverb settings"
+              >
+                SAVE
+              </button>
             </div>
 
             {/* Reverb Knobs Grid */}
@@ -18070,6 +19241,211 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         />
       )}
 
+      {activeEqSlotId && (
+        <EqEditorModal
+          slotId={activeEqSlotId}
+          sampleSlots={sampleSlots}
+          updateSlotParam={updateSlotParam}
+          onClose={() => {
+            setActiveEqSlotId(null);
+            setSelectedEditSlotId(null);
+          }}
+          ringColors={ringColors}
+          audioCtx={audioCtxRef.current}
+        />
+      )}
+
+      {showExportModal && (
+        <div 
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(5, 7, 12, 0.85)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'monospace'
+          }}
+        >
+          <div 
+            className="modal-content"
+            style={{
+              width: '380px',
+              background: 'rgba(15, 20, 32, 0.95)',
+              border: '1px solid #00f3ff',
+              boxShadow: '0 0 30px rgba(0, 243, 255, 0.2), inset 0 0 15px rgba(0, 243, 255, 0.1)',
+              borderRadius: '8px',
+              padding: '20px',
+              color: '#fff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 243, 255, 0.2)', paddingBottom: '10px' }}>
+              <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#00f3ff', letterSpacing: '1px' }}>BOUNCE / EXPORT SEQUENCE</span>
+              <button 
+                onClick={() => setShowExportModal(false)}
+                style={{ background: 'transparent', border: 'none', color: '#ff4444', fontSize: '1rem', cursor: 'pointer', padding: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Export Format */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '0.65rem', color: '#888' }}>EXPORT FORMAT</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className={`btn ${exportSettings.format === 'stereo-mix' ? 'btn-active' : ''}`}
+                  onClick={() => setExportSettings(prev => ({ ...prev, format: 'stereo-mix' }))}
+                  style={{
+                    flex: 1,
+                    fontSize: '0.65rem',
+                    background: exportSettings.format === 'stereo-mix' ? '#00f3ff' : 'transparent',
+                    color: exportSettings.format === 'stereo-mix' ? '#000' : '#00f3ff',
+                    border: '1px solid #00f3ff',
+                    padding: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  STEREO MIXDOWN
+                </button>
+                <button
+                  className={`btn ${exportSettings.format === 'stems' ? 'btn-active' : ''}`}
+                  onClick={() => setExportSettings(prev => ({ ...prev, format: 'stems' }))}
+                  disabled={!projectDirHandle}
+                  style={{
+                    flex: 1,
+                    fontSize: '0.65rem',
+                    background: exportSettings.format === 'stems' ? '#00f3ff' : 'transparent',
+                    color: exportSettings.format === 'stems' ? '#000' : '#00f3ff',
+                    border: '1px solid #00f3ff',
+                    padding: '6px',
+                    cursor: 'pointer',
+                    opacity: !projectDirHandle ? 0.3 : 1,
+                    fontWeight: 'bold'
+                  }}
+                  title={!projectDirHandle ? "Stem export requires a project directory configured" : ""}
+                >
+                  MULTI-TRACK STEMS
+                </button>
+              </div>
+              {!projectDirHandle && (
+                <span style={{ fontSize: '0.52rem', color: '#ff4444' }}>⚠️ Stems export requires a Project Directory.</span>
+              )}
+            </div>
+
+            {/* Sample Rate */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '0.65rem', color: '#888' }}>SAMPLE RATE</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {[44100, 48000].map(sr => (
+                  <button
+                    key={sr}
+                    className={`btn ${exportSettings.sampleRate === sr ? 'btn-active' : ''}`}
+                    onClick={() => setExportSettings(prev => ({ ...prev, sampleRate: sr }))}
+                    style={{
+                      flex: 1,
+                      fontSize: '0.65rem',
+                      background: exportSettings.sampleRate === sr ? '#ffe600' : 'transparent',
+                      color: exportSettings.sampleRate === sr ? '#000' : '#ffe600',
+                      border: '1px solid #ffe600',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {sr / 1000} kHz
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bit Depth */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '0.65rem', color: '#888' }}>BIT DEPTH</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {[16, 24].map(bd => (
+                  <button
+                    key={bd}
+                    className={`btn ${exportSettings.bitDepth === bd ? 'btn-active' : ''}`}
+                    onClick={() => setExportSettings(prev => ({ ...prev, bitDepth: bd }))}
+                    style={{
+                      flex: 1,
+                      fontSize: '0.65rem',
+                      background: exportSettings.bitDepth === bd ? '#ffe600' : 'transparent',
+                      color: exportSettings.bitDepth === bd ? '#000' : '#ffe600',
+                      border: '1px solid #ffe600',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {bd}-bit PCM
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Duration (Bar Count) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '0.65rem', color: '#888' }}>LENGTH (BARS)</span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {[1, 2, 4, 8, 16].map(bars => (
+                  <button
+                    key={bars}
+                    className={`btn ${exportSettings.barCount === bars ? 'btn-active' : ''}`}
+                    onClick={() => setExportSettings(prev => ({ ...prev, barCount: bars }))}
+                    style={{
+                      flex: 1,
+                      fontSize: '0.65rem',
+                      background: exportSettings.barCount === bars ? '#ff00ff' : 'transparent',
+                      color: exportSettings.barCount === bars ? '#000' : '#ff00ff',
+                      border: '1px solid #ff00ff',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {bars} Bar{bars > 1 ? 's' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bounce Action */}
+            <button
+              onClick={() => {
+                setShowExportModal(false);
+                handleBounceSequenceOffline(exportSettings);
+              }}
+              style={{
+                marginTop: '10px',
+                background: '#00f3ff',
+                color: '#000',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '12px',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                letterSpacing: '1px',
+                cursor: 'pointer',
+                boxShadow: '0 0 12px rgba(0, 243, 255, 0.4)',
+                textAlign: 'center',
+                fontFamily: 'monospace'
+              }}
+            >
+              🚀 BOUNCE NOW
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -18444,7 +19820,7 @@ function KeyboardTrigger({ playVoice, stopVoice }) {
 
 export const openSamplerDB = () => {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('Delta7SamplerDB', 2);
+    const request = indexedDB.open('Delta7SamplerDB', 3);
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('samples')) {
@@ -18453,9 +19829,47 @@ export const openSamplerDB = () => {
       if (!db.objectStoreNames.contains('banks')) {
         db.createObjectStore('banks', { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains('settings')) {
+        db.createObjectStore('settings', { keyPath: 'key' });
+      }
     };
     request.onsuccess = (e) => resolve(e.target.result);
     request.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const saveProjectDirHandle = async (handle) => {
+  const db = await openSamplerDB();
+  const tx = db.transaction('settings', 'readwrite');
+  const store = tx.objectStore('settings');
+  return new Promise((resolve, reject) => {
+    const req = store.put({ key: 'projectDirHandle', handle });
+    req.onsuccess = () => resolve();
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const loadProjectDirHandle = async () => {
+  const db = await openSamplerDB();
+  const tx = db.transaction('settings', 'readonly');
+  const store = tx.objectStore('settings');
+  return new Promise((resolve) => {
+    const req = store.get('projectDirHandle');
+    req.onsuccess = (e) => {
+      resolve(e.target.result ? e.target.result.handle : null);
+    };
+    req.onerror = () => resolve(null);
+  });
+};
+
+export const deleteProjectDirHandle = async () => {
+  const db = await openSamplerDB();
+  const tx = db.transaction('settings', 'readwrite');
+  const store = tx.objectStore('settings');
+  return new Promise((resolve) => {
+    const req = store.delete('projectDirHandle');
+    req.onsuccess = () => resolve();
+    req.onerror = () => resolve();
   });
 };
 
@@ -18502,6 +19916,7 @@ export const saveSampleToDb = async (slot) => {
     randomPan: slot.randomPan !== undefined ? slot.randomPan : 0.0,
     sliceMasterKey: slot.sliceMasterKey !== undefined ? slot.sliceMasterKey : 0,
     sliceMasterOctave: slot.sliceMasterOctave !== undefined ? slot.sliceMasterOctave : 0,
+    eq: slot.eq,
     channels: channels,
     sampleRate: slot.buffer.sampleRate
   };
@@ -18595,11 +20010,10 @@ export const getSavedBankFromDb = async (id) => {
   });
 };
 
-export const audioBufferToWav = (buffer) => {
+export const audioBufferToWav = (buffer, bitDepth = 16) => {
   const numOfChan = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const format = 1; // 1 = raw PCM
-  const bitDepth = 16;
   
   let result;
   if (numOfChan === 2) {
@@ -18616,8 +20030,9 @@ export const audioBufferToWav = (buffer) => {
     result = buffer.getChannelData(0);
   }
   
+  const bytesPerSample = bitDepth === 24 ? 3 : 2;
   const bufferLength = result.length;
-  const byteLength = bufferLength * 2;
+  const byteLength = bufferLength * bytesPerSample;
   const bufferArray = new ArrayBuffer(44 + byteLength);
   const view = new DataView(bufferArray);
   
@@ -18629,15 +20044,61 @@ export const audioBufferToWav = (buffer) => {
   view.setUint16(20, format, true);
   view.setUint16(22, numOfChan, true);
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * numOfChan * 2, true);
-  view.setUint16(32, numOfChan * 2, true);
+  view.setUint32(28, sampleRate * numOfChan * bytesPerSample, true);
+  view.setUint16(32, numOfChan * bytesPerSample, true);
   view.setUint16(34, bitDepth, true);
   writeString(view, 36, 'data');
   view.setUint32(40, byteLength, true);
   
-  floatTo16BitPCM(view, 44, result);
+  if (bitDepth === 24) {
+    let offset = 44;
+    for (let i = 0; i < result.length; i++, offset += 3) {
+      let s = Math.max(-1, Math.min(1, result[i]));
+      let sample = s < 0 ? s * 0x800000 : s * 0x7FFFFF;
+      sample = Math.floor(sample);
+      view.setUint8(offset, sample & 0xFF);
+      view.setUint8(offset + 1, (sample >> 8) & 0xFF);
+      view.setUint8(offset + 2, (sample >> 16) & 0xFF);
+    }
+  } else {
+    floatTo16BitPCM(view, 44, result);
+  }
   
   return new Blob([view], { type: 'audio/wav' });
+};
+
+export const loadLocalBanksList = async (dirHandle) => {
+  try {
+    const subDir = await dirHandle.getDirectoryHandle('banks', { create: true });
+    const list = [];
+    for await (const entry of subDir.values()) {
+      if (entry.kind === 'file' && entry.name.endsWith('.json')) {
+        list.push(entry.name.replace('.json', ''));
+      }
+    }
+    return list.sort();
+  } catch (err) {
+    console.error('Failed to list local banks:', err);
+    return [];
+  }
+};
+
+export const verifyDirectoryPermission = async (handle, readWrite) => {
+  const options = {};
+  if (readWrite) {
+    options.mode = 'readwrite';
+  }
+  try {
+    if ((await handle.queryPermission(options)) === 'granted') {
+      return true;
+    }
+    if ((await handle.requestPermission(options)) === 'granted') {
+      return true;
+    }
+  } catch (e) {
+    console.warn("Permission request error:", e);
+  }
+  return false;
 };
 
 const interleave = (inputL, inputR) => {
@@ -18666,3 +20127,496 @@ const floatTo16BitPCM = (output, offset, input) => {
     output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
   }
 };
+
+// ==========================================
+// 12. PER-PAD EQ EDITOR MODAL COMPONENT
+// ==========================================
+export function EqEditorModal({
+  slotId,
+  sampleSlots,
+  updateSlotParam,
+  onClose,
+  ringColors,
+  audioCtx
+}) {
+  const slot = sampleSlots.find(s => s.id === slotId);
+  if (!slot || !slot.eq) return null;
+
+  const graphFrequencies = React.useMemo(() => {
+    const freqs = new Float32Array(200);
+    const minF = Math.log10(20);
+    const maxF = Math.log10(20000);
+    for (let i = 0; i < 200; i++) {
+      const ratio = i / (200 - 1);
+      freqs[i] = Math.pow(10, minF + ratio * (maxF - minF));
+    }
+    return freqs;
+  }, []);
+
+  const [dbResponse, setDbResponse] = React.useState(new Float32Array(200));
+
+  React.useEffect(() => {
+    const actx = audioCtx || (typeof OfflineAudioContext !== 'undefined' ? new OfflineAudioContext(1, 1, 44100) : null);
+    if (!actx) return;
+    const compositeMags = new Float32Array(200).fill(1.0);
+    
+    if (slot.eq.enabled) {
+      slot.eq.bands.forEach((band) => {
+        if (band.bypass) return;
+        try {
+          const filter = actx.createBiquadFilter();
+          filter.type = band.type;
+          filter.frequency.value = band.frequency;
+          filter.Q.value = band.Q;
+          filter.gain.value = band.gain;
+          
+          const mags = new Float32Array(200);
+          const phases = new Float32Array(200);
+          filter.getFrequencyResponse(graphFrequencies, mags, phases);
+          
+          for (let i = 0; i < 200; i++) {
+            if (!isNaN(mags[i])) {
+              compositeMags[i] *= mags[i];
+            }
+          }
+        } catch (e) {
+          console.warn('Error calculating frequency response:', e);
+        }
+      });
+    }
+
+    const dbs = new Float32Array(200);
+    for (let i = 0; i < 200; i++) {
+      dbs[i] = 20 * Math.log10(Math.max(1e-5, compositeMags[i]));
+    }
+    setDbResponse(dbs);
+  }, [slot.eq, audioCtx, graphFrequencies]);
+
+  const width = 560;
+  const height = 200;
+
+  const getX = (f) => {
+    const minL = Math.log10(20);
+    const maxL = Math.log10(20000);
+    const valL = Math.log10(Math.max(20, Math.min(20000, f)));
+    return ((valL - minL) / (maxL - minL)) * width;
+  };
+
+  const getFreqFromX = (x) => {
+    const minL = Math.log10(20);
+    const maxL = Math.log10(20000);
+    const ratio = Math.max(0, Math.min(1, x / width));
+    return Math.round(Math.pow(10, minL + ratio * (maxL - minL)));
+  };
+
+  const getY = (g) => {
+    const minDb = -12;
+    const maxDb = 12;
+    const ratio = (g - minDb) / (maxDb - minDb);
+    return height - ratio * height;
+  };
+
+  const getGainFromY = (y) => {
+    const minDb = -12;
+    const maxDb = 12;
+    const ratio = Math.max(0, Math.min(1, (height - y) / height));
+    return parseFloat((minDb + ratio * (maxDb - minDb)).toFixed(1));
+  };
+
+  const svgRef = React.useRef(null);
+  const [draggingIdx, setDraggingIdx] = React.useState(null);
+
+  const handleMouseDown = (idx, e) => {
+    e.preventDefault();
+    setDraggingIdx(idx);
+  };
+
+  React.useEffect(() => {
+    if (draggingIdx === null) return;
+
+    const handleMouseMove = (e) => {
+      if (!svgRef.current) return;
+      const rect = svgRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const freq = getFreqFromX(mouseX);
+      const band = slot.eq.bands[draggingIdx];
+      const hasGain = band.type !== 'lowpass' && band.type !== 'highpass' && band.type !== 'notch' && band.type !== 'bandpass';
+      const gain = hasGain ? getGainFromY(mouseY) : 0;
+
+      const updatedBand = {
+        ...band,
+        frequency: freq,
+        gain: gain
+      };
+
+      const nextBands = [...slot.eq.bands];
+      nextBands[draggingIdx] = updatedBand;
+
+      updateSlotParam(slotId, 'eq-band-change', {
+        bandIdx: draggingIdx,
+        band: updatedBand
+      });
+
+      updateSlotParam(slotId, 'eq', {
+        ...slot.eq,
+        bands: nextBands
+      });
+    };
+
+    const handleMouseUp = () => {
+      setDraggingIdx(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggingIdx, slot, slotId, updateSlotParam]);
+
+  const curvePathD = React.useMemo(() => {
+    const points = [];
+    for (let i = 0; i < 200; i++) {
+      const f = graphFrequencies[i];
+      const x = getX(f);
+      const y = getY(dbResponse[i]);
+      points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    return `M ${points.join(' ')}`;
+  }, [dbResponse, graphFrequencies]);
+
+  const areaPathD = React.useMemo(() => {
+    return `${curvePathD} L ${width},${height} L 0,${height} Z`;
+  }, [curvePathD]);
+
+  const freqGrid = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+  const gainGrid = [-12, -6, 0, 6, 12];
+
+  const handleGlobalToggle = () => {
+    const nextEnabled = !slot.eq.enabled;
+    updateSlotParam(slotId, 'eq-toggle', nextEnabled);
+    updateSlotParam(slotId, 'eq', {
+      ...slot.eq,
+      enabled: nextEnabled
+    });
+  };
+
+  const isDeckA = slotId.startsWith('a');
+  const padIdx = parseInt(slotId.slice(1)) - 1;
+
+  return (
+    <div className="eq-modal-overlay" onClick={onClose}>
+      <div className="eq-modal-window" onClick={(e) => e.stopPropagation()}>
+        <div className="eq-modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '1rem', color: ringColors[padIdx] || '#00f3ff' }}>🎛️</span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#ffffff', letterSpacing: '1px' }}>
+                SLOT {slotId.toUpperCase()} &mdash; EQ GRAPH EDITOR
+              </div>
+              <div style={{ fontSize: '0.55rem', color: '#888', textTransform: 'uppercase' }}>
+                {slot.name}
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.55rem', color: '#888', fontWeight: 'bold', fontFamily: 'monospace' }}>EQ ACTIVE</span>
+              <button
+                className="eq-global-toggle-btn"
+                data-active={slot.eq.enabled ? 'true' : 'false'}
+                onClick={handleGlobalToggle}
+              >
+                {slot.eq.enabled ? 'ON' : 'BYP'}
+              </button>
+            </div>
+            <button className="eq-modal-close" onClick={onClose}>✕</button>
+          </div>
+        </div>
+
+        <div className="eq-modal-body">
+          {/* SVG EQ GRAPH CANVAS */}
+          <div className="eq-graph-container" style={{ position: 'relative', width: `${width}px`, height: `${height}px`, background: '#0a0d16', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', margin: '0 auto 15px auto' }}>
+            <svg
+              ref={svgRef}
+              width={width}
+              height={height}
+              viewBox={`0 0 ${width} ${height}`}
+              style={{ display: 'block', width: '100%', height: '100%' }}
+            >
+              <defs>
+                <linearGradient id="eqAreaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#00f3ff" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#00f3ff" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+
+              {/* Freq Vertical Grid Lines */}
+              {freqGrid.map((f) => {
+                const x = getX(f);
+                return (
+                  <g key={`f-line-${f}`}>
+                    <line
+                      x1={x}
+                      y1={0}
+                      x2={x}
+                      y2={height}
+                      stroke="rgba(255,255,255,0.06)"
+                      strokeWidth="1"
+                      strokeDasharray="2,2"
+                    />
+                    <text
+                      x={x}
+                      y={height - 6}
+                      fill="rgba(255,255,255,0.3)"
+                      fontSize="8"
+                      fontFamily="monospace"
+                      textAnchor="middle"
+                    >
+                      {f >= 1000 ? `${f/1000}k` : f}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Gain Horizontal Grid Lines */}
+              {gainGrid.map((g) => {
+                const y = getY(g);
+                return (
+                  <g key={`g-line-${g}`}>
+                    <line
+                      x1={0}
+                      y1={y}
+                      x2={width}
+                      y2={y}
+                      stroke={g === 0 ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255,255,255,0.06)'}
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={4}
+                      y={y - 4}
+                      fill="rgba(255,255,255,0.3)"
+                      fontSize="8"
+                      fontFamily="monospace"
+                    >
+                      {g > 0 ? `+${g}` : g} dB
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Response Path Area & Curve */}
+              {slot.eq.enabled && (
+                <>
+                  <path d={areaPathD} fill="url(#eqAreaGrad)" style={{ pointerEvents: 'none' }} />
+                  <path d={curvePathD} fill="none" stroke="#00f3ff" strokeWidth="2" style={{ pointerEvents: 'none' }} />
+                </>
+              )}
+
+              {/* Interactive Band Control Points */}
+              {slot.eq.enabled && slot.eq.bands.map((band, idx) => {
+                const hasGain = band.type !== 'lowpass' && band.type !== 'highpass' && band.type !== 'notch' && band.type !== 'bandpass';
+                const cx = getX(band.frequency);
+                const cy = getY(hasGain ? band.gain : 0);
+                const padColor = ringColors[idx] || '#00f3ff';
+
+                return (
+                  <g key={`ctrl-pt-${idx}`}>
+                    {/* Outer glow ring when dragging */}
+                    {draggingIdx === idx && (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r="14"
+                        fill="none"
+                        stroke={padColor}
+                        strokeWidth="1"
+                        opacity="0.5"
+                      />
+                    )}
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={draggingIdx === idx ? 8 : 6}
+                      fill={band.bypass ? 'rgba(80, 80, 80, 0.4)' : padColor}
+                      stroke="#ffffff"
+                      strokeWidth="1.5"
+                      style={{ cursor: 'pointer' }}
+                      onMouseDown={(e) => handleMouseDown(idx, e)}
+                    />
+                    <text
+                      x={cx}
+                      y={cy - 10}
+                      textAnchor="middle"
+                      fill="#ffffff"
+                      fontSize="9"
+                      fontWeight="bold"
+                      fontFamily="monospace"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      {idx + 1}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+
+          {/* BANDS GRID PANEL */}
+          <div className="eq-bands-grid">
+            {slot.eq.bands.map((band, idx) => {
+              const hasGain = band.type !== 'lowpass' && band.type !== 'highpass' && band.type !== 'notch' && band.type !== 'bandpass';
+              const padColor = ringColors[idx] || '#00f3ff';
+
+              return (
+                <div
+                  key={`band-card-${idx}`}
+                  className="eq-band-card"
+                  style={{
+                    borderTop: `2px solid ${band.bypass ? 'rgba(255,255,255,0.08)' : padColor}`,
+                    opacity: slot.eq.enabled ? 1 : 0.4,
+                    pointerEvents: slot.eq.enabled ? 'auto' : 'none'
+                  }}
+                >
+                  <div className="eq-band-card-header">
+                    <span className="eq-band-card-title">BAND {idx + 1}</span>
+                    <button
+                      className="eq-band-bypass-btn"
+                      data-active={!band.bypass ? 'true' : 'false'}
+                      onClick={() => {
+                        const updatedBand = { ...band, bypass: !band.bypass };
+                        const nextBands = [...slot.eq.bands];
+                        nextBands[idx] = updatedBand;
+                        
+                        updateSlotParam(slotId, 'eq-band-change', { bandIdx: idx, band: updatedBand });
+                        updateSlotParam(slotId, 'eq', { ...slot.eq, bands: nextBands });
+                      }}
+                    >
+                      {band.bypass ? 'BYP' : 'ON'}
+                    </button>
+                  </div>
+
+                  <div className="eq-band-card-body">
+                    {/* Filter Type */}
+                    <div className="eq-control-group">
+                      <span className="eq-label">TYPE</span>
+                      <select
+                        value={band.type}
+                        onChange={(e) => {
+                          const nextType = e.target.value;
+                          const updatedBand = { ...band, type: nextType };
+                          const nextHasGain = nextType !== 'lowpass' && nextType !== 'highpass' && nextType !== 'notch' && nextType !== 'bandpass';
+                          if (!nextHasGain) {
+                            updatedBand.gain = 0;
+                          }
+                          const nextBands = [...slot.eq.bands];
+                          nextBands[idx] = updatedBand;
+                          
+                          updateSlotParam(slotId, 'eq-band-change', { bandIdx: idx, band: updatedBand });
+                          updateSlotParam(slotId, 'eq', { ...slot.eq, bands: nextBands });
+                        }}
+                        className="eq-select"
+                      >
+                        <option value="peaking">PEAKING</option>
+                        <option value="lowshelf">LOWSHELF</option>
+                        <option value="highshelf">HIGHSHELF</option>
+                        <option value="lowpass">LOWPASS</option>
+                        <option value="highpass">HIGHPASS</option>
+                        <option value="bandpass">BANDPASS</option>
+                        <option value="notch">NOTCH</option>
+                      </select>
+                    </div>
+
+                    {/* Frequency */}
+                    <div className="eq-slider-row">
+                      <div className="eq-slider-labels">
+                        <span className="eq-label">FREQ</span>
+                        <span className="eq-val font-mono">
+                          {band.frequency >= 1000 ? `${(band.frequency / 1000).toFixed(1)}k` : band.frequency} Hz
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={Math.log10(20)}
+                        max={Math.log10(20000)}
+                        step={0.01}
+                        value={Math.log10(band.frequency)}
+                        onChange={(e) => {
+                          const val = Math.round(Math.pow(10, parseFloat(e.target.value)));
+                          const updatedBand = { ...band, frequency: val };
+                          const nextBands = [...slot.eq.bands];
+                          nextBands[idx] = updatedBand;
+                          
+                          updateSlotParam(slotId, 'eq-band-change', { bandIdx: idx, band: updatedBand });
+                          updateSlotParam(slotId, 'eq', { ...slot.eq, bands: nextBands });
+                        }}
+                        className="eq-range-input"
+                      />
+                    </div>
+
+                    {/* Q Factor */}
+                    <div className="eq-slider-row">
+                      <div className="eq-slider-labels">
+                        <span className="eq-label">Q-FACTOR</span>
+                        <span className="eq-val font-mono">{band.Q.toFixed(2)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1}
+                        max={10.0}
+                        step={0.05}
+                        value={band.Q}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          const updatedBand = { ...band, Q: val };
+                          const nextBands = [...slot.eq.bands];
+                          nextBands[idx] = updatedBand;
+                          
+                          updateSlotParam(slotId, 'eq-band-change', { bandIdx: idx, band: updatedBand });
+                          updateSlotParam(slotId, 'eq', { ...slot.eq, bands: nextBands });
+                        }}
+                        className="eq-range-input"
+                      />
+                    </div>
+
+                    {/* Gain */}
+                    <div className="eq-slider-row" style={{ opacity: hasGain ? 1 : 0.25 }}>
+                      <div className="eq-slider-labels">
+                        <span className="eq-label">GAIN</span>
+                        <span className="eq-val font-mono">
+                          {hasGain ? `${band.gain > 0 ? '+' : ''}${band.gain.toFixed(1)} dB` : '0.0 dB'}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-12.0}
+                        max={12.0}
+                        step={0.1}
+                        value={band.gain}
+                        disabled={!hasGain}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          const updatedBand = { ...band, gain: val };
+                          const nextBands = [...slot.eq.bands];
+                          nextBands[idx] = updatedBand;
+                          
+                          updateSlotParam(slotId, 'eq-band-change', { bandIdx: idx, band: updatedBand });
+                          updateSlotParam(slotId, 'eq', { ...slot.eq, bands: nextBands });
+                        }}
+                        className="eq-range-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
