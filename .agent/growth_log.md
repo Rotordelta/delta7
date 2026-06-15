@@ -92,4 +92,10 @@
   - **Note and CC Segregation**: Mapped note keys receive `N` prefixing and CC channels receive `C` prefixing to avoid overlapping collisions, and CC values >=64 trigger button press, while values <64 trigger release.
   - **Unified MIDI Mapping Menu**: Listing the custom parameters inside organized categories (Transport, Mixer, Utilities) makes it easy to review and clear mappings in one place.
 
+## Session: 2026-06-15 (Part 8)
+- **Task**: Fixed MIDI pad triggering early return bug in playVoice.
+- **Jimmy's Preferences**:
+  - **Order of MIDI Note Handling**: Ensure performance pad mapping checks are not short-circuited by global custom button/transport note-handling loops, by explicitly skipping keys starting with `pad-` during general key interceptors.
+
+
 
