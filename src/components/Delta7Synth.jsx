@@ -3722,10 +3722,8 @@ export default function Delta7Synth() {
           const eventTime = evt.beat * beatDur;
 
           let slotId = '';
-          if (evt.type === 'slot') {
+          if (evt.type === 'slot' || evt.type === 'slice') {
             slotId = (evt.deck === 'A' ? 'a0' : 'b0') + (evt.index + 1);
-          } else if (evt.type === 'slice') {
-            slotId = activeBankCSlotIdRef.current || 'c01';
           }
           
           if (laneFilter !== undefined && slotId !== laneFilter) {
@@ -3883,7 +3881,9 @@ export default function Delta7Synth() {
         const exportsDir = await projectDirHandle.getDirectoryHandle('exports', { create: true });
         
         const activeSlotIds = new Set(renderEvents.map(e => {
-          if (e.type === 'slot') return (e.deck === 'A' ? 'a0' : 'b0') + (e.index + 1);
+          if (e.type === 'slot' || e.type === 'slice') {
+            return (e.deck === 'A' ? 'a0' : 'b0') + (e.index + 1);
+          }
           return activeBankCSlotIdRef.current || 'c01';
         }));
 
@@ -9099,6 +9099,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           oscATriggerMode: 'slice',
           oscAVol: 1.0,
           oscBVol: 0.0,
+          oscBalance: 0.0,
           oscMode: 'single',
         };
         
@@ -9682,6 +9683,21 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const slot = sampleSlotsRef.current.find(s => s.id === slotId);
     const triggerMode = slot ? (slot.triggerMode || 'hold') : 'hold';
 
+    // If the slot is configured for slice playback, override type and derive sliceIdx
+    // from the pad index. The pad grid always fires type='slot' — we remap here.
+    let resolvedType = type;
+    let resolvedSliceIdx = undefined;
+    if (type === 'slot' && slot) {
+      const deckTriggerMode = deck === 'A'
+        ? (paramsRef.current.oscATriggerMode || slot.oscATriggerMode)
+        : (paramsRef.current.oscBTriggerMode || slot.oscBTriggerMode);
+      if (deckTriggerMode === 'slice') {
+        resolvedType = 'slice';
+        resolvedSliceIdx = index; // pad index maps 1:1 to slice index
+      }
+    }
+
+
     // Intercept armed record state and start recording immediately on first pad hit
     if (perfRecordArmedRef.current && isNoteOn) {
       startRecordingFromArmed();
@@ -9691,7 +9707,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     // 1. Latch Mode Routing
     if (triggerMode === 'latch') {
       if (!isNoteOn) return; // ignore release completely
-      const padKey = `${deck}-${type}-${index}`;
+      const padKey = `${deck}-${resolvedType}-${index}`;
       const isActive = activePerfPadsRef.current[padKey];
       const isPending = activePerfPadsRef.current[`${padKey}-pending`];
       
@@ -9713,16 +9729,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setPerfPad(`${padKey}-pending`, true);
       }
       
-      dispatchLiveTrigger(deck, type, index, velocity, true, actualShouldRecord, isActive ? 'None' : quantGrid);
+      dispatchLiveTrigger(deck, resolvedType, index, velocity, true, actualShouldRecord, isActive ? 'None' : quantGrid, resolvedSliceIdx);
       return;
     }
 
     // 1.5 Queue Mode Routing
     if (triggerMode === 'queue') {
       if (!isNoteOn) return; // ignore release completely
-      const padKey = `${deck}-${type}-${index}`;
+      const padKey = `${deck}-${resolvedType}-${index}`;
       const isAlreadyActive = activePerfPadsRef.current[padKey] || activePerfPadsRef.current[`${padKey}-pending`];
-      
       // Get slot local loopbeats (defaulting to 4.0 beats if not warped or empty slot)
       const loopBeats = slot && slot.warpBeats ? slot.warpBeats : 4.0;
       
@@ -9733,18 +9748,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       
       setPerfPad(`${padKey}-pending`, true);
       
-      dispatchLiveTrigger(deck, type, index, velocity, !isAlreadyActive, actualShouldRecord, loopBeats);
+      dispatchLiveTrigger(deck, resolvedType, index, velocity, !isAlreadyActive, actualShouldRecord, loopBeats, resolvedSliceIdx);
       return;
     }
 
     // 2. Free Mode Routing
     if (triggerMode === 'free') {
-      dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, actualShouldRecord, 'None');
+      dispatchLiveTrigger(deck, resolvedType, index, velocity, isNoteOn, actualShouldRecord, 'None', resolvedSliceIdx);
       return;
     }
 
     // 3. Hold and Flux Modes Routing (Default instant trigger)
-    dispatchLiveTrigger(deck, type, index, velocity, isNoteOn, actualShouldRecord, 'None');
+    dispatchLiveTrigger(deck, resolvedType, index, velocity, isNoteOn, actualShouldRecord, 'None', resolvedSliceIdx);
   };
 
   // -- Event-delegated pad grid handlers
@@ -9835,10 +9850,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     const currentParams = paramsRef.current;
     let slotId = '';
-    if (type === 'slot') {
+    if (type === 'slot' || type === 'slice') {
       slotId = (deck === 'A' ? 'a0' : 'b0') + (index + 1);
-    } else if (type === 'slice') {
-      slotId = activeBankCSlotIdRef.current;
     } else {
       slotId = deck === 'A' ? currentParams.oscAWave : currentParams.oscBWave;
     }
@@ -10049,6 +10062,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       oscBTriggerMode: 'normal',
       oscAVol: 1.0,
       oscBVol: 0.0,
+      oscBalance: 0.0,
       perfPadPan: slot ? (slot.pan !== undefined ? slot.pan : 0) : 0,
       perfPadFxType: slot ? (slot.fxType || 'None') : 'None',
       perfPadFxSend: slot ? (slot.fxSend !== undefined ? slot.fxSend : 0) : 0,
