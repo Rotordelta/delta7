@@ -907,7 +907,7 @@ export default function Delta7Synth() {
 
 
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('a01'); // Target slot in Editor
-  const [uiScale, setUiScale] = useState(0.9);
+  const [uiScale, setUiScale] = useState(0.8);
   const [projectDirHandle, setProjectDirHandle] = useState(null);
   const [projectDirName, setProjectDirName] = useState('');
   const [localBanks, setLocalBanks] = useState([]);
