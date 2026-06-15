@@ -108,6 +108,12 @@
 - **Jimmy's Preferences**:
   - **Streamlined Toolbar Actions**: Place the slot-level `🗑️ CLEAR` action as a primary action in the main toolbar group of the Waveform Editor, completely replacing the specific selection-only range deletion to simplify the interface.
 
+## Session: 2026-06-15 (Part 11)
+- **Task**: Removed the static MIDI CC Learn Matrix panel from the right sidebar.
+- **Jimmy's Preferences**:
+  - **Maximize Sidebar Real Estate**: Avoid rendering duplicate layout elements (like the MIDI CC Learn Matrix) in sidebar panels when they are already fully configurable in a global mapping modal. This saves screen space and keeps the panel layout neat.
+
+
 
 
 
