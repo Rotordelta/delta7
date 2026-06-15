@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, desktopCapturer, session } = require('electron');
 const path = require('path');
 
 let mainWindow;
@@ -48,6 +48,16 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+      desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
+        const source = sources.find(s => s.id.startsWith('screen:')) || sources[0];
+        callback({
+          video: source,
+          audio: 'loopback'
+        });
+      });
+    });
+
     createWindow();
 
     app.on('activate', () => {

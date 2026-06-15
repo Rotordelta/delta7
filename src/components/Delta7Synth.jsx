@@ -2983,14 +2983,16 @@ export default function Delta7Synth() {
     }
     recordingTargetSlotIdRef.current = selectedEditSlotId;
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: "browser" },
+      const isElectron = typeof window !== 'undefined' && window.navigator && window.navigator.userAgent && window.navigator.userAgent.indexOf('Electron') >= 0;
+      const constraints = {
+        video: isElectron ? { width: 1280, height: 720 } : { displaySurface: "browser" },
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false
         }
-      });
+      };
+      const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
       // Stop the video tracks immediately to capture only the audio tracks
       stream.getVideoTracks().forEach(track => track.stop());
 
