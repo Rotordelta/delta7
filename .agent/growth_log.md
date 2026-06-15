@@ -85,3 +85,11 @@
   - **Offline Renderer Parity**: WAV stem and mix exports must match the live voice slot-resolution path exactly, mapping slice events to the respective target pad slots to prevent empty audio bounces.
   - **Zero-Bypass Balance Control**: When launching temporary slice programs (which force single-oscillator play), overriding `oscBalance: 0.0` prevents the active program's balance setting from scaling down or completely silencing the slice playback.
 
+## Session: 2026-06-15 (Part 7)
+- **Task**: MIDI Mapping of Transport, Mixer, and Utilities.
+- **Jimmy's Preferences**:
+  - **Full-coverage MIDI learn badges**: Every interactable parameter (faders, solos, crossfader, transport buttons, metronome, chord, and bank C routing) should have its own orange-themed mapping badge overlays that visually update on learn.
+  - **Note and CC Segregation**: Mapped note keys receive `N` prefixing and CC channels receive `C` prefixing to avoid overlapping collisions, and CC values >=64 trigger button press, while values <64 trigger release.
+  - **Unified MIDI Mapping Menu**: Listing the custom parameters inside organized categories (Transport, Mixer, Utilities) makes it easy to review and clear mappings in one place.
+
+

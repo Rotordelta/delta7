@@ -95,7 +95,9 @@ const DEFAULT_PARAMS = {
   stutterPitchSweep: 0,
   stutterPattern: 'None',
   stutterPanMode: 'None',
-  stutterFilterSweep: 0
+  stutterFilterSweep: 0,
+  chordOn: false,
+  chordType: 'Major'
 };
 
 const FACTORY_PROGRAMS = Array.from({ length: 9 }, (_, i) => ({
@@ -133,7 +135,7 @@ const FACTORY_PROGRAMS = Array.from({ length: 9 }, (_, i) => ({
   ifx2Type: 'Bypass', ifx2Mix: 0,
   mfx1SendA: 0, mfx1SendB: 0, mfx2SendA: 0, mfx2SendB: 0,
   eqLow: 0, eqMid: 0, eqHigh: 0,
-  arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8
+  arpOn: false, arpBpm: 120, arpPattern: 'UP', arpGate: 0.8, arpVelocity: 100, arpDivision: 8, chordOn: false, chordType: 'Major'
 }));
 
 const FACTORY_COMBIS = Array.from({ length: 3 }, (_, i) => ({
@@ -5191,6 +5193,70 @@ export default function Delta7Synth() {
 
   // Synced Parameters Ref (for low-latency access in loop)
   const paramsRef = useRef(params);
+  const getChordNotes = (rootNote) => {
+    if (!paramsRef.current.chordOn) return [rootNote];
+    const type = paramsRef.current.chordType || 'Major';
+    let offsets = [0];
+    if (type === 'Major') offsets = [0, 4, 7];
+    else if (type === 'Minor') offsets = [0, 3, 7];
+    else if (type === 'Fifth') offsets = [0, 7];
+    else if (type === 'Octave') offsets = [0, 12];
+    else if (type === 'Major 7th') offsets = [0, 4, 7, 11];
+    else if (type === 'Minor 7th') offsets = [0, 3, 7, 10];
+    else if (type === 'Suspended 4th') offsets = [0, 5, 7];
+    return offsets.map(o => rootNote + o).filter(n => n >= 0 && n <= 127);
+  };
+  const MidiBadge = ({ paramKey, style = {} }) => {
+    const isLearning = midiLearnParam === paramKey;
+    const ccVal = midiMappings[paramKey];
+    
+    const handleClick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setMidiLearnParam(isLearning ? null : paramKey);
+    };
+    
+    let label = 'MID';
+    let className = 'midi-badge-inline';
+    if (isLearning) {
+      label = 'LRN';
+      className += ' learning';
+    } else if (ccVal !== undefined && ccVal !== null) {
+      const strVal = String(ccVal);
+      label = strVal.startsWith('N') ? `N${strVal.substring(1)}` : `CC${strVal.startsWith('C') ? strVal.substring(1) : strVal}`;
+      className += ' mapped';
+    }
+    
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        className={className}
+        style={{
+          background: isLearning ? 'rgba(255, 230, 0, 0.15)' : (ccVal ? 'rgba(0, 255, 150, 0.15)' : 'rgba(21, 26, 33, 0.65)'),
+          border: `1px solid ${isLearning ? '#ffe600' : (ccVal ? '#00ff96' : 'rgba(0, 243, 255, 0.2)')}`,
+          color: isLearning ? '#ffe600' : (ccVal ? '#00ff96' : 'rgba(0, 243, 255, 0.5)'),
+          fontFamily: 'monospace',
+          fontSize: '0.35rem',
+          padding: '0px 2px',
+          borderRadius: '1.5px',
+          cursor: 'pointer',
+          lineHeight: 1.1,
+          outline: 'none',
+          display: 'inline-block',
+          marginLeft: '4px',
+          marginRight: '2px',
+          verticalAlign: 'middle',
+          transition: 'all 0.1s ease',
+          zIndex: 10,
+          ...style
+        }}
+        title={`Map MIDI for ${paramKey}`}
+      >
+        {label}
+      </button>
+    );
+  };
   const tapeStopFactorRef = useRef(1.0);
   useEffect(() => {
     paramsRef.current = params;
@@ -9084,6 +9150,17 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       setMidiLearnParam(null);
       return;
     }
+    
+    // Intercept custom note mappings
+    let noteMappedHandled = false;
+    Object.keys(midiMappings).forEach(paramName => {
+      const mapping = midiMappings[paramName];
+      if (mapping === `N${note}`) {
+        noteMappedHandled = true;
+        handleMidiButtonPress(paramName, velocity / 127);
+      }
+    });
+    if (noteMappedHandled) return;
 
     // Intercept Bank C keyboard slice mapping
     if (keyboardMapBankCRef.current && note >= 48 && note <= 63) {
@@ -9198,8 +9275,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     stopVoice(note);
 
     if (currentMode === 'PROG') {
-      const voice = playProgramVoice(ctx, note, velocity, paramsRef.current, `${note}-prog`);
-      activeVoicesRef.current.set(note, [voice]);
+      const chordNotes = getChordNotes(note);
+      const voices = chordNotes.map(n => playProgramVoice(ctx, n, velocity, paramsRef.current, `${note}-prog-${n}`));
+      activeVoicesRef.current.set(note, voices);
     } else {
       // COMBI MODE: Layer up to 4 tracks concurrently based on split key zones
       const combi = FACTORY_COMBIS[selectedCombiIndex];
@@ -9212,19 +9290,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         { id: combi.t4ProgId, vol: combi.t4Vol, min: combi.t4MinKey, max: combi.t4MaxKey, oct: combi.t4Octave },
       ];
 
-      tracks.forEach((track, idx) => {
-        if (track.vol > 0.01 && note >= track.min && note <= track.max) {
-          const prog = FACTORY_PROGRAMS.find(p => p.id === track.id) || FACTORY_PROGRAMS[0];
-          const adjustedProg = {
-            ...prog,
-            oscAVol: prog.oscAVol * track.vol,
-            oscBVol: prog.oscBVol * track.vol
-          };
-          const voiceKey = `${note}-track-${idx}`;
-          // Trigger split/layer oscillator with delay offsets
-          const voice = playProgramVoice(ctx, note + track.oct * 12, velocity, adjustedProg, voiceKey, 0, idx);
-          voicesToTrigger.push(voice);
-        }
+      const chordNotes = getChordNotes(note);
+      chordNotes.forEach(chordNote => {
+        tracks.forEach((track, idx) => {
+          if (track.vol > 0.01 && chordNote >= track.min && chordNote <= track.max) {
+            const prog = FACTORY_PROGRAMS.find(p => p.id === track.id) || FACTORY_PROGRAMS[0];
+            const adjustedProg = {
+              ...prog,
+              oscAVol: prog.oscAVol * track.vol,
+              oscBVol: prog.oscBVol * track.vol
+            };
+            const voiceKey = `${note}-track-${idx}-${chordNote}`;
+            // Trigger split/layer oscillator with delay offsets
+            const voice = playProgramVoice(ctx, chordNote + track.oct * 12, velocity, adjustedProg, voiceKey, 0, idx);
+            voicesToTrigger.push(voice);
+          }
+        });
       });
 
       activeVoicesRef.current.set(note, voicesToTrigger);
@@ -10761,23 +10842,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     }
     
     const delayOffset = Math.max(0, time - ctx.currentTime);
-    const voiceKey = `arp-${stepIndex}-${noteToPlay}`;
-    
-    const voice = playProgramVoice(ctx, noteToPlay, velocity, paramsRef.current, voiceKey, delayOffset);
-    
-    activeVoicesRef.current.set(voiceKey, [voice]);
-    activeArpKeysRef.current.add(voiceKey);
-    
-    // Release note schedule
-    const stopTimeMs = (delayOffset + stepDuration * gate) * 1000;
-    setTimeout(() => {
-      const voices = activeVoicesRef.current.get(voiceKey);
-      if (voices) {
-        voices.forEach(releaseVoice);
-        activeVoicesRef.current.delete(voiceKey);
-      }
-      activeArpKeysRef.current.delete(voiceKey);
-    }, stopTimeMs);
+    const chordNotes = getChordNotes(noteToPlay);
+    chordNotes.forEach((n, idx) => {
+      const voiceKey = `arp-${stepIndex}-${noteToPlay}-${idx}`;
+      const voice = playProgramVoice(ctx, n, velocity, paramsRef.current, voiceKey, delayOffset);
+      activeVoicesRef.current.set(voiceKey, [voice]);
+      activeArpKeysRef.current.add(voiceKey);
+      
+      // Release note schedule
+      const stopTimeMs = (delayOffset + stepDuration * gate) * 1000;
+      setTimeout(() => {
+        const voices = activeVoicesRef.current.get(voiceKey);
+        if (voices) {
+          voices.forEach(releaseVoice);
+          activeVoicesRef.current.delete(voiceKey);
+        }
+        activeArpKeysRef.current.delete(voiceKey);
+      }, stopTimeMs);
+    });
   };
 
   const playMetronomeClick = (ctx, time, isDownbeat) => {
@@ -11832,6 +11914,113 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     };
   };
 
+  const handleMidiButtonPress = (key, valNormalized = 1.0) => {
+    if (key === 'playPause') {
+      if (valNormalized >= 0.5) {
+        togglePerformancePlayback();
+      }
+      return true;
+    }
+    if (key === 'stop') {
+      if (valNormalized >= 0.5) {
+        stopPerformancePlayback();
+      }
+      return true;
+    }
+    if (key === 'record') {
+      if (valNormalized >= 0.5) {
+        togglePerformanceRecord(false);
+      }
+      return true;
+    }
+    if (key === 'overdub') {
+      if (valNormalized >= 0.5) {
+        togglePerformanceRecord(true);
+      }
+      return true;
+    }
+    if (key === 'metronomeToggle') {
+      if (valNormalized >= 0.5) {
+        if (metronomeOn) {
+          stopMetronome();
+          setMetronomeOn(false);
+        } else {
+          setMetronomeOn(true);
+          startMetronome();
+        }
+      }
+      return true;
+    }
+    if (key === 'arpToggle') {
+      if (valNormalized >= 0.5) {
+        setParams(prev => ({ ...prev, arpOn: !prev.arpOn }));
+      }
+      return true;
+    }
+    if (key === 'chordToggle') {
+      if (valNormalized >= 0.5) {
+        setParams(prev => ({ ...prev, chordOn: !prev.chordOn }));
+      }
+      return true;
+    }
+    if (key === 'keyboardMapBankCToggle') {
+      if (valNormalized >= 0.5) {
+        setKeyboardMapBankC(prev => !prev);
+      }
+      return true;
+    }
+    if (key === 'deckASolo') {
+      if (valNormalized >= 0.5) {
+        const nextSolo = !deckASoloActive;
+        setDeckASoloActive(nextSolo);
+        showEditorStatus(`Deck A Solo Mode: ${nextSolo ? 'ON' : 'OFF'} 🎧`);
+      }
+      return true;
+    }
+    if (key === 'deckBSolo') {
+      if (valNormalized >= 0.5) {
+        const nextSolo = !deckBSoloActive;
+        setDeckBSoloActive(nextSolo);
+        showEditorStatus(`Deck B Solo Mode: ${nextSolo ? 'ON' : 'OFF'} 🎧`);
+      }
+      return true;
+    }
+    if (key === 'stutterAToggle') {
+      if (valNormalized >= 0.5) {
+        setParams(prev => ({ ...prev, stutterAOn: !prev.stutterAOn }));
+      }
+      return true;
+    }
+    if (key === 'stutterBToggle') {
+      if (valNormalized >= 0.5) {
+        setParams(prev => ({ ...prev, stutterBOn: !prev.stutterBOn }));
+      }
+      return true;
+    }
+    if (key === 'selectedSlotWarp') {
+      if (valNormalized >= 0.5 && selectedEditSlotId) {
+        const slot = sampleSlotsRef.current.find(s => s.id === selectedEditSlotId);
+        if (slot) updateSlotParam(selectedEditSlotId, 'warpOn', !slot.warpOn);
+      }
+      return true;
+    }
+    if (key === 'selectedSlotLoop') {
+      if (valNormalized >= 0.5 && selectedEditSlotId) {
+        const slot = sampleSlotsRef.current.find(s => s.id === selectedEditSlotId);
+        if (slot) updateSlotParam(selectedEditSlotId, 'loopOn', !slot.loopOn);
+      }
+      return true;
+    }
+    if (key === 'selectedSlotReverse') {
+      if (valNormalized >= 0.5 && selectedEditSlotId) {
+        const slot = sampleSlotsRef.current.find(s => s.id === selectedEditSlotId);
+        if (slot) updateSlotParam(selectedEditSlotId, 'reverseOn', !slot.reverseOn);
+      }
+      return true;
+    }
+    return false;
+  };
+
   const handleMidiCC = (cc, val) => {
     // Intercept CC 64 (Sustain Pedal) for live record loop triggering!
     if (cc === 64) {
@@ -12081,6 +12270,52 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           setParams(prev => ({ ...prev, reverbDecay: valNormalized * 7.9 + 0.1 }));
         } else if (paramName === 'reverbPreDelay') {
           setParams(prev => ({ ...prev, reverbPreDelay: valNormalized * 0.2 }));
+        } else if (paramName === 'deckAVolume') {
+          setDeckAVolFader(valNormalized);
+        } else if (paramName === 'deckBVolume') {
+          setDeckBVolFader(valNormalized);
+        } else if (paramName === 'crossfader') {
+          setCrossfaderVal(valNormalized * 2 - 1);
+        } else if (paramName === 'deckASolo') {
+          handleMidiButtonPress('deckASolo', valNormalized);
+        } else if (paramName === 'deckBSolo') {
+          handleMidiButtonPress('deckBSolo', valNormalized);
+        } else if (paramName === 'stutterAToggle') {
+          handleMidiButtonPress('stutterAToggle', valNormalized);
+        } else if (paramName === 'stutterBToggle') {
+          handleMidiButtonPress('stutterBToggle', valNormalized);
+        } else if (paramName === 'arpToggle') {
+          handleMidiButtonPress('arpToggle', valNormalized);
+        } else if (paramName === 'chordToggle') {
+          handleMidiButtonPress('chordToggle', valNormalized);
+        } else if (paramName === 'keyboardMapBankCToggle') {
+          handleMidiButtonPress('keyboardMapBankCToggle', valNormalized);
+        } else if (paramName === 'playPause') {
+          handleMidiButtonPress('playPause', valNormalized);
+        } else if (paramName === 'stop') {
+          handleMidiButtonPress('stop', valNormalized);
+        } else if (paramName === 'record') {
+          handleMidiButtonPress('record', valNormalized);
+        } else if (paramName === 'overdub') {
+          handleMidiButtonPress('overdub', valNormalized);
+        } else if (paramName === 'metronomeToggle') {
+          handleMidiButtonPress('metronomeToggle', valNormalized);
+        } else if (paramName === 'selectedSlotVolume' && selectedEditSlotId) {
+          updateSlotParam(selectedEditSlotId, 'volume', valNormalized);
+        } else if (paramName === 'selectedSlotTuning' && selectedEditSlotId) {
+          updateSlotParam(selectedEditSlotId, 'tuning', Math.round(valNormalized * 48 - 24));
+        } else if (paramName === 'selectedSlotAttack' && selectedEditSlotId) {
+          updateSlotParam(selectedEditSlotId, 'attack', valNormalized * 4.999 + 0.001);
+        } else if (paramName === 'selectedSlotDecay' && selectedEditSlotId) {
+          updateSlotParam(selectedEditSlotId, 'decay', valNormalized * 9.99 + 0.01);
+        } else if (paramName === 'selectedSlotRandomPan' && selectedEditSlotId) {
+          updateSlotParam(selectedEditSlotId, 'randomPan', valNormalized);
+        } else if (paramName === 'selectedSlotWarp') {
+          handleMidiButtonPress('selectedSlotWarp', valNormalized);
+        } else if (paramName === 'selectedSlotLoop') {
+          handleMidiButtonPress('selectedSlotLoop', valNormalized);
+        } else if (paramName === 'selectedSlotReverse') {
+          handleMidiButtonPress('selectedSlotReverse', valNormalized);
         }
       }
     });
@@ -13571,6 +13806,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 title="Solo Deck A (Only one pad plays at a time)"
               >
                 Solo
+                <MidiBadge paramKey="deckASolo" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
               </button>
               <button 
                 className="deck-btn deck-btn-cue"
@@ -14078,7 +14314,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             {/* Channel volume faders */}
             <div className="mixer-vol-faders" style={{ margin: '0', padding: '0 4px', width: '100%', display: 'flex', justifyContent: 'space-around' }}>
               <div className="mixer-fader-wrapper">
-                <span className="mixer-fader-label">A</span>
+                <span className="mixer-fader-label">A<MidiBadge paramKey="deckAVolume" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} /></span>
                 <input 
                   type="range" min="0.0" max="1.0" step="0.02" 
                   value={deckAVolFader} 
@@ -14087,7 +14323,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 />
               </div>
               <div className="mixer-fader-wrapper">
-                <span className="mixer-fader-label">B</span>
+                <span className="mixer-fader-label">B<MidiBadge paramKey="deckBVolume" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} /></span>
                 <input 
                   type="range" min="0.0" max="1.0" step="0.02" 
                   value={deckBVolFader} 
@@ -14101,7 +14337,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             <div className="crossfader-section" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '2px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 6px' }}>
                 <span className="crossfader-label" className="label-cyan">A</span>
-                <span className="crossfader-label" style={{ fontSize: '0.38rem', color: '#666', letterSpacing: '1px' }}>CROSSFADER</span>
+                <span className="crossfader-label" style={{ fontSize: '0.38rem', color: '#666', letterSpacing: '1px', display: 'flex', alignItems: 'center' }}>
+                  CROSSFADER
+                  <MidiBadge paramKey="crossfader" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '4px' }} />
+                </span>
                 <span className="crossfader-label" style={{ color: '#ff5599' }}>B</span>
               </div>
               <input 
@@ -14250,10 +14489,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     borderRadius: '3px',
                     cursor: 'pointer',
                     transition: 'all 0.12s ease',
-                    lineHeight: '15px'
+                    lineHeight: '15px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                 >
                   {metronomeOn ? 'ON' : 'OFF'}
+                  <MidiBadge paramKey="metronomeToggle" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
                 </button>
               </div>
             </div>
@@ -14687,6 +14930,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 title="Solo Deck B (Only one pad plays at a time)"
               >
                 Solo
+                <MidiBadge paramKey="deckBSolo" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
               </button>
               <button 
                 className="deck-btn deck-btn-cue"
@@ -17781,6 +18025,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             style={{ padding: '0px 3px', fontSize: '0.45rem', flexShrink: 0 }}
                           >
                             {params.arpOn ? 'ON' : 'OFF'}
+                            <MidiBadge paramKey="arpToggle" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
                           </button>
                           <input 
                             type="range" min="40" max="250" step="0.1"
@@ -17788,6 +18033,32 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             onChange={(e) => setParams(prev => ({ ...prev, arpBpm: parseFloat(e.target.value) || 120 }))} 
                             style={{ flexGrow: 1, height: '8px', minWidth: '25px' }}
                           />
+                        </div>
+                        
+                        {/* Chord Mode */}
+                        <div className="flex-row-sub" style={{ alignItems: 'center', marginTop: '2px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '2px', gap: '3px' }}>
+                          <label style={{ width: '20px', flexShrink: 0 }}>Chrd:</label>
+                          <button
+                            className={`segmented-btn btn-xs ${params.chordOn ? 'active' : ''}`}
+                            onClick={() => setParams(prev => ({ ...prev, chordOn: !prev.chordOn }))}
+                            style={{ padding: '0px 3px', fontSize: '0.45rem', flexShrink: 0 }}
+                          >
+                            {params.chordOn ? 'ON' : 'OFF'}
+                            <MidiBadge paramKey="chordToggle" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
+                          </button>
+                          <select
+                            value={params.chordType || 'Major'}
+                            onChange={(e) => setParams(prev => ({ ...prev, chordType: e.target.value }))}
+                            style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.3)', color: '#00f3ff', fontSize: '0.45rem', padding: '0px 1px', borderRadius: '2px', flexGrow: 1, outline: 'none' }}
+                          >
+                            <option value="Major">Major</option>
+                            <option value="Minor">Minor</option>
+                            <option value="Fifth">Fifth</option>
+                            <option value="Octave">Octave</option>
+                            <option value="Major 7th">Maj7</option>
+                            <option value="Minor 7th">Min7</option>
+                            <option value="Suspended 4th">Sus4</option>
+                          </select>
                         </div>
                         
                         {/* Arpeggiator Parameters (Pattern, Div, Gate) */}
@@ -17952,6 +18223,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   title="Clean Record (clears sequence)"
                 >
                   {perfRecordActive && !perfIsDubbing ? '● REC ON' : '● REC'}
+                  <MidiBadge paramKey="record" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
                 </button>
                 <button
                   className="btn btn-xs"
@@ -17969,6 +18241,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   title="Overdub (layers notes on top)"
                 >
                   {perfRecordActive && perfIsDubbing ? '● DUB ON' : '● DUB'}
+                  <MidiBadge paramKey="overdub" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
                 </button>
                 <button
                   className={`btn btn-xs ${perfPlaybackActive ? 'active-green' : ''}`}
@@ -17977,6 +18250,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   title="Play/Pause"
                 >
                   {perfPlaybackActive ? '⏸ PAUSE' : '► PLAY'}
+                  <MidiBadge paramKey="playPause" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
                 </button>
                 <button
                   className="btn btn-xs"
@@ -17985,6 +18259,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   title="Stop & Reset"
                 >
                   STOP
+                  <MidiBadge paramKey="stop" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
                 </button>
                 <button
                   className="btn btn-xs"
@@ -18697,9 +18972,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       startMetronome();
                     }
                   }}
-                  style={{ padding: '2px 8px', fontSize: '0.52rem', borderColor: '#ff00ff', color: '#ff00ff' }}
+                  style={{ padding: '2px 8px', fontSize: '0.52rem', borderColor: '#ff00ff', color: '#ff00ff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
                   {metronomeOn ? 'ON' : 'OFF'}
+                  <MidiBadge paramKey="metronomeToggle" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
                 </button>
                 <span className="font-mono" style={{ color: '#ff00ff', opacity: 0.8, fontSize: '0.52rem', marginLeft: '4px' }}>VOL:</span>
                 <input 
@@ -18945,6 +19221,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               boxShadow: keyboardMapBankC ? '0 0 6px #ff9f00' : 'none'
             }} />
             ROUTE KEYBOARD (C3-D#4) TO SLICES
+            <MidiBadge paramKey="keyboardMapBankCToggle" style={{ fontSize: '0.28rem', padding: '0px 1px', marginLeft: '2px' }} />
           </button>
 
           {(() => {
@@ -19829,6 +20106,44 @@ function MidiMappingMenu({
     {
       title: "Deck B Performance Pads",
       items: Array.from({ length: 8 }, (_, i) => ({ key: `pad-b-${i}`, name: `Deck B Pad ${i + 1}` }))
+    },
+    {
+      title: "Mixer & Transport",
+      items: [
+        { key: "deckAVolume", name: "Deck A Fader Volume" },
+        { key: "deckBVolume", name: "Deck B Fader Volume" },
+        { key: "crossfader", name: "Crossfader" },
+        { key: "deckASolo", name: "Deck A Solo Switch" },
+        { key: "deckBSolo", name: "Deck B Solo Switch" },
+        { key: "playPause", name: "Transport Play/Pause" },
+        { key: "stop", name: "Transport Stop" },
+        { key: "record", name: "Transport Record" },
+        { key: "overdub", name: "Transport Overdub" },
+        { key: "metronomeToggle", name: "Metronome Toggle" }
+      ]
+    },
+    {
+      title: "Utilities & Modes",
+      items: [
+        { key: "arpToggle", name: "Arpeggiator On/Off" },
+        { key: "chordToggle", name: "Chord Mode On/Off" },
+        { key: "keyboardMapBankCToggle", name: "Bank C Mapping Toggle" },
+        { key: "stutterAToggle", name: "Deck A Stutter On/Off" },
+        { key: "stutterBToggle", name: "Deck B Stutter On/Off" }
+      ]
+    },
+    {
+      title: "Selected Edit Slot Parameters",
+      items: [
+        { key: "selectedSlotVolume", name: "Slot Volume" },
+        { key: "selectedSlotTuning", name: "Slot Tuning" },
+        { key: "selectedSlotAttack", name: "Slot Attack Time" },
+        { key: "selectedSlotDecay", name: "Slot Decay Time" },
+        { key: "selectedSlotRandomPan", name: "Slot Random Pan" },
+        { key: "selectedSlotWarp", name: "Slot Warp Toggle" },
+        { key: "selectedSlotLoop", name: "Slot Loop Toggle" },
+        { key: "selectedSlotReverse", name: "Slot Reverse Toggle" }
+      ]
     }
   ];
 
