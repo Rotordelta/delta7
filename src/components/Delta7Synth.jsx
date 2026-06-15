@@ -15606,42 +15606,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
           </div>
 
-          {/* Ribbon Controller */}
-          <div className="ribbon-wrapper">
-            <span className="knob-label">RIBBON CONTROLLER</span>
-            <div 
-              className="ribbon-strip"
-              onMouseDown={(e) => {
-                setRibbonTouched(true);
-                const rect = e.currentTarget.getBoundingClientRect();
-                const v = (e.clientX - rect.left) / rect.width;
-                setRibbonVal(v);
-              }}
-              onMouseMove={(e) => {
-                if (e.buttons === 1) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const v = (e.clientX - rect.left) / rect.width;
-                  setRibbonVal(v);
-                }
-              }}
-              onMouseUp={() => {
-                setRibbonTouched(false);
-                setRibbonVal(0.5);
-              }}
-              onMouseLeave={() => {
-                setRibbonTouched(false);
-                setRibbonVal(0.5);
-              }}
-            >
-              <div 
-                className="ribbon-indicator"
-                style={{ 
-                  left: `${ribbonVal * 100}%`,
-                  opacity: ribbonTouched ? 1 : 0.2
-                }}
-              ></div>
-            </div>
-          </div>
 
           {/* Reverb Unit */}
           <div className="reverb-unit-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(0, 243, 255, 0.25)', paddingTop: '10px', marginTop: '10px' }}>
