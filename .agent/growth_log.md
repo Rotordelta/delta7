@@ -119,3 +119,11 @@
   - **Ref-Synced Recording Modes**: Synchronize interactive selector states (such as `recordingInputMode`) to active refs (`recordingInputModeRef`) to eliminate stale closures when triggers are fired from external MIDI CC events (sustain pedals) or keyboard hook listeners.
   - **Dynamic Arming Selection**: Ensure that arming the looper checks the active input source and invokes the correct capture helper (`armMicrophone` or `armMonitor`) rather than falling back to the microphone by default.
   - **System Loopback for Internet Recording**: To record browser/internet audio playing on the host system within the Electron container, register a desktop capture display handler (`session.defaultSession.setDisplayMediaRequestHandler`) in the main process and feed it screen/window sources with audio loopback. Simplify constraints inside the renderer to compatibility-friendly profiles (`width`/`height`) when Electron is active to prevent overconstraint errors.
+
+## Session: 2026-06-18
+- **Task**: Implemented a visual Latency Calibration tool with auto-detection inside the looper panel.
+- **Jimmy's Preferences**:
+  - **Visual Alignment Reference**: In addition to listening by ear, having a visual representation of phase alignment (like overlaying the recorded waveform trace on top of the original/reference waveform) is highly valued for dialing in latency settings.
+  - **Single-Click Auto-Calibration**: Support for automatic mathematical calibration (such as cross-correlation sweep detection) that instantly snaps the slider to the best-fitting offset values.
+  - **High-contrast Glassmorphic UI**: Interactive modal dialogs should feature blur backdrops (`backdropFilter: 'blur(8px)'`) and high-contrast color-coded indicators (LOCKED in green, CLOSE in amber) matching the workstation's dark neon aesthetic.
+
