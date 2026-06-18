@@ -2540,10 +2540,12 @@ export default function Delta7Synth() {
     setSampleSlots(nextSlots);
 
     if (updatedSlot) {
-      // Auto-play: trigger the pad immediately so the loop starts from the beat the gate closed
+      // Auto-play directly via main-thread DSP — the SAB/worklet path won't see the
+      // freshly created buffer yet, but sampleSlotsRef.current was just updated above.
       const deck = targetSlotId.startsWith('b') ? 'B' : 'A';
       const index = parseInt(targetSlotId.replace(/[ab]0*/, ''), 10) - 1;
-      dispatchLiveTrigger(deck, 'slot', index, 100, true, false, 0);
+      const ctx = audioCtxRef.current;
+      triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx ? ctx.currentTime : 0, 0);
 
       saveSampleToDb(updatedSlot)
         .then(() => {
