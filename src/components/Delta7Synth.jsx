@@ -2399,23 +2399,41 @@ export default function Delta7Synth() {
     if (isPlaying) {
       const bpm = paramsRef.current.arpBpm || 120;
       const beatDur = 60 / bpm;
+      const loopBeats = liveRecBeatsRef.current;
+      const loopDur = loopBeats * beatDur;
+      const now = ctx.currentTime;
 
-      // Walk nextNoteTime forward by beat-sized steps until it's in the future.
-      // This keeps us locked to the existing clock grid without touching the clock itself.
-      let nextBeatTime = metronomeRef.current.nextNoteTime;
-      while (!nextBeatTime || nextBeatTime <= ctx.currentTime + 0.01) {
-        nextBeatTime = (nextBeatTime || ctx.currentTime) + beatDur;
+      let snapTime;
+      const T0 = liveRecStartTimeRef.current; // beat-1 of the last recorded loop
+
+      if (T0 && T0 < now && loopDur > 0) {
+        // Snap to the next iteration of the playing loop's cycle (beat 1 of next loop)
+        // e.g. 16-beat loop: arm at beat 12 → waits 4 beats; arm at beat 4 → waits 12 beats
+        const elapsed = now - T0;
+        let nextCycle = Math.ceil(elapsed / loopDur);
+        if (nextCycle < 1) nextCycle = 1;
+        snapTime = T0 + nextCycle * loopDur;
+        // Float-point guard: if we somehow land in the past, push one more cycle
+        if (snapTime <= now + 0.02) snapTime += loopDur;
+      } else {
+        // No previous loop recorded yet — snap to next beat from the MIDI clock
+        snapTime = metronomeRef.current.nextNoteTime;
+        while (!snapTime || snapTime <= now + 0.01) {
+          snapTime = (snapTime || now) + beatDur;
+        }
       }
 
-      liveRecStartTimeRef.current = nextBeatTime;
+      liveRecStartTimeRef.current = snapTime; // becomes T0 for the next recording
       liveRecPendingStartRef.current = true;
       setLiveRecPendingStart(true);
-      showEditorStatus('⏳ Armed — punches in on next beat...');
+
+      const beatsUntil = Math.max(1, Math.round((snapTime - now) / beatDur));
+      showEditorStatus(`⏳ Armed — gate opens in ${beatsUntil} beat${beatsUntil !== 1 ? 's' : ''} (beat 1 of next loop)`);
 
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({
           type: 'ARM_LIVE_LOOP',
-          startTime: nextBeatTime,
+          startTime: snapTime,
           totalSamples: limitSamples
         });
       }
@@ -2436,6 +2454,7 @@ export default function Delta7Synth() {
       }
     }
   };
+
 
   const saveLiveLoopRecording = () => {
     const ctx = audioCtxRef.current;
