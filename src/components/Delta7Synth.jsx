@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Knob from './Knob.jsx';
+import LatencyCalModal from './LatencyCalModal.jsx';
 import './delta7-styles.css';
 
 // SharedArrayBuffer configuration constants
@@ -1244,6 +1245,7 @@ export default function Delta7Synth() {
   const sustainPedalPressedRef = useRef(false);
   const sustainPedalPressTimeRef = useRef(0);
 
+  const [showLatencyCal, setShowLatencyCal] = useState(false);
   const [recLatencyOffset, setRecLatencyOffset] = useState(() => {
     const val = localStorage.getItem('recLatencyOffset');
     return val !== null ? parseInt(val, 10) : 30;
@@ -19355,9 +19357,21 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.4rem', color: '#888' }} title="Compensate for audio interface round-trip delay">LATENCY OFFSET:</span>
-                    <span style={{ color: '#ff9f00', fontSize: '0.48rem', fontFamily: 'monospace' }}>
-                      {recLatencyOffset}ms
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ color: '#ff9f00', fontSize: '0.48rem', fontFamily: 'monospace' }}>
+                        {recLatencyOffset}ms
+                      </span>
+                      <button
+                        onClick={() => setShowLatencyCal(true)}
+                        title="Open latency calibration tool"
+                        style={{
+                          background: '#1e1e30', border: '1px solid #3a3a55',
+                          borderRadius: '3px', color: '#a0a0cc',
+                          fontSize: '0.38rem', padding: '1px 4px',
+                          cursor: 'pointer', fontWeight: 600, letterSpacing: '0.05em',
+                        }}
+                      >⚙ CAL</button>
+                    </div>
                   </div>
                   <input 
                     type="range" min="-150" max="150" step="1"
@@ -20181,6 +20195,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </button>
           </div>
         </div>
+      )}
+
+      {showLatencyCal && (
+        <LatencyCalModal
+          referenceBuffer={sampleSlots.find(s => s.id === selectedEditSlotId)?.buffer}
+          sampleRate={audioCtxRef.current ? audioCtxRef.current.sampleRate : 44100}
+          recLatencyOffset={recLatencyOffset}
+          onOffsetChange={(ms) => setRecLatencyOffset(ms)}
+          onClose={() => setShowLatencyCal(false)}
+        />
       )}
 
     </div>
