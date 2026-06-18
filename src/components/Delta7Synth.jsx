@@ -2397,15 +2397,21 @@ export default function Delta7Synth() {
     const useWorklet = recordingWorkletNodeRef.current !== null;
 
     if (isPlaying) {
+      const bpm = paramsRef.current.arpBpm || 120;
+      const beatDur = 60 / bpm;
+
+      // Walk nextNoteTime forward by beat-sized steps until it's in the future.
+      // This keeps us locked to the existing clock grid without touching the clock itself.
       let nextBeatTime = metronomeRef.current.nextNoteTime;
-      if (nextBeatTime < ctx.currentTime) {
-        nextBeatTime = ctx.currentTime + 0.05;
+      while (!nextBeatTime || nextBeatTime <= ctx.currentTime + 0.01) {
+        nextBeatTime = (nextBeatTime || ctx.currentTime) + beatDur;
       }
+
       liveRecStartTimeRef.current = nextBeatTime;
       liveRecPendingStartRef.current = true;
       setLiveRecPendingStart(true);
-      showEditorStatus("Armed: Waiting for next beat... ⏳");
-      
+      showEditorStatus('⏳ Armed — punches in on next beat...');
+
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({
           type: 'ARM_LIVE_LOOP',
