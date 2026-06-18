@@ -2550,26 +2550,24 @@ export default function Delta7Synth() {
   };
 
   const handleSustainPedalDown = () => {
-    sustainPedalPressTimeRef.current = performance.now();
-    if (!isLiveRecordingRef.current && !liveRecPendingStartRef.current) {
+    if (liveRecPendingStartRef.current) {
+      // Gate is queued but hasn't opened yet — cancel it
+      liveRecPendingStartRef.current = false;
+      liveLoopInProgressRef.current = false;
+      setLiveRecPendingStart(false);
+      if (recordingWorkletNodeRef.current) {
+        recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
+      }
+      showEditorStatus('Gate cancelled ✖️');
+    } else if (!isLiveRecordingRef.current) {
+      // Gate is closed — arm it to open on the next beat
       startLiveLoopRecording();
     }
+    // Gate is open and recording — do nothing, let it close naturally at end of loop
   };
 
   const handleSustainPedalUp = () => {
-    const holdDuration = performance.now() - sustainPedalPressTimeRef.current;
-    if (holdDuration > 300 && (isLiveRecordingRef.current || liveRecPendingStartRef.current)) {
-      if (isLiveRecordingRef.current) {
-        isLiveRecordingRef.current = false;
-        setIsLiveRecording(false);
-        saveLiveLoopRecording();
-      } else {
-        liveRecPendingStartRef.current = false;
-        setLiveRecPendingStart(false);
-        liveLoopInProgressRef.current = false;
-        showEditorStatus("Live Recording Aborted ⏹️");
-      }
-    }
+    // Intentionally empty — the gate closes itself when the loop length is reached
   };
 
   // Issue 7: selectedAudioDeviceRef prevents stale closure in devicechange listener
