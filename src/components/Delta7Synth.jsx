@@ -9381,12 +9381,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       let finalStartOffsetA = startOffsetA;
       let finalDurationA = durationToPlayA;
 
-      const globalLatencyMsA = (slotA && slotA.isRecorded) ? (recLatencyOffsetRef.current || 0) : 0;
-      const latencyOffsetSecA = (!prog.isPlaybackTrigger) ? (globalLatencyMsA / 1000) : 0;
-      if (latencyOffsetSecA > 0) {
-        finalStartOffsetA = Math.min(bufferA.duration - 0.01, finalStartOffsetA + latencyOffsetSecA);
-        finalDurationA = Math.max(0.01, finalDurationA - latencyOffsetSecA);
-      }
+
 
       if (prog.fluxOffset !== undefined) {
         const loopDuration = durationToPlayA || 0.01;
@@ -9429,12 +9424,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       let finalStartOffsetB = startOffsetB;
       let finalDurationB = durationToPlayB;
 
-      const globalLatencyMsB = (slotB && slotB.isRecorded) ? (recLatencyOffsetRef.current || 0) : 0;
-      const latencyOffsetSecB = (!prog.isPlaybackTrigger) ? (globalLatencyMsB / 1000) : 0;
-      if (latencyOffsetSecB > 0) {
-        finalStartOffsetB = Math.min(bufferB.duration - 0.01, finalStartOffsetB + latencyOffsetSecB);
-        finalDurationB = Math.max(0.01, finalDurationB - latencyOffsetSecB);
-      }
+
 
       if (prog.fluxOffset !== undefined) {
         const loopDuration = durationToPlayB || 0.01;
@@ -10590,9 +10580,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     let compensatedTargetTime = targetTime;
     if (isPlayback && (type === 'slot' || type === 'slice') && slot) {
       // Lookahead micro-timing nudge compensation (DAW style playback compensation)
-      const globalLatencyMs = slot.isRecorded ? (recLatencyOffsetRef.current || 0) : 0;
       const nudgeMs = slot.nudgeMs || 0;
-      compensatedTargetTime = targetTime - (globalLatencyMs / 1000) + (nudgeMs / 1000);
+      compensatedTargetTime = targetTime + (nudgeMs / 1000);
     }
     const delayOffset = Math.max(0, compensatedTargetTime - now);
 
