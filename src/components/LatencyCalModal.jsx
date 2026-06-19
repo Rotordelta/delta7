@@ -128,6 +128,7 @@ export default function LatencyCalModal({
   recLatencyOffset,  // current ms value
   onOffsetChange,    // (ms: number) => void
   onClose,
+  audioCtx,          // Web Audio AudioContext passed from main thread
 }) {
   const canvasRef = useRef(null);
   const [localOffset, setLocalOffset] = useState(recLatencyOffset);
@@ -135,6 +136,26 @@ export default function LatencyCalModal({
   const [detecting, setDetecting] = useState(false);
   const [refSlotId, setRefSlotId] = useState('');
   const [peaks, setPeaks] = useState({ ref: null, rec: null });
+  const [isPlayingPreview, setIsPlayingPreview] = useState(true);
+
+  // Audio refs
+  const sourceRefNodeRef = useRef(null);
+  const sourceRecNodeRef = useRef(null);
+  const delayRefNodeRef = useRef(null);
+  const delayRecNodeRef = useRef(null);
+  const gainRefNodeRef = useRef(null);
+  const gainRecNodeRef = useRef(null);
+  const masterGainNodeRef = useRef(null);
+
+  // Auto-select first slot with buffer as reference if empty
+  useEffect(() => {
+    if (!refSlotId && sampleSlots) {
+      const firstWithBuffer = sampleSlots.find(s => s.buffer && s.id !== targetSlotId);
+      if (firstWithBuffer) {
+        setRefSlotId(firstWithBuffer.id);
+      }
+    }
+  }, [sampleSlots, refSlotId, targetSlotId]);
 
   // Build peaks when targetBuffer or selected refSlot changes
   useEffect(() => {
@@ -162,6 +183,103 @@ export default function LatencyCalModal({
     setScore(Math.round(s * 100));
   }, [localOffset, msToBins, peaks]);
 
+  // Setup preview audio looping
+  useEffect(() => {
+    if (!audioCtx || !referenceBuffer) return;
+
+    const ctx = audioCtx;
+    
+    // Create master preview gain node
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(isPlayingPreview ? 0.7 : 0.0, ctx.currentTime);
+    masterGain.connect(ctx.destination);
+    masterGainNodeRef.current = masterGain;
+
+    const refSlot = sampleSlots.find(s => s.id === refSlotId);
+    const refBuffer = refSlot?.buffer;
+
+    let srcRef = null;
+    let srcRec = null;
+
+    const startTime = ctx.currentTime + 0.05;
+
+    // Set up reference path (original loop loopback)
+    if (refBuffer) {
+      srcRef = ctx.createBufferSource();
+      srcRef.buffer = refBuffer;
+      srcRef.loop = true;
+
+      const delayRef = ctx.createDelay(1.0);
+      delayRef.delayTime.value = 0.2; // 200ms base delay
+      delayRefNodeRef.current = delayRef;
+
+      const gainRef = ctx.createGain();
+      gainRef.gain.value = 0.45;
+
+      srcRef.connect(delayRef);
+      delayRef.connect(gainRef);
+      gainRef.connect(masterGain);
+
+      srcRef.start(startTime);
+      sourceRefNodeRef.current = srcRef;
+    }
+
+    // Set up recorded path (newly recorded loop)
+    if (referenceBuffer) {
+      srcRec = ctx.createBufferSource();
+      srcRec.buffer = referenceBuffer;
+      srcRec.loop = true;
+
+      const delayRec = ctx.createDelay(1.0);
+      // Align initial delay time to current local offset value
+      delayRec.delayTime.value = 0.2 + (localOffset / 1000);
+      delayRecNodeRef.current = delayRec;
+
+      const gainRec = ctx.createGain();
+      gainRec.gain.value = 0.45;
+
+      srcRec.connect(delayRec);
+      delayRec.connect(gainRec);
+      gainRec.connect(masterGain);
+
+      srcRec.start(startTime);
+      sourceRecNodeRef.current = srcRec;
+    }
+
+    // Clean up
+    return () => {
+      try {
+        if (sourceRefNodeRef.current) sourceRefNodeRef.current.stop();
+      } catch (e) {}
+      try {
+        if (sourceRecNodeRef.current) sourceRecNodeRef.current.stop();
+      } catch (e) {}
+      
+      if (sourceRefNodeRef.current) sourceRefNodeRef.current.disconnect();
+      if (sourceRecNodeRef.current) sourceRecNodeRef.current.disconnect();
+      if (delayRefNodeRef.current) delayRefNodeRef.current.disconnect();
+      if (delayRecNodeRef.current) delayRecNodeRef.current.disconnect();
+      if (gainRefNodeRef.current) gainRefNodeRef.current.disconnect();
+      if (gainRecNodeRef.current) gainRecNodeRef.current.disconnect();
+      if (masterGainNodeRef.current) masterGainNodeRef.current.disconnect();
+    };
+  }, [audioCtx, referenceBuffer, refSlotId, sampleSlots]);
+
+  // Dynamically update variable delay as slider drags
+  useEffect(() => {
+    if (delayRecNodeRef.current && audioCtx) {
+      const timeVal = 0.2 + (localOffset / 1000);
+      delayRecNodeRef.current.delayTime.setValueAtTime(timeVal, audioCtx.currentTime);
+    }
+  }, [localOffset, audioCtx]);
+
+  // Dynamically update preview volume (mute/unmute)
+  useEffect(() => {
+    if (masterGainNodeRef.current && audioCtx) {
+      masterGainNodeRef.current.gain.setTargetAtTime(isPlayingPreview ? 0.7 : 0.0, audioCtx.currentTime, 0.015);
+    }
+  }, [isPlayingPreview, audioCtx]);
+
   const handleAutoDetect = async () => {
     if (!referenceBuffer || !peaks.ref || !peaks.rec) return;
     setDetecting(true);
@@ -187,18 +305,27 @@ export default function LatencyCalModal({
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(5, 7, 12, 0.75)',
-      backdropFilter: 'blur(8px)',
+      background: 'none',
+      pointerEvents: 'none',
     }}>
+      <style>{`
+        @keyframes calPulse {
+          0% { opacity: 0.5; }
+          50% { opacity: 1.0; }
+          100% { opacity: 0.5; }
+        }
+      `}</style>
       <div style={{
-        background: '#131318',
+        background: 'rgba(19, 19, 24, 0.9)',
         border: '1px solid #2a2a40',
         borderRadius: '10px',
         padding: '18px',
         width: '420px',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.7)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.85), 0 0 15px rgba(255, 159, 0, 0.1)',
         display: 'flex', flexDirection: 'column', gap: '12px',
         fontFamily: "'Outfit', 'Roboto', sans-serif",
+        backdropFilter: 'blur(12px)',
+        pointerEvents: 'auto',
       }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -248,10 +375,18 @@ export default function LatencyCalModal({
         <div style={{ position: 'relative', borderRadius: '6px', overflow: 'hidden', border: '1px solid #222' }}>
           {noBuffer ? (
             <div style={{
-              height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#555', fontSize: '0.6rem', background: '#0d0d0f',
+              height: '110px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              color: '#888', fontSize: '0.52rem', background: '#0a0a0f', gap: '8px', padding: '12px',
+              textAlign: 'center', border: '1px dashed #3a3a55', borderRadius: '6px'
             }}>
-              Record a loop first to use calibration
+              <span style={{ color: '#ff3d3d', fontWeight: 700, animation: 'calPulse 1.5s infinite', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                🔴 STANDBY — AWAITING LOOP RECORDING
+              </span>
+              <span style={{ color: '#666', fontSize: '0.45rem', lineHeight: 1.4 }}>
+                Keep your drum machine/reference track running.<br/>
+                Arm the looper and record into this pad ({getSlotLabel(targetSlotId)}).<br/>
+                Calibration will activate automatically upon completion.
+              </span>
             </div>
           ) : (
             <canvas
@@ -270,6 +405,35 @@ export default function LatencyCalModal({
             <span style={{ color: '#ff9f00' }}>■ Recorded</span>
           </div>
         </div>
+
+        {/* Audio monitor controller */}
+        {!noBuffer && (
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: '#181822', padding: '6px 8px', borderRadius: '6px',
+            border: '1px solid #2a2a3e'
+          }}>
+            <span style={{ color: '#a0a0b2', fontSize: '0.5rem', fontWeight: 600, letterSpacing: '0.05em' }}>
+              🔊 LIVE AUDIO PREVIEW
+            </span>
+            <button
+              onClick={() => setIsPlayingPreview(!isPlayingPreview)}
+              style={{
+                background: isPlayingPreview ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 61, 61, 0.1)',
+                border: `1px solid ${isPlayingPreview ? '#00e676' : '#ff3d3d'}`,
+                borderRadius: '4px',
+                color: isPlayingPreview ? '#00e676' : '#ff3d3d',
+                padding: '3px 8px',
+                fontSize: '0.5rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              {isPlayingPreview ? 'MUTE PREVIEW' : 'UNMUTE PREVIEW'}
+            </button>
+          </div>
+        )}
 
         {/* Correlation meter */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -359,7 +523,7 @@ export default function LatencyCalModal({
         {/* Hint */}
         <p style={{ color: '#555', fontSize: '0.42rem', margin: 0, textAlign: 'center', lineHeight: 1.4 }}>
           {refSlotId ? 
-            "Drag to align the recorded (orange) waveform peaks over the reference (grey) peaks, or click Auto-Detect." : 
+            "Drag the slider to shift the recorded (orange) peaks until they align with the reference (grey) peaks and sound perfectly in phase." : 
             "To calibrate, select the original loop pad you recorded as the Reference Pad above."
           }
         </p>

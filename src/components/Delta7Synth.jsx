@@ -20271,6 +20271,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           recLatencyOffset={recLatencyOffset}
           onOffsetChange={(ms) => setRecLatencyOffset(ms)}
           onClose={() => setShowLatencyCal(false)}
+          audioCtx={audioCtxRef.current}
         />
       )}
 
