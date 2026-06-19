@@ -2547,7 +2547,20 @@ export default function Delta7Synth() {
       const deck = targetSlotId.startsWith('b') ? 'B' : 'A';
       const index = parseInt(targetSlotId.replace(/[ab]0*/, ''), 10) - 1;
       const ctx = audioCtxRef.current;
-      triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx ? ctx.currentTime : 0, 0);
+
+      const isPlaying = metronomeRef.current.isPlaying || perfPlaybackActiveRef.current || perfRecordActiveRef.current;
+      let customOffset = 0;
+      if (isPlaying && liveRecStartTimeRef.current > 0) {
+        const bpm = paramsRef.current.arpBpm || 120;
+        const beatDuration = 60 / bpm;
+        const loopDuration = beatDuration * liveRecBeatsRef.current;
+        const T_start = liveRecStartTimeRef.current;
+        const T_play = T_start + loopDuration;
+        const elapsed = (ctx ? ctx.currentTime : 0) - T_play;
+        customOffset = Math.max(0, elapsed);
+      }
+
+      triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx ? ctx.currentTime : 0, 0, undefined, false, customOffset);
 
       saveSampleToDb(updatedSlot)
         .then(() => {
@@ -10075,7 +10088,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     cycleTriggerMode(slotId, e);
   }, []);
 
-  const triggerPerfPadDSP = (deck, type, index, velocity, isNoteOn, shouldRecord, targetTime, targetBeat, sliceIdx = undefined, isPlayback = false) => {
+  const triggerPerfPadDSP = (deck, type, index, velocity, isNoteOn, shouldRecord, targetTime, targetBeat, sliceIdx = undefined, isPlayback = false, customOffset = 0) => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     const now = ctx.currentTime;
@@ -10333,7 +10346,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     };
 
     // Flux mode logic: calculate fluxOffset
-    if (triggerMode === 'flux') {
+    if (customOffset > 0) {
+      tempProg.fluxOffset = customOffset;
+    } else if (triggerMode === 'flux') {
       let fluxOffset = 0;
       const fileDur = slot.buffer.duration * (slot.end - slot.start);
       if (perfPlaybackActiveRef.current || seqCurrentBeatRef.current > 0) {
@@ -10353,11 +10368,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const startVoiceTrigger = () => {
       const voice = playProgramVoice(ctx, triggerNote, velocity, tempProg, voiceKey, delayOffset);
       if (voice) {
-        if (triggerMode === 'flux' && tempProg.fluxOffset !== undefined) {
+        if ((triggerMode === 'flux' || customOffset > 0) && tempProg.fluxOffset !== undefined) {
           const bpm = paramsRef.current.arpBpm || 120;
           const beatDur = 60 / bpm;
           const fluxOffsetBeats = tempProg.fluxOffset / beatDur;
-          voice.triggerBeat = targetBeat - fluxOffsetBeats;
+          const baseBeat = customOffset > 0 ? seqCurrentBeatRef.current : targetBeat;
+          voice.triggerBeat = baseBeat - fluxOffsetBeats;
           const rateVal = deck === 'A' ? (voice.freqScaleA || 1.0) : (voice.freqScaleB || 1.0);
           const safeRate = isNaN(rateVal) || rateVal <= 0 ? 1.0 : rateVal;
           voice.startTime = now - (tempProg.fluxOffset / safeRate);
