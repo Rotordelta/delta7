@@ -2744,6 +2744,8 @@ export default function Delta7Synth() {
             echoCancellation: false,
             noiseSuppression: false,
             autoGainControl: false,
+            sampleRate: { ideal: 48000 },
+            sampleSize: { ideal: 24 },
             deviceId: { exact: deviceId }
           };
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -2793,7 +2795,9 @@ export default function Delta7Synth() {
       const audioConstraints = {
         echoCancellation: false,
         noiseSuppression: false,
-        autoGainControl: false
+        autoGainControl: false,
+        sampleRate: { ideal: 48000 },
+        sampleSize: { ideal: 24 }
       };
       if (selectedAudioDevice) {
         audioConstraints.deviceId = { exact: selectedAudioDevice };
@@ -10523,7 +10527,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       perfPadPan: slot ? (slot.pan !== undefined ? slot.pan : 0) : 0,
       perfPadFxType: slot ? (slot.fxType || 'None') : 'None',
       perfPadFxSend: slot ? (slot.fxSend !== undefined ? slot.fxSend : 0) : 0,
-      perfPadAttack: slot ? (slot.attack !== undefined ? slot.attack : 0.01) : 0.01,
+      perfPadAttack: slot ? (slot.attack !== undefined ? slot.attack : (slot.isRecorded ? 0.001 : 0.01)) : 0.01,
       perfPadDecay: slot ? (slot.decay !== undefined ? slot.decay : 0.3) : 0.3,
       perfPadLfoTarget: slot ? (slot.lfoTarget || 'None') : 'None',
       perfPadLfoRate: slot ? (slot.lfoRate !== undefined ? slot.lfoRate : 3.0) : 3.0,
@@ -10545,7 +10549,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       perfPadPan: slot ? (slot.pan !== undefined ? slot.pan : 0) : 0,
       perfPadFxType: slot ? (slot.fxType || 'None') : 'None',
       perfPadFxSend: slot ? (slot.fxSend !== undefined ? slot.fxSend : 0) : 0,
-      perfPadAttack: slot ? (slot.attack !== undefined ? slot.attack : 0.01) : 0.01,
+      perfPadAttack: slot ? (slot.attack !== undefined ? slot.attack : (slot.isRecorded ? 0.001 : 0.01)) : 0.01,
       perfPadDecay: slot ? (slot.decay !== undefined ? slot.decay : 0.3) : 0.3,
       perfPadLfoTarget: slot ? (slot.lfoTarget || 'None') : 'None',
       perfPadLfoRate: slot ? (slot.lfoRate !== undefined ? slot.lfoRate : 3.0) : 3.0,
@@ -21358,7 +21362,7 @@ export function EqEditorModal({
   const [dbResponse, setDbResponse] = React.useState(new Float32Array(200));
 
   React.useEffect(() => {
-    const actx = audioCtx || (typeof OfflineAudioContext !== 'undefined' ? new OfflineAudioContext(1, 1, 44100) : null);
+    const actx = audioCtx || (typeof OfflineAudioContext !== 'undefined' ? new OfflineAudioContext(1, 1, audioCtx?.sampleRate || 48000) : null);
     if (!actx) return;
     const compositeMags = new Float32Array(200).fill(1.0);
     
