@@ -134,11 +134,8 @@
   - **Animated Platter Phase Alignment**: For auto-playing loops triggered late, the visual platter rotation angles must be synchronized to the same phase offset (by backing up the voice's `triggerBeat` and `startTime` dynamically) to prevent visual platter jumps or timeline phase drift.
   - **Quantized Cycle Arming**: Arming the looper recording must align to the active loop length grid (multiples of 16, 32, etc. beats relative to the sequencer start beat) rather than general single-beat boundaries. This keeps all recorded takes perfectly quantized to the phrase cycles. Includes a 0.2 beat safety threshold to prevent misfires on late clicks.
   - **Reference-Based Calibration**: Auto-calibrating latency requires comparing the recorded waveform against the original playing audio source (the ground truth reference) that was resampled, rather than comparing a buffer against itself. Introducing a selector to compare the recorded loop to any other pad buffer allows the cross-correlation algorithm to detect the exact system/hardware roundtrip lag (e.g. 50-120ms) and snap the slider accordingly.
-  - **Unified Recording Shifting**: Both the quantized auto looper (`saveLiveLoopRecording`) and the manual Resample Looper (`saveResampledAudio`) must apply the exact same latency offset crop/shift logic so that shifting behaves identically regardless of how recording is triggered. Adding developer console logs outputs the exact applied millisecond and sample crops for validation.
-  - **Playback Nudge & Lookahead (PDC)**: In addition to recording-stage cropping, introducing a per-slot `PLAYBACK NUDGE (MICRO-TIMING)` slider allows the user to shift playback timing dynamically (e.g., -100ms to +100ms) in real-time. Negative values schedule the buffer start time early (lookahead) to compensate for any remaining hardware/driver dragging, matching the delay-compensation features of professional DAWs.
-
-
-
-
-
-
+  - **Global Playback Latency Compensation (Lookahead vs Cropping)**: Because host latency is permanent without hardware monitoring, shifting playback globally is superior to destructive cropping. Keeping recorded buffers fully raw and intact prevents transient clipping (especially when notes are rushed/played early). 
+  - **Sequencer Lookahead**: Subtracting the global latency offset (`recLatencyOffset`) from the sequencer start schedule plays the recorded slots early, aligning them perfectly to the grid.
+  - **Manual Preview Silence-Skipping**: For manual triggers/clicks (where we cannot schedule into the past), starting playback from the latency offset point in the raw buffer skips the initial silence and provides zero-latency response.
+  - **Automatic Handover Playback Alignment**: The autoplay handover dynamically sets the customOffset to `elapsed + latencyOffsetSec` so that the uncropped buffer aligns seamlessly at trigger time.
+  - **Playback Nudge & Lookahead (PDC)**: In addition to the global latency offset, a per-slot `PLAYBACK NUDGE (MICRO-TIMING)` slider allows shifting playback timing dynamically (e.g., -100ms to +100ms) in real-time. Negative values schedule the buffer start time early to compensate for slot-specific timing adjustments.
