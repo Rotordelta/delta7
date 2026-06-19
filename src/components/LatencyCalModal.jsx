@@ -24,6 +24,29 @@ function buildPeaks(buffer, numBins = 512, channel = 0) {
   return peaks;
 }
 
+/** Downsample one channel of an AudioBuffer to `numBins` peaks within a specific sample range. */
+function buildPeaksRange(buffer, startSample, endSample, numBins = 512, channel = 0) {
+  if (!buffer) return new Float32Array(numBins).fill(0);
+  const data = buffer.getChannelData(channel);
+  const rangeLength = Math.max(1, endSample - startSample);
+  const blockSize = Math.max(1, Math.floor(rangeLength / numBins));
+  const peaks = new Float32Array(numBins);
+  for (let i = 0; i < numBins; i++) {
+    let max = 0;
+    const start = startSample + i * blockSize;
+    const end = Math.min(start + blockSize, data.length);
+    for (let j = Math.max(0, start); j < Math.min(end, data.length); j++) {
+      const abs = Math.abs(data[j]);
+      if (abs > max) max = abs;
+    }
+    peaks[i] = max;
+  }
+  // Normalise based on local peaks
+  const localMax = peaks.reduce((a, b) => Math.max(a, b), 0.0001);
+  for (let i = 0; i < numBins; i++) peaks[i] /= localMax;
+  return peaks;
+}
+
 /**
  * Slide `recPeaks` by `offsetBins` bins relative to `refPeaks` and compute
  * a Pearson-like correlation score in [0, 1].
@@ -67,7 +90,7 @@ function getSlotLabel(id) {
 
 // ─── drawing ─────────────────────────────────────────────────────────────────
 
-function drawOverlay(canvas, refPeaks, recPeaks, offsetBins) {
+function drawOverlay(canvas, refPeaks, recPeaks, offsetBins, zoom, sampleRate, bufferLength) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width;
   const H = canvas.height;
@@ -94,7 +117,7 @@ function drawOverlay(canvas, refPeaks, recPeaks, offsetBins) {
     for (let i = 0; i < W; i++) {
       const srcIdx = i + shift;
       const val = (srcIdx >= 0 && srcIdx < peaks.length) ? peaks[srcIdx] : 0;
-      const y = mid - val * (mid * 0.88);
+      const y = mid - val * (mid * 0.72);
       if (i === 0) ctx.moveTo(i, y);
       else ctx.lineTo(i, y);
     }
@@ -105,7 +128,7 @@ function drawOverlay(canvas, refPeaks, recPeaks, offsetBins) {
     for (let i = 0; i < W; i++) {
       const srcIdx = i + shift;
       const val = (srcIdx >= 0 && srcIdx < peaks.length) ? peaks[srcIdx] : 0;
-      const y = mid + val * (mid * 0.88);
+      const y = mid + val * (mid * 0.72);
       if (i === 0) ctx.moveTo(i, y);
       else ctx.lineTo(i, y);
     }
@@ -114,8 +137,39 @@ function drawOverlay(canvas, refPeaks, recPeaks, offsetBins) {
 
   // Reference (grey)
   drawWave(refPeaks, 0, 'rgba(140,140,160,0.6)');
-  // Recorded, shifted by offsetBins (positive = shift left = aligns late recording)
+  // Recorded, shifted by offsetBins
   drawWave(recPeaks, offsetBins, 'rgba(255,159,0,0.85)');
+
+  // Draw timeline grid lines and ms labels at the top of the canvas
+  const windowDurationMs = (bufferLength / sampleRate) * 1000 / zoom;
+  
+  ctx.fillStyle = '#666';
+  ctx.font = '8px monospace';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.lineWidth = 1;
+
+  // Determine tick spacing based on window duration
+  let tickIntervalMs = 100;
+  if (windowDurationMs <= 50) tickIntervalMs = 5;
+  else if (windowDurationMs <= 100) tickIntervalMs = 10;
+  else if (windowDurationMs <= 250) tickIntervalMs = 25;
+  else if (windowDurationMs <= 500) tickIntervalMs = 50;
+  else if (windowDurationMs <= 1000) tickIntervalMs = 100;
+  else if (windowDurationMs <= 2000) tickIntervalMs = 250;
+  else tickIntervalMs = 500;
+
+  for (let ms = 0; ms <= windowDurationMs; ms += tickIntervalMs) {
+    const x = (ms / windowDurationMs) * W;
+    
+    // Draw tick line
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+
+    // Label at top
+    ctx.fillText(`${Math.round(ms)}ms`, x + 2, 10);
+  }
 }
 
 // ─── component ───────────────────────────────────────────────────────────────
@@ -135,7 +189,8 @@ export default function LatencyCalModal({
   const [score, setScore] = useState(0);
   const [detecting, setDetecting] = useState(false);
   const [refSlotId, setRefSlotId] = useState('');
-  const [peaks, setPeaks] = useState({ ref: null, rec: null });
+  const [zoom, setZoom] = useState(1); // Zoom level: 1x, 2x, 5x, 10x, 20x
+  const [peaks, setPeaks] = useState({ refFull: null, recFull: null, refZoom: null, recZoom: null });
   const [isPlayingPreview, setIsPlayingPreview] = useState(true);
 
   // Audio refs
@@ -157,31 +212,50 @@ export default function LatencyCalModal({
     }
   }, [sampleSlots, refSlotId, targetSlotId]);
 
-  // Build peaks when targetBuffer or selected refSlot changes
+  // Build peaks when targetBuffer, selected refSlot, or zoom changes
   useEffect(() => {
     if (!referenceBuffer) return;
-    const recPeaks = buildPeaks(referenceBuffer, 512, 0);
+    
+    // Full peaks (for correlation)
+    const recPeaksFull = buildPeaks(referenceBuffer, 512, 0);
     const refSlot = sampleSlots.find(s => s.id === refSlotId);
-    const refPeaks = (refSlot && refSlot.buffer) ? buildPeaks(refSlot.buffer, 512, 0) : recPeaks;
-    setPeaks({ ref: refPeaks, rec: recPeaks });
-  }, [referenceBuffer, refSlotId, sampleSlots]);
+    const refPeaksFull = (refSlot && refSlot.buffer) ? buildPeaks(refSlot.buffer, 512, 0) : recPeaksFull;
+
+    // Zoomed peaks (for drawing)
+    const windowLength = Math.round(referenceBuffer.length / zoom);
+    const recPeaksZoom = buildPeaksRange(referenceBuffer, 0, windowLength, 512, 0);
+    const refPeaksZoom = (refSlot && refSlot.buffer) ? buildPeaksRange(refSlot.buffer, 0, windowLength, 512, 0) : recPeaksZoom;
+
+    setPeaks({
+      refFull: refPeaksFull,
+      recFull: recPeaksFull,
+      refZoom: refPeaksZoom,
+      recZoom: recPeaksZoom
+    });
+  }, [referenceBuffer, refSlotId, sampleSlots, zoom]);
 
   // Convert ms → canvas bins
   const msToBins = useCallback((ms) => {
     if (!referenceBuffer) return 0;
+    const windowDurationMs = (referenceBuffer.length / sampleRate) * 1000 / zoom;
     const numBins = 512;
-    return Math.round((ms / 1000) * sampleRate * (numBins / referenceBuffer.length));
-  }, [referenceBuffer, sampleRate]);
+    return Math.round((ms / windowDurationMs) * numBins);
+  }, [referenceBuffer, sampleRate, zoom]);
 
-  // Redraw whenever offset or peaks change
+  // Redraw whenever offset, peaks, or zoom changes
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !peaks.ref || !peaks.rec) return;
+    if (!canvas || !peaks.refZoom || !peaks.recZoom) return;
     const offsetBins = msToBins(localOffset);
-    drawOverlay(canvas, peaks.ref, peaks.rec, offsetBins);
-    const s = correlate(peaks.ref, peaks.rec, offsetBins);
+    
+    // Draw the zoomed peaks in the canvas
+    drawOverlay(canvas, peaks.refZoom, peaks.recZoom, offsetBins, zoom, sampleRate, referenceBuffer.length);
+    
+    // Pearson correlation score is always calculated on the full 512-bin waveforms so it stays stable
+    const fullOffsetBins = Math.round((localOffset / 1000) * sampleRate * (512 / referenceBuffer.length));
+    const s = correlate(peaks.refFull, peaks.recFull, fullOffsetBins);
     setScore(Math.round(s * 100));
-  }, [localOffset, msToBins, peaks]);
+  }, [localOffset, msToBins, peaks, zoom, sampleRate, referenceBuffer]);
 
   // Setup preview audio looping
   useEffect(() => {
@@ -405,6 +479,40 @@ export default function LatencyCalModal({
             <span style={{ color: '#ff9f00' }}>■ Recorded</span>
           </div>
         </div>
+
+        {/* Zoom Selector */}
+        {!noBuffer && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: '#181822', padding: '6px 8px', borderRadius: '6px',
+            border: '1px solid #2a2a3e'
+          }}>
+            <span style={{ color: '#a0a0b2', fontSize: '0.5rem', fontWeight: 600, letterSpacing: '0.05em' }}>
+              🔍 ZOOM WAVEFORM
+            </span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {[1, 2, 5, 10, 20].map(z => (
+                <button
+                  key={z}
+                  onClick={() => setZoom(z)}
+                  style={{
+                    background: zoom === z ? '#ff9f00' : 'rgba(255, 255, 255, 0.03)',
+                    border: `1px solid ${zoom === z ? '#ff9f00' : '#2a2a40'}`,
+                    borderRadius: '4px',
+                    color: zoom === z ? '#131318' : '#a0a0cc',
+                    padding: '3px 8px',
+                    fontSize: '0.48rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {z}X
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Audio monitor controller */}
         {!noBuffer && (
