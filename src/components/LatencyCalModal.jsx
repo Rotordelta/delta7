@@ -90,7 +90,7 @@ function getSlotLabel(id) {
 
 // ─── drawing ─────────────────────────────────────────────────────────────────
 
-function drawOverlay(canvas, refPeaks, recPeaks, offsetBins, zoom, sampleRate, bufferLength) {
+function drawOverlay(canvas, refPeaks, recPeaks, offsetBins, zoom, sampleRate, bufferLength, refSlotId) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width;
   const H = canvas.height;
@@ -135,17 +135,36 @@ function drawOverlay(canvas, refPeaks, recPeaks, offsetBins, zoom, sampleRate, b
     ctx.stroke();
   };
 
-  // Reference (grey)
-  drawWave(refPeaks, 0, 'rgba(140,140,160,0.6)');
-  // Recorded, shifted by offsetBins
+  // Reference (grey) - only draw if reference is selected
+  if (refPeaks && refSlotId) {
+    drawWave(refPeaks, 0, 'rgba(140,140,160,0.6)');
+  }
+  // Recorded (orange), shifted by offsetBins
   drawWave(recPeaks, offsetBins, 'rgba(255,159,0,0.85)');
 
   // Draw timeline grid lines and ms labels at the top of the canvas
   const windowDurationMs = (bufferLength / sampleRate) * 1000 / zoom;
+  const preRollMs = 50; // 50ms pre-roll padding
+
+  // Pixel position of 0ms (Beat 1 Grid Start)
+  const x_0 = (preRollMs / windowDurationMs) * W;
+
+  // Draw glowing GRID START beat line in cyan
+  ctx.strokeStyle = 'rgba(0, 230, 118, 0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x_0, 0);
+  ctx.lineTo(x_0, H);
+  ctx.stroke();
+
+  // Add "GRID START" label at the bottom of the line
+  ctx.fillStyle = '#00e676';
+  ctx.font = '7px monospace';
+  ctx.fillText('GRID START (0ms)', x_0 + 3, H - 4);
   
   ctx.fillStyle = '#666';
   ctx.font = '8px monospace';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
   ctx.lineWidth = 1;
 
   // Determine tick spacing based on window duration
@@ -158,17 +177,24 @@ function drawOverlay(canvas, refPeaks, recPeaks, offsetBins, zoom, sampleRate, b
   else if (windowDurationMs <= 2000) tickIntervalMs = 250;
   else tickIntervalMs = 500;
 
-  for (let ms = 0; ms <= windowDurationMs; ms += tickIntervalMs) {
-    const x = (ms / windowDurationMs) * W;
-    
-    // Draw tick line
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, H);
-    ctx.stroke();
+  // Draw ticks relative to the 0ms line
+  // Start from the closest round tick left of -preRollMs
+  const startMs = Math.ceil(-preRollMs / tickIntervalMs) * tickIntervalMs;
+  const endMs = windowDurationMs - preRollMs;
 
-    // Label at top
-    ctx.fillText(`${Math.round(ms)}ms`, x + 2, 10);
+  for (let ms = startMs; ms <= endMs; ms += tickIntervalMs) {
+    const x = ((ms + preRollMs) / windowDurationMs) * W;
+    
+    // Draw tick line (skip drawing directly on x_0 to prevent overlaying the cyan line)
+    if (Math.abs(x - x_0) > 2) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+      
+      // Label at top
+      ctx.fillText(`${ms > 0 ? '+' : ''}${Math.round(ms)}ms`, x + 2, 10);
+    }
   }
 }
 
@@ -202,16 +228,6 @@ export default function LatencyCalModal({
   const gainRecNodeRef = useRef(null);
   const masterGainNodeRef = useRef(null);
 
-  // Auto-select first slot with buffer as reference if empty
-  useEffect(() => {
-    if (!refSlotId && sampleSlots) {
-      const firstWithBuffer = sampleSlots.find(s => s.buffer && s.id !== targetSlotId);
-      if (firstWithBuffer) {
-        setRefSlotId(firstWithBuffer.id);
-      }
-    }
-  }, [sampleSlots, refSlotId, targetSlotId]);
-
   // Build peaks when targetBuffer, selected refSlot, or zoom changes
   useEffect(() => {
     if (!referenceBuffer) return;
@@ -221,10 +237,15 @@ export default function LatencyCalModal({
     const refSlot = sampleSlots.find(s => s.id === refSlotId);
     const refPeaksFull = (refSlot && refSlot.buffer) ? buildPeaks(refSlot.buffer, 512, 0) : recPeaksFull;
 
-    // Zoomed peaks (for drawing)
+    // Zoomed peaks with a 50ms pre-roll padding range
+    const preRollMs = 50;
+    const preRollSamples = Math.round((preRollMs / 1000) * sampleRate);
     const windowLength = Math.round(referenceBuffer.length / zoom);
-    const recPeaksZoom = buildPeaksRange(referenceBuffer, 0, windowLength, 512, 0);
-    const refPeaksZoom = (refSlot && refSlot.buffer) ? buildPeaksRange(refSlot.buffer, 0, windowLength, 512, 0) : recPeaksZoom;
+
+    const recPeaksZoom = buildPeaksRange(referenceBuffer, -preRollSamples, windowLength - preRollSamples, 512, 0);
+    const refPeaksZoom = (refSlot && refSlot.buffer) 
+      ? buildPeaksRange(refSlot.buffer, -preRollSamples, windowLength - preRollSamples, 512, 0)
+      : null;
 
     setPeaks({
       refFull: refPeaksFull,
@@ -232,7 +253,7 @@ export default function LatencyCalModal({
       refZoom: refPeaksZoom,
       recZoom: recPeaksZoom
     });
-  }, [referenceBuffer, refSlotId, sampleSlots, zoom]);
+  }, [referenceBuffer, refSlotId, sampleSlots, zoom, sampleRate]);
 
   // Convert ms → canvas bins
   const msToBins = useCallback((ms) => {
@@ -245,17 +266,17 @@ export default function LatencyCalModal({
   // Redraw whenever offset, peaks, or zoom changes
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !peaks.refZoom || !peaks.recZoom) return;
+    if (!canvas || !peaks.recZoom) return;
     const offsetBins = msToBins(localOffset);
     
     // Draw the zoomed peaks in the canvas
-    drawOverlay(canvas, peaks.refZoom, peaks.recZoom, offsetBins, zoom, sampleRate, referenceBuffer.length);
+    drawOverlay(canvas, peaks.refZoom, peaks.recZoom, offsetBins, zoom, sampleRate, referenceBuffer.length, refSlotId);
     
     // Pearson correlation score is always calculated on the full 512-bin waveforms so it stays stable
     const fullOffsetBins = Math.round((localOffset / 1000) * sampleRate * (512 / referenceBuffer.length));
     const s = correlate(peaks.refFull, peaks.recFull, fullOffsetBins);
     setScore(Math.round(s * 100));
-  }, [localOffset, msToBins, peaks, zoom, sampleRate, referenceBuffer]);
+  }, [localOffset, msToBins, peaks, zoom, sampleRate, referenceBuffer, refSlotId]);
 
   // Setup preview audio looping
   useEffect(() => {
