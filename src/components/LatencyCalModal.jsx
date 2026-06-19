@@ -58,6 +58,13 @@ function autoDetect(refPeaks, recPeaks, sampleRate, bufferLength, maxMs = 150, s
   return { bestOffsetMs, bestScore };
 }
 
+function getSlotLabel(id) {
+  if (!id) return '';
+  const deck = id.startsWith('b') ? 'B' : 'A';
+  const index = parseInt(id.replace(/[ab]0*/, ''), 10);
+  return `${deck}${index}`;
+}
+
 // ─── drawing ─────────────────────────────────────────────────────────────────
 
 function drawOverlay(canvas, refPeaks, recPeaks, offsetBins) {
@@ -107,14 +114,16 @@ function drawOverlay(canvas, refPeaks, recPeaks, offsetBins) {
 
   // Reference (grey)
   drawWave(refPeaks, 0, 'rgba(140,140,160,0.6)');
-  // Recorded, shifted by offsetBins (positive = shift right = recorded is earlier)
-  drawWave(recPeaks, -offsetBins, 'rgba(255,159,0,0.85)');
+  // Recorded, shifted by offsetBins (positive = shift left = aligns late recording)
+  drawWave(recPeaks, offsetBins, 'rgba(255,159,0,0.85)');
 }
 
 // ─── component ───────────────────────────────────────────────────────────────
 
 export default function LatencyCalModal({
   referenceBuffer,   // AudioBuffer — the recorded loop in the slot
+  sampleSlots = [],  // Array of all sample slots to choose reference from
+  targetSlotId = '', // Target slot ID
   sampleRate,
   recLatencyOffset,  // current ms value
   onOffsetChange,    // (ms: number) => void
@@ -124,20 +133,17 @@ export default function LatencyCalModal({
   const [localOffset, setLocalOffset] = useState(recLatencyOffset);
   const [score, setScore] = useState(0);
   const [detecting, setDetecting] = useState(false);
-  const refPeaksRef = useRef(null);
-  const recPeaksRef = useRef(null);
+  const [refSlotId, setRefSlotId] = useState('');
+  const [peaks, setPeaks] = useState({ ref: null, rec: null });
 
-  // Build peaks once when buffer changes
+  // Build peaks when targetBuffer or selected refSlot changes
   useEffect(() => {
     if (!referenceBuffer) return;
-    // Reference = channel 0 of the buffer (the "ground truth" waveform shape)
-    // Recorded  = channel 1 if stereo, otherwise same as ref — just to show both traces
-    // In a real stereo loop both channels are the same loop, so we use ch0 as both
-    // and apply the latency offset shift to demonstrate alignment.
-    const peaks = buildPeaks(referenceBuffer, 512, 0);
-    refPeaksRef.current = peaks;
-    recPeaksRef.current = peaks; // same waveform; offset shift simulates the latency
-  }, [referenceBuffer]);
+    const recPeaks = buildPeaks(referenceBuffer, 512, 0);
+    const refSlot = sampleSlots.find(s => s.id === refSlotId);
+    const refPeaks = (refSlot && refSlot.buffer) ? buildPeaks(refSlot.buffer, 512, 0) : recPeaks;
+    setPeaks({ ref: refPeaks, rec: recPeaks });
+  }, [referenceBuffer, refSlotId, sampleSlots]);
 
   // Convert ms → canvas bins
   const msToBins = useCallback((ms) => {
@@ -146,24 +152,24 @@ export default function LatencyCalModal({
     return Math.round((ms / 1000) * sampleRate * (numBins / referenceBuffer.length));
   }, [referenceBuffer, sampleRate]);
 
-  // Redraw whenever offset changes
+  // Redraw whenever offset or peaks change
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !refPeaksRef.current) return;
+    if (!canvas || !peaks.ref || !peaks.rec) return;
     const offsetBins = msToBins(localOffset);
-    drawOverlay(canvas, refPeaksRef.current, recPeaksRef.current, offsetBins);
-    const s = correlate(refPeaksRef.current, recPeaksRef.current, offsetBins);
+    drawOverlay(canvas, peaks.ref, peaks.rec, offsetBins);
+    const s = correlate(peaks.ref, peaks.rec, offsetBins);
     setScore(Math.round(s * 100));
-  }, [localOffset, msToBins]);
+  }, [localOffset, msToBins, peaks]);
 
   const handleAutoDetect = async () => {
-    if (!referenceBuffer || !refPeaksRef.current) return;
+    if (!referenceBuffer || !peaks.ref || !peaks.rec) return;
     setDetecting(true);
     // Yield to allow UI to update
     await new Promise(r => setTimeout(r, 30));
     const { bestOffsetMs, bestScore } = autoDetect(
-      refPeaksRef.current,
-      recPeaksRef.current,
+      peaks.ref,
+      peaks.rec,
       sampleRate,
       referenceBuffer.length,
     );
@@ -204,6 +210,39 @@ export default function LatencyCalModal({
             style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '1rem' }}
           >✕</button>
         </div>
+
+        {/* Reference Selector */}
+        {!noBuffer && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{ color: '#888', fontSize: '0.45rem', letterSpacing: '0.05em', fontWeight: 600 }}>
+              COMPARE TO REFERENCE PAD:
+            </span>
+            <select
+              value={refSlotId}
+              onChange={(e) => setRefSlotId(e.target.value)}
+              style={{
+                background: '#181822',
+                border: '1px solid #2a2a40',
+                borderRadius: '4px',
+                color: '#fff',
+                padding: '5px',
+                fontSize: '0.52rem',
+                fontFamily: 'inherit',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="">(None - Compare against self)</option>
+              {sampleSlots
+                .filter(s => s.buffer && s.id !== targetSlotId)
+                .map(s => (
+                  <option key={s.id} value={s.id}>
+                    {getSlotLabel(s.id)} - {s.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
 
         {/* Waveform canvas */}
         <div style={{ position: 'relative', borderRadius: '6px', overflow: 'hidden', border: '1px solid #222' }}>
@@ -318,9 +357,11 @@ export default function LatencyCalModal({
         </div>
 
         {/* Hint */}
-        <p style={{ color: '#444', fontSize: '0.42rem', margin: 0, textAlign: 'center', lineHeight: 1.4 }}>
-          Drag to align the orange trace over the grey. Auto-detect finds the best match automatically.
-          Green = within ±5ms alignment.
+        <p style={{ color: '#555', fontSize: '0.42rem', margin: 0, textAlign: 'center', lineHeight: 1.4 }}>
+          {refSlotId ? 
+            "Drag to align the recorded (orange) waveform peaks over the reference (grey) peaks, or click Auto-Detect." : 
+            "To calibrate, select the original loop pad you recorded as the Reference Pad above."
+          }
         </p>
       </div>
     </div>

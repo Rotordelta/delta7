@@ -20216,6 +20216,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       {showLatencyCal && (
         <LatencyCalModal
           referenceBuffer={sampleSlots.find(s => s.id === selectedEditSlotId)?.buffer}
+          sampleSlots={sampleSlots}
+          targetSlotId={selectedEditSlotId}
           sampleRate={audioCtxRef.current ? audioCtxRef.current.sampleRate : 44100}
           recLatencyOffset={recLatencyOffset}
           onOffsetChange={(ms) => setRecLatencyOffset(ms)}
