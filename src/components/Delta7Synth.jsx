@@ -2406,19 +2406,19 @@ export default function Delta7Synth() {
       const now = ctx.currentTime;
 
       let snapTime;
-      const T0 = liveRecStartTimeRef.current; // beat-1 of the last recorded loop
+      const B_curr = seqCurrentBeatRef.current;
+      const L = liveRecBeatsRef.current;
 
-      if (T0 && T0 < now && loopDur > 0) {
-        // Snap to the next iteration of the playing loop's cycle (beat 1 of next loop)
-        // e.g. 16-beat loop: arm at beat 12 → waits 4 beats; arm at beat 4 → waits 12 beats
-        const elapsed = now - T0;
-        let nextCycle = Math.ceil(elapsed / loopDur);
-        if (nextCycle < 1) nextCycle = 1;
-        snapTime = T0 + nextCycle * loopDur;
-        // Float-point guard: if we somehow land in the past, push one more cycle
-        if (snapTime <= now + 0.02) snapTime += loopDur;
+      if (perfPlayStartTimeRef.current > 0) {
+        // Calculate next cycle start beat
+        let B_next = Math.ceil(B_curr / L) * L;
+        // If we are too close to the boundary (less than 0.2 beats), push to the next cycle
+        if (B_next - B_curr < 0.2) {
+          B_next += L;
+        }
+        snapTime = perfPlayStartTimeRef.current + (B_next - seqStartBeatOffsetRef.current) * beatDur;
       } else {
-        // No previous loop recorded yet — snap to next beat from the MIDI clock
+        // Sequencer not active — snap to next beat of the MIDI/metronome clock
         snapTime = metronomeRef.current.nextNoteTime;
         while (!snapTime || snapTime <= now + 0.01) {
           snapTime = (snapTime || now) + beatDur;
