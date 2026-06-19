@@ -139,3 +139,5 @@
   - **Manual Preview Silence-Skipping**: For manual triggers/clicks (where we cannot schedule into the past), starting playback from the latency offset point in the raw buffer skips the initial silence and provides zero-latency response.
   - **Automatic Handover Playback Alignment**: The autoplay handover dynamically sets the customOffset to `elapsed + latencyOffsetSec` so that the uncropped buffer aligns seamlessly at trigger time.
   - **Playback Nudge & Lookahead (PDC)**: In addition to the global latency offset, a per-slot `PLAYBACK NUDGE (MICRO-TIMING)` slider allows shifting playback timing dynamically (e.g., -100ms to +100ms) in real-time. Negative values schedule the buffer start time early to compensate for slot-specific timing adjustments.
+  - **Bypassing Playback Toggles on Handover**: Autoplay handovers must explicitly bypass any "latch/toggle-off" logic on pads that were already active (e.g., during overdubs) to ensure that the new mix takes over seamlessly rather than stopping the slot playback.
+
