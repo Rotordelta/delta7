@@ -1253,9 +1253,60 @@ export default function Delta7Synth() {
     return val !== null ? parseInt(val, 10) : 30;
   });
   const recLatencyOffsetRef = useRef(30);
+
+  const [waveformZoom, setWaveformZoom] = useState(1);
+  const [waveformScroll, setWaveformScroll] = useState(0);
+
   useEffect(() => {
     localStorage.setItem('recLatencyOffset', recLatencyOffset);
     recLatencyOffsetRef.current = recLatencyOffset;
+
+    // Recalculate shifted buffers for any slots that have a rawBuffer
+    const ctx = audioCtxRef.current;
+    if (ctx && sampleSlotsRef.current) {
+      let changed = false;
+      const nextSlots = sampleSlotsRef.current.map(slot => {
+        if (slot.isRecorded && slot.rawBuffer && slot.liveRecTotalSamples) {
+          const latencySamples = Math.round((recLatencyOffset / 1000) * ctx.sampleRate);
+          const targetLength = slot.liveRecTotalSamples;
+          const totalLength = slot.rawBuffer.length;
+          
+          const buffer = ctx.createBuffer(2, targetLength, ctx.sampleRate);
+          const channelL = buffer.getChannelData(0);
+          const channelR = buffer.getChannelData(1);
+          
+          const rawL = slot.rawBuffer.getChannelData(0);
+          const rawR = slot.rawBuffer.getChannelData(1);
+          
+          let srcStart = 0;
+          let dstStart = 0;
+          if (latencySamples > 0) {
+            srcStart = latencySamples;
+          } else if (latencySamples < 0) {
+            dstStart = -latencySamples;
+          }
+          
+          const lengthToCopy = Math.min(targetLength - dstStart, totalLength - srcStart);
+          if (lengthToCopy > 0) {
+            channelL.set(rawL.subarray(srcStart, srcStart + lengthToCopy), dstStart);
+            channelR.set(rawR.subarray(srcStart, srcStart + lengthToCopy), dstStart);
+          }
+          
+          normalizeBuffer(buffer);
+          changed = true;
+          return {
+            ...slot,
+            buffer: buffer,
+            revBuffer: getReversedBuffer(ctx, buffer)
+          };
+        }
+        return slot;
+      });
+      if (changed) {
+        sampleSlotsRef.current = nextSlots;
+        setSampleSlots(nextSlots);
+      }
+    }
   }, [recLatencyOffset]);
 
   const [midiClockSync, setMidiClockSync] = useState(() => {
@@ -2483,20 +2534,33 @@ export default function Delta7Synth() {
       offset += chunksL[i].length;
     }
 
-    // Apply latency offset shifting
     const latencyMs = recLatencyOffsetRef.current || 0;
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
+    const targetLength = liveRecTotalSamplesRef.current || totalLength;
     console.log(`[Looper] saveLiveLoopRecording: latencyMs = ${latencyMs}ms, latencySamples = ${latencySamples}, totalLength = ${totalLength}, targetLength = ${targetLength}`);
 
-    const targetLength = liveRecTotalSamplesRef.current || totalLength;
+    // Create the raw unshifted buffer first
+    const rawBuffer = ctx.createBuffer(2, totalLength, ctx.sampleRate);
+    rawBuffer.getChannelData(0).set(rawL);
+    rawBuffer.getChannelData(1).set(rawR);
+
+    // Create the shifted buffer
     const buffer = ctx.createBuffer(2, targetLength, ctx.sampleRate);
     const channelL = buffer.getChannelData(0);
     const channelR = buffer.getChannelData(1);
 
-    const lengthToCopy = Math.min(targetLength, totalLength);
+    let srcStart = 0;
+    let dstStart = 0;
+    if (latencySamples > 0) {
+      srcStart = latencySamples;
+    } else if (latencySamples < 0) {
+      dstStart = -latencySamples;
+    }
+
+    const lengthToCopy = Math.min(targetLength - dstStart, totalLength - srcStart);
     if (lengthToCopy > 0) {
-      channelL.set(rawL.subarray(0, lengthToCopy), 0);
-      channelR.set(rawR.subarray(0, lengthToCopy), 0);
+      channelL.set(rawL.subarray(srcStart, srcStart + lengthToCopy), dstStart);
+      channelR.set(rawR.subarray(srcStart, srcStart + lengthToCopy), dstStart);
     }
     
     const targetSlotId = liveRecTargetSlotRef.current;
@@ -2508,6 +2572,16 @@ export default function Delta7Synth() {
       }
     }
     normalizeBuffer(finalBuffer);
+
+    let existingRawBuffer = undefined;
+    const existingSlot = sampleSlotsRef.current.find(s => s.id === targetSlotId);
+    if (existingSlot) {
+      existingRawBuffer = existingSlot.rawBuffer;
+    }
+    let finalRawBuffer = rawBuffer;
+    if (liveRecOverdubRef.current && existingRawBuffer) {
+      finalRawBuffer = mixAudioBuffers(existingRawBuffer, rawBuffer);
+    }
     
     let updatedSlot = null;
     const nextSlots = sampleSlotsRef.current.map(slot => {
@@ -2516,6 +2590,8 @@ export default function Delta7Synth() {
           ...slot,
           name: `Live Loop (${liveRecBeatsRef.current}b)`,
           buffer: finalBuffer,
+          rawBuffer: finalRawBuffer,
+          liveRecTotalSamples: targetLength,
           revBuffer: getReversedBuffer(ctx, finalBuffer),
           start: 0.0,
           end: 1.0,
@@ -2552,17 +2628,48 @@ export default function Delta7Synth() {
         customOffset = Math.max(0, elapsed);
       }
 
-      console.log(`[Looper] Autoplay handover: deck = ${deck}, slotIndex = ${index}, customOffset = ${customOffset}s, triggerMode = ${updatedSlot.triggerMode || 'latch'}`);
-      triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx ? ctx.currentTime : 0, 0, undefined, false, customOffset, true);
+      if (!showLatencyCal) {
+        console.log(`[Looper] Autoplay handover: deck = ${deck}, slotIndex = ${index}, customOffset = ${customOffset}s, triggerMode = ${updatedSlot.triggerMode || 'latch'}`);
+        triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx ? ctx.currentTime : 0, 0, undefined, false, customOffset, true);
+      } else {
+        console.log(`[Looper] Autoplay handover bypassed because calibration modal is active (audio preview will play in modal).`);
+      }
 
       saveSampleToDb(updatedSlot)
         .then(() => {
-          showEditorStatus(`🔁 Live Loop → ${getSlotLabel(targetSlotId)} (playing)`);
+          showEditorStatus(`🔁 Live Loop → ${getSlotLabel(targetSlotId)} (ready/playing)`);
         })
         .catch((e) => {
           console.error("Failed to save live loop to DB:", e);
         });
     }
+  };
+
+  const triggerSlotInSync = (slotId) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const deck = slotId.startsWith('b') ? 'B' : 'A';
+    const index = parseInt(slotId.replace(/[ab]0*/, ''), 10) - 1;
+    const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+    if (!slot || !slot.buffer) return;
+
+    const isPlaying = metronomeRef.current.isPlaying || perfPlaybackActiveRef.current || perfRecordActiveRef.current;
+    let customOffset = 0;
+    if (isPlaying) {
+      const bpm = paramsRef.current.arpBpm || 120;
+      const beatDuration = 60 / bpm;
+      const loopBeats = slot.warpOn ? slot.warpBeats : 4;
+      
+      const now = ctx.currentTime;
+      const currentBeat = seqCurrentBeatRef.current > 0 ? seqCurrentBeatRef.current : (metronomeRef.current.isPlaying ? metronomeRef.current.currentBeat : 0);
+      const beatPhase = currentBeat % loopBeats;
+      customOffset = beatPhase * beatDuration;
+    }
+
+    const voiceKey = `perf-${deck.toLowerCase()}-slot-${index}`;
+    stopPerfVoice(voiceKey);
+
+    triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx.currentTime, 0, undefined, false, customOffset, true);
   };
 
   const toggleLiveLoopRecording = () => {
@@ -3163,6 +3270,17 @@ export default function Delta7Synth() {
   };
 
   // --- Waveform Selection Mouse & Touch Handlers ---
+  const pixelToBufferPct = (x, rectWidth, bufferLength) => {
+    const pctVisible = Math.max(0.0, Math.min(1.0, x / rectWidth));
+    const zoom = waveformZoom;
+    const scroll = waveformScroll;
+    const visibleSamples = Math.round(bufferLength / zoom);
+    const maxStartSample = Math.max(0, bufferLength - visibleSamples);
+    const startSample = Math.round(scroll * maxStartSample);
+    const clickedSample = startSample + pctVisible * visibleSamples;
+    return Math.max(0.0, Math.min(1.0, clickedSample / bufferLength));
+  };
+
   const handleCanvasMouseDown = (e) => {
     const canvas = samplerCanvasRef.current;
     if (!canvas) return;
@@ -3171,7 +3289,7 @@ export default function Delta7Synth() {
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const pct = Math.max(0.0, Math.min(1.0, x / rect.width));
+    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length);
 
     setSelectionStart(pct);
     setSelectionEnd(pct);
@@ -3182,9 +3300,11 @@ export default function Delta7Synth() {
     if (!isDraggingSelectionRef.current) return;
     const canvas = samplerCanvasRef.current;
     if (!canvas) return;
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot || !slot.buffer) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const pct = Math.max(0.0, Math.min(1.0, x / rect.width));
+    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length);
     setSelectionEnd(pct);
   };
 
@@ -3207,7 +3327,7 @@ export default function Delta7Synth() {
 
     const rect = canvas.getBoundingClientRect();
     const x = e.touches[0].clientX - rect.left;
-    const pct = Math.max(0.0, Math.min(1.0, x / rect.width));
+    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length);
 
     setSelectionStart(pct);
     setSelectionEnd(pct);
@@ -3218,9 +3338,11 @@ export default function Delta7Synth() {
     if (!isDraggingSelectionRef.current || e.touches.length === 0) return;
     const canvas = samplerCanvasRef.current;
     if (!canvas) return;
+    const slot = sampleSlots.find(s => s.id === selectedEditSlotId);
+    if (!slot || !slot.buffer) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.touches[0].clientX - rect.left;
-    const pct = Math.max(0.0, Math.min(1.0, x / rect.width));
+    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length);
     setSelectionEnd(pct);
   };
 
@@ -4979,9 +5101,18 @@ export default function Delta7Synth() {
       
       const buffer = slot.buffer;
       const data = buffer.getChannelData(0);
-      const step = Math.ceil(data.length / canvas.width);
+      
+      const visibleSamples = Math.round(data.length / waveformZoom);
+      const maxStartSample = Math.max(0, data.length - visibleSamples);
+      const startSample = Math.round(waveformScroll * maxStartSample);
+      const endSample = Math.min(data.length, startSample + visibleSamples);
+      
+      const step = Math.max(1, (endSample - startSample) / canvas.width);
       const amp = canvas.height / 2;
       
+      // Helper to map 0-1 ratio to canvas pixel x
+      const getCanvasX = (p) => ((p * data.length - startSample) / (endSample - startSample)) * canvas.width;
+
       // Draw Waveform
       ctx.strokeStyle = '#00f3ff';
       ctx.lineWidth = 1.0;
@@ -4989,14 +5120,17 @@ export default function Delta7Synth() {
       for (let i = 0; i < canvas.width; i++) {
         let min = 1.0;
         let max = -1.0;
-        for (let j = 0; j < step; j++) {
-          const idx = i * step + j;
+        const startIdx = startSample + Math.round(i * step);
+        const endIdx = startSample + Math.round((i + 1) * step);
+        for (let idx = startIdx; idx < endIdx; idx++) {
           if (idx < data.length) {
             const dat = data[idx];
             if (dat < min) min = dat;
             if (dat > max) max = dat;
           }
         }
+        if (min === 1.0) min = 0.0;
+        if (max === -1.0) max = 0.0;
         const x = i;
         const yMin = (1 + min) * amp;
         const yMax = (1 + max) * amp;
@@ -5006,52 +5140,72 @@ export default function Delta7Synth() {
       ctx.stroke();
       
       // Shading inactive start/end regions
-      const startX = slot.start * canvas.width;
-      const endX = slot.end * canvas.width;
+      const startX = getCanvasX(slot.start);
+      const endX = getCanvasX(slot.end);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.fillRect(0, 0, startX, canvas.height);
-      ctx.fillRect(endX, 0, canvas.width - endX, canvas.height);
+      if (startX > 0) {
+        ctx.fillRect(0, 0, Math.min(canvas.width, startX), canvas.height);
+      }
+      if (endX < canvas.width) {
+        ctx.fillRect(Math.max(0, endX), 0, canvas.width - Math.max(0, endX), canvas.height);
+      }
 
       // Selection highlight overlay
       if (selectionStart !== null && selectionEnd !== null) {
-        const selStartX = Math.min(selectionStart, selectionEnd) * canvas.width;
-        const selEndX = Math.max(selectionStart, selectionEnd) * canvas.width;
-        ctx.fillStyle = 'rgba(0, 243, 255, 0.22)';
-        ctx.fillRect(selStartX, 0, selEndX - selStartX, canvas.height);
+        const selStartX = getCanvasX(Math.min(selectionStart, selectionEnd));
+        const selEndX = getCanvasX(Math.max(selectionStart, selectionEnd));
+        
+        const drawStartX = Math.max(0, Math.min(canvas.width, selStartX));
+        const drawEndX = Math.max(0, Math.min(canvas.width, selEndX));
+        
+        if (drawEndX > drawStartX) {
+          ctx.fillStyle = 'rgba(0, 243, 255, 0.22)';
+          ctx.fillRect(drawStartX, 0, drawEndX - drawStartX, canvas.height);
+        }
 
         ctx.strokeStyle = '#00f3ff';
         ctx.lineWidth = 1.0;
         ctx.beginPath();
-        ctx.moveTo(selStartX, 0); ctx.lineTo(selStartX, canvas.height);
-        ctx.moveTo(selEndX, 0); ctx.lineTo(selEndX, canvas.height);
+        if (selStartX >= 0 && selStartX <= canvas.width) {
+          ctx.moveTo(selStartX, 0); ctx.lineTo(selStartX, canvas.height);
+        }
+        if (selEndX >= 0 && selEndX <= canvas.width) {
+          ctx.moveTo(selEndX, 0); ctx.lineTo(selEndX, canvas.height);
+        }
         ctx.stroke();
       }
       
       // Visual boundary markers
       ctx.lineWidth = 1.5;
       // Start (Yellow)
-      ctx.strokeStyle = '#ffe600';
-      ctx.beginPath(); ctx.moveTo(startX, 0); ctx.lineTo(startX, canvas.height); ctx.stroke();
+      if (startX >= 0 && startX <= canvas.width) {
+        ctx.strokeStyle = '#ffe600';
+        ctx.beginPath(); ctx.moveTo(startX, 0); ctx.lineTo(startX, canvas.height); ctx.stroke();
+      }
       // End (Red)
-      ctx.strokeStyle = '#ff0055';
-      ctx.beginPath(); ctx.moveTo(endX, 0); ctx.lineTo(endX, canvas.height); ctx.stroke();
+      if (endX >= 0 && endX <= canvas.width) {
+        ctx.strokeStyle = '#ff0055';
+        ctx.beginPath(); ctx.moveTo(endX, 0); ctx.lineTo(endX, canvas.height); ctx.stroke();
+      }
       
       // Loop bounds (dashed green)
       if (slot.loopOn) {
-        const loopStartX = slot.loopStart * canvas.width;
-        const loopEndX = slot.loopEnd * canvas.width;
+        const loopStartX = getCanvasX(slot.loopStart);
+        const loopEndX = getCanvasX(slot.loopEnd);
         ctx.strokeStyle = '#00ff66';
         ctx.lineWidth = 1.0;
         ctx.setLineDash([2, 2]);
-        ctx.beginPath(); ctx.moveTo(loopStartX, 0); ctx.lineTo(loopStartX, canvas.height); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(loopEndX, 0); ctx.lineTo(loopEndX, canvas.height); ctx.stroke();
+        if (loopStartX >= 0 && loopStartX <= canvas.width) {
+          ctx.beginPath(); ctx.moveTo(loopStartX, 0); ctx.lineTo(loopStartX, canvas.height); ctx.stroke();
+        }
+        if (loopEndX >= 0 && loopEndX <= canvas.width) {
+          ctx.beginPath(); ctx.moveTo(loopEndX, 0); ctx.lineTo(loopEndX, canvas.height); ctx.stroke();
+        }
         ctx.setLineDash([]);
       }
 
       // Draw Slices & tags
       const sliceCount = slot.sliceCount || 16;
-      const activeWidth = endX - startX;
-      const sliceWidth = activeWidth / sliceCount;
       ctx.strokeStyle = 'rgba(0, 243, 255, 0.2)';
       ctx.lineWidth = 1.0;
       ctx.fillStyle = 'rgba(0, 243, 255, 0.4)';
@@ -5063,17 +5217,20 @@ export default function Delta7Synth() {
         const sliceStartNorm = sliceParam.start !== undefined ? sliceParam.start : (slot.start + (i / sliceCount) * (slot.end - slot.start));
         const sliceEndNorm = sliceParam.end !== undefined ? sliceParam.end : (slot.start + ((i + 1) / sliceCount) * (slot.end - slot.start));
         
-        const sliceStartX = sliceStartNorm * canvas.width;
-        const sliceEndX = sliceEndNorm * canvas.width;
+        const sliceStartX = getCanvasX(sliceStartNorm);
+        const sliceEndX = getCanvasX(sliceEndNorm);
         
-        if (i > 0) {
+        if (i > 0 && sliceStartX >= 0 && sliceStartX <= canvas.width) {
           ctx.beginPath();
           ctx.moveTo(sliceStartX, 0);
           ctx.lineTo(sliceStartX, canvas.height);
           ctx.stroke();
         }
         
-        ctx.fillText((i + 1).toString(), (sliceStartX + sliceEndX) / 2, canvas.height - 4);
+        const textX = (sliceStartX + sliceEndX) / 2;
+        if (textX >= 0 && textX <= canvas.width) {
+          ctx.fillText((i + 1).toString(), textX, canvas.height - 4);
+        }
       }
 
       // Highlight the slice selected for editing
@@ -16757,6 +16914,62 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             onTouchEnd={handleCanvasTouchEnd}
                             style={{ display: 'block', width: '100%', height: '75px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.3)', background: '#020d1e', cursor: slot.buffer ? 'col-resize' : 'default' }}
                           />
+                          {slot.buffer && (
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', background: 'rgba(0, 243, 255, 0.03)', padding: '3px 6px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.1)', flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ color: '#888', fontSize: '0.52rem', fontFamily: 'monospace', fontWeight: 600 }}>🔍 ZOOM:</span>
+                                <input 
+                                  type="range" min="1" max="100" step="1" 
+                                  value={waveformZoom} 
+                                  onChange={(e) => {
+                                    const nextZoom = parseInt(e.target.value, 10);
+                                    setWaveformZoom(nextZoom);
+                                    if (nextZoom === 1) setWaveformScroll(0);
+                                  }} 
+                                  style={{ width: '80px', height: '6px', accentColor: '#00f3ff', cursor: 'pointer' }}
+                                />
+                                <span style={{ color: '#00f3ff', fontSize: '0.52rem', fontFamily: 'monospace', minWidth: '24px', fontWeight: 'bold' }}>{waveformZoom}X</span>
+                              </div>
+                              
+                              {waveformZoom > 1 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexGrow: 1 }}>
+                                  <span style={{ color: '#888', fontSize: '0.52rem', fontFamily: 'monospace', fontWeight: 600 }}>◀ SCROLL ▶</span>
+                                  <input 
+                                    type="range" min="0" max="1" step="0.001" 
+                                    value={waveformScroll} 
+                                    onChange={(e) => setWaveformScroll(parseFloat(e.target.value))} 
+                                    style={{ flexGrow: 1, height: '6px', accentColor: '#00f3ff', cursor: 'pointer' }}
+                                  />
+                                </div>
+                              )}
+                              
+                              <div style={{ display: 'flex', gap: '3px', marginLeft: 'auto' }}>
+                                {[1, 5, 10, 50, 100].map(z => (
+                                  <button
+                                    key={z}
+                                    onClick={() => {
+                                      setWaveformZoom(z);
+                                      if (z === 1) setWaveformScroll(0);
+                                    }}
+                                    style={{
+                                      background: waveformZoom === z ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                                      border: '1px solid ' + (waveformZoom === z ? '#00f3ff' : 'rgba(0, 243, 255, 0.15)'),
+                                      borderRadius: '3px',
+                                      color: waveformZoom === z ? '#00f3ff' : '#a0a0cc',
+                                      padding: '1px 5px',
+                                      fontSize: '0.45rem',
+                                      fontFamily: 'monospace',
+                                      fontWeight: 'bold',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease',
+                                    }}
+                                  >
+                                    {z}X
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Trim start/end and Loop controls */}

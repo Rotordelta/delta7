@@ -376,13 +376,13 @@ export default function LatencyCalModal({
   }, [isPlayingPreview, audioCtx]);
 
   const handleAutoDetect = async () => {
-    if (!referenceBuffer || !peaks.ref || !peaks.rec) return;
+    if (!referenceBuffer || !peaks.refFull || !peaks.recFull) return;
     setDetecting(true);
     // Yield to allow UI to update
     await new Promise(r => setTimeout(r, 30));
     const { bestOffsetMs, bestScore } = autoDetect(
-      peaks.ref,
-      peaks.rec,
+      peaks.refFull,
+      peaks.recFull,
       sampleRate,
       referenceBuffer.length,
     );
