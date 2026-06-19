@@ -127,3 +127,10 @@
   - **Single-Click Auto-Calibration**: Support for automatic mathematical calibration (such as cross-correlation sweep detection) that instantly snaps the slider to the best-fitting offset values.
   - **High-contrast Glassmorphic UI**: Interactive modal dialogs should feature blur backdrops (`backdropFilter: 'blur(8px)'`) and high-contrast color-coded indicators (LOCKED in green, CLOSE in amber) matching the workstation's dark neon aesthetic.
 
+## Session: 2026-06-19
+- **Task**: Implemented seamless looper handover and autoplay offset alignment.
+- **Jimmy's Preferences**:
+  - **Zero-Latency Handover**: The transition from loop recording to playback must be completely seamless. Any delay due to thread messaging or buffer initialization must be compensated for by starting buffer playback with a dynamic `fluxOffset` that represents the exact elapsed time since the loop was supposed to start.
+  - **Animated Platter Phase Alignment**: For auto-playing loops triggered late, the visual platter rotation angles must be synchronized to the same phase offset (by backing up the voice's `triggerBeat` and `startTime` dynamically) to prevent visual platter jumps or timeline phase drift.
+
+
