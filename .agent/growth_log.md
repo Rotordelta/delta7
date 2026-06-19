@@ -142,3 +142,11 @@
   - **Bypassing Playback Toggles on Handover**: Autoplay handovers must explicitly bypass any "latch/toggle-off" logic on pads that were already active (e.g., during overdubs) to ensure that the new mix takes over seamlessly rather than stopping the slot playback.
   - **Non-Blocking Standby Calibration**: To calibrate latency easily, opening the Calibration Modal on an empty/new target slot should put it in a standby state without blocking the user from clicking screen pads/transport buttons (achieved via pointer-events). Once recording finishes, the modal automatically wakes up, loads the new buffer, and starts the real-time audio phase preview.
   - **High-Resolution Timeline Zoom & Ruler**: Supporting zooming (1X to 20X) focusing on the start of the loop cycle (including a 50ms pre-roll padding for early notes/transients) and drawing a vertical "GRID START (0ms)" line allows the user to visually measure the latency displacement in milliseconds using clear ruler ticks, aligning transients by both eye and ear.
+
+## Session: 2026-06-19 (Part 2)
+- **Task**: Waveform Zoom & Scroll, high-resolution cross-correlation calibration fix, and looper autoplay handover muting.
+- **Jimmy's Preferences**:
+  - **High-Zoom Waveform Fine Tuning**: When trimming or editing start/end boundaries, having high-resolution zoom (up to 100X) and smooth scrolling allows precise single-sample or micro-transient visual alignment.
+  - **Accurate Canvas-to-Buffer Mapping**: Selection and mouse clicks must map correctly to the true buffer coordinates by factoring in both scroll offsets and zoom scales.
+  - **Auto-Correlation of Raw Capture**: The cross-correlation algorithm must analyze the raw, full-resolution buffer references rather than downsampled visual arrays to maintain perfect sub-millisecond precision.
+  - **Exclusive Calibration Previews**: When the Latency Calibration modal is open, global pad autoplay handovers should be bypassed, allowing the user to rehearse and preview phase-flanging alignment isolated inside the modal itself.
