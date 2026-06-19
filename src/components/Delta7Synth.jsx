@@ -2552,7 +2552,8 @@ export default function Delta7Synth() {
         customOffset = Math.max(0, elapsed);
       }
 
-      triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx ? ctx.currentTime : 0, 0, undefined, false, customOffset);
+      console.log(`[Looper] Autoplay handover: deck = ${deck}, slotIndex = ${index}, customOffset = ${customOffset}s, triggerMode = ${updatedSlot.triggerMode || 'latch'}`);
+      triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx ? ctx.currentTime : 0, 0, undefined, false, customOffset, true);
 
       saveSampleToDb(updatedSlot)
         .then(() => {
@@ -10108,7 +10109,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     cycleTriggerMode(slotId, e);
   }, []);
 
-  const triggerPerfPadDSP = (deck, type, index, velocity, isNoteOn, shouldRecord, targetTime, targetBeat, sliceIdx = undefined, isPlayback = false, customOffset = 0) => {
+  const triggerPerfPadDSP = (deck, type, index, velocity, isNoteOn, shouldRecord, targetTime, targetBeat, sliceIdx = undefined, isPlayback = false, customOffset = 0, isHandover = false) => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     const now = ctx.currentTime;
@@ -10193,7 +10194,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     // 2. Handle Key Press (Note On)
     if (triggerMode === 'latch') {
-      if (!isPlayback) {
+      if (!isPlayback && !isHandover) {
         const isAlreadyActive = activePerfPadsRef.current[padKey];
         if (isAlreadyActive) {
           // Stop active loop trigger
