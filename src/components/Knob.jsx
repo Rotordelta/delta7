@@ -44,6 +44,23 @@ export default function Knob({
   // Percentage of 270 degrees arc length
   const strokeDashoffset = circumference - (percentage * 270 / 360) * circumference;
 
+  // Store handlers in refs to allow cleanups with stable references
+  const handleMouseMoveRef = useRef(null);
+  const handleMouseUpRef = useRef(null);
+
+  useEffect(() => {
+    handleMouseMoveRef.current = handleMouseMove;
+    handleMouseUpRef.current = handleMouseUp;
+  });
+
+  const runMouseMove = (e) => {
+    if (handleMouseMoveRef.current) handleMouseMoveRef.current(e);
+  };
+
+  const runMouseUp = () => {
+    if (handleMouseUpRef.current) handleMouseUpRef.current();
+  };
+
   // Vertical drag handlers
   const handleMouseDown = (e) => {
     e.preventDefault();
@@ -51,8 +68,8 @@ export default function Knob({
       y: e.clientY,
       val: value,
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousemove', runMouseMove);
+    window.addEventListener('mouseup', runMouseUp);
   };
 
   const handleMouseMove = (e) => {
@@ -75,9 +92,17 @@ export default function Knob({
   };
 
   const handleMouseUp = () => {
-    window.removeEventListener('mousemove', handleMouseMove);
-    window.removeEventListener('mouseup', handleMouseUp);
+    window.removeEventListener('mousemove', runMouseMove);
+    window.removeEventListener('mouseup', runMouseUp);
   };
+
+  // Cleanup on unmount if drag was active
+  useEffect(() => {
+    return () => {
+      window.removeEventListener('mousemove', runMouseMove);
+      window.removeEventListener('mouseup', runMouseUp);
+    };
+  }, []);
 
   // Scroll wheel handler
   const handleWheel = (e) => {

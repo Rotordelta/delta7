@@ -4,8 +4,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 /** Downsample one channel of an AudioBuffer to `numBins` peak values (0–1). */
 function buildPeaks(buffer, numBins = 512, channel = 0) {
-  if (!buffer) return new Float32Array(numBins).fill(0);
-  const data = buffer.getChannelData(channel);
+  if (!buffer || buffer.numberOfChannels === 0) return new Float32Array(numBins).fill(0);
+  const targetChannel = Math.min(channel, buffer.numberOfChannels - 1);
+  const data = buffer.getChannelData(targetChannel);
   const blockSize = Math.max(1, Math.floor(data.length / numBins));
   const peaks = new Float32Array(numBins);
   for (let i = 0; i < numBins; i++) {
@@ -26,8 +27,9 @@ function buildPeaks(buffer, numBins = 512, channel = 0) {
 
 /** Downsample one channel of an AudioBuffer to `numBins` peaks within a specific sample range. */
 function buildPeaksRange(buffer, startSample, endSample, numBins = 512, channel = 0) {
-  if (!buffer) return new Float32Array(numBins).fill(0);
-  const data = buffer.getChannelData(channel);
+  if (!buffer || buffer.numberOfChannels === 0) return new Float32Array(numBins).fill(0);
+  const targetChannel = Math.min(channel, buffer.numberOfChannels - 1);
+  const data = buffer.getChannelData(targetChannel);
   const rangeLength = Math.max(1, endSample - startSample);
   const blockSize = Math.max(1, Math.floor(rangeLength / numBins));
   const peaks = new Float32Array(numBins);
