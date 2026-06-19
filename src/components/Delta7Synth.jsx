@@ -5518,7 +5518,7 @@ export default function Delta7Synth() {
     return () => {
       cancelAnimationFrame(samplerCanvasAnimIdRef.current);
     };
-  }, [selectedEditSlotId, isPlayingPreview, selectedSliceIndex, selectionStart, selectionEnd]);
+  }, [selectedEditSlotId, isPlayingPreview, selectedSliceIndex, selectionStart, selectionEnd, waveformZoom, waveformScroll, performanceViewActive]);
 
   // Auto-update Tempo Synced Delay times when Master BPM changes
   useEffect(() => {
