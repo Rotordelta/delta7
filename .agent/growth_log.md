@@ -133,6 +133,8 @@
   - **Zero-Latency Handover**: The transition from loop recording to playback must be completely seamless. Any delay due to thread messaging or buffer initialization must be compensated for by starting buffer playback with a dynamic `fluxOffset` that represents the exact elapsed time since the loop was supposed to start.
   - **Animated Platter Phase Alignment**: For auto-playing loops triggered late, the visual platter rotation angles must be synchronized to the same phase offset (by backing up the voice's `triggerBeat` and `startTime` dynamically) to prevent visual platter jumps or timeline phase drift.
   - **Quantized Cycle Arming**: Arming the looper recording must align to the active loop length grid (multiples of 16, 32, etc. beats relative to the sequencer start beat) rather than general single-beat boundaries. This keeps all recorded takes perfectly quantized to the phrase cycles. Includes a 0.2 beat safety threshold to prevent misfires on late clicks.
+  - **Reference-Based Calibration**: Auto-calibrating latency requires comparing the recorded waveform against the original playing audio source (the ground truth reference) that was resampled, rather than comparing a buffer against itself. Introducing a selector to compare the recorded loop to any other pad buffer allows the cross-correlation algorithm to detect the exact system/hardware roundtrip lag (e.g. 50-120ms) and snap the slider accordingly.
+
 
 
 
