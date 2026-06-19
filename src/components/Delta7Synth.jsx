@@ -875,6 +875,7 @@ export default function Delta7Synth() {
       lfoFade: 0,
       lfoRetrigger: true,
       randomPan: 0.0,
+      nudgeMs: 0,
       eq: createDefaultEq()
     }));
   });
@@ -10389,7 +10390,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       tempProg.fluxOffset = fluxOffset;
     }
 
-    const delayOffset = Math.max(0, targetTime - now);
+    let compensatedTargetTime = targetTime;
+    if (isPlayback && (type === 'slot' || type === 'slice') && slot) {
+      // Lookahead micro-timing nudge compensation (DAW style playback compensation)
+      const nudgeMs = slot.nudgeMs || 0;
+      compensatedTargetTime = targetTime + (nudgeMs / 1000);
+    }
+    const delayOffset = Math.max(0, compensatedTargetTime - now);
 
     const startVoiceTrigger = () => {
       const voice = playProgramVoice(ctx, triggerNote, velocity, tempProg, voiceKey, delayOffset);
@@ -17178,6 +17185,25 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             </span>
                           </div>
                         )}
+                      </div>
+
+                      {/* Playback Nudge control */}
+                      <div className="editor-flex-row" style={{ justifyContent: 'flex-start', gap: '8px', marginTop: '4px', borderTop: '1px dashed rgba(0, 243, 255, 0.1)', paddingTop: '4px', alignItems: 'center' }}>
+                        <div className="editor-flex-row" style={{ fontSize: '0.62rem', gap: '6px', width: '100%' }}>
+                          <span className="label-cyan" style={{ minWidth: '150px' }}>PLAYBACK NUDGE (MICRO-TIMING):</span>
+                          <input 
+                            type="range" min="-100" max="100" step="1"
+                            value={slot.nudgeMs !== undefined ? slot.nudgeMs : 0} 
+                            onChange={(e) => updateSlotParam(selectedEditSlotId, 'nudgeMs', parseInt(e.target.value, 10))}
+                            style={{ flexGrow: 1, height: '6px', accentColor: '#ff9f00', cursor: 'pointer' }}
+                          />
+                          <span className="font-mono value-readout-sm" style={{ color: (slot.nudgeMs || 0) === 0 ? '#aaa' : '#ff9f00', minWidth: '45px', textAlign: 'right', marginRight: '5px' }}>
+                            {slot.nudgeMs || 0}ms
+                          </span>
+                          <span style={{ fontSize: '0.52rem', color: '#666', fontStyle: 'italic' }}>
+                            (Negative = early/lookahead, Positive = late)
+                          </span>
+                        </div>
                       </div>
 
                       {/* Slice Editor Sub-Panel */}
