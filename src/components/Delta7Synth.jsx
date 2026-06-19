@@ -2484,6 +2484,7 @@ export default function Delta7Synth() {
     // Apply latency offset shifting
     const latencyMs = recLatencyOffsetRef.current || 0;
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
+    console.log(`[Looper] saveLiveLoopRecording: latencyMs = ${latencyMs}ms, latencySamples = ${latencySamples}, totalLength = ${totalLength}, targetLength = ${targetLength}`);
 
     const targetLength = liveRecTotalSamplesRef.current || totalLength;
     const buffer = ctx.createBuffer(2, targetLength, ctx.sampleRate);
@@ -2870,17 +2871,42 @@ export default function Delta7Synth() {
       totalLength += chunksL[i].length;
     }
     
+    // Apply latency offset shifting
+    const latencyMs = recLatencyOffsetRef.current || 0;
+    const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
+    console.log(`[Looper] saveResampledAudio: latencyMs = ${latencyMs}ms, latencySamples = ${latencySamples}, totalLength = ${totalLength}`);
+
+    // Concatenate chunks to raw Float32Arrays first
+    const rawL = new Float32Array(totalLength);
+    const rawR = new Float32Array(totalLength);
+    let offset = 0;
+    for (let i = 0; i < chunksL.length; i++) {
+      rawL.set(chunksL[i], offset);
+      rawR.set(chunksR[i], offset);
+      offset += chunksL[i].length;
+    }
+
     // Create new AudioBuffer
     const buffer = ctx.createBuffer(2, totalLength, ctx.sampleRate);
     const channelL = buffer.getChannelData(0);
     const channelR = buffer.getChannelData(1);
-    
-    // Copy data
-    let offset = 0;
-    for (let i = 0; i < chunksL.length; i++) {
-      channelL.set(chunksL[i], offset);
-      channelR.set(chunksR[i], offset);
-      offset += chunksL[i].length;
+
+    if (latencySamples >= 0) {
+      // Shift earlier by cropping startIdx
+      const startIdx = Math.min(latencySamples, totalLength);
+      const lengthToCopy = Math.min(totalLength, totalLength - startIdx);
+      if (lengthToCopy > 0) {
+        channelL.set(rawL.subarray(startIdx, startIdx + lengthToCopy), 0);
+        channelR.set(rawR.subarray(startIdx, startIdx + lengthToCopy), 0);
+      }
+    } else {
+      // Shift later by inserting silence at start
+      const destIdx = Math.min(Math.abs(latencySamples), totalLength);
+      const lengthToCopy = Math.min(totalLength - destIdx, totalLength);
+      if (lengthToCopy > 0) {
+        channelL.set(rawL.subarray(0, lengthToCopy), destIdx);
+        channelR.set(rawR.subarray(0, lengthToCopy), destIdx);
+      }
     }
     
     // Normalize the buffer to 98% peak amplitude (lossless gain maximization)
