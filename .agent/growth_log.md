@@ -148,5 +148,5 @@
 - **Jimmy's Preferences**:
   - **High-Zoom Waveform Fine Tuning**: When trimming or editing start/end boundaries, having high-resolution zoom (up to 100X) and smooth scrolling allows precise single-sample or micro-transient visual alignment.
   - **Accurate Canvas-to-Buffer Mapping**: Selection and mouse clicks must map correctly to the true buffer coordinates by factoring in both scroll offsets and zoom scales.
-  - **Auto-Correlation of Raw Capture**: The cross-correlation algorithm must analyze the raw, full-resolution buffer references rather than downsampled visual arrays to maintain perfect sub-millisecond precision.
   - **Exclusive Calibration Previews**: When the Latency Calibration modal is open, global pad autoplay handovers should be bypassed, allowing the user to rehearse and preview phase-flanging alignment isolated inside the modal itself.
+  - **Integrated Looper Level & Gain Controls**: Having real-time peak level meters and software input gain sliders integrated directly inside the looper panels (rather than hidden in the waveform editor) is essential to quickly set up, monitor, and calibrate loops before committing to a recording.

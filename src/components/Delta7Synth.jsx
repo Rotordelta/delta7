@@ -2880,6 +2880,10 @@ export default function Delta7Synth() {
     }
     const bar = document.getElementById('mic-level-bar-fill');
     if (bar) bar.style.width = '0%';
+    const barLooper = document.getElementById('looper-level-bar-fill');
+    if (barLooper) barLooper.style.width = '0%';
+    const barMini = document.getElementById('looper-level-bar-fill-mini');
+    if (barMini) barMini.style.width = '0%';
   };
 
   const startMicMonitor = () => {
@@ -2893,13 +2897,53 @@ export default function Delta7Synth() {
       for (let i = 0; i < array.length; i++) sum += array[i];
       const avg = sum / array.length;
       
+      const valPct = `${Math.min(100, (avg / 150) * 100)}%`;
+      
       const bar = document.getElementById('mic-level-bar-fill');
-      if (bar) {
-        bar.style.width = `${Math.min(100, (avg / 150) * 100)}%`;
-      }
+      if (bar) bar.style.width = valPct;
+      
+      const barLooper = document.getElementById('looper-level-bar-fill');
+      if (barLooper) barLooper.style.width = valPct;
+      
+      const barMini = document.getElementById('looper-level-bar-fill-mini');
+      if (barMini) barMini.style.width = valPct;
+      
       recordAnimationFrameIdRef.current = requestAnimationFrame(updateLevel);
     };
     updateLevel();
+  };
+
+  const armLooperInput = () => {
+    if (isArmed) {
+      disarmMicrophone();
+      return;
+    }
+    // Sync the edit slot so that standard arming functions use the looper target
+    setSelectedEditSlotId(liveRecTargetSlot);
+    recordingTargetSlotIdRef.current = liveRecTargetSlot;
+    
+    if (recordingInputMode === 'mic') {
+      armMicrophone();
+    } else if (recordingInputMode === 'monitor') {
+      armMonitor();
+    } else if (recordingInputMode === 'resample') {
+      if (!audioCtxRef.current) initAudio();
+      const ctx = audioCtxRef.current;
+      const resamplerGainNode = ctx.createGain();
+      resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+      resamplerGainNodeRef.current = resamplerGainNode;
+      if (analyserRef.current) {
+        analyserRef.current.connect(resamplerGainNode);
+      }
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      micAnalyserRef.current = analyser;
+      resamplerGainNode.connect(analyser);
+      setupLosslessRecorderNode(ctx, resamplerGainNode);
+      setIsArmed(true);
+      startMicMonitor();
+      showEditorStatus("Internal Resampler armed! ⏺️");
+    }
   };
 
   const normalizeBuffer = (buffer) => {
@@ -14995,40 +15039,70 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </select>
               </div>
 
-              {/* Row 2: Live Record Button */}
-              <button
-                className={`deck-btn ${isLiveRecording ? 'active' : ''}`}
-                onClick={toggleLiveLoopRecording}
-                style={{
-                  width: '100%',
-                  padding: '3px 0',
-                  fontSize: '0.46rem',
-                  fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.8px',
-                  fontFamily: 'monospace',
-                  background: isLiveRecording 
-                    ? 'rgba(255, 0, 85, 0.25)' 
-                    : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.22)' : 'rgba(255, 255, 255, 0.05)'),
-                  border: `1px solid ${isLiveRecording 
-                    ? '#ff0055' 
-                    : (liveRecPendingStart ? '#ffe600' : 'rgba(255,255,255,0.18)')}`,
-                  color: isLiveRecording 
-                    ? '#ff0055' 
-                    : (liveRecPendingStart ? '#ffe600' : '#8c9ba5'),
-                  boxShadow: isLiveRecording 
-                    ? '0 0 6px rgba(255, 0, 85, 0.35)' 
-                    : (liveRecPendingStart ? '0 0 6px rgba(255, 230, 0, 0.25)' : 'none'),
-                  cursor: 'pointer',
-                  borderRadius: '3px',
-                  transition: 'all 0.12s ease',
-                  animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none'
-                }}
-              >
-                {isLiveRecording 
-                  ? 'Rec Active' 
-                  : (liveRecPendingStart ? 'Pending Beat...' : 'Live Rec (Pedal CC64)')}
-              </button>
+              {/* Row 2: Arm & Live Record Buttons */}
+              <div style={{ display: 'flex', width: '100%', gap: '4px' }}>
+                <button
+                  onClick={armLooperInput}
+                  className={`deck-btn ${isArmed ? 'active' : ''}`}
+                  style={{
+                    flex: 1,
+                    padding: '3px 0',
+                    fontSize: '0.44rem',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    fontFamily: 'monospace',
+                    background: isArmed ? 'rgba(255, 230, 0, 0.22)' : 'rgba(255, 255, 255, 0.05)',
+                    border: `1px solid ${isArmed ? '#ffe600' : 'rgba(255,255,255,0.18)'}`,
+                    color: isArmed ? '#ffe600' : '#8c9ba5',
+                    cursor: 'pointer',
+                    borderRadius: '3px',
+                    transition: 'all 0.12s ease'
+                  }}
+                >
+                  {isArmed ? 'Disarm' : 'Arm In'}
+                </button>
+                <button
+                  className={`deck-btn ${isLiveRecording ? 'active' : ''}`}
+                  onClick={toggleLiveLoopRecording}
+                  style={{
+                    flex: 1.2,
+                    padding: '3px 0',
+                    fontSize: '0.44rem',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    fontFamily: 'monospace',
+                    background: isLiveRecording 
+                      ? 'rgba(255, 0, 85, 0.25)' 
+                      : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.22)' : 'rgba(255, 255, 255, 0.05)'),
+                    border: `1px solid ${isLiveRecording 
+                      ? '#ff0055' 
+                      : (liveRecPendingStart ? '#ffe600' : 'rgba(255,255,255,0.18)')}`,
+                    color: isLiveRecording 
+                      ? '#ff0055' 
+                      : (liveRecPendingStart ? '#ffe600' : '#8c9ba5'),
+                    boxShadow: isLiveRecording 
+                      ? '0 0 6px rgba(255, 0, 85, 0.35)' 
+                      : (liveRecPendingStart ? '0 0 6px rgba(255, 230, 0, 0.25)' : 'none'),
+                    cursor: 'pointer',
+                    borderRadius: '3px',
+                    transition: 'all 0.12s ease',
+                    animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none'
+                  }}
+                >
+                  {isLiveRecording 
+                    ? 'Rec Active' 
+                    : (liveRecPendingStart ? 'Pending...' : 'Live Rec')}
+                </button>
+              </div>
+
+              {/* Row 3: Mini level meter */}
+              <div style={{ width: '100%', marginTop: '2px' }}>
+                <div className="mic-level-meter-container" style={{ padding: '1px 2px', height: '6px', background: 'rgba(0,0,0,0.4)', borderRadius: '2px' }}>
+                  <div className="mic-level-bar-track" style={{ height: '2px', background: 'rgba(255,255,255,0.05)' }}>
+                    <div id="looper-level-bar-fill-mini" className="mic-level-bar-fill" style={{ width: '0%', height: '100%', background: 'linear-gradient(90deg, #00ff96 70%, #ffc000 85%, #ff0055 100%)', transition: 'width 0.05s ease' }}></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -19660,29 +19734,87 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </div>
               )}
 
-              {/* Trigger Button */}
-              <button
-                onClick={toggleLiveLoopRecording}
-                className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : '')}`}
-                style={{
-                  fontSize: '0.52rem',
-                  padding: '5px 0',
-                  fontWeight: 'bold',
-                  width: '100%',
-                  marginTop: '4px',
-                  color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : '#aaa'),
-                  borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : 'rgba(255,255,255,0.15)'),
-                  background: isLiveRecording 
-                    ? 'rgba(255, 0, 85, 0.25)' 
-                    : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.8)' : 'rgba(0,0,0,0.3)'),
-                  boxShadow: isLiveRecording 
-                    ? '0 0 8px rgba(255, 0, 85, 0.4)' 
-                    : (liveRecPendingStart ? '0 0 8px rgba(255, 230, 0, 0.4)' : 'none'),
-                  animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none'
-                }}
-              >
-                {isLiveRecording ? '⏹️ STOP RECORDING' : (liveRecPendingStart ? '⏳ ARMED...' : '🔴 START LIVE REC')}
-              </button>
+              {/* Input Gain Slider */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginTop: '2px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.4rem', color: '#888' }}>INPUT GAIN:</span>
+                  <span style={{ color: '#00f3ff', fontSize: '0.48rem', fontFamily: 'monospace' }}>
+                    {Math.round(recordingInputGain * 100)}%
+                  </span>
+                </div>
+                <input 
+                  type="range" min="0" max="2" step="0.01"
+                  value={recordingInputGain}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setRecordingInputGain(val);
+                    recordingInputGainRef.current = val;
+                    const ctx = audioCtxRef.current;
+                    if (ctx) {
+                      if (micInputGainNodeRef.current) {
+                        micInputGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
+                      }
+                      if (resamplerGainNodeRef.current) {
+                        resamplerGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
+                      }
+                    }
+                  }}
+                  style={{ width: '100%', height: '8px', accentColor: '#00f3ff', cursor: 'pointer', margin: 0 }}
+                />
+              </div>
+
+              {/* ARM & REC Buttons */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '6px', width: '100%', marginTop: '4px' }}>
+                <button
+                  onClick={armLooperInput}
+                  className={`btn btn-xs ${isArmed ? 'active-yellow' : ''}`}
+                  style={{
+                    fontSize: '0.45rem',
+                    padding: '4px 0',
+                    fontWeight: 'bold',
+                    margin: 0,
+                    borderColor: isArmed ? '#ffe600' : 'rgba(255,255,255,0.15)',
+                    background: isArmed ? 'rgba(255, 230, 0, 0.2)' : 'rgba(0,0,0,0.3)',
+                    color: isArmed ? '#ffe600' : '#aaa',
+                  }}
+                >
+                  {isArmed ? 'DISARM IN' : 'ARM INPUT'}
+                </button>
+                <button
+                  onClick={toggleLiveLoopRecording}
+                  className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : '')}`}
+                  style={{
+                    fontSize: '0.45rem',
+                    padding: '4px 0',
+                    fontWeight: 'bold',
+                    margin: 0,
+                    color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : '#aaa'),
+                    borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : 'rgba(255,255,255,0.15)'),
+                    background: isLiveRecording 
+                      ? 'rgba(255, 0, 85, 0.25)' 
+                      : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.8)' : 'rgba(0,0,0,0.3)'),
+                    boxShadow: isLiveRecording 
+                      ? '0 0 8px rgba(255, 0, 85, 0.4)' 
+                      : (liveRecPendingStart ? '0 0 8px rgba(255, 230, 0, 0.4)' : 'none'),
+                    animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none'
+                  }}
+                >
+                  {isLiveRecording ? '⏹️ STOP REC' : (liveRecPendingStart ? '⏳ ARMED...' : '🔴 START REC')}
+                </button>
+              </div>
+
+              {/* Input level meter */}
+              <div style={{ width: '100%', marginTop: '3px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.36rem', color: '#888', marginBottom: '2px', fontFamily: 'monospace' }}>
+                  <span>RECORD LEVEL:</span>
+                  <span style={{ color: isArmed ? '#00f3ff' : '#666' }}>{isArmed ? 'MONITORING' : 'OFF'}</span>
+                </div>
+                <div className="mic-level-meter-container" style={{ padding: '2px 4px', height: '10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '2px' }}>
+                  <div className="mic-level-bar-track" style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div id="looper-level-bar-fill" className="mic-level-bar-fill" style={{ width: '0%', height: '100%', background: 'linear-gradient(90deg, #00ff96 70%, #ffc000 85%, #ff0055 100%)', borderRadius: '2px', transition: 'width 0.05s ease' }}></div>
+                  </div>
+                </div>
+              </div>
 
             </div>
           </div>
