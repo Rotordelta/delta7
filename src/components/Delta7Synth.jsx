@@ -876,6 +876,7 @@ export default function Delta7Synth() {
       lfoRetrigger: true,
       randomPan: 0.0,
       nudgeMs: 0,
+      isRecorded: false,
       eq: createDefaultEq()
     }));
   });
@@ -2492,22 +2493,10 @@ export default function Delta7Synth() {
     const channelL = buffer.getChannelData(0);
     const channelR = buffer.getChannelData(1);
 
-    if (latencySamples >= 0) {
-      // Shift earlier by cropping startIdx
-      const startIdx = Math.min(latencySamples, totalLength);
-      const lengthToCopy = Math.min(targetLength, totalLength - startIdx);
-      if (lengthToCopy > 0) {
-        channelL.set(rawL.subarray(startIdx, startIdx + lengthToCopy), 0);
-        channelR.set(rawR.subarray(startIdx, startIdx + lengthToCopy), 0);
-      }
-    } else {
-      // Shift later by inserting silence at start
-      const destIdx = Math.min(Math.abs(latencySamples), targetLength);
-      const lengthToCopy = Math.min(targetLength - destIdx, totalLength);
-      if (lengthToCopy > 0) {
-        channelL.set(rawL.subarray(0, lengthToCopy), destIdx);
-        channelR.set(rawR.subarray(0, lengthToCopy), destIdx);
-      }
+    const lengthToCopy = Math.min(targetLength, totalLength);
+    if (lengthToCopy > 0) {
+      channelL.set(rawL.subarray(0, lengthToCopy), 0);
+      channelR.set(rawR.subarray(0, lengthToCopy), 0);
     }
     
     const targetSlotId = liveRecTargetSlotRef.current;
@@ -2534,7 +2523,8 @@ export default function Delta7Synth() {
           loopEnd: 1.0,
           loopOn: true,
           warpOn: true,
-          warpBeats: liveRecBeatsRef.current
+          warpBeats: liveRecBeatsRef.current,
+          isRecorded: true
         };
         return updatedSlot;
       }
@@ -2892,22 +2882,10 @@ export default function Delta7Synth() {
     const channelL = buffer.getChannelData(0);
     const channelR = buffer.getChannelData(1);
 
-    if (latencySamples >= 0) {
-      // Shift earlier by cropping startIdx
-      const startIdx = Math.min(latencySamples, totalLength);
-      const lengthToCopy = Math.min(totalLength, totalLength - startIdx);
-      if (lengthToCopy > 0) {
-        channelL.set(rawL.subarray(startIdx, startIdx + lengthToCopy), 0);
-        channelR.set(rawR.subarray(startIdx, startIdx + lengthToCopy), 0);
-      }
-    } else {
-      // Shift later by inserting silence at start
-      const destIdx = Math.min(Math.abs(latencySamples), totalLength);
-      const lengthToCopy = Math.min(totalLength - destIdx, totalLength);
-      if (lengthToCopy > 0) {
-        channelL.set(rawL.subarray(0, lengthToCopy), destIdx);
-        channelR.set(rawR.subarray(0, lengthToCopy), destIdx);
-      }
+    const lengthToCopy = totalLength;
+    if (lengthToCopy > 0) {
+      channelL.set(rawL.subarray(0, lengthToCopy), 0);
+      channelR.set(rawR.subarray(0, lengthToCopy), 0);
     }
     
     // Normalize the buffer to 98% peak amplitude (lossless gain maximization)
@@ -2927,6 +2905,7 @@ export default function Delta7Synth() {
           end: 1.0,
           loopStart: 0.0,
           loopEnd: 1.0,
+          isRecorded: true,
           ...(isBeatSynced ? { warpOn: true, warpBeats: manualRecBeatsRef.current } : {})
         };
         return updatedSlot;
@@ -9200,6 +9179,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       let finalStartOffsetA = startOffsetA;
       let finalDurationA = durationToPlayA;
 
+      const globalLatencyMsA = (slotA && slotA.isRecorded) ? (recLatencyOffsetRef.current || 0) : 0;
+      const latencyOffsetSecA = (!prog.isPlaybackTrigger) ? (globalLatencyMsA / 1000) : 0;
+      if (latencyOffsetSecA > 0) {
+        finalStartOffsetA = Math.min(bufferA.duration - 0.01, finalStartOffsetA + latencyOffsetSecA);
+        finalDurationA = Math.max(0.01, finalDurationA - latencyOffsetSecA);
+      }
+
       if (prog.fluxOffset !== undefined) {
         const loopDuration = durationToPlayA || 0.01;
         const wrappedFlux = prog.fluxOffset % loopDuration;
@@ -9240,6 +9226,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
       let finalStartOffsetB = startOffsetB;
       let finalDurationB = durationToPlayB;
+
+      const globalLatencyMsB = (slotB && slotB.isRecorded) ? (recLatencyOffsetRef.current || 0) : 0;
+      const latencyOffsetSecB = (!prog.isPlaybackTrigger) ? (globalLatencyMsB / 1000) : 0;
+      if (latencyOffsetSecB > 0) {
+        finalStartOffsetB = Math.min(bufferB.duration - 0.01, finalStartOffsetB + latencyOffsetSecB);
+        finalDurationB = Math.max(0.01, finalDurationB - latencyOffsetSecB);
+      }
 
       if (prog.fluxOffset !== undefined) {
         const loopDuration = durationToPlayB || 0.01;
@@ -10390,11 +10383,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       tempProg.fluxOffset = fluxOffset;
     }
 
+    tempProg.isPlaybackTrigger = isPlayback;
+
     let compensatedTargetTime = targetTime;
     if (isPlayback && (type === 'slot' || type === 'slice') && slot) {
       // Lookahead micro-timing nudge compensation (DAW style playback compensation)
+      const globalLatencyMs = slot.isRecorded ? (recLatencyOffsetRef.current || 0) : 0;
       const nudgeMs = slot.nudgeMs || 0;
-      compensatedTargetTime = targetTime + (nudgeMs / 1000);
+      compensatedTargetTime = targetTime - (globalLatencyMs / 1000) + (nudgeMs / 1000);
     }
     const delayOffset = Math.max(0, compensatedTargetTime - now);
 
