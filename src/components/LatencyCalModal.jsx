@@ -143,24 +143,34 @@ function drawOverlay(canvas, refPeaks, recPeaks, offsetBins, zoom, sampleRate, b
   drawWave(recPeaks, offsetBins, 'rgba(255,159,0,0.85)');
 
   // Draw timeline grid lines and ms labels at the top of the canvas
-  const windowDurationMs = (bufferLength / sampleRate) * 1000 / zoom;
-  const preRollMs = 50; // 50ms pre-roll padding
+  const fullDurationMs = (bufferLength / sampleRate) * 1000;
+  let windowDurationMs = fullDurationMs;
+  if (zoom === 2) windowDurationMs = Math.min(fullDurationMs, 2000);
+  else if (zoom === 5) windowDurationMs = Math.min(fullDurationMs, 1000);
+  else if (zoom === 10) windowDurationMs = Math.min(fullDurationMs, 500);
+  else if (zoom === 20) windowDurationMs = Math.min(fullDurationMs, 200);
+  else if (zoom === 50) windowDurationMs = Math.min(fullDurationMs, 100);
+  else if (zoom === 100) windowDurationMs = Math.min(fullDurationMs, 50);
+
+  const preRollMs = zoom === 1 ? 0 : windowDurationMs * 0.20;
 
   // Pixel position of 0ms (Beat 1 Grid Start)
-  const x_0 = (preRollMs / windowDurationMs) * W;
+  const x_0 = zoom === 1 ? 0 : (preRollMs / windowDurationMs) * W;
 
-  // Draw glowing GRID START beat line in cyan
-  ctx.strokeStyle = 'rgba(0, 230, 118, 0.4)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x_0, 0);
-  ctx.lineTo(x_0, H);
-  ctx.stroke();
+  if (zoom > 1) {
+    // Draw glowing GRID START beat line in cyan
+    ctx.strokeStyle = 'rgba(0, 230, 118, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x_0, 0);
+    ctx.lineTo(x_0, H);
+    ctx.stroke();
 
-  // Add "GRID START" label at the bottom of the line
-  ctx.fillStyle = '#00e676';
-  ctx.font = '7px monospace';
-  ctx.fillText('GRID START (0ms)', x_0 + 3, H - 4);
+    // Add "GRID START" label at the bottom of the line
+    ctx.fillStyle = '#00e676';
+    ctx.font = '7px monospace';
+    ctx.fillText('GRID START (0ms)', x_0 + 3, H - 4);
+  }
   
   ctx.fillStyle = '#666';
   ctx.font = '8px monospace';
@@ -183,17 +193,21 @@ function drawOverlay(canvas, refPeaks, recPeaks, offsetBins, zoom, sampleRate, b
   const endMs = windowDurationMs - preRollMs;
 
   for (let ms = startMs; ms <= endMs; ms += tickIntervalMs) {
-    const x = ((ms + preRollMs) / windowDurationMs) * W;
+    const x = zoom === 1
+      ? (ms / windowDurationMs) * W
+      : ((ms + preRollMs) / windowDurationMs) * W;
     
     // Draw tick line (skip drawing directly on x_0 to prevent overlaying the cyan line)
-    if (Math.abs(x - x_0) > 2) {
+    if (zoom === 1 || Math.abs(x - x_0) > 2) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
       ctx.stroke();
       
       // Label at top
-      ctx.fillText(`${ms > 0 ? '+' : ''}${Math.round(ms)}ms`, x + 2, 10);
+      if (ms !== 0 || zoom === 1) {
+        ctx.fillText(`${ms > 0 ? '+' : ''}${Math.round(ms)}ms`, x + 2, 10);
+      }
     }
   }
 }
@@ -215,7 +229,7 @@ export default function LatencyCalModal({
   const [score, setScore] = useState(0);
   const [detecting, setDetecting] = useState(false);
   const [refSlotId, setRefSlotId] = useState('');
-  const [zoom, setZoom] = useState(1); // Zoom level: 1x, 2x, 5x, 10x, 20x
+  const [zoom, setZoom] = useState(1); // Zoom level: 1x, 2x, 5x, 10x, 20x, 50x, 100x
   const [peaks, setPeaks] = useState({ refFull: null, recFull: null, refZoom: null, recZoom: null });
   const [isPlayingPreview, setIsPlayingPreview] = useState(true);
 
@@ -237,14 +251,26 @@ export default function LatencyCalModal({
     const refSlot = sampleSlots.find(s => s.id === refSlotId);
     const refPeaksFull = (refSlot && refSlot.buffer) ? buildPeaks(refSlot.buffer, 512, 0) : recPeaksFull;
 
-    // Zoomed peaks with a 50ms pre-roll padding range
-    const preRollMs = 50;
-    const preRollSamples = Math.round((preRollMs / 1000) * sampleRate);
-    const windowLength = Math.round(referenceBuffer.length / zoom);
+    // Zoomed peaks based on window durations
+    const fullDurationMs = (referenceBuffer.length / sampleRate) * 1000;
+    let windowDurationMs = fullDurationMs;
+    if (zoom === 2) windowDurationMs = Math.min(fullDurationMs, 2000);
+    else if (zoom === 5) windowDurationMs = Math.min(fullDurationMs, 1000);
+    else if (zoom === 10) windowDurationMs = Math.min(fullDurationMs, 500);
+    else if (zoom === 20) windowDurationMs = Math.min(fullDurationMs, 200);
+    else if (zoom === 50) windowDurationMs = Math.min(fullDurationMs, 100);
+    else if (zoom === 100) windowDurationMs = Math.min(fullDurationMs, 50);
 
-    const recPeaksZoom = buildPeaksRange(referenceBuffer, -preRollSamples, windowLength - preRollSamples, 512, 0);
+    const preRollMs = zoom === 1 ? 0 : windowDurationMs * 0.20;
+    const preRollSamples = Math.round((preRollMs / 1000) * sampleRate);
+    const windowLength = Math.round((windowDurationMs / 1000) * sampleRate);
+
+    const startSample = zoom === 1 ? 0 : -preRollSamples;
+    const endSample = zoom === 1 ? referenceBuffer.length : (windowLength - preRollSamples);
+
+    const recPeaksZoom = buildPeaksRange(referenceBuffer, startSample, endSample, 512, 0);
     const refPeaksZoom = (refSlot && refSlot.buffer) 
-      ? buildPeaksRange(refSlot.buffer, -preRollSamples, windowLength - preRollSamples, 512, 0)
+      ? buildPeaksRange(refSlot.buffer, startSample, endSample, 512, 0)
       : null;
 
     setPeaks({
@@ -258,7 +284,15 @@ export default function LatencyCalModal({
   // Convert ms → canvas bins
   const msToBins = useCallback((ms) => {
     if (!referenceBuffer) return 0;
-    const windowDurationMs = (referenceBuffer.length / sampleRate) * 1000 / zoom;
+    const fullDurationMs = (referenceBuffer.length / sampleRate) * 1000;
+    let windowDurationMs = fullDurationMs;
+    if (zoom === 2) windowDurationMs = Math.min(fullDurationMs, 2000);
+    else if (zoom === 5) windowDurationMs = Math.min(fullDurationMs, 1000);
+    else if (zoom === 10) windowDurationMs = Math.min(fullDurationMs, 500);
+    else if (zoom === 20) windowDurationMs = Math.min(fullDurationMs, 200);
+    else if (zoom === 50) windowDurationMs = Math.min(fullDurationMs, 100);
+    else if (zoom === 100) windowDurationMs = Math.min(fullDurationMs, 50);
+
     const numBins = 512;
     return Math.round((ms / windowDurationMs) * numBins);
   }, [referenceBuffer, sampleRate, zoom]);
@@ -512,7 +546,7 @@ export default function LatencyCalModal({
               🔍 ZOOM WAVEFORM
             </span>
             <div style={{ display: 'flex', gap: '4px' }}>
-              {[1, 2, 5, 10, 20].map(z => (
+              {[1, 2, 5, 10, 20, 50, 100].map(z => (
                 <button
                   key={z}
                   onClick={() => setZoom(z)}
@@ -521,11 +555,11 @@ export default function LatencyCalModal({
                     border: `1px solid ${zoom === z ? '#ff9f00' : '#2a2a40'}`,
                     borderRadius: '4px',
                     color: zoom === z ? '#131318' : '#a0a0cc',
-                    padding: '3px 8px',
-                    fontSize: '0.48rem',
+                    padding: '3.5px 6px',
+                    fontSize: '0.45rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.15s',
                   }}
                 >
                   {z}X
