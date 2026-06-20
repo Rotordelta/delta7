@@ -30,8 +30,7 @@ export default function CircularAlignModal({
 }) {
   const canvasRef = useRef(null);
   const isDraggingRef = useRef(false);
-  const startAngleRef = useRef(0);
-  const tempOffsetMsRef = useRef(0);
+  const prevAngleRef = useRef(0);
 
   const buffer = slot?.buffer || null;
   const duration = buffer ? buffer.duration : 1.0;
@@ -40,6 +39,7 @@ export default function CircularAlignModal({
   const [offsetMs, setOffsetMs] = useState(0);
 
   useEffect(() => {
+    if (isDraggingRef.current) return;
     setOffsetMs(slot?.nudgeMs || 0);
   }, [slotId, slot?.nudgeMs]);
 
@@ -235,8 +235,7 @@ export default function CircularAlignModal({
     if (dist < 22 || dist > 140) return;
     
     isDraggingRef.current = true;
-    startAngleRef.current = Math.atan2(dy, dx);
-    tempOffsetMsRef.current = offsetMs;
+    prevAngleRef.current = Math.atan2(dy, dx);
   };
 
   const handleMouseMove = (e) => {
@@ -249,13 +248,21 @@ export default function CircularAlignModal({
     const dy = y - 150;
     const curAngle = Math.atan2(dy, dx);
     
-    let angleDiff = curAngle - startAngleRef.current;
-    const diffMs = -(angleDiff / (2 * Math.PI)) * duration * 1000;
+    let deltaAngle = curAngle - prevAngleRef.current;
+    if (deltaAngle > Math.PI) {
+      deltaAngle -= 2 * Math.PI;
+    } else if (deltaAngle < -Math.PI) {
+      deltaAngle += 2 * Math.PI;
+    }
     
-    let newOffsetMs = Math.round(tempOffsetMsRef.current + diffMs);
-    newOffsetMs = Math.max(-300, Math.min(300, newOffsetMs));
+    const stepMs = -(deltaAngle / (2 * Math.PI)) * duration * 1000;
     
-    setOffsetMs(newOffsetMs);
+    setOffsetMs(prev => {
+      let nextOffset = Math.round(prev + stepMs);
+      return Math.max(-300, Math.min(300, nextOffset));
+    });
+    
+    prevAngleRef.current = curAngle;
   };
 
   const handleMouseUp = () => {
@@ -277,8 +284,7 @@ export default function CircularAlignModal({
     if (dist < 22 || dist > 140) return;
     
     isDraggingRef.current = true;
-    startAngleRef.current = Math.atan2(dy, dx);
-    tempOffsetMsRef.current = offsetMs;
+    prevAngleRef.current = Math.atan2(dy, dx);
   };
 
   const handleTouchMove = (e) => {
@@ -292,13 +298,20 @@ export default function CircularAlignModal({
     const dy = y - 150;
     const curAngle = Math.atan2(dy, dx);
     
-    let angleDiff = curAngle - startAngleRef.current;
-    const diffMs = -(angleDiff / (2 * Math.PI)) * duration * 1000;
+    let deltaAngle = curAngle - prevAngleRef.current;
+    if (deltaAngle > Math.PI) {
+      deltaAngle -= 2 * Math.PI;
+    } else if (deltaAngle < -Math.PI) {
+      deltaAngle += 2 * Math.PI;
+    }
     
-    let newOffsetMs = Math.round(tempOffsetMsRef.current + diffMs);
-    newOffsetMs = Math.max(-300, Math.min(300, newOffsetMs));
+    const stepMs = -(deltaAngle / (2 * Math.PI)) * duration * 1000;
+    setOffsetMs(prev => {
+      let nextOffset = Math.round(prev + stepMs);
+      return Math.max(-300, Math.min(300, nextOffset));
+    });
     
-    setOffsetMs(newOffsetMs);
+    prevAngleRef.current = curAngle;
   };
 
   // Audio Preview via actual performance voice triggers
@@ -318,8 +331,8 @@ export default function CircularAlignModal({
       }
       
       // Stop and restart performance voice pad to align with current timings
-      triggerPerfPadInternal(deck, index, 0, false);
-      triggerPerfPadInternal(deck, index, 100, true);
+      triggerPerfPadInternal(deck, 'slot', index, 0, false);
+      triggerPerfPadInternal(deck, 'slot', index, 100, true);
       setIsPlaying(true);
     } catch (err) {
       console.error("[Vinyl Diagnostic] Failed to play preview:", err);
@@ -329,7 +342,7 @@ export default function CircularAlignModal({
   const stopPreview = () => {
     if (!triggerPerfPadInternal) return;
     try {
-      triggerPerfPadInternal(deck, index, 0, false);
+      triggerPerfPadInternal(deck, 'slot', index, 0, false);
     } catch (e) {}
     setIsPlaying(false);
   };
@@ -344,7 +357,7 @@ export default function CircularAlignModal({
     return () => {
       if (triggerPerfPadInternal) {
         try {
-          triggerPerfPadInternal(deck, index, 0, false);
+          triggerPerfPadInternal(deck, 'slot', index, 0, false);
         } catch (e) {}
       }
     };

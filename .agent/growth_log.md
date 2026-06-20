@@ -177,3 +177,11 @@
   - **In-Memory Parameter Nudging**: When adjusting nudge values in the alignment modal, parameters should be updated in-memory only (bypassing slow database writes to IndexedDB) so that drag sweeps remain lightweight and responsive without write performance glitches.
   - **Cancel Safety**: Closing the modal using Cancel should revert the slot's parameter to its original in-memory state, while clicking Save should commit it permanently to IndexedDB.
   - **Clean Code Isolation**: Component-scoped helpers (like `getRingAngle`) should be exposed to modals, avoiding duplicate code declarations inside rendering cycles or closures.
+
+## Session: 2026-06-20 (Part 4)
+- **Task**: Corrected playhead nudgeMs offset direction and prevented double-nudge on JIT autoplay handover.
+- **Jimmy's Preferences**:
+  - **Correct Lookahead Compensation Direction**: Positive playback nudge values (`nudgeMs > 0`) represent lookahead latency compensation (PDC). To make the sample sound *earlier* to align with delayed inputs, the playhead must skip ahead in the buffer. Therefore, the audio engine must subtract the nudge seconds from the start offset (`startOffset - nudgeSec`) rather than adding them.
+  - **Double-Nudge Prevention on Autoplay**: When a new live loop is recorded and immediately autoplays via JIT handover, the handover scheduling logic already compensates for elapsed latency beats. Applying the slot's `nudgeMs` during the JIT playback trigger would double-compensate the delay. Programmatically bypassing/overriding the nudge offset to `0` during JIT autoplay triggers prevents this mismatch.
+  - **Loop Duration Preservation**: Standard sampler playheads must maintain their target duration during nudging. Adjusting the final duration downwards when a playhead starts early cuts off the end of the loop and causes drift over repeated bars. Preserving `finalDuration = durationToPlay` ensures loops repeat seamlessly.
+
