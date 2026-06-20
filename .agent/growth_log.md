@@ -154,3 +154,10 @@
   - **No Playback Double-Compensation**: If recorded loop buffers are physically cropped at save time (applying the calibration offset directly to the WAV file), no further trigger-time or start-offset latency shifts should be applied during sequencer playback, manual pad tapping, or autoplay handover, preventing notes from starting late or having their transients cut off.
   - **Native 48kHz Audio Alignment**: Both sampling input constraints and playback context configuration must run at a matched native 48kHz sample rate. This completely avoids browser/driver sample rate conversion (SRC) filter lag, ensuring sample-accurate recording alignment with zero micro-timing drift.
   - **Fast Looper Attack Default**: Recorded loop pads should default to a 1ms (0.001s) trigger attack envelope instead of the standard 10ms (0.01s) sampler default to prevent clipping the transient of recorded instruments (guitar, drums, etc.).
+
+## Session: 2026-06-20
+- **Task**: Implemented Just-In-Time (JIT) Latency Handover for zero-latency seamless autoplay.
+- **Jimmy's Preferences**:
+  - **Zero-Latency Handover Handshake**: When latency compensation is active, the recording must run *past* the loop end boundary to collect delayed input samples. JIT slicing solves this: the engine slice-and-posts a temporary buffer *immediately* at the loop boundary for instant autoplay handover, while continuation frames write the remaining late samples to disk asynchronously.
+  - **Double-stage Worklet Handler**: Splitting the audio thread message handlers into `HANDOVER_START` (delivering immediate audio block to main thread playhead) and `RECORDING_COMPLETE` (writing final raw WAV buffer to DB) guarantees that the user hears their loop play back in sync with the grid without a single frame of latency gap.
+  - **Clean State Synchronization**: Using dedicated loop boundaries (`liveRecTotalSamplesRef` vs `liveRecLimitSamplesRef`) and track indicators (`liveRecHandoverStartedRef`) prevents duplicate triggers and guarantees fallback parity under ScriptProcessor paths.

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Knob from './Knob.jsx';
 import LatencyCalModal from './LatencyCalModal.jsx';
+import CircularAlignModal from './CircularAlignModal.jsx';
 import './delta7-styles.css';
 
 // SharedArrayBuffer configuration constants
@@ -1202,7 +1203,9 @@ export default function Delta7Synth() {
 
   const liveRecStartTimeRef = useRef(0);
   const liveRecTotalSamplesRef = useRef(0);
+  const liveRecLimitSamplesRef = useRef(0);
   const liveRecCollectedSamplesRef = useRef(0);
+  const liveRecHandoverStartedRef = useRef(false);
 
   const [liveRecOverdub, setLiveRecOverdub] = useState(false);
   const liveRecOverdubRef = useRef(false);
@@ -1248,11 +1251,17 @@ export default function Delta7Synth() {
   const sustainPedalPressTimeRef = useRef(0);
 
   const [showLatencyCal, setShowLatencyCal] = useState(false);
+  const [circularAlignState, setCircularAlignState] = useState({ visible: false, deck: 'A', index: 0, initialOffset: 0 });
   const [recLatencyOffset, setRecLatencyOffset] = useState(() => {
     const val = localStorage.getItem('recLatencyOffset');
     return val !== null ? parseInt(val, 10) : 30;
   });
   const recLatencyOffsetRef = useRef(30);
+
+  const [handoverAutoplay, setHandoverAutoplay] = useState(() => {
+    const val = localStorage.getItem('handoverAutoplay');
+    return val !== null ? val === 'true' : true;
+  });
 
   const [waveformZoom, setWaveformZoom] = useState(1);
   const [waveformScroll, setWaveformScroll] = useState(0);
@@ -2346,7 +2355,7 @@ export default function Delta7Synth() {
 
       if (isLiveRecordingRef.current) {
         const blockLength = inputL.length;
-        const remaining = liveRecTotalSamplesRef.current - liveRecCollectedSamplesRef.current;
+        const remaining = liveRecLimitSamplesRef.current - liveRecCollectedSamplesRef.current;
         if (remaining > 0) {
           const countToCopy = Math.min(blockLength, remaining);
           const chunkL = new Float32Array(countToCopy);
@@ -2358,8 +2367,31 @@ export default function Delta7Synth() {
           recordedChunksL.current.push(chunkL);
           recordedChunksR.current.push(chunkR);
           liveRecCollectedSamplesRef.current += countToCopy;
-          
-          if (liveRecCollectedSamplesRef.current >= liveRecTotalSamplesRef.current) {
+
+          if (!liveRecHandoverStartedRef.current && liveRecCollectedSamplesRef.current >= liveRecTotalSamplesRef.current) {
+            liveRecHandoverStartedRef.current = true;
+            
+            let totalCollected = 0;
+            for (let i = 0; i < recordedChunksL.current.length; i++) {
+              totalCollected += recordedChunksL.current[i].length;
+            }
+            const bufferL = new Float32Array(totalCollected);
+            const bufferR = new Float32Array(totalCollected);
+            let offset = 0;
+            for (let i = 0; i < recordedChunksL.current.length; i++) {
+              bufferL.set(recordedChunksL.current[i], offset);
+              bufferR.set(recordedChunksR.current[i], offset);
+              offset += recordedChunksL.current[i].length;
+            }
+            const slicedL = bufferL.subarray(0, liveRecTotalSamplesRef.current);
+            const slicedR = bufferR.subarray(0, liveRecTotalSamplesRef.current);
+            
+            setTimeout(() => {
+              saveLiveLoopHandoverStart(slicedL, slicedR);
+            }, 0);
+          }
+
+          if (liveRecCollectedSamplesRef.current >= liveRecLimitSamplesRef.current) {
             isLiveRecordingRef.current = false;
             setTimeout(() => {
               setIsLiveRecording(false);
@@ -2443,10 +2475,12 @@ export default function Delta7Synth() {
     const latencyMs = recLatencyOffsetRef.current || 0;
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     const limitSamples = liveRecTotalSamplesRef.current + Math.max(0, latencySamples);
+    liveRecLimitSamplesRef.current = limitSamples;
 
     liveRecCollectedSamplesRef.current = 0;
     recordedChunksL.current = [];
     recordedChunksR.current = [];
+    liveRecHandoverStartedRef.current = false;
     
     const isPlaying = metronomeRef.current.isPlaying || perfPlaybackActiveRef.current || perfRecordActiveRef.current;
     const useWorklet = recordingWorkletNodeRef.current !== null;
@@ -2489,7 +2523,8 @@ export default function Delta7Synth() {
         recordingWorkletNodeRef.current.port.postMessage({
           type: 'ARM_LIVE_LOOP',
           startTime: snapTime,
-          totalSamples: limitSamples
+          targetSamples: liveRecTotalSamplesRef.current,
+          latencySamples: Math.max(0, latencySamples)
         });
       }
     } else {
@@ -2504,7 +2539,8 @@ export default function Delta7Synth() {
         recordingWorkletNodeRef.current.port.postMessage({
           type: 'ARM_LIVE_LOOP',
           startTime: ctx.currentTime,
-          totalSamples: limitSamples
+          targetSamples: liveRecTotalSamplesRef.current,
+          latencySamples: Math.max(0, latencySamples)
         });
       }
     }
@@ -2628,11 +2664,11 @@ export default function Delta7Synth() {
         customOffset = Math.max(0, elapsed);
       }
 
-      if (!showLatencyCal) {
+      if (!showLatencyCal && handoverAutoplay) {
         console.log(`[Looper] Autoplay handover: deck = ${deck}, slotIndex = ${index}, customOffset = ${customOffset}s, triggerMode = ${updatedSlot.triggerMode || 'latch'}`);
         triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx ? ctx.currentTime : 0, 0, undefined, false, customOffset, true);
       } else {
-        console.log(`[Looper] Autoplay handover bypassed because calibration modal is active (audio preview will play in modal).`);
+        console.log(`[Looper] Autoplay handover bypassed. showLatencyCal = ${showLatencyCal}, handoverAutoplay = ${handoverAutoplay}`);
       }
 
       saveSampleToDb(updatedSlot)
@@ -2642,6 +2678,48 @@ export default function Delta7Synth() {
         .catch((e) => {
           console.error("Failed to save live loop to DB:", e);
         });
+    }
+  };
+
+  const handlePlatterClick = (deck, e) => {
+    const container = deck === 'A' ? ringsContainerRefA.current : ringsContainerRefB.current;
+    if (!container) return;
+    
+    const rect = container.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    
+    const dx = clickX - 125;
+    const dy = clickY - 125;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Radii of the concentric playhead rings
+    const radii = [115, 106, 97, 88, 79, 70, 61, 52];
+    
+    let closestIdx = -1;
+    let minDiff = Infinity;
+    for (let i = 0; i < radii.length; i++) {
+      const diff = Math.abs(dist - radii[i]);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIdx = i;
+      }
+    }
+    
+    // Click threshold (7px margin around the target ring path)
+    if (closestIdx !== -1 && minDiff < 7) {
+      const bankOffset = deck === 'A' ? 0 : 8;
+      const slot = sampleSlots[bankOffset + closestIdx];
+      if (slot && slot.buffer) {
+        console.log(`[Platter Click] Deck ${deck}, Ring ${closestIdx + 1} clicked. Slot ID: ${slot.id}`);
+        setCircularAlignState({
+          visible: true,
+          deck,
+          index: closestIdx,
+          slotId: slot.id,
+          initialOffset: slot.nudgeMs || 0
+        });
+      }
     }
   };
 
@@ -6211,14 +6289,39 @@ export default function Delta7Synth() {
               this.pendingStop = true;
             } else if (msg.type === 'ARM_LIVE_LOOP') {
               this.startTime = msg.startTime;
-              this.totalSamplesLimit = msg.totalSamples;
+              this.targetSamples = msg.targetSamples || 96000;
+              this.latencySamples = msg.latencySamples || 0;
+              this.totalSamplesLimit = this.targetSamples + this.latencySamples;
               this.pendingStart = true;
               this.liveLoopMode = true;
               this.recordedL = [];
               this.recordedR = [];
               this.collectedSamples = 0;
+              this.handoverStarted = false;
             }
           };
+        }
+
+        sendHandoverStart() {
+          let totalLen = 0;
+          for (let i = 0; i < this.recordedL.length; i++) {
+            totalLen += this.recordedL[i].length;
+          }
+          const bufferL = new Float32Array(totalLen);
+          const bufferR = new Float32Array(totalLen);
+          let offset = 0;
+          for (let i = 0; i < this.recordedL.length; i++) {
+            bufferL.set(this.recordedL[i], offset);
+            bufferR.set(this.recordedR[i], offset);
+            offset += this.recordedL[i].length;
+          }
+          const slicedL = bufferL.subarray(0, this.targetSamples);
+          const slicedR = bufferR.subarray(0, this.targetSamples);
+          this.port.postMessage({
+            type: 'HANDOVER_START',
+            bufferL: slicedL,
+            bufferR: slicedR
+          });
         }
 
         sendBuffers() {
@@ -6313,23 +6416,19 @@ export default function Delta7Synth() {
                 return true;
               }
 
-              if (length <= remaining) {
-                this.recordedL.push(new Float32Array(inputL));
-                this.recordedR.push(new Float32Array(inputR));
-                this.collectedSamples += length;
-                
-                if (this.collectedSamples >= this.totalSamplesLimit) {
-                  this.isRecording = false;
-                  this.port.postMessage({ type: 'STOPPED' });
-                  this.sendBuffers();
-                }
-              } else {
-                const sliceL = inputL.subarray(0, remaining);
-                const sliceR = inputR.subarray(0, remaining);
-                this.recordedL.push(new Float32Array(sliceL));
-                this.recordedR.push(new Float32Array(sliceR));
-                this.collectedSamples += remaining;
-                
+              let countToCopy = Math.min(length, remaining);
+              const sliceL = inputL.subarray(0, countToCopy);
+              const sliceR = inputR.subarray(0, countToCopy);
+              this.recordedL.push(new Float32Array(sliceL));
+              this.recordedR.push(new Float32Array(sliceR));
+              this.collectedSamples += countToCopy;
+
+              if (!this.handoverStarted && this.collectedSamples >= this.targetSamples) {
+                this.handoverStarted = true;
+                this.sendHandoverStart();
+              }
+
+              if (this.collectedSamples >= this.totalSamplesLimit) {
                 this.isRecording = false;
                 this.port.postMessage({ type: 'STOPPED' });
                 this.sendBuffers();
@@ -6342,7 +6441,6 @@ export default function Delta7Synth() {
           }
 
           return true;
-        }
       }
       registerProcessor('recorder-processor', RecorderProcessor);
     `;
@@ -13988,7 +14086,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               {/* GPU-Accelerated Concentric Playhead Rings Container */}
               <div 
                 ref={ringsContainerRefA} 
-                style={{ position: 'absolute', top: 0, left: 0, width: '250px', height: '250px', pointerEvents: 'none', zIndex: 3 }}
+                style={{ position: 'absolute', top: 0, left: 0, width: '250px', height: '250px', pointerEvents: 'auto', cursor: 'pointer', zIndex: 3 }}
+                onClick={(e) => handlePlatterClick('A', e)}
               />
 
               {/* Central display Hub SVG (Stationary Overlay) */}
@@ -15142,7 +15241,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               {/* GPU-Accelerated Concentric Playhead Rings Container */}
               <div 
                 ref={ringsContainerRefB} 
-                style={{ position: 'absolute', top: 0, left: 0, width: '250px', height: '250px', pointerEvents: 'none', zIndex: 3 }}
+                style={{ position: 'absolute', top: 0, left: 0, width: '250px', height: '250px', pointerEvents: 'auto', cursor: 'pointer', zIndex: 3 }}
+                onClick={(e) => handlePlatterClick('B', e)}
               />
 
               {/* Central display Hub SVG (Stationary Overlay) */}
@@ -17477,6 +17577,33 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           <span className="font-mono value-readout-sm" style={{ color: (slot.nudgeMs || 0) === 0 ? '#aaa' : '#ff9f00', minWidth: '45px', textAlign: 'right', marginRight: '5px' }}>
                             {slot.nudgeMs || 0}ms
                           </span>
+                          <button
+                            className="btn btn-xs"
+                            style={{
+                              borderColor: '#ff9f00',
+                              color: '#ff9f00',
+                              fontSize: '0.55rem',
+                              padding: '1px 5px',
+                              margin: '0 4px',
+                              background: 'rgba(255, 159, 0, 0.05)',
+                              whiteSpace: 'nowrap',
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => {
+                              const deck = selectedEditSlotId.startsWith('b') ? 'B' : 'A';
+                              const index = parseInt(selectedEditSlotId.replace(/[ab]0*/, ''), 10) - 1;
+                              setCircularAlignState({
+                                visible: true,
+                                deck,
+                                index,
+                                slotId: selectedEditSlotId,
+                                initialOffset: slot.nudgeMs || 0
+                              });
+                            }}
+                            title="Open interactive circular visual alignment helper"
+                          >
+                            💿 VISUAL ALIGN
+                          </button>
                           <span style={{ fontSize: '0.52rem', color: '#666', fontStyle: 'italic' }}>
                             (Negative = early/lookahead, Positive = late)
                           </span>
@@ -18386,6 +18513,52 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           IMPORT FILE...
                         </button>
                       </div>
+                    </div>
+
+                    {/* Autoplay & Calibration Controls */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '6px', marginTop: '6px', alignItems: 'center' }}>
+                      <label style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        cursor: 'pointer',
+                        fontSize: '0.6rem',
+                        color: handoverAutoplay ? '#00ffcc' : '#888',
+                        textShadow: handoverAutoplay ? '0 0 4px rgba(0,255,204,0.4)' : 'none',
+                        transition: 'all 0.2s ease'
+                      }}>
+                        <input 
+                          type="checkbox" 
+                          checked={handoverAutoplay} 
+                          onChange={(e) => {
+                            const val = e.target.checked;
+                            setHandoverAutoplay(val);
+                            localStorage.setItem('handoverAutoplay', val ? 'true' : 'false');
+                          }}
+                          style={{
+                            accentColor: '#00ffcc',
+                            cursor: 'pointer'
+                          }}
+                        />
+                        HANDOVER AUTOPLAY
+                      </label>
+                      
+                      <button
+                        className="btn btn-xs"
+                        style={{
+                          borderColor: '#ff00ff',
+                          color: '#ff00ff',
+                          margin: 0,
+                          fontSize: '0.6rem',
+                          padding: '3px 6px',
+                          background: 'rgba(255,0,255,0.05)',
+                          textShadow: '0 0 4px rgba(255,0,255,0.3)',
+                          boxShadow: 'inset 0 0 4px rgba(255,0,255,0.1)'
+                        }}
+                        onClick={() => setShowLatencyCal(true)}
+                      >
+                        ⏱️ CALIBRATE
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -20602,14 +20775,32 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
       {showLatencyCal && (
         <LatencyCalModal
-          referenceBuffer={sampleSlots.find(s => s.id === selectedEditSlotId)?.buffer}
+          referenceBuffer={sampleSlots.find(s => s.id === liveRecTargetSlot)?.buffer}
           sampleSlots={sampleSlots}
-          targetSlotId={selectedEditSlotId}
+          targetSlotId={liveRecTargetSlot}
           sampleRate={audioCtxRef.current ? audioCtxRef.current.sampleRate : 48000}
           recLatencyOffset={recLatencyOffset}
           onOffsetChange={(ms) => setRecLatencyOffset(ms)}
           onClose={() => setShowLatencyCal(false)}
           audioCtx={audioCtxRef.current}
+        />
+      )}
+
+      {circularAlignState.visible && (
+        <CircularAlignModal
+          slotId={circularAlignState.slotId}
+          sampleSlots={sampleSlots}
+          sampleRate={audioCtxRef.current ? audioCtxRef.current.sampleRate : 48000}
+          audioCtx={audioCtxRef.current}
+          initialOffset={circularAlignState.initialOffset}
+          recLatencyOffset={recLatencyOffset}
+          onUpdateNudge={(nudgeMs) => {
+            updateSlotParam(circularAlignState.slotId, 'nudgeMs', nudgeMs);
+          }}
+          onUpdateGlobalLatency={(latencyMs) => {
+            setRecLatencyOffset(latencyMs);
+          }}
+          onClose={() => setCircularAlignState({ visible: false, deck: 'A', index: 0, slotId: '', initialOffset: 0 })}
         />
       )}
 
