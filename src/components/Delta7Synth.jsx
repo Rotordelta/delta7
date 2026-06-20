@@ -4606,6 +4606,56 @@ export default function Delta7Synth() {
         }
       }
 
+      if (param === 'nudgeMs') {
+        const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+        if (slot && slot.buffer) {
+          const isDeckA = slotId.startsWith('a');
+          const nudgeSec = (val || 0) / 1000;
+          
+          if (isDeckA) {
+            const loopStart = slot.loopStart * slot.buffer.duration - nudgeSec;
+            const loopEnd = slot.loopEnd * slot.buffer.duration - nudgeSec;
+            
+            const clampedLoopStart = Math.max(0, Math.min(slot.buffer.duration, loopStart));
+            const clampedLoopEnd = Math.max(0, Math.min(slot.buffer.duration, loopEnd));
+            
+            voice.startOffsetA = clampedLoopStart;
+            voice.endOffsetA = clampedLoopEnd;
+            
+            ['oscA', 'oscA_L', 'oscA_R'].forEach(oscKey => {
+              const osc = voice[oscKey];
+              if (osc) {
+                try {
+                  if (osc.loop) {
+                    osc.loopStart = clampedLoopStart;
+                    osc.loopEnd = clampedLoopEnd;
+                  }
+                } catch (e) {}
+              }
+            });
+          } else {
+            const loopStart = slot.loopStart * slot.buffer.duration - nudgeSec;
+            const loopEnd = slot.loopEnd * slot.buffer.duration - nudgeSec;
+            
+            const clampedLoopStart = Math.max(0, Math.min(slot.buffer.duration, loopStart));
+            const clampedLoopEnd = Math.max(0, Math.min(slot.buffer.duration, loopEnd));
+            
+            voice.startOffsetB = clampedLoopStart;
+            voice.endOffsetB = clampedLoopEnd;
+            
+            const osc = voice.oscB;
+            if (osc) {
+              try {
+                if (osc.loop) {
+                  osc.loopStart = clampedLoopStart;
+                  osc.loopEnd = clampedLoopEnd;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      }
+
       if (param === 'lfoTarget' || param === 'lfoRate' || param === 'lfoDepth' ||
           param === 'lfoType' || param === 'lfoRateMode' || param === 'lfoFade' || param === 'lfoRetrigger') {
         const slot = sampleSlotsRef.current.find(s => s.id === slotId);
@@ -8622,7 +8672,17 @@ export default function Delta7Synth() {
           playhead = (prog.grainPosition !== undefined ? prog.grainPosition : 0.0) * bufferA.duration;
           isLoopA = true;
         }
+
+        const nudgeSecA = (slotA.nudgeMs || 0) / 1000;
+        if (!isSliceGranular) {
+          startOffsetA = Math.max(0, Math.min(bufferA.duration, startOffsetA - nudgeSecA));
+          endOffsetA = Math.max(0, Math.min(bufferA.duration, endOffsetA - nudgeSecA));
+        }
+
+        playhead = startOffsetA;
         voiceObj.isLoopA = isLoopA;
+        voiceObj.startOffsetA = startOffsetA;
+        voiceObj.endOffsetA = endOffsetA;
         
         if (prog.fluxOffset !== undefined) {
           if (isSliceGranular) {
@@ -8647,6 +8707,9 @@ export default function Delta7Synth() {
           const currentRevBuf = currentSlot ? currentSlot.revBuffer : null;
           if (!currentBuf) return;
 
+          const currentStartOffsetA = voiceObj.startOffsetA !== undefined ? voiceObj.startOffsetA : startOffsetA;
+          const currentEndOffsetA = voiceObj.endOffsetA !== undefined ? voiceObj.endOffsetA : endOffsetA;
+
           const ctxNow = ctx.currentTime;
 
           let gSize, gRate;
@@ -8670,7 +8733,7 @@ export default function Delta7Synth() {
           }
 
           while (nextGrainTime < ctxNow + lookahead + 0.1) {
-            if ((isSliceGranular || isWarpedGranularA) && !isLoopA && !sliceSustainA && playhead >= endOffsetA) {
+            if ((isSliceGranular || isWarpedGranularA) && !isLoopA && !sliceSustainA && playhead >= currentEndOffsetA) {
               break; 
             }
 
@@ -8750,14 +8813,14 @@ export default function Delta7Synth() {
 
             if (isSliceGranular || isWarpedGranularA) {
               if (isLoopA) {
-                if (playhead >= endOffsetA) {
-                  const loopLen = endOffsetA - startOffsetA;
-                  playhead = startOffsetA + ((playhead - startOffsetA) % Math.max(0.01, loopLen));
+                if (playhead >= currentEndOffsetA) {
+                  const loopLen = currentEndOffsetA - currentStartOffsetA;
+                  playhead = currentStartOffsetA + ((playhead - currentStartOffsetA) % Math.max(0.01, loopLen));
                 }
               } else if (sliceSustainA && isSliceGranular) {
-                if (playhead >= endOffsetA) {
-                  const sustainLength = Math.min(0.05, (endOffsetA - startOffsetA) * 0.2);
-                  const sustainStart = endOffsetA - sustainLength;
+                if (playhead >= currentEndOffsetA) {
+                  const sustainLength = Math.min(0.05, (currentEndOffsetA - currentStartOffsetA) * 0.2);
+                  const sustainStart = currentEndOffsetA - sustainLength;
                   playhead = sustainStart + ((playhead - sustainStart) % sustainLength);
                 }
               }
@@ -8981,10 +9044,17 @@ export default function Delta7Synth() {
           endOffsetB = useReverseB 
             ? (1.0 - slotB.start) * bufferB.duration 
             : slotB.end * bufferB.duration;
-          playhead = startOffsetB;
           isLoopB = !!slotB.loopOn;
         }
+
+        const nudgeSecB = (slotB.nudgeMs || 0) / 1000;
+        startOffsetB = Math.max(0, Math.min(bufferB.duration, startOffsetB - nudgeSecB));
+        endOffsetB = Math.max(0, Math.min(bufferB.duration, endOffsetB - nudgeSecB));
+
+        playhead = startOffsetB;
         voiceObj.isLoopB = isLoopB;
+        voiceObj.startOffsetB = startOffsetB;
+        voiceObj.endOffsetB = endOffsetB;
         
         if (prog.fluxOffset !== undefined) {
           if (isSliceGranularB) {
@@ -9009,6 +9079,9 @@ export default function Delta7Synth() {
           const currentRevBuf = currentSlot ? currentSlot.revBuffer : null;
           if (!currentBuf) return;
 
+          const currentStartOffsetB = voiceObj.startOffsetB !== undefined ? voiceObj.startOffsetB : startOffsetB;
+          const currentEndOffsetB = voiceObj.endOffsetB !== undefined ? voiceObj.endOffsetB : endOffsetB;
+
           const ctxNow = ctx.currentTime;
 
           // Serato-style time-stretch: grain size 80-120ms, hop = 25% (4 grains overlapping)
@@ -9023,7 +9096,7 @@ export default function Delta7Synth() {
           }
 
           while (nextGrainTime < ctxNow + lookahead + 0.1) {
-            if ((isSliceGranularB || isWarpedGranularB) && !isLoopB && !sliceSustainB && playhead >= endOffsetB) {
+            if ((isSliceGranularB || isWarpedGranularB) && !isLoopB && !sliceSustainB && playhead >= currentEndOffsetB) {
               break;
             }
 
@@ -9076,14 +9149,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
             if (isSliceGranularB || isWarpedGranularB) {
               if (isLoopB) {
-                if (playhead >= endOffsetB) {
-                  const loopLen = endOffsetB - startOffsetB;
-                  playhead = startOffsetB + ((playhead - startOffsetB) % Math.max(0.01, loopLen));
+                if (playhead >= currentEndOffsetB) {
+                  const loopLen = currentEndOffsetB - currentStartOffsetB;
+                  playhead = currentStartOffsetB + ((playhead - currentStartOffsetB) % Math.max(0.01, loopLen));
                 }
               } else if (sliceSustainB && isSliceGranularB) {
-                if (playhead >= endOffsetB) {
-                  const sustainLength = Math.min(0.05, (endOffsetB - startOffsetB) * 0.2);
-                  const sustainStart = endOffsetB - sustainLength;
+                if (playhead >= currentEndOffsetB) {
+                  const sustainLength = Math.min(0.05, (currentEndOffsetB - currentStartOffsetB) * 0.2);
+                  const sustainStart = currentEndOffsetB - sustainLength;
                   playhead = sustainStart + ((playhead - sustainStart) % sustainLength);
                 }
               }
@@ -9495,7 +9568,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         durationToPlayA = (slotA.end - slotA.start) * bufferA.duration;
       }
 
-      let finalStartOffsetA = startOffsetA;
+      const nudgeSecA = (slotA.nudgeMs || 0) / 1000;
+      let finalStartOffsetA = Math.max(0, Math.min(bufferA.duration, startOffsetA - nudgeSecA));
       let finalDurationA = durationToPlayA;
 
 
@@ -9538,7 +9612,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         durationToPlayB = (slotB.end - slotB.start) * bufferB.duration;
       }
 
-      let finalStartOffsetB = startOffsetB;
+      const nudgeSecB = (slotB.nudgeMs || 0) / 1000;
+      let finalStartOffsetB = Math.max(0, Math.min(bufferB.duration, startOffsetB - nudgeSecB));
       let finalDurationB = durationToPlayB;
 
 

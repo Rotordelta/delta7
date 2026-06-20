@@ -19,9 +19,14 @@ export default function CircularAlignModal({
   slot,
   recLatencyOffset,
   onUpdateNudge,
+  onNudgeChangeInMemory,
   onUpdateGlobalLatency,
   onClose,
-  audioCtx
+  audioCtx,
+  triggerPerfPadInternal,
+  getRingAngle,
+  perfPlaybackActive,
+  setPerfPlaybackActive
 }) {
   const canvasRef = useRef(null);
   const isDraggingRef = useRef(false);
@@ -42,8 +47,6 @@ export default function CircularAlignModal({
   
   // Real-time audio preview states
   const [isPlaying, setIsPlaying] = useState(false);
-  const previewSourceRef = useRef(null);
-  const previewGainRef = useRef(null);
 
   // Downsample buffer to 360 bins for circular waveform rendering
   const [peaks, setPeaks] = useState(() => new Float32Array(360).fill(0));
@@ -76,11 +79,17 @@ export default function CircularAlignModal({
   }, [buffer]);
 
   // Calculate the rotation angle in radians corresponding to the current offsetMs
-  // Formula: rotateAngle = - (offsetMs / 1000 / duration) * 2 * Math.PI
   const rotateAngle = -((offsetMs / 1000) / duration) * 2 * Math.PI;
 
-  // Redraw the canvas when peaks, rotateAngle, or isPlaying changes
+  // Sync timing offset in-memory as the user adjusts it
   useEffect(() => {
+    if (onNudgeChangeInMemory) {
+      onNudgeChangeInMemory(offsetMs);
+    }
+  }, [offsetMs, onNudgeChangeInMemory]);
+
+  // Render function for the circular vinyl platter
+  const drawCanvas = (currentAngleDegrees = 0) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -89,7 +98,6 @@ export default function CircularAlignModal({
     const centerX = W / 2;
     const centerY = H / 2;
     
-    // Clear canvas
     ctx.clearRect(0, 0, W, H);
     
     // Draw background outer record vinyl plate
@@ -124,12 +132,14 @@ export default function CircularAlignModal({
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
     
+    const playheadAngle = (currentAngleDegrees / 360) * 2 * Math.PI;
+    const dynamicRotate = rotateAngle - playheadAngle;
+
     for (let i = 0; i < 360; i++) {
       const amp = peaks[i] || 0;
       if (amp <= 0) continue;
       
-      // Calculate angle with the rotation offset applied
-      const angle = -Math.PI / 2 + (i / 360) * 2 * Math.PI + rotateAngle;
+      const angle = -Math.PI / 2 + (i / 360) * 2 * Math.PI + dynamicRotate;
       
       const xStart = centerX + R_in * Math.cos(angle);
       const yStart = centerY + R_in * Math.sin(angle);
@@ -155,7 +165,7 @@ export default function CircularAlignModal({
 
     ctx.beginPath();
     ctx.arc(centerX, centerY, 6, 0, 2 * Math.PI);
-    ctx.fillStyle = '#d4af37'; // gold spindle accent
+    ctx.fillStyle = '#d4af37';
     ctx.fill();
 
     // Draw vertical green anchor line at 12 o'clock representing GRID START (0ms)
@@ -167,7 +177,7 @@ export default function CircularAlignModal({
     ctx.shadowColor = '#00ff66';
     ctx.shadowBlur = 6;
     ctx.stroke();
-    ctx.shadowBlur = 0; // reset shadow
+    ctx.shadowBlur = 0;
 
     // Add labels next to Grid Start line
     ctx.fillStyle = '#00ff66';
@@ -175,7 +185,41 @@ export default function CircularAlignModal({
     ctx.textAlign = 'center';
     ctx.fillText('GRID START (0ms)', centerX, centerY - 138);
 
-  }, [peaks, rotateAngle, padColor]);
+    // Orbiting playhead dot
+    if (isPlaying) {
+      const phAngle = -Math.PI / 2 + playheadAngle;
+      const phX = centerX + 70 * Math.cos(phAngle);
+      const phY = centerY + 70 * Math.sin(phAngle);
+      ctx.beginPath();
+      ctx.arc(phX, phY, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = '#00f3ff';
+      ctx.shadowColor = '#00f3ff';
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  };
+
+  // Redraw canvas on static parameter changes, or run animation frame loop if isPlaying
+  useEffect(() => {
+    if (!isPlaying) {
+      drawCanvas(0);
+      return;
+    }
+
+    let active = true;
+    const tick = () => {
+      if (!active) return;
+      const angle = getRingAngle ? getRingAngle(deck, index) : 0;
+      drawCanvas(angle);
+      requestAnimationFrame(tick);
+    };
+    
+    requestAnimationFrame(tick);
+    return () => {
+      active = false;
+    };
+  }, [peaks, rotateAngle, padColor, isPlaying]);
 
   // Drag interaction handlers
   const handleMouseDown = (e) => {
@@ -188,7 +232,6 @@ export default function CircularAlignModal({
     const dy = y - 150;
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    // Ignore clicks too close to center hub or too far from outer edge
     if (dist < 22 || dist > 140) return;
     
     isDraggingRef.current = true;
@@ -207,15 +250,9 @@ export default function CircularAlignModal({
     const curAngle = Math.atan2(dy, dx);
     
     let angleDiff = curAngle - startAngleRef.current;
-    
-    // Convert angular displacement to ms timing offset:
-    // angleDiff = - (diffMs / 1000 / duration) * 2 * Math.PI
-    // -> diffMs = - (angleDiff / (2 * Math.PI)) * duration * 1000
     const diffMs = -(angleDiff / (2 * Math.PI)) * duration * 1000;
     
     let newOffsetMs = Math.round(tempOffsetMsRef.current + diffMs);
-    
-    // Clamp to logical lookahead ranges [-300ms, +300ms] to prevent spinning out of bounds
     newOffsetMs = Math.max(-300, Math.min(300, newOffsetMs));
     
     setOffsetMs(newOffsetMs);
@@ -264,7 +301,7 @@ export default function CircularAlignModal({
     setOffsetMs(newOffsetMs);
   };
 
-  // Audio Preview implementation (plays the raw buffer starting at the aligned offset)
+  // Audio Preview via actual performance voice triggers
   const togglePlayPreview = () => {
     if (isPlaying) {
       stopPreview();
@@ -274,30 +311,15 @@ export default function CircularAlignModal({
   };
 
   const startPreview = () => {
-    if (!audioCtx || !buffer) return;
+    if (!triggerPerfPadInternal) return;
     try {
-      // Stop previous instance if running
-      stopPreview();
+      if (setPerfPlaybackActive && !perfPlaybackActive) {
+        setPerfPlaybackActive(true);
+      }
       
-      const source = audioCtx.createBufferSource();
-      source.buffer = buffer;
-      source.loop = true;
-      
-      const gainNode = audioCtx.createGain();
-      // Apply modest gain to avoid blasting ears
-      gainNode.gain.setValueAtTime(0.7, audioCtx.currentTime);
-      
-      source.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      
-      // Calculate start offset: we play starting from offsetMs
-      // Negative offsetMs means we skip silence at the start of the buffer
-      let startOffset = Math.max(0, offsetMs / 1000);
-      
-      source.start(0, startOffset);
-      
-      previewSourceRef.current = source;
-      previewGainRef.current = gainNode;
+      // Stop and restart performance voice pad to align with current timings
+      triggerPerfPadInternal(deck, index, 0, false);
+      triggerPerfPadInternal(deck, index, 100, true);
       setIsPlaying(true);
     } catch (err) {
       console.error("[Vinyl Diagnostic] Failed to play preview:", err);
@@ -305,28 +327,28 @@ export default function CircularAlignModal({
   };
 
   const stopPreview = () => {
-    if (previewSourceRef.current) {
-      try {
-        previewSourceRef.current.stop();
-        previewSourceRef.current.disconnect();
-      } catch (e) {}
-      previewSourceRef.current = null;
-    }
-    if (previewGainRef.current) {
-      try {
-        previewGainRef.current.disconnect();
-      } catch (e) {}
-      previewGainRef.current = null;
-    }
+    if (!triggerPerfPadInternal) return;
+    try {
+      triggerPerfPadInternal(deck, index, 0, false);
+    } catch (e) {}
     setIsPlaying(false);
   };
 
-  // Clean up audio nodes on unmount
+  const handleClose = () => {
+    stopPreview();
+    if (onClose) onClose();
+  };
+
+  // Stop performance preview when modal unmounts
   useEffect(() => {
     return () => {
-      stopPreview();
+      if (triggerPerfPadInternal) {
+        try {
+          triggerPerfPadInternal(deck, index, 0, false);
+        } catch (e) {}
+      }
     };
-  }, []);
+  }, [deck, index, triggerPerfPadInternal]);
 
   return (
     <div className="circular-align-overlay" style={overlayStyle}>
@@ -338,7 +360,7 @@ export default function CircularAlignModal({
             <span style={{ ...indicatorDot, backgroundColor: padColor }} />
             <h3 style={titleStyle}>VINYL DIAGNOSTIC TOOL</h3>
           </div>
-          <button style={closeBtnStyle} onClick={onClose}>✕</button>
+          <button style={closeBtnStyle} onClick={handleClose}>✕</button>
         </div>
 
         {/* Target Details */}
@@ -429,20 +451,20 @@ export default function CircularAlignModal({
         <div style={applySection}>
           <button 
             className="action-btn glow-cyan" 
-            style={applyBtnStyle('#00f3ff')} 
+            style={{ ...applyBtnStyle('#00f3ff'), fontSize: '0.75rem', padding: '10px' }} 
             onClick={() => {
               onUpdateNudge(offsetMs);
-              onClose();
+              handleClose();
             }}
           >
-            APPLY TO PAD NUDGE
+            💾 COMMIT ALIGNMENT TO PAD
           </button>
           <button 
             className="action-btn glow-yellow" 
             style={applyBtnStyle('#ffe600')}
             onClick={() => {
               onUpdateGlobalLatency(offsetMs);
-              onClose();
+              handleClose();
             }}
           >
             APPLY TO GLOBAL LATENCY
