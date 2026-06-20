@@ -20788,7 +20788,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
       {circularAlignState.visible && (
         <CircularAlignModal
+          deck={circularAlignState.deck}
+          index={circularAlignState.index}
           slotId={circularAlignState.slotId}
+          slot={sampleSlots.find(s => s.id === circularAlignState.slotId)}
           sampleSlots={sampleSlots}
           sampleRate={audioCtxRef.current ? audioCtxRef.current.sampleRate : 48000}
           audioCtx={audioCtxRef.current}

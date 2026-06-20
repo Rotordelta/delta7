@@ -32,7 +32,12 @@ export default function CircularAlignModal({
   const duration = buffer ? buffer.duration : 1.0;
   
   // Local state for the calibrated offset in milliseconds (starts at the pad's current nudgeMs)
-  const [offsetMs, setOffsetMs] = useState(slot?.nudgeMs || 0);
+  const [offsetMs, setOffsetMs] = useState(0);
+
+  useEffect(() => {
+    setOffsetMs(slot?.nudgeMs || 0);
+  }, [slotId, slot?.nudgeMs]);
+
   const padColor = RING_COLORS[index] || '#00f3ff';
   
   // Real-time audio preview states
@@ -41,8 +46,13 @@ export default function CircularAlignModal({
   const previewGainRef = useRef(null);
 
   // Downsample buffer to 360 bins for circular waveform rendering
-  const [peaks, setPeaks] = useState(() => {
-    if (!buffer) return new Float32Array(360).fill(0);
+  const [peaks, setPeaks] = useState(() => new Float32Array(360).fill(0));
+
+  useEffect(() => {
+    if (!buffer) {
+      setPeaks(new Float32Array(360).fill(0));
+      return;
+    }
     const data = buffer.getChannelData(0);
     const numBins = 360;
     const blockSize = Math.max(1, Math.floor(data.length / numBins));
@@ -62,8 +72,8 @@ export default function CircularAlignModal({
     for (let i = 0; i < numBins; i++) {
       result[i] = result[i] / globalMax;
     }
-    return result;
-  });
+    setPeaks(result);
+  }, [buffer]);
 
   // Calculate the rotation angle in radians corresponding to the current offsetMs
   // Formula: rotateAngle = - (offsetMs / 1000 / duration) * 2 * Math.PI
