@@ -1277,8 +1277,9 @@ export default function Delta7Synth() {
     const voice = voices[0];
     if (!voice) return 0;
     
+    if (voice.startTime === undefined || isNaN(voice.startTime)) return 0;
     const elapsed = ctx.currentTime - voice.startTime;
-    if (elapsed < 0) return 0;
+    if (isNaN(elapsed) || elapsed < 0) return 0;
     
     const isA = deck === 'A';
     const duration = isA ? voice.activeDurationA : voice.activeDurationB;
@@ -8673,10 +8674,11 @@ export default function Delta7Synth() {
           isLoopA = true;
         }
 
-        const nudgeSecA = (slotA.nudgeMs || 0) / 1000;
+        const isPlayback = prog.isPlaybackTrigger || false;
+        const nudgeSecA = isPlayback ? 0 : ((slotA.nudgeMs || 0) / 1000);
         if (!isSliceGranular) {
-          startOffsetA = Math.max(0, Math.min(bufferA.duration, startOffsetA - nudgeSecA));
-          endOffsetA = Math.max(0, Math.min(bufferA.duration, endOffsetA - nudgeSecA));
+          startOffsetA = Math.max(0, Math.min(bufferA.duration, startOffsetA + nudgeSecA));
+          endOffsetA = Math.max(0, Math.min(bufferA.duration, endOffsetA + nudgeSecA));
         }
 
         playhead = startOffsetA;
@@ -9047,9 +9049,10 @@ export default function Delta7Synth() {
           isLoopB = !!slotB.loopOn;
         }
 
-        const nudgeSecB = (slotB.nudgeMs || 0) / 1000;
-        startOffsetB = Math.max(0, Math.min(bufferB.duration, startOffsetB - nudgeSecB));
-        endOffsetB = Math.max(0, Math.min(bufferB.duration, endOffsetB - nudgeSecB));
+        const isPlayback = prog.isPlaybackTrigger || false;
+        const nudgeSecB = isPlayback ? 0 : ((slotB.nudgeMs || 0) / 1000);
+        startOffsetB = Math.max(0, Math.min(bufferB.duration, startOffsetB + nudgeSecB));
+        endOffsetB = Math.max(0, Math.min(bufferB.duration, endOffsetB + nudgeSecB));
 
         playhead = startOffsetB;
         voiceObj.isLoopB = isLoopB;
@@ -9568,8 +9571,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         durationToPlayA = (slotA.end - slotA.start) * bufferA.duration;
       }
 
-      const nudgeSecA = (slotA.nudgeMs || 0) / 1000;
-      let finalStartOffsetA = Math.max(0, Math.min(bufferA.duration, startOffsetA - nudgeSecA));
+      const isPlayback = prog.isPlaybackTrigger || false;
+      const nudgeSecA = isPlayback ? 0 : ((slotA.nudgeMs || 0) / 1000);
+      let finalStartOffsetA = Math.max(0, Math.min(bufferA.duration, startOffsetA + nudgeSecA));
       let finalDurationA = durationToPlayA;
 
 
@@ -9612,8 +9616,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         durationToPlayB = (slotB.end - slotB.start) * bufferB.duration;
       }
 
-      const nudgeSecB = (slotB.nudgeMs || 0) / 1000;
-      let finalStartOffsetB = Math.max(0, Math.min(bufferB.duration, startOffsetB - nudgeSecB));
+      const isPlayback = prog.isPlaybackTrigger || false;
+      const nudgeSecB = isPlayback ? 0 : ((slotB.nudgeMs || 0) / 1000);
+      let finalStartOffsetB = Math.max(0, Math.min(bufferB.duration, startOffsetB + nudgeSecB));
       let finalDurationB = durationToPlayB;
 
 
@@ -10773,7 +10778,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     if (isPlayback && (type === 'slot' || type === 'slice') && slot) {
       // Lookahead micro-timing nudge compensation (DAW style playback compensation)
       const nudgeMs = slot.nudgeMs || 0;
-      compensatedTargetTime = targetTime + (nudgeMs / 1000);
+      compensatedTargetTime = targetTime - (nudgeMs / 1000);
     }
     const delayOffset = Math.max(0, compensatedTargetTime - now);
 
@@ -10791,6 +10796,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           voice.startTime = now - (tempProg.fluxOffset / safeRate);
         } else {
           voice.triggerBeat = targetBeat;
+          voice.startTime = now + delayOffset;
         }
         voice.type = type;
       }
