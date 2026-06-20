@@ -169,3 +169,11 @@
   - **Dynamic Calibration Target Tracking**: When the Latency Calibration modal is open on Standby, it must dynamically track the looper's target pad (`liveRecTargetSlot`) rather than remaining locked to the workstation's current editor selection (`selectedEditSlotId`). This ensures that if the user records drums on pad `A5`, the standby modal automatically wakes up, loads, and calibrates the `A5` buffer instead of looking at `A1`.
   - **Persistent Autoplay Toggles**: Providing a clear "HANDOVER AUTOPLAY" toggle in the looper control panel, along with a direct "CALIBRATE" trigger button, gives instant control over whether new recordings start playing automatically. Persisting this preference in local storage keeps the performance workflow predictable across sessions.
   - **Quick Editor Alignment Access**: Adding a "VISUAL ALIGN" button next to the micro-timing nudge slider in the sample slot properties panel allows the user to open the circular platter diagnostic modal for any slot instantly.
+
+## Session: 2026-06-20 (Part 3)
+- **Task**: Interactive transport controls, real-time playhead, and in-memory parameter nudging in Circular Calibration modal.
+- **Jimmy's Preferences**:
+  - **Live Platter Audio & Visual Feedback**: The circular calibration modal should display an active playhead (a glowing cyan dot orbiting the platter ring) synchronized in real-time with the audio. Adding dedicated transport controls (Play, Pause, Stop) directly within the modal allows auditioning phase-alignment by ear and eye simultaneously.
+  - **In-Memory Parameter Nudging**: When adjusting nudge values in the alignment modal, parameters should be updated in-memory only (bypassing slow database writes to IndexedDB) so that drag sweeps remain lightweight and responsive without write performance glitches.
+  - **Cancel Safety**: Closing the modal using Cancel should revert the slot's parameter to its original in-memory state, while clicking Save should commit it permanently to IndexedDB.
+  - **Clean Code Isolation**: Component-scoped helpers (like `getRingAngle`) should be exposed to modals, avoiding duplicate code declarations inside rendering cycles or closures.
