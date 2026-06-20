@@ -1266,6 +1266,70 @@ export default function Delta7Synth() {
   const [waveformZoom, setWaveformZoom] = useState(1);
   const [waveformScroll, setWaveformScroll] = useState(0);
 
+  const getRingAngle = (deck, slotIdx) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return 0;
+    
+    const voiceKey = `perf-${deck.toLowerCase()}-slot-${slotIdx}`;
+    const voices = activeVoicesRef.current.get(voiceKey);
+    if (!voices || voices.length === 0) return 0;
+    
+    const voice = voices[0];
+    if (!voice) return 0;
+    
+    const elapsed = ctx.currentTime - voice.startTime;
+    if (elapsed < 0) return 0;
+    
+    const isA = deck === 'A';
+    const duration = isA ? voice.activeDurationA : voice.activeDurationB;
+    const isLoop = isA ? voice.isLoopA : voice.isLoopB;
+    const isReverse = isA ? voice.isReverseA : voice.isReverseB;
+    
+    if (duration <= 0) return 0;
+    
+    let progress = 0;
+    const bpm = paramsRef.current.arpBpm || 120;
+    const beatDuration = 60 / bpm;
+    const isTimelineRunning = perfPlaybackActiveRef.current || perfRecordActiveRef.current;
+    
+    if (isTimelineRunning && voice.triggerBeat !== undefined) {
+      const elapsedBeats = Math.max(0.0, seqCurrentBeatRef.current - voice.triggerBeat);
+      const warpOn = isA ? voice.warpOnA : voice.warpOnB;
+      const warpBeats = isA ? voice.warpBeatsA : voice.warpBeatsB;
+      
+      if (warpOn && warpBeats) {
+        const loopBeats = warpBeats;
+        let beatPos = elapsedBeats;
+        if (isLoop) {
+          beatPos = ((beatPos % loopBeats) + loopBeats) % loopBeats;
+        } else {
+          if (beatPos >= loopBeats) return 0;
+        }
+        progress = beatPos / loopBeats;
+      } else {
+        const durationBeats = duration / beatDuration;
+        let beatPos = elapsedBeats;
+        if (isLoop) {
+          beatPos = ((beatPos % durationBeats) + durationBeats) % durationBeats;
+        } else {
+          if (beatPos >= durationBeats) return 0;
+        }
+        progress = beatPos / durationBeats;
+      }
+    } else {
+      const rate = isA ? (voice.orig_oscA_rate || 1.0) : (voice.orig_oscB_rate || 1.0);
+      let pos = elapsed * rate;
+      if (isLoop) {
+        pos = pos % duration;
+      } else {
+        if (pos >= duration) return 0;
+      }
+      progress = pos / duration;
+    }
+    
+    return (isReverse ? (1.0 - progress) : progress) * 360;
+  };
+
   useEffect(() => {
     localStorage.setItem('recLatencyOffset', recLatencyOffset);
     recLatencyOffsetRef.current = recLatencyOffset;
@@ -1677,68 +1741,7 @@ export default function Delta7Synth() {
           highwayEventsRefB.current.style.transform = `translate3d(0, ${translatePx}px, 0)`;
         }
 
-        // Concentric Rings calculation
-        const getRingAngle = (deck, slotIdx) => {
-          const voiceKey = `perf-${deck.toLowerCase()}-slot-${slotIdx}`;
-          const voices = activeVoicesRef.current.get(voiceKey);
-          if (!voices || voices.length === 0) return 0;
-          
-          const voice = voices[0];
-          if (!voice) return 0;
-          
-          const elapsed = ctx.currentTime - voice.startTime;
-          if (elapsed < 0) return 0;
-          
-          const isA = deck === 'A';
-          const duration = isA ? voice.activeDurationA : voice.activeDurationB;
-          const isLoop = isA ? voice.isLoopA : voice.isLoopB;
-          const isReverse = isA ? voice.isReverseA : voice.isReverseB;
-          
-          if (duration <= 0) return 0;
-          
-          let progress = 0;
-          const bpm = paramsRef.current.arpBpm || 120;
-          const beatDuration = 60 / bpm;
-          const isTimelineRunning = perfPlaybackActiveRef.current || perfRecordActiveRef.current;
-          
-          if (isTimelineRunning && voice.triggerBeat !== undefined) {
-            const elapsedBeats = Math.max(0.0, currentBeat - voice.triggerBeat);
-            const warpOn = isA ? voice.warpOnA : voice.warpOnB;
-            const warpBeats = isA ? voice.warpBeatsA : voice.warpBeatsB;
-            
-            if (warpOn && warpBeats) {
-              const loopBeats = warpBeats;
-              let beatPos = elapsedBeats;
-              if (isLoop) {
-                beatPos = ((beatPos % loopBeats) + loopBeats) % loopBeats;
-              } else {
-                if (beatPos >= loopBeats) return 0;
-              }
-              progress = beatPos / loopBeats;
-            } else {
-              const durationBeats = duration / beatDuration;
-              let beatPos = elapsedBeats;
-              if (isLoop) {
-                beatPos = ((beatPos % durationBeats) + durationBeats) % durationBeats;
-              } else {
-                if (beatPos >= durationBeats) return 0;
-              }
-              progress = beatPos / durationBeats;
-            }
-          } else {
-            // Fallback to real-time timer when sequencer is not running
-            const rate = isA ? (voice.orig_oscA_rate || 1.0) : (voice.orig_oscB_rate || 1.0);
-            let pos = elapsed * rate;
-            if (isLoop) {
-              pos = pos % duration;
-            } else {
-              if (pos >= duration) return 0;
-            }
-            progress = pos / duration;
-          }
-          
-          return (isReverse ? (1.0 - progress) : progress) * 360;
-        };
+        // Concentric Rings calculation using component-level helper
 
         // Mutate concentric playhead rings and satellite dots directly in the DOM
         for (let i = 0; i < 8; i++) {
@@ -4946,6 +4949,18 @@ export default function Delta7Synth() {
     setSampleSlots(nextSlots);
     syncActiveVoiceParams(slotId, param, val);
     saveSlotMetadataToDb(slotId, { [param]: val }).catch(() => {});
+  };
+
+  const updateSlotParamInMemory = (slotId, param, val) => {
+    const nextSlots = sampleSlotsRef.current.map(s => {
+      if (s.id === slotId) {
+        return { ...s, [param]: val };
+      }
+      return s;
+    });
+    sampleSlotsRef.current = nextSlots;
+    setSampleSlots(nextSlots);
+    syncActiveVoiceParams(slotId, param, val);
   };
 
   const handleStartChange = (val) => {
@@ -20800,10 +20815,21 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           onUpdateNudge={(nudgeMs) => {
             updateSlotParam(circularAlignState.slotId, 'nudgeMs', nudgeMs);
           }}
+          onNudgeChangeInMemory={(nudgeMs) => {
+            updateSlotParamInMemory(circularAlignState.slotId, 'nudgeMs', nudgeMs);
+          }}
           onUpdateGlobalLatency={(latencyMs) => {
             setRecLatencyOffset(latencyMs);
           }}
-          onClose={() => setCircularAlignState({ visible: false, deck: 'A', index: 0, slotId: '', initialOffset: 0 })}
+          triggerPerfPadInternal={triggerPerfPadInternal}
+          getRingAngle={getRingAngle}
+          perfPlaybackActive={perfPlaybackActive}
+          setPerfPlaybackActive={setPerfPlaybackActive}
+          onClose={() => {
+            // Restore original in-memory offset if closing without committing
+            updateSlotParamInMemory(circularAlignState.slotId, 'nudgeMs', circularAlignState.initialOffset);
+            setCircularAlignState({ visible: false, deck: 'A', index: 0, slotId: '', initialOffset: 0 });
+          }}
         />
       )}
 
