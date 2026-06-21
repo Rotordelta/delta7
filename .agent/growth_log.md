@@ -207,4 +207,7 @@
   - **Dynamic FX Routing Highlights**: Wrapping the left panel's 4 effects units (Space Echo, Leslie/Rotor Cabinet, Reverb, Stutter) in GPU-accelerated glow panels (`.fx-bloom-section`) that light up automatically based on the selected pad's active FX target makes routing instantly clear and visually interactive.
   - **Context-Aware Visual Aids**: Shifting the styling of FX units from simple static borders to glowing, pulsating borders of corresponding colors draws focus to the active parameters, keeping the workspace extremely clean and functional.
 
-
+## Session: 2026-06-21 (Part 3)
+- **Task**: Standalone outer header removal and hardware top rack branding restoration.
+- **Jimmy's Preferences**:
+  - **Standalone Website Headings vs. Hardware Aesthetics**: Keep the hardware chassis clean of external website titles and headers (e.g. `<h1>Delta7 Workstation</h1>` outside the chassis). Keep all hardware-style branding elements (e.g., top rack bar labels `delta7` and `HYPER INTEGRATED SYNTHESIS WORKSTATION`) intact to maintain the immersive feel of working on a physical synthesizer unit.
