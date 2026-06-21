@@ -201,4 +201,10 @@
   - **Horizontal Console Dashboard**: Rendering a dedicated master console panel horizontally below the highways fits the physical workstation chassis feel and groups master controls in a clean dashboard.
   - **Dynamic Limiter Bypassing**: Toggling the brickwall limiter in and out of the signal path dynamically via a dedicated, glowing **ACTIVE/BYPASS** switch allows comparing the limited output against the raw parallel sum immediately, while also visually dimming the level meters to indicate a bypassed state.
 
+## Session: 2026-06-21 (Part 2)
+- **Task**: GPU-Accelerated Cockpit FX Bloom Sections based on Pad Routing.
+- **Jimmy's Preferences**:
+  - **Dynamic FX Routing Highlights**: Wrapping the left panel's 4 effects units (Space Echo, Leslie/Rotor Cabinet, Reverb, Stutter) in GPU-accelerated glow panels (`.fx-bloom-section`) that light up automatically based on the selected pad's active FX target makes routing instantly clear and visually interactive.
+  - **Context-Aware Visual Aids**: Shifting the styling of FX units from simple static borders to glowing, pulsating borders of corresponding colors draws focus to the active parameters, keeping the workspace extremely clean and functional.
+
 
