@@ -191,3 +191,12 @@
   - **Lookahead Timing Compensation Direction**: Correct lookahead scheduling logic for sequencer-scheduled playbacks requires subtracting the nudge offset from the target beat schedule (`compensatedTargetTime = targetTime - nudgeMs / 1000`) to trigger the note early in the future, compensating for USB buffer delays.
   - **Decoupled Playhead Offset Modes**: We must decouple manual play triggers from sequencer-scheduled playbacks. Manual note triggers (e.g. pad taps) start playing the sample buffer immediately, shifted forward by `+ nudgeMs` to bypass initial recording silence. Sequencer playback triggers play from start offset `0` (since the scheduler already triggers them early by `- nudgeMs`), preserving early transients and pre-rolls without clipping or shortening the loop.
   - **Platter Visual Playhead NaN Protection**: Concurrently rendering multiple voice platter rings under high CPU/MIDI load can sometimes cause voice timestamps to evaluate to NaN during the initialization frame. Validating all `voice.startTime` and elapsed calculations inside `getRingAngle` to safely return `0` prevents invalid values and warnings in browser renderers.
+
+## Session: 2026-06-21
+- **Task**: Master Bus Console, Parallel Glue Compressor, Master Limiter VU, and Sidechain Ducker.
+- **Jimmy's Preferences**:
+  - **Premium Master Bus Dynamics**: Integrating parallel glue compression and final brickwall limiting directly inside the master audio graph is highly valued to glue master loops together and prevent clipping during live overdub jams.
+  - **Dynamic Sidechain Ducking**: Having a one-knob sidechain ducker that automatically ducks active loops/voices upon pad strikes helps clear headroom for transient notes (like kick/snare) and keeps the mix breathing.
+  - **Tactile LED VU Metering**: Including a physical-style 10-segment LED VU meter bound to final brickwall output levels provides immediate visual confirmation of master levels and limiting compression depth.
+  - **Horizontal Console Dashboard**: Rendering a dedicated master console panel horizontally below the highways fits the physical workstation chassis feel and groups master controls in a clean dashboard.
+
