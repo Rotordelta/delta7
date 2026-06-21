@@ -999,6 +999,14 @@ export default function Delta7Synth() {
   useEffect(() => { deckASoloActiveRef.current = deckASoloActive; }, [deckASoloActive]);
   useEffect(() => { deckBSoloActiveRef.current = deckBSoloActive; }, [deckBSoloActive]);
   const [padMenuState, setPadMenuState] = useState({ visible: false, x: 0, y: 0, deck: 'A', index: 0 });
+
+  const getActiveRoutedFxType = () => {
+    if (!padMenuState.visible) return 'None';
+    const prefix = padMenuState.deck === 'A' ? 'a0' : 'b0';
+    const slotId = prefix + (padMenuState.index + 1);
+    const slot = sampleSlots.find(s => s.id === slotId);
+    return slot ? (slot.fxType || 'None') : 'None';
+  };
   const platterAngleARef = useRef(0);
   const platterAngleBRef = useRef(0);
   const platterRefA = useRef(null);
@@ -16847,7 +16855,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           
           {/* TAPE ECHO & LESLIE CONTROL DECK */}
           <div className="tape-leslie-deck">
-            <span className="knob-label">TAPE ECHO DECK</span>
+            {/* Space Echo section with bloom feedback */}
+            <div 
+              className={`fx-bloom-section ${getActiveRoutedFxType() === 'Space Echo' ? 'active-bloom-cyan' : ''}`}
+              style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '8px', alignItems: 'center' }}
+            >
+              <span className="knob-label" style={{ display: 'block', margin: '0 auto 4px auto' }}>TAPE ECHO DECK</span>
             
             {/* Spinning Tape Reels */}
             <div className="tape-deck-reels">
@@ -17049,10 +17062,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </span>
               </div>
             </div>
+          </div>
 
-            <div className="leslie-separator"></div>
-
-            <span className="knob-label">ROTOR CABINET (LESLIE)</span>
+            {/* Rotor Cabinet section with bloom feedback */}
+            <div 
+              className={`fx-bloom-section ${getActiveRoutedFxType() === 'Rotor Cabinet' ? 'active-bloom-magenta' : ''}`}
+              style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '8px', alignItems: 'center' }}
+            >
+              <span className="knob-label" style={{ display: 'block', margin: '0 auto 4px auto' }}>ROTOR CABINET (LESLIE)</span>
             {/* Leslie Speed Toggle */}
             <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '0.4rem 0', justifyContent: 'space-between', display: 'flex' }}>
               <label style={{ color: '#ff00ff', fontWeight: 'bold' }}>SPEED:</label>
@@ -17162,11 +17179,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               />
             </div>
           </div>
+        </div>
 
 
           {/* Reverb Unit */}
-          <div className="reverb-unit-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(0, 243, 255, 0.25)', paddingTop: '10px', marginTop: '10px' }}>
-            <span className="knob-label" style={{ color: '#d000ff', textShadow: '0 0 5px rgba(208, 0, 255, 0.5)', display: 'block', fontWeight: 'bold', fontSize: '0.62rem', letterSpacing: '0.5px' }}>REVERB UNIT</span>
+          <div 
+            className={`reverb-unit-section fx-bloom-section ${getActiveRoutedFxType() === 'Reverb' ? 'active-bloom-reverb' : ''}`} 
+            style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+          >
+            <span className="knob-label" style={{ color: '#d000ff', textShadow: '0 0 5px rgba(208, 0, 255, 0.5)', display: 'block', fontWeight: 'bold', fontSize: '0.62rem', letterSpacing: '0.5px', margin: '0 auto 4px auto' }}>REVERB UNIT</span>
             
             {/* Reverb Active Toggle */}
             <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
@@ -17332,8 +17353,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           </div>
 
           {/* Stutter & Movement Section */}
-          <div className="stutter-unit-section" style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255, 0, 85, 0.25)', paddingTop: '10px', marginTop: '10px' }}>
-            <span className="knob-label" style={{ color: '#ff0055', textShadow: '0 0 5px rgba(255, 0, 85, 0.5)', display: 'block', fontWeight: 'bold', fontSize: '0.62rem', letterSpacing: '0.5px' }}>STUTTER & MOVEMENT</span>
+          <div 
+            className={`stutter-unit-section fx-bloom-section ${getActiveRoutedFxType() === 'Stutter' ? 'active-bloom-stutter' : ''}`} 
+            style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
+          >
+            <span className="knob-label" style={{ color: '#ff0055', textShadow: '0 0 5px rgba(255, 0, 85, 0.5)', display: 'block', fontWeight: 'bold', fontSize: '0.62rem', letterSpacing: '0.5px', margin: '0 auto 4px auto' }}>STUTTER & MOVEMENT</span>
             
             {/* Stutter Active Toggle */}
             <div className="flex-row-sub flex-space-between" style={{ width: '100%', margin: '2px 0', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
