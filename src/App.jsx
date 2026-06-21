@@ -4,10 +4,6 @@ import Delta7Synth from './components/Delta7Synth.jsx';
 export default function App() {
   return (
     <div className="standalone-container">
-      <header className="standalone-header">
-        <h1>Delta7 Workstation</h1>
-      </header>
-
       <main className="standalone-main">
         <Delta7Synth />
       </main>

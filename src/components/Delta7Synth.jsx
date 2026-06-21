@@ -16635,6 +16635,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     <div className="delta7-hardware-chassis" style={{ zoom: uiScale }}>
       {/* Aluminum Top Rack Bar */}
       <div className="rack-header-bar">
+        <div className="branding-title">delta7</div>
+        <div className="branding-sub">HYPER INTEGRATED SYNTHESIS WORKSTATION</div>
         <div style={{ position: 'relative', marginLeft: 'auto', marginRight: '16px' }}>
           <button
             className="btn btn-xs"
