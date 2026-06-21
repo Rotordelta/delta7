@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Knob from './Knob.jsx';
 import LatencyCalModal from './LatencyCalModal.jsx';
 import CircularAlignModal from './CircularAlignModal.jsx';
+import HelpMenuModal from './HelpMenuModal.jsx';
 import './delta7-styles.css';
 
 // SharedArrayBuffer configuration constants
@@ -602,6 +603,7 @@ export default function Delta7Synth() {
 
   // MIDI Learn State
   const [midiMenuOpen, setMidiMenuOpen] = useState(false);
+  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [midiLearnParam, setMidiLearnParam] = useState(null);
   const [midiMappings, setMidiMappings] = useState(() => {
     try {
@@ -16411,6 +16413,25 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         >
           🎛️ MIDI MAPPINGS
         </button>
+        <button 
+          className="btn btn-xs" 
+          onClick={() => setHelpMenuOpen(true)}
+          style={{
+            marginRight: '16px',
+            borderColor: '#ffe600',
+            color: '#ffe600',
+            fontSize: '0.58rem',
+            padding: '2px 8px',
+            fontWeight: 'bold',
+            letterSpacing: '0.8px',
+            background: 'transparent',
+            boxShadow: '0 0 6px rgba(255, 230, 0, 0.15)',
+            cursor: 'pointer',
+            fontFamily: 'monospace'
+          }}
+        >
+          📖 HELP
+        </button>
         <div className="ui-resize-slider-wrap" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.62rem', color: '#ff00ff', marginRight: '24px' }}>
           <span style={{ fontWeight: 'bold', letterSpacing: '0.5px' }}>UI RESIZE:</span>
           <input 
@@ -20661,6 +20682,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           midiLearnParam={midiLearnParam}
           setMidiLearnParam={setMidiLearnParam}
           onClose={() => setMidiMenuOpen(false)}
+        />
+      )}
+
+      {helpMenuOpen && (
+        <HelpMenuModal 
+          onClose={() => setHelpMenuOpen(false)}
         />
       )}
 
