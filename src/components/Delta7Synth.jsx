@@ -1478,6 +1478,101 @@ export default function Delta7Synth() {
   const [isArmed, setIsArmed] = useState(false);
   const [recordingInputGain, setRecordingInputGain] = useState(1.0);
   const recordingInputGainRef = useRef(1.0);
+
+  // Master Bus Tools States & Refs
+  const [inputGainSat, setInputGainSat] = useState(() => {
+    const saved = localStorage.getItem('delta7_input_gain_sat');
+    return saved ? parseFloat(saved) : 0;
+  });
+  const inputGainSatRef = useRef(inputGainSat);
+
+  const [duckerAmount, setDuckerAmount] = useState(() => {
+    const saved = localStorage.getItem('delta7_ducker_amount');
+    return saved ? parseFloat(saved) : 0;
+  });
+  const duckerAmountRef = useRef(duckerAmount);
+
+  const [glueMix, setGlueMix] = useState(() => {
+    const saved = localStorage.getItem('delta7_glue_mix');
+    return saved ? parseFloat(saved) : 0;
+  });
+  const glueMixRef = useRef(glueMix);
+
+  useEffect(() => {
+    inputGainSatRef.current = inputGainSat;
+    localStorage.setItem('delta7_input_gain_sat', inputGainSat);
+    updateLiveInputSaturation();
+  }, [inputGainSat]);
+
+  useEffect(() => {
+    duckerAmountRef.current = duckerAmount;
+    localStorage.setItem('delta7_ducker_amount', duckerAmount);
+  }, [duckerAmount]);
+
+  useEffect(() => {
+    glueMixRef.current = glueMix;
+    localStorage.setItem('delta7_glue_mix', glueMix);
+    updateGlueMixDSP();
+  }, [glueMix]);
+
+  const micInputPreGainNodeRef = useRef(null);
+  const micInputSaturationNodeRef = useRef(null);
+  const masterGlueCompressorRef = useRef(null);
+  const masterGlueDryGainRef = useRef(null);
+  const masterGlueWetGainRef = useRef(null);
+  const masterLimiterRef = useRef(null);
+  const limiterAnalyserRef = useRef(null);
+
+  const makeNeveSaturationCurve = (amount) => {
+    const k = (amount / 100) * 8.0; // scale from 0 to 8 for rich saturation harmonics
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+    for (let i = 0; i < n_samples; ++i) {
+      const x = (i * 2) / (n_samples - 1) - 1;
+      if (k === 0) {
+        curve[i] = x;
+      } else {
+        curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+      }
+    }
+    return curve;
+  };
+
+  const updateLiveInputSaturation = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    
+    if (micInputPreGainNodeRef.current) {
+      const driveFactor = 1.0 + (inputGainSatRef.current / 100) * 3.0;
+      micInputPreGainNodeRef.current.gain.setValueAtTime(driveFactor, now);
+    }
+    
+    if (micInputSaturationNodeRef.current) {
+      micInputSaturationNodeRef.current.curve = makeNeveSaturationCurve(inputGainSatRef.current);
+    }
+    
+    if (micInputGainNodeRef.current) {
+      const scaleDown = 1.0 + (inputGainSatRef.current / 100) * 1.5;
+      const finalGain = recordingInputGainRef.current / scaleDown;
+      micInputGainNodeRef.current.gain.setValueAtTime(finalGain, now);
+    }
+  };
+
+  const updateGlueMixDSP = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const mix = glueMixRef.current / 100;
+    
+    if (masterGlueDryGainRef.current) {
+      masterGlueDryGainRef.current.gain.setValueAtTime(1.0 - mix, now);
+    }
+    if (masterGlueWetGainRef.current) {
+      masterGlueWetGainRef.current.gain.setValueAtTime(mix, now);
+    }
+  };
+
   const resamplerGainNodeRef = useRef(null);
   const recordingTargetSlotIdRef = useRef('a01');
   const recordingScriptNodeRef = useRef(null);
@@ -2843,14 +2938,26 @@ export default function Delta7Synth() {
           const source = ctx.createMediaStreamSource(stream);
           micSourceRef.current = source;
 
+          const inputPreGain = ctx.createGain();
+          const driveFactor = 1.0 + (inputGainSatRef.current / 100) * 3.0;
+          inputPreGain.gain.setValueAtTime(driveFactor, ctx.currentTime);
+          micInputPreGainNodeRef.current = inputPreGain;
+
+          const inputSaturation = ctx.createWaveShaper();
+          inputSaturation.curve = makeNeveSaturationCurve(inputGainSatRef.current);
+          micInputSaturationNodeRef.current = inputSaturation;
+
           const inputGainNode = ctx.createGain();
-          inputGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+          const scaleDown = 1.0 + (inputGainSatRef.current / 100) * 1.5;
+          inputGainNode.gain.setValueAtTime(recordingInputGainRef.current / scaleDown, ctx.currentTime);
           micInputGainNodeRef.current = inputGainNode;
 
           const recordingDest = ctx.createMediaStreamDestination();
           recordingDestRef.current = recordingDest;
 
-          source.connect(inputGainNode);
+          source.connect(inputPreGain);
+          inputPreGain.connect(inputSaturation);
+          inputSaturation.connect(inputGainNode);
           inputGainNode.connect(recordingDest);
 
           const analyser = ctx.createAnalyser();
@@ -2899,17 +3006,26 @@ export default function Delta7Synth() {
       const source = ctx.createMediaStreamSource(stream);
       micSourceRef.current = source;
 
-      // Create recording input gain node
+      const inputPreGain = ctx.createGain();
+      const driveFactor = 1.0 + (inputGainSatRef.current / 100) * 3.0;
+      inputPreGain.gain.setValueAtTime(driveFactor, ctx.currentTime);
+      micInputPreGainNodeRef.current = inputPreGain;
+
+      const inputSaturation = ctx.createWaveShaper();
+      inputSaturation.curve = makeNeveSaturationCurve(inputGainSatRef.current);
+      micInputSaturationNodeRef.current = inputSaturation;
+
       const inputGainNode = ctx.createGain();
-      inputGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+      const scaleDown = 1.0 + (inputGainSatRef.current / 100) * 1.5;
+      inputGainNode.gain.setValueAtTime(recordingInputGainRef.current / scaleDown, ctx.currentTime);
       micInputGainNodeRef.current = inputGainNode;
 
-      // Create media stream destination node
       const recordingDest = ctx.createMediaStreamDestination();
       recordingDestRef.current = recordingDest;
 
-      // Connect source -> inputGainNode -> recordingDest
-      source.connect(inputGainNode);
+      source.connect(inputPreGain);
+      inputPreGain.connect(inputSaturation);
+      inputSaturation.connect(inputGainNode);
       inputGainNode.connect(recordingDest);
 
       // Connect inputGainNode -> level analyser
@@ -18553,11 +18669,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           const val = parseFloat(e.target.value);
                           setRecordingInputGain(val);
                           recordingInputGainRef.current = val;
+                          updateLiveInputSaturation();
                           const ctx = audioCtxRef.current;
                           if (ctx) {
-                            if (micInputGainNodeRef.current) {
-                              micInputGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
-                            }
                             if (resamplerGainNodeRef.current) {
                               resamplerGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
                             }
@@ -18567,6 +18681,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       />
                       <span className="font-mono text-cyan" style={{ width: '30px', textAlign: 'right', marginLeft: '6px' }}>
                         {Math.round(recordingInputGain * 100)}%
+                      </span>
+                    </div>
+
+                    {/* Recording Saturation Drive Slider */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.62rem' }}>
+                      <label style={{ color: '#ff4c4c', marginRight: '6px' }}>SAT DRIVE:</label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        step="1" 
+                        value={inputGainSat} 
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setInputGainSat(val);
+                        }}
+                        style={{ flexGrow: 1, height: '8px', accentColor: '#ff4c4c' }}
+                      />
+                      <span className="font-mono" style={{ width: '30px', textAlign: 'right', marginLeft: '6px', color: '#ff4c4c' }}>
+                        {Math.round(inputGainSat)}%
                       </span>
                     </div>
 
@@ -20032,17 +20166,34 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     const val = parseFloat(e.target.value);
                     setRecordingInputGain(val);
                     recordingInputGainRef.current = val;
+                    updateLiveInputSaturation();
                     const ctx = audioCtxRef.current;
                     if (ctx) {
-                      if (micInputGainNodeRef.current) {
-                        micInputGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
-                      }
                       if (resamplerGainNodeRef.current) {
                         resamplerGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
                       }
                     }
                   }}
                   style={{ width: '100%', height: '8px', accentColor: '#00f3ff', cursor: 'pointer', margin: 0 }}
+                />
+              </div>
+
+              {/* Saturation Drive Slider */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginTop: '2px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.4rem', color: '#888' }}>SAT DRIVE:</span>
+                  <span style={{ color: '#ff4c4c', fontSize: '0.48rem', fontFamily: 'monospace' }}>
+                    {Math.round(inputGainSat)}%
+                  </span>
+                </div>
+                <input 
+                  type="range" min="0" max="100" step="1"
+                  value={inputGainSat}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setInputGainSat(val);
+                  }}
+                  style={{ width: '100%', height: '8px', accentColor: '#ff4c4c', cursor: 'pointer', margin: 0 }}
                 />
               </div>
 
