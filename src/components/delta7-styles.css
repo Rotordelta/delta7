@@ -2665,3 +2665,151 @@
   color: #00f3ff;
   border-color: rgba(0, 243, 255, 0.25);
 }
+
+/* Master Bus Console styling */
+.master-bus-panel {
+  background: rgba(2, 6, 12, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 243, 255, 0.25);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.master-bus-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+  padding-bottom: 4px;
+}
+
+.master-bus-title {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 0.65rem;
+  font-weight: bold;
+  color: #00f3ff;
+  text-shadow: 0 0 8px rgba(0, 243, 255, 0.5);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.master-bus-strips {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.master-bus-strip {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 6px 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.master-bus-strip:hover {
+  border-color: rgba(255, 0, 85, 0.3);
+  box-shadow: 0 0 8px rgba(255, 0, 85, 0.08);
+}
+
+.master-bus-strip-label {
+  font-family: monospace;
+  font-size: 0.52rem;
+  color: #ffe600;
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.master-bus-control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+}
+
+.master-bus-slider-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.master-bus-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.master-bus-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #00f3ff;
+  box-shadow: 0 0 6px #00f3ff;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+
+.master-bus-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #ff0055;
+  box-shadow: 0 0 8px #ff0055;
+}
+
+.master-bus-value-display {
+  font-family: monospace;
+  font-size: 0.48rem;
+  color: #00f3ff;
+}
+
+/* Master VU meter segments */
+.master-vu-container {
+  display: flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  padding: 2px 4px;
+  width: 100%;
+  height: 8px;
+  box-sizing: border-box;
+  justify-content: center;
+  align-items: center;
+}
+
+.master-vu-segment {
+  flex: 1;
+  height: 100%;
+  background: #111827;
+  border-radius: 1px;
+  transition: background 0.05s ease, box-shadow 0.05s ease;
+}
+

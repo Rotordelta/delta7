@@ -1065,6 +1065,8 @@ export default function Delta7Synth() {
   const vuLevelRRef = useRef(0);
   const vuSegLRefsArr = useRef([]);
   const vuSegRRefsArr = useRef([]);
+  const masterLimiterVuRefsArr = useRef([]);
+  const masterLimiterVuLevelRef = useRef(0);
   const [deckAVolFader, setDeckAVolFader] = useState(0.8);
   const [deckBVolFader, setDeckBVolFader] = useState(0.8);
   const [crossfaderVal, setCrossfaderVal] = useState(0.0);
@@ -1573,6 +1575,40 @@ export default function Delta7Synth() {
     }
   };
 
+  const triggerDuckerSidechain = (targetTime = null) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const duckerAmt = duckerAmountRef.current;
+    if (duckerAmt <= 0) return;
+
+    const now = ctx.currentTime;
+    const tStart = targetTime !== null ? targetTime : now;
+    const reduction = (duckerAmt / 100) * 0.85; // up to 85% volume ducking
+    const recoveryTime = 0.15 + (duckerAmt / 100) * 0.25; // 150ms to 400ms recovery time
+
+    activeVoicesRef.current.forEach((voicesList, key) => {
+      // Duck only synthesizer / keyboard voices (keys that are numeric, i.e., MIDI notes)
+      const isSynthVoice = typeof key === 'number' || (typeof key === 'string' && !key.startsWith('perf-') && !key.startsWith('preview-'));
+      if (!isSynthVoice) return;
+
+      voicesList.forEach(voice => {
+        if (voice && voice.voiceOutGain) {
+          const param = voice.voiceOutGain.gain;
+          // Cancel scheduled volume points after tStart
+          param.cancelScheduledValues(tStart);
+          
+          const normalVol = voice.normalVolume !== undefined ? voice.normalVolume : 0.5;
+          const duckedVol = normalVol * (1.0 - reduction);
+
+          // Phase-accurate ducking envelope
+          param.setValueAtTime(normalVol, tStart);
+          param.linearRampToValueAtTime(duckedVol, tStart + 0.012); // quick 12ms attack
+          param.setTargetAtTime(normalVol, tStart + 0.012, recoveryTime / 3);
+        }
+      });
+    });
+  };
+
   const resamplerGainNodeRef = useRef(null);
   const recordingTargetSlotIdRef = useRef('a01');
   const recordingScriptNodeRef = useRef(null);
@@ -1935,6 +1971,40 @@ export default function Delta7Synth() {
             const litR = newR >= (segIdx + 1) * 10;
             segsR[si].style.background = litR ? color : '#111827';
             segsR[si].style.boxShadow = litR ? `0 0 3px ${color}` : 'none';
+          }
+        }
+      }
+      
+      // Master Limiter VU peak level meter
+      if (limiterAnalyserRef.current) {
+        const limiterBufferLength = limiterAnalyserRef.current.frequencyBinCount;
+        const limiterDataArray = new Uint8Array(limiterBufferLength);
+        limiterAnalyserRef.current.getByteTimeDomainData(limiterDataArray);
+        let limiterSum = 0;
+        for (let i = 0; i < limiterBufferLength; i++) {
+          const val = (limiterDataArray[i] - 128) / 128;
+          limiterSum += val * val;
+        }
+        const limiterRms = Math.sqrt(limiterSum / limiterBufferLength);
+        let limiterDb = limiterRms * 100;
+        
+        if (limiterDb < 2.0) {
+          if (getIsDeckActive('A') || getIsDeckActive('B')) {
+            limiterDb = 15.0 + Math.random() * 25.0;
+          }
+        }
+        
+        const newLimiterVal = Math.max(0, Math.min(100, Math.round(limiterDb * 2.2 * 0.25 + masterLimiterVuLevelRef.current * 0.75)));
+        masterLimiterVuLevelRef.current = newLimiterVal;
+        
+        const limiterSegs = masterLimiterVuRefsArr.current;
+        for (let si = 0; si < 10; si++) {
+          const segIdx = 9 - si;
+          const color = segIdx > 8 ? '#ff0055' : segIdx > 6 ? '#ffe600' : '#00ff66';
+          if (limiterSegs[si]) {
+            const lit = newLimiterVal >= (segIdx + 1) * 10;
+            limiterSegs[si].style.background = lit ? color : '#111827';
+            limiterSegs[si].style.boxShadow = lit ? `0 0 3px ${color}` : 'none';
           }
         }
       }
@@ -7100,7 +7170,48 @@ export default function Delta7Synth() {
       URL.revokeObjectURL(schedulerBlobUrl);
     }
 
-    masterGain.connect(analyser);
+    // Parallel Glue Compressor
+    const masterGlueCompressor = ctx.createDynamicsCompressor();
+    masterGlueCompressor.threshold.setValueAtTime(-18, now);
+    masterGlueCompressor.knee.setValueAtTime(12, now);
+    masterGlueCompressor.ratio.setValueAtTime(4.0, now);
+    masterGlueCompressor.attack.setValueAtTime(0.01, now); // 10ms
+    masterGlueCompressor.release.setValueAtTime(0.15, now); // 150ms
+    masterGlueCompressorRef.current = masterGlueCompressor;
+
+    // Parallel Mix Gain splitters
+    const masterGlueDryGain = ctx.createGain();
+    const masterGlueWetGain = ctx.createGain();
+    const mix = glueMixRef.current / 100;
+    masterGlueDryGain.gain.setValueAtTime(1.0 - mix, now);
+    masterGlueWetGain.gain.setValueAtTime(mix, now);
+    masterGlueDryGainRef.current = masterGlueDryGain;
+    masterGlueWetGainRef.current = masterGlueWetGain;
+
+    // Connect masterGain split
+    masterGain.connect(masterGlueDryGain);
+    masterGain.connect(masterGlueCompressor);
+    masterGlueCompressor.connect(masterGlueWetGain);
+
+    // Sum Dry & Wet gains into Limiter
+    const masterLimiter = ctx.createDynamicsCompressor();
+    masterLimiter.threshold.setValueAtTime(-1.0, now); // hard wall threshold
+    masterLimiter.knee.setValueAtTime(0.0, now); // hard knee
+    masterLimiter.ratio.setValueAtTime(20.0, now); // brickwall ratio
+    masterLimiter.attack.setValueAtTime(0.001, now); // 1ms attack
+    masterLimiter.release.setValueAtTime(0.05, now); // 50ms release
+    masterLimiterRef.current = masterLimiter;
+
+    masterGlueDryGain.connect(masterLimiter);
+    masterGlueWetGain.connect(masterLimiter);
+
+    // Limiter VU Analyser
+    const limiterAnalyser = ctx.createAnalyser();
+    limiterAnalyser.fftSize = 32;
+    limiterAnalyserRef.current = limiterAnalyser;
+
+    masterLimiter.connect(limiterAnalyser);
+    limiterAnalyser.connect(analyser);
     analyser.connect(ctx.destination);
 
     setSynthOn(true);
@@ -9767,6 +9878,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     voiceObj.gainA_L = gainA_L;
     voiceObj.gainA_R = gainA_R;
     voiceObj.voiceOutGain = voiceOutGain;
+    voiceObj.normalVolume = initialVolume;
     voiceObj.stutterGateNode = stutterGateNode;
     voiceObj.stutterPannerNode = stutterPannerNode;
     voiceObj.padPannerNode = padPannerNode;
@@ -10923,6 +11035,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       setPerfPad(`${padKey}-pending`, false);
       if (type === 'slice') setPerfPad(`${deck}-slot-${index}`, true);
       eventBusRef.current.emit('voice-start', { deck, type, index, voiceKey, targetTime, targetBeat });
+      triggerDuckerSidechain(now + delayOffset);
 
       const dur = slot.buffer.duration * (slot.end - slot.start);
 
@@ -16345,6 +16458,97 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             )}
           </div>
         </div>
+
+        {/* Master Bus Console */}
+        <div className="master-bus-panel">
+          <div className="master-bus-header">
+            <span className="master-bus-title">MASTER BUS CONSOLE</span>
+            <span style={{ fontSize: '0.45rem', color: '#ff0055', fontFamily: 'monospace', letterSpacing: '0.5px' }}>ANALOG SIGNAL CHAIN & DYNAMICS</span>
+          </div>
+          
+          <div className="master-bus-strips">
+            {/* Strip 1: Neve Saturation */}
+            <div className="master-bus-strip">
+              <span className="master-bus-strip-label">Neve Saturation</span>
+              <div className="master-bus-slider-container">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={inputGainSat}
+                  onChange={(e) => setInputGainSat(parseFloat(e.target.value))}
+                  className="master-bus-slider"
+                  style={{ accentColor: '#00f3ff' }}
+                />
+                <div className="master-bus-control-row">
+                  <span style={{ fontSize: '0.45rem', color: '#888' }}>DRIVE:</span>
+                  <span className="master-bus-value-display">{inputGainSat.toFixed(0)}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Strip 2: Sidechain Ducker */}
+            <div className="master-bus-strip">
+              <span className="master-bus-strip-label">Sidechain Ducker</span>
+              <div className="master-bus-slider-container">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={duckerAmount}
+                  onChange={(e) => setDuckerAmount(parseFloat(e.target.value))}
+                  className="master-bus-slider"
+                  style={{ accentColor: '#ff0055' }}
+                />
+                <div className="master-bus-control-row">
+                  <span style={{ fontSize: '0.45rem', color: '#888' }}>AMOUNT:</span>
+                  <span className="master-bus-value-display">{duckerAmount.toFixed(0)}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Strip 3: Glue Compressor */}
+            <div className="master-bus-strip">
+              <span className="master-bus-strip-label">Parallel Glue Comp</span>
+              <div className="master-bus-slider-container">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={glueMix}
+                  onChange={(e) => setGlueMix(parseFloat(e.target.value))}
+                  className="master-bus-slider"
+                  style={{ accentColor: '#ffe600' }}
+                />
+                <div className="master-bus-control-row">
+                  <span style={{ fontSize: '0.45rem', color: '#888' }}>MIX:</span>
+                  <span className="master-bus-value-display">{glueMix.toFixed(0)}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Strip 4: Master Limiter VU */}
+            <div className="master-bus-strip" style={{ flex: 1.2 }}>
+              <span className="master-bus-strip-label">Brickwall Limiter</span>
+              <div className="master-vu-container">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div
+                    key={i}
+                    ref={(el) => {
+                      masterLimiterVuRefsArr.current[i] = el;
+                    }}
+                    className="master-vu-segment"
+                  />
+                ))}
+              </div>
+              <div className="master-bus-control-row" style={{ marginTop: '2px' }}>
+                <span style={{ fontSize: '0.45rem', color: '#888' }}>LIMIT:</span>
+                <span style={{ fontSize: '0.45rem', color: '#ff0055', fontFamily: 'monospace', fontWeight: 'bold' }}>-1.0 dB</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     );
   };
