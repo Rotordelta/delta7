@@ -1517,6 +1517,18 @@ export default function Delta7Synth() {
     updateGlueMixDSP();
   }, [glueMix]);
 
+  const [masterLimiterActive, setMasterLimiterActive] = useState(() => {
+    const saved = localStorage.getItem('delta7_master_limiter_active');
+    return saved ? saved === 'true' : true;
+  });
+  const masterLimiterActiveRef = useRef(masterLimiterActive);
+
+  useEffect(() => {
+    masterLimiterActiveRef.current = masterLimiterActive;
+    localStorage.setItem('delta7_master_limiter_active', masterLimiterActive);
+    updateLimiterActiveDSP();
+  }, [masterLimiterActive]);
+
   const micInputPreGainNodeRef = useRef(null);
   const micInputSaturationNodeRef = useRef(null);
   const masterGlueCompressorRef = useRef(null);
@@ -1572,6 +1584,30 @@ export default function Delta7Synth() {
     }
     if (masterGlueWetGainRef.current) {
       masterGlueWetGainRef.current.gain.setValueAtTime(mix, now);
+    }
+  };
+
+  const updateLimiterActiveDSP = () => {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const active = masterLimiterActiveRef.current;
+    if (!masterGlueDryGainRef.current || !masterGlueWetGainRef.current || !masterLimiterRef.current || !limiterAnalyserRef.current) return;
+
+    try {
+      masterGlueDryGainRef.current.disconnect();
+      masterGlueWetGainRef.current.disconnect();
+      masterLimiterRef.current.disconnect();
+    } catch (e) {
+      // ignore
+    }
+
+    if (active) {
+      masterGlueDryGainRef.current.connect(masterLimiterRef.current);
+      masterGlueWetGainRef.current.connect(masterLimiterRef.current);
+      masterLimiterRef.current.connect(limiterAnalyserRef.current);
+    } else {
+      masterGlueDryGainRef.current.connect(limiterAnalyserRef.current);
+      masterGlueWetGainRef.current.connect(limiterAnalyserRef.current);
     }
   };
 
@@ -7202,15 +7238,20 @@ export default function Delta7Synth() {
     masterLimiter.release.setValueAtTime(0.05, now); // 50ms release
     masterLimiterRef.current = masterLimiter;
 
-    masterGlueDryGain.connect(masterLimiter);
-    masterGlueWetGain.connect(masterLimiter);
-
     // Limiter VU Analyser
     const limiterAnalyser = ctx.createAnalyser();
     limiterAnalyser.fftSize = 32;
     limiterAnalyserRef.current = limiterAnalyser;
 
-    masterLimiter.connect(limiterAnalyser);
+    if (masterLimiterActiveRef.current) {
+      masterGlueDryGain.connect(masterLimiter);
+      masterGlueWetGain.connect(masterLimiter);
+      masterLimiter.connect(limiterAnalyser);
+    } else {
+      masterGlueDryGain.connect(limiterAnalyser);
+      masterGlueWetGain.connect(limiterAnalyser);
+    }
+
     limiterAnalyser.connect(analyser);
     analyser.connect(ctx.destination);
 
@@ -16528,9 +16569,32 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Strip 4: Master Limiter VU */}
-            <div className="master-bus-strip" style={{ flex: 1.2 }}>
-              <span className="master-bus-strip-label">Brickwall Limiter</span>
-              <div className="master-vu-container">
+            <div className="master-bus-strip" style={{ flex: 1.2, position: 'relative' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                <span className="master-bus-strip-label" style={{ margin: 0 }}>Brickwall Limiter</span>
+                <button
+                  className="deck-btn-xs"
+                  onClick={() => setMasterLimiterActive(prev => !prev)}
+                  style={{
+                    fontSize: '0.4rem',
+                    padding: '1px 4px',
+                    height: '14px',
+                    lineHeight: '12px',
+                    background: masterLimiterActive ? 'rgba(255, 0, 85, 0.25)' : 'rgba(255,255,255,0.05)',
+                    color: masterLimiterActive ? '#ff0055' : '#888',
+                    border: `1px solid ${masterLimiterActive ? '#ff0055' : 'rgba(255,255,255,0.1)'}`,
+                    borderRadius: '2px',
+                    cursor: 'pointer',
+                    boxShadow: masterLimiterActive ? '0 0 5px rgba(255, 0, 85, 0.4)' : 'none',
+                    fontWeight: 'bold',
+                    transition: 'all 0.1s ease'
+                  }}
+                  title="Toggle Master Limiter On/Off (Bypass)"
+                >
+                  {masterLimiterActive ? 'ACTIVE' : 'BYPASS'}
+                </button>
+              </div>
+              <div className="master-vu-container" style={{ opacity: masterLimiterActive ? 1.0 : 0.25, transition: 'opacity 0.2s ease' }}>
                 {Array.from({ length: 10 }).map((_, i) => (
                   <div
                     key={i}
@@ -16543,7 +16607,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </div>
               <div className="master-bus-control-row" style={{ marginTop: '2px' }}>
                 <span style={{ fontSize: '0.45rem', color: '#888' }}>LIMIT:</span>
-                <span style={{ fontSize: '0.45rem', color: '#ff0055', fontFamily: 'monospace', fontWeight: 'bold' }}>-1.0 dB</span>
+                <span style={{ fontSize: '0.45rem', color: masterLimiterActive ? '#ff0055' : '#666', fontFamily: 'monospace', fontWeight: 'bold' }}>
+                  {masterLimiterActive ? '-1.0 dB' : 'OFF'}
+                </span>
               </div>
             </div>
           </div>

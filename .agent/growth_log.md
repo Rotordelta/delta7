@@ -199,4 +199,6 @@
   - **Dynamic Sidechain Ducking**: Having a one-knob sidechain ducker that automatically ducks active loops/voices upon pad strikes helps clear headroom for transient notes (like kick/snare) and keeps the mix breathing.
   - **Tactile LED VU Metering**: Including a physical-style 10-segment LED VU meter bound to final brickwall output levels provides immediate visual confirmation of master levels and limiting compression depth.
   - **Horizontal Console Dashboard**: Rendering a dedicated master console panel horizontally below the highways fits the physical workstation chassis feel and groups master controls in a clean dashboard.
+  - **Dynamic Limiter Bypassing**: Toggling the brickwall limiter in and out of the signal path dynamically via a dedicated, glowing **ACTIVE/BYPASS** switch allows comparing the limited output against the raw parallel sum immediately, while also visually dimming the level meters to indicate a bypassed state.
+
 
