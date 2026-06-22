@@ -239,3 +239,8 @@
   - **Fullscreen Video Viewport**: Playing the intro video on a fullscreen overlay that fades out to black dynamically over 1 second gives a professional, immersive, and high-fidelity console-loading experience.
   - **Vite Public Assets Pathing**: Placing static videos and big assets in the `public/` directory ensures they are cleanly served by Vite's relative base configuration, resolving perfectly under both local development servers and packaged file system routes (`file://`) inside Electron.
   - **Skip Button Availability**: Always include a "Skip Intro" option on screens or videos to let users bypass animations and get straight to creating music.
+
+## Session: 2026-06-22 (Part 5)
+- **Task**: Latency initialization synchronization.
+- **Jimmy's Preferences**:
+  - **Ref/State Initialization Sync**: In high-performance React audio environments where timing logic runs inside asynchronous handlers (or Web Audio API callbacks), reading values from `useRef` is crucial to avoid closure capture bugs. However, initializing these refs to hardcoded defaults (e.g. `useRef(30)`) while loading the actual setting from `localStorage` into state causes a severe initialization mismatch on startup. The refs must be initialized directly to their state-derived values (e.g. `useRef(recLatencyOffset)`) to ensure the correct calibration is active immediately on load.
