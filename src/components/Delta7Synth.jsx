@@ -604,6 +604,9 @@ export default function Delta7Synth() {
   // MIDI Learn State
   const [midiMenuOpen, setMidiMenuOpen] = useState(false);
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
+  const [focusZoomEnabled, setFocusZoomEnabled] = useState(() => {
+    return localStorage.getItem('focusZoomEnabled') === 'true';
+  });
   const [midiLearnParam, setMidiLearnParam] = useState(null);
   const [midiMappings, setMidiMappings] = useState(() => {
     try {
@@ -16627,12 +16630,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     );
   };
 
+  const isFocusZoomActive = focusZoomEnabled && !helpMenuOpen && !showExportModal && !showLatencyCal && !circularAlignState.visible;
+
+  const toggleFocusZoom = () => {
+    const nextVal = !focusZoomEnabled;
+    setFocusZoomEnabled(nextVal);
+    localStorage.setItem('focusZoomEnabled', String(nextVal));
+  };
+
   // ==========================================
   // 9. THE HARDWARE & SOFTWARE INTERFACE RENDERING
   // ==========================================
 
   return (
-    <div className="delta7-hardware-chassis" style={{ zoom: uiScale }}>
+    <div className={`delta7-hardware-chassis ${isFocusZoomActive ? 'chassis-focus-zoom-enabled' : ''}`} style={{ zoom: uiScale }}>
       {/* Aluminum Top Rack Bar */}
       <div className="rack-header-bar">
         <div className="branding-title">delta7</div>
@@ -16807,6 +16818,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         >
           🎛️ MIDI MAPPINGS
         </button>
+        <button 
+          className="btn btn-xs" 
+          onClick={toggleFocusZoom}
+          style={{
+            marginRight: '16px',
+            borderColor: focusZoomEnabled ? '#00ff88' : '#666',
+            color: focusZoomEnabled ? '#00ff88' : '#888',
+            fontSize: '0.58rem',
+            padding: '2px 8px',
+            fontWeight: 'bold',
+            letterSpacing: '0.8px',
+            background: focusZoomEnabled ? 'rgba(0, 255, 136, 0.08)' : 'transparent',
+            boxShadow: focusZoomEnabled ? '0 0 8px rgba(0, 255, 136, 0.25)' : 'none',
+            cursor: 'pointer',
+            fontFamily: 'monospace'
+          }}
+        >
+          🔍 FOCUS ZOOM: {focusZoomEnabled ? 'ON' : 'OFF'}
+        </button>
+
         <button 
           className="btn btn-xs" 
           onClick={() => setHelpMenuOpen(true)}

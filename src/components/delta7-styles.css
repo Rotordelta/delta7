@@ -2857,3 +2857,39 @@
   transition: background 0.05s ease, box-shadow 0.05s ease;
 }
 
+/* ==========================================================
+   FOCUS ZOOM PANELS
+   ========================================================== */
+.chassis-focus-zoom-enabled .steel-plate,
+.chassis-focus-zoom-enabled .blue-screen-border {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease, opacity 0.25s ease;
+}
+
+/* When one panel is hovered, dim/blur the others */
+.chassis-focus-zoom-enabled .rack-main-grid:hover .steel-plate:not(:hover),
+.chassis-focus-zoom-enabled .rack-main-grid:hover .blue-screen-border:not(:hover) {
+  opacity: 0.55;
+  filter: blur(1.5px) grayscale(15%);
+}
+
+.chassis-focus-zoom-enabled .steel-plate:hover {
+  transform: scale(1.025) translateY(-2px);
+  z-index: 100;
+  border-color: rgba(0, 243, 255, 0.8) !important;
+  box-shadow: 
+    0 20px 45px 0 rgba(0, 0, 0, 0.95),
+    0 0 35px rgba(0, 243, 255, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.chassis-focus-zoom-enabled .blue-screen-border:hover {
+  transform: scale(1.025) translateY(-2px);
+  z-index: 100;
+  border-color: #39ff14 !important;
+  box-shadow: 
+    0 20px 45px 0 rgba(0, 0, 0, 0.95),
+    0 0 35px rgba(57, 255, 20, 0.45),
+    inset 0 0 10px rgba(57, 255, 20, 0.3) !important;
+}
+
+
