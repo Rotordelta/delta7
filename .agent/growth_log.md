@@ -211,3 +211,11 @@
 - **Task**: Standalone outer header removal and hardware top rack branding restoration.
 - **Jimmy's Preferences**:
   - **Standalone Website Headings vs. Hardware Aesthetics**: Keep the hardware chassis clean of external website titles and headers (e.g. `<h1>Delta7 Workstation</h1>` outside the chassis). Keep all hardware-style branding elements (e.g., top rack bar labels `delta7` and `HYPER INTEGRATED SYNTHESIS WORKSTATION`) intact to maintain the immersive feel of working on a physical synthesizer unit.
+
+## Session: 2026-06-22
+- **Task**: Intelligent Focus Zoom & UI Accessibility Mode.
+- **Jimmy's Preferences**:
+  - **Focus Zoom Interactive Effect**: Jimmy loves a dynamic interface that responds to interaction. Scaling the hovered panel by `1.025x` and elevating its `z-index` while dimming and blurring surrounding panels helps draw focus onto the active controls, especially on dense hardware interfaces.
+  - **Modal Accessibility Safeguards**: The Focus Zoom hover effect should automatically bypass when fullscreen overlays or modals are open to avoid visual conflicts and preserve pointer interaction on popups.
+  - **Header Toggle Buttons**: A clear, dedicated controller in the header rack with color-coded states (ON/OFF) makes accessibility toggles easily discoverable and cohesive.
+
