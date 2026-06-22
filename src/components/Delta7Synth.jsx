@@ -1279,7 +1279,7 @@ export default function Delta7Synth() {
     const val = localStorage.getItem('recLatencyOffset');
     return val !== null ? parseInt(val, 10) : 30;
   });
-  const recLatencyOffsetRef = useRef(30);
+  const recLatencyOffsetRef = useRef(recLatencyOffset);
 
   const [handoverAutoplay, setHandoverAutoplay] = useState(() => {
     const val = localStorage.getItem('handoverAutoplay');
@@ -1409,7 +1409,7 @@ export default function Delta7Synth() {
   const [midiClockSync, setMidiClockSync] = useState(() => {
     return localStorage.getItem('midiClockSync') === 'true';
   });
-  const midiClockSyncRef = useRef(false);
+  const midiClockSyncRef = useRef(midiClockSync);
   useEffect(() => {
     localStorage.setItem('midiClockSync', midiClockSync);
     midiClockSyncRef.current = midiClockSync;
