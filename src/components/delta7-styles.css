@@ -2862,7 +2862,7 @@
    ========================================================== */
 .chassis-focus-zoom-enabled .steel-plate,
 .chassis-focus-zoom-enabled .blue-screen-border {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease, opacity 0.25s ease;
+  transition: transform var(--focus-zoom-duration, 0.25s) cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease, opacity 0.25s ease;
 }
 
 /* When one panel is hovered, dim/blur the others */
@@ -2873,7 +2873,7 @@
 }
 
 .chassis-focus-zoom-enabled .steel-plate:hover {
-  transform: scale(1.025) translateY(-2px);
+  transform: scale(var(--focus-zoom-scale, 1.025)) translateY(-2px);
   z-index: 100;
   border-color: rgba(0, 243, 255, 0.8) !important;
   box-shadow: 
@@ -2883,7 +2883,7 @@
 }
 
 .chassis-focus-zoom-enabled .blue-screen-border:hover {
-  transform: scale(1.025) translateY(-2px);
+  transform: scale(var(--focus-zoom-scale, 1.025)) translateY(-2px);
   z-index: 100;
   border-color: #39ff14 !important;
   box-shadow: 

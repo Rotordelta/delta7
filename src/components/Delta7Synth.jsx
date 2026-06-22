@@ -607,6 +607,14 @@ export default function Delta7Synth() {
   const [focusZoomEnabled, setFocusZoomEnabled] = useState(() => {
     return localStorage.getItem('focusZoomEnabled') === 'true';
   });
+  const [focusZoomScale, setFocusZoomScale] = useState(() => {
+    const saved = localStorage.getItem('focusZoomScale');
+    return saved ? parseFloat(saved) : 1.025;
+  });
+  const [focusZoomDuration, setFocusZoomDuration] = useState(() => {
+    const saved = localStorage.getItem('focusZoomDuration');
+    return saved ? parseFloat(saved) : 0.25;
+  });
   const [midiLearnParam, setMidiLearnParam] = useState(null);
   const [midiMappings, setMidiMappings] = useState(() => {
     try {
@@ -16643,7 +16651,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   // ==========================================
 
   return (
-    <div className={`delta7-hardware-chassis ${isFocusZoomActive ? 'chassis-focus-zoom-enabled' : ''}`} style={{ zoom: uiScale }}>
+    <div 
+      className={`delta7-hardware-chassis ${isFocusZoomActive ? 'chassis-focus-zoom-enabled' : ''}`} 
+      style={{ 
+        zoom: uiScale,
+        '--focus-zoom-scale': focusZoomScale,
+        '--focus-zoom-duration': `${focusZoomDuration}s`
+      }}
+    >
       {/* Aluminum Top Rack Bar */}
       <div className="rack-header-bar">
         <div className="branding-title">delta7</div>
@@ -16822,7 +16837,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           className="btn btn-xs" 
           onClick={toggleFocusZoom}
           style={{
-            marginRight: '16px',
+            marginRight: focusZoomEnabled ? '10px' : '16px',
             borderColor: focusZoomEnabled ? '#00ff88' : '#666',
             color: focusZoomEnabled ? '#00ff88' : '#888',
             fontSize: '0.58rem',
@@ -16837,6 +16852,56 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         >
           🔍 FOCUS ZOOM: {focusZoomEnabled ? 'ON' : 'OFF'}
         </button>
+        {focusZoomEnabled && (
+          <div 
+            className="focus-zoom-settings-wrap" 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              fontSize: '0.58rem', 
+              color: '#00ff88', 
+              marginRight: '16px',
+              borderLeft: '1px solid rgba(0, 255, 136, 0.2)',
+              paddingLeft: '10px',
+              height: '16px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontWeight: 'bold', letterSpacing: '0.5px' }}>ZOOM:</span>
+              <input 
+                type="range" min="1.005" max="1.15" step="0.005"
+                value={focusZoomScale}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setFocusZoomScale(val);
+                  localStorage.setItem('focusZoomScale', String(val));
+                }}
+                style={{ width: '60px', height: '6px', cursor: 'pointer', accentColor: '#00ff88' }}
+              />
+              <span className="font-mono" style={{ color: '#00f3ff', minWidth: '38px', fontSize: '0.55rem' }}>
+                {focusZoomScale.toFixed(3)}x
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontWeight: 'bold', letterSpacing: '0.5px' }}>SPEED:</span>
+              <input 
+                type="range" min="0.05" max="1.00" step="0.05"
+                value={focusZoomDuration}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setFocusZoomDuration(val);
+                  localStorage.setItem('focusZoomDuration', String(val));
+                }}
+                style={{ width: '60px', height: '6px', cursor: 'pointer', accentColor: '#00ff88' }}
+              />
+              <span className="font-mono" style={{ color: '#00f3ff', minWidth: '38px', fontSize: '0.55rem' }}>
+                {Math.round(focusZoomDuration * 1000)}ms
+              </span>
+            </div>
+          </div>
+        )}
 
         <button 
           className="btn btn-xs" 
