@@ -244,3 +244,21 @@
 - **Task**: Latency initialization synchronization.
 - **Jimmy's Preferences**:
   - **Ref/State Initialization Sync**: In high-performance React audio environments where timing logic runs inside asynchronous handlers (or Web Audio API callbacks), reading values from `useRef` is crucial to avoid closure capture bugs. However, initializing these refs to hardcoded defaults (e.g. `useRef(30)`) while loading the actual setting from `localStorage` into state causes a severe initialization mismatch on startup. The refs must be initialized directly to their state-derived values (e.g. `useRef(recLatencyOffset)`) to ensure the correct calibration is active immediately on load.
+
+## Session: 2026-06-22 (Part 6)
+- **Task**: Workstation-wide audio sample rate configuration switcher (44.1kHz vs 48kHz).
+- **Jimmy's Preferences**:
+  - **Dynamic Sample Rate Selection**: Swapping sample rates (44.1kHz vs 48kHz) in the header should rebuild the audio context and restart the engine in place. This allows Jimmy to quickly switch between CD-quality (44.1kHz) and standard video-audio sync (48kHz) without reloading the page.
+  - **Safety Indicators**: A clear status readout (e.g. `⚡ ENGINE: 48kHz`) and an explanatory note in the switcher warning that changing the rate resets active voices and restarts the engine keeps the user informed and prevents accidental dropouts.
+
+## Session: 2026-06-22 (Part 7)
+- **Task**: Lookahead Verification & Outbound MIDI Stop Integration.
+- **Jimmy's Preferences**:
+  - **Variable Latency Enforcement**: To protect flexibility when swapping audio interfaces or changing physical buffer configurations, the lookahead and latency compensation values must remain fully variable (derived dynamically from the active `recLatencyOffset` state and individual pad `nudgeMs` registers) with no hardcoded millisecond constants.
+  - **Dynamic Outbound Transport Sync**: When stopping playback or disabling MIDI clock streams internally, dispatching the physical MIDI Stop signal (`0xFC`) ensures external hardware instruments slaved to the Delta7 sequencer stop immediately.
+
+## Session: 2026-06-22 (Part 8)
+- **Task**: AudioContext Startup Race Condition Fix.
+- **Jimmy's Preferences**:
+  - **Mount-Time Initialization**: Rather than lazy-loading the Web Audio Context and compiling AudioWorklet modules on the first note/pad trigger (which creates timing race conditions and lost events), the engine should initialize automatically upon mounting after a splash screen gesture.
+  - **Null Safety in Async Init**: All call-sites performing lazy context checks must be safeguarded with explicit checks for null `audioCtxRef.current` to prevent TypeError crashes during initialization windows.
