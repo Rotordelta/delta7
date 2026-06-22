@@ -1217,7 +1217,7 @@ export default function Delta7Synth() {
 
   const [liveRecBeats, setLiveRecBeats] = useState(8);
   const liveRecBeatsRef = useRef(8);
-  useEffect(() => { liveRecBeatsRef.current = liveRecBeats; }, [liveRecBeats]);
+  useEffect(() => { liveRecBeatsRef.current = Number(liveRecBeats) || 8; }, [liveRecBeats]);
 
   const [liveRecTargetSlot, setLiveRecTargetSlot] = useState('a01');
   const liveRecTargetSlotRef = useRef('a01');
@@ -7091,7 +7091,7 @@ export default function Delta7Synth() {
               // Timing params are also passed so the boundary detection works even when
               // START_PLAYBACK or syncSabPlaybackState was not called for this session.
               this.recordGateArmed = true;
-              this.recordGateLoopBeats = msg.loopBeats || 16;
+              this.recordGateLoopBeats = Number(msg.loopBeats) || 16;
               this.recordGateFired = false;
               if (msg.playbackStartTime > 0) {
                 this.playbackActive = true;
