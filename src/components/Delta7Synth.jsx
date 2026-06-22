@@ -782,6 +782,7 @@ export default function Delta7Synth() {
 
   // Master Audio Context references
   const audioCtxRef = useRef(null);
+  const isInitializingRef = useRef(false);
   const activeVoicesRef = useRef(new Map()); // voiceKey (e.g. note-progId) -> voiceObjects
   const schedulerNodeRef = useRef(null);
   const masterGainRef = useRef(null);
@@ -1422,44 +1423,7 @@ export default function Delta7Synth() {
 
     if (audioCtxRef.current) {
       const ctx = audioCtxRef.current;
-      if (schedulerNodeRef.current) {
-        try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' }); } catch {}
-        try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_ARP' }); } catch {}
-        try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_METRONOME' }); } catch {}
-        try { schedulerNodeRef.current.disconnect(); } catch {}
-        schedulerNodeRef.current = null;
-      }
-      
-      activeVoicesRef.current.forEach(voices => {
-        voices.forEach(voice => {
-          const sources = [
-            voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
-            voice.driftLfo, voice.vibratoLfo, voice.filterLfo
-          ];
-          sources.forEach(src => {
-            if (src) { try { src.stop(); } catch {} }
-          });
-          const nodes = [
-            voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
-            voice.driftLfo, voice.vibratoLfo, voice.filterLfo,
-            voice.gainA, voice.gainB, voice.gainA_L, voice.gainA_R, voice.subGain, voice.noiseGain,
-            voice.vibratoLfoGain, voice.filterLfoGain, voice.filter1, voice.filter2,
-            voice.eqLowNode, voice.eqMidNode, voice.eqHighNode, voice.sendGainNode, voice.slotGainNode, voice.voiceOutGain
-          ];
-          nodes.forEach(node => {
-            if (node && typeof node.disconnect === 'function') {
-              try { node.disconnect(); } catch {}
-            }
-          });
-        });
-      });
-      activeVoicesRef.current.clear();
-      
-      try {
-        await ctx.close();
-      } catch (err) {
-        console.warn("Error closing context on sample rate change:", err);
-      }
+      await cleanupAudioEngine(ctx);
       audioCtxRef.current = null;
 
       // Re-initialize audio engine
@@ -2374,68 +2338,7 @@ export default function Delta7Synth() {
 
       // Robust cleanup of Web Audio nodes and AudioContext closure to prevent leaks on component unmount
       if (audioCtxRef.current) {
-        // Stop any active scheduled worklet clocks
-        if (schedulerNodeRef.current) {
-          try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' }); } catch {}
-          try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_ARP' }); } catch {}
-          try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_METRONOME' }); } catch {}
-          try { schedulerNodeRef.current.disconnect(); } catch {}
-          schedulerNodeRef.current = null;
-        }
-        
-        // Stop and disconnect all currently active voice node sub-graphs
-        activeVoicesRef.current.forEach(voices => {
-          voices.forEach(voice => {
-            const sources = [
-              voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
-              voice.driftLfo, voice.vibratoLfo, voice.filterLfo
-            ];
-            sources.forEach(src => {
-              if (src) { try { src.stop(); } catch {} }
-            });
-
-            const nodes = [
-              voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
-              voice.driftLfo, voice.vibratoLfo, voice.filterLfo,
-              voice.gainA, voice.gainB, voice.gainA_L, voice.gainA_R, voice.subGain, voice.noiseGain,
-              voice.vibratoLfoGain, voice.filterLfoGain, voice.filter1, voice.filter2,
-              voice.eqLowNode, voice.eqMidNode, voice.eqHighNode, voice.sendGainNode, voice.slotGainNode, voice.voiceOutGain
-            ];
-            nodes.forEach(node => {
-              if (node && typeof node.disconnect === 'function') {
-                try { node.disconnect(); } catch {}
-              }
-            });
-          });
-        });
-        activeVoicesRef.current.clear();
-        
-        // Disconnect global rack nodes to free memory
-        const globalNodes = [
-          analyserRef.current, masterGainRef.current, preampNodeRef.current,
-          ifx1InputRef.current, ifx1OutputRef.current, ifx2InputRef.current, ifx2OutputRef.current,
-          delayInputRef.current, delayOutputRef.current, leslieInputRef.current, leslieOutputRef.current,
-          dubSirenOscRef.current, dubSirenGainRef.current, formantInputRef.current, formantMixGainRef.current,
-          formantDryGainRef.current, formantF1Ref.current, formantF2Ref.current, formantF3Ref.current
-        ];
-        globalNodes.forEach(node => {
-          if (node && typeof node.disconnect === 'function') {
-            try { node.disconnect(); } catch {}
-          }
-        });
-        
-        if (dubSirenOscRef.current) {
-          try { dubSirenOscRef.current.stop(); } catch {}
-        }
-
-        // Close the AudioContext to release hardware device channels
-        try {
-          audioCtxRef.current.close().then(() => {
-            console.log("[Leo Audit] AudioContext closed successfully to prevent hardware device leaks.");
-          });
-        } catch (err) {
-          console.warn("Error closing AudioContext on unmount:", err);
-        }
+        cleanupAudioEngine(audioCtxRef.current);
         audioCtxRef.current = null;
       }
     };
@@ -4013,7 +3916,9 @@ export default function Delta7Synth() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1000);
       
       showEditorStatus('Exported WAV! 📥');
     } catch (err) {
@@ -6309,14 +6214,248 @@ export default function Delta7Synth() {
     }
   };
 
+  const openLatencyCalibration = () => {
+    const targetSlot = liveRecTargetSlot;
+    if (targetSlot && targetSlot.length >= 3) {
+      const targetDeck = targetSlot[0].toLowerCase();
+      const targetIndex = parseInt(targetSlot.slice(2), 10) - 1;
+      
+      if (!isNaN(targetIndex) && targetIndex >= 0) {
+        // Halt active performance voice playback for this slot
+        const voiceKeySlot = `perf-${targetDeck}-slot-${targetIndex}`;
+        stopPerfVoice(voiceKeySlot);
+        
+        // Also stop slice voices for this pad index if any are active
+        for (let s = 0; s < 16; s++) {
+          stopPerfVoice(`perf-${targetDeck}-slice-${targetIndex}-${s}`);
+        }
+        
+        // Reset pad triggers state in UI
+        const padKey = `${targetDeck === 'a' ? 'A' : 'B'}-slot-${targetIndex}`;
+        setPerfPad(padKey, false);
+        setPerfPad(`${padKey}-pending`, false);
+      }
+    }
+    setShowLatencyCal(true);
+  };
+
+  const cleanupAudioEngine = async (ctx) => {
+    if (!ctx) return;
+    console.log("[Leo Audit] Starting comprehensive AudioEngine cleanup sequence...");
+
+    // 1. Stop any active scheduled worklet clocks
+    if (schedulerNodeRef.current) {
+      try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' }); } catch {}
+      try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_ARP' }); } catch {}
+      try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_METRONOME' }); } catch {}
+      try { schedulerNodeRef.current.disconnect(); } catch {}
+      schedulerNodeRef.current = null;
+    }
+
+    // 2. Disconnect recording nodes
+    if (recordingWorkletNodeRef.current) {
+      try { recordingWorkletNodeRef.current.disconnect(); } catch {}
+      recordingWorkletNodeRef.current = null;
+    }
+    if (recordingScriptNodeRef.current) {
+      try { recordingScriptNodeRef.current.disconnect(); } catch {}
+      recordingScriptNodeRef.current = null;
+    }
+    if (resamplerGainNodeRef.current) {
+      try { resamplerGainNodeRef.current.disconnect(); } catch {}
+      resamplerGainNodeRef.current = null;
+    }
+    if (micAnalyserRef.current) {
+      try { micAnalyserRef.current.disconnect(); } catch {}
+      micAnalyserRef.current = null;
+    }
+
+    // 3. Stop and disconnect all active synth voices
+    activeVoicesRef.current.forEach(voices => {
+      voices.forEach(voice => {
+        const sources = [
+          voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
+          voice.driftLfo, voice.vibratoLfo, voice.filterLfo
+        ];
+        sources.forEach(src => {
+          if (src) { try { src.stop(); } catch {} }
+        });
+
+        const nodes = [
+          voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
+          voice.driftLfo, voice.vibratoLfo, voice.filterLfo,
+          voice.gainA, voice.gainB, voice.gainA_L, voice.gainA_R, voice.subGain, voice.noiseGain,
+          voice.vibratoLfoGain, voice.filterLfoGain, voice.filter1, voice.filter2,
+          voice.eqLowNode, voice.eqMidNode, voice.eqHighNode, voice.sendGainNode, voice.slotGainNode, voice.voiceOutGain
+        ];
+        nodes.forEach(node => {
+          if (node && typeof node.disconnect === 'function') {
+            try { node.disconnect(); } catch {}
+          }
+        });
+      });
+    });
+    activeVoicesRef.current.clear();
+
+    // 4. Stop and disconnect active delay (Space Echo / Stereo Delay)
+    if (activeDelayRef.current) {
+      const ad = activeDelayRef.current;
+      if (ad.wowLfo) { try { ad.wowLfo.stop(); } catch {} }
+      if (ad.flutterLfo) { try { ad.flutterLfo.stop(); } catch {} }
+      
+      const subNodes = [
+        ad.input, ad.output, ad.delay1, ad.delay2, ad.delay3,
+        ad.wowGain1, ad.wowGain2, ad.wowGain3,
+        ad.flutterGain1, ad.flutterGain2, ad.flutterGain3,
+        ad.feedbackGain1, ad.feedbackGain2, ad.feedbackGain3,
+        ad.springGain, ad.tapeSat, ad.hpfNode, ad.lpfNode,
+        ad.wowLfo, ad.flutterLfo,
+        ad.delayNode, ad.feedbackNode
+      ];
+      subNodes.forEach(node => {
+        if (node && typeof node.disconnect === 'function') {
+          try { node.disconnect(); } catch {}
+        }
+      });
+      activeDelayRef.current = null;
+    }
+
+    if (delayInputRef.current) {
+      try { delayInputRef.current.disconnect(); } catch {}
+      delayInputRef.current = null;
+    }
+    if (delayOutputRef.current) {
+      try { delayOutputRef.current.disconnect(); } catch {}
+      delayOutputRef.current = null;
+    }
+
+    // 5. Clean up insert effects (IFX1 / IFX2)
+    const cleanupIFX = (effect) => {
+      if (!effect) return;
+      if (effect.lfo) { try { effect.lfo.stop(); } catch {} }
+      if (effect.lfoTreble) { try { effect.lfoTreble.stop(); } catch {} }
+      if (effect.lfoBass) { try { effect.lfoBass.stop(); } catch {} }
+      
+      const nodes = [
+        effect.input, effect.output, effect.filter, effect.shaper, effect.gain, effect.lfo,
+        effect.lfoTreble, effect.lfoBass, effect.delayL, effect.delayR, effect.feedbackGain,
+        effect.crossoverHP, effect.crossoverLP, effect.driveNode,
+        effect.delayTrebleL, effect.delayTrebleR, effect.tremoloTrebleGainL, effect.tremoloTrebleGainR,
+        effect.delayBassL, effect.delayBassR, effect.tremoloBassGainL, effect.tremoloBassGainR,
+        effect.trebleLfoGainL, effect.trebleLfoGainR, effect.tremTrebleL, effect.tremTrebleR,
+        effect.bassLfoGainL, effect.bassLfoGainR, effect.tremBassL, effect.tremBassR
+      ];
+      nodes.forEach(node => {
+        if (node && typeof node.disconnect === 'function') {
+          try { node.disconnect(); } catch {}
+        }
+      });
+    };
+
+    cleanupIFX(ifx1EffectRef.current);
+    ifx1EffectRef.current = null;
+    cleanupIFX(ifx2EffectRef.current);
+    ifx2EffectRef.current = null;
+
+    // 6. Clean up Reverb nodes
+    if (reverbPreDelayNodeRef.current) {
+      try { reverbPreDelayNodeRef.current.disconnect(); } catch {}
+      reverbPreDelayNodeRef.current = null;
+    }
+    if (reverbHighCutFilterRef.current) {
+      try { reverbHighCutFilterRef.current.disconnect(); } catch {}
+      reverbHighCutFilterRef.current = null;
+    }
+    if (reverbConvolverRef.current) {
+      try { reverbConvolverRef.current.disconnect(); } catch {}
+      reverbConvolverRef.current = null;
+    }
+
+    // 7. Stop and disconnect all global nodes
+    const globalNodes = [
+      analyserRef.current, masterGainRef.current, preampNodeRef.current,
+      masterEqLowRef.current, masterEqMidRef.current, masterEqHighRef.current,
+      ifx1InputRef.current, ifx1OutputRef.current, ifx2InputRef.current, ifx2OutputRef.current,
+      leslieInputRef.current, leslieOutputRef.current, leslieEffectRef.current,
+      dubSirenOscRef.current, dubSirenGainRef.current,
+      formantInputRef.current, formantMixGainRef.current, formantDryGainRef.current,
+      formantF1Ref.current, formantF2Ref.current, formantF3Ref.current,
+      bitcrusherInputRef.current, bitcrusherOutputRef.current, bitcrusherNodeRef.current,
+      bitcrusherMixGainRef.current, bitcrusherDryGainRef.current,
+      gaterGainNodeRef.current, gaterLfoRef.current, gaterLfoGainRef.current,
+      glitchDryGainRef.current, glitchInputGainRef.current, glitchDelayRef.current, glitchFeedbackRef.current,
+      masterGlueCompressorRef.current, masterGlueDryGainRef.current, masterGlueWetGainRef.current,
+      masterLimiterRef.current, limiterAnalyserRef.current
+    ];
+
+    globalNodes.forEach(node => {
+      if (node && typeof node.disconnect === 'function') {
+        try { node.disconnect(); } catch {}
+      }
+    });
+
+    if (dubSirenOscRef.current) {
+      try { dubSirenOscRef.current.stop(); } catch {}
+    }
+
+    // 8. Nullify all global refs to guarantee GC release
+    analyserRef.current = null;
+    masterGainRef.current = null;
+    preampNodeRef.current = null;
+    masterEqLowRef.current = null;
+    masterEqMidRef.current = null;
+    masterEqHighRef.current = null;
+    ifx1InputRef.current = null;
+    ifx1OutputRef.current = null;
+    ifx2InputRef.current = null;
+    ifx2OutputRef.current = null;
+    leslieInputRef.current = null;
+    leslieOutputRef.current = null;
+    leslieEffectRef.current = null;
+    dubSirenOscRef.current = null;
+    dubSirenGainRef.current = null;
+    formantInputRef.current = null;
+    formantMixGainRef.current = null;
+    formantDryGainRef.current = null;
+    formantF1Ref.current = null;
+    formantF2Ref.current = null;
+    formantF3Ref.current = null;
+    bitcrusherInputRef.current = null;
+    bitcrusherOutputRef.current = null;
+    bitcrusherNodeRef.current = null;
+    bitcrusherMixGainRef.current = null;
+    bitcrusherDryGainRef.current = null;
+    gaterGainNodeRef.current = null;
+    gaterLfoRef.current = null;
+    gaterLfoGainRef.current = null;
+    glitchDryGainRef.current = null;
+    glitchInputGainRef.current = null;
+    glitchDelayRef.current = null;
+    glitchFeedbackRef.current = null;
+    masterGlueCompressorRef.current = null;
+    masterGlueDryGainRef.current = null;
+    masterGlueWetGainRef.current = null;
+    masterLimiterRef.current = null;
+    limiterAnalyserRef.current = null;
+
+    // 9. Close the context itself
+    try {
+      await ctx.close();
+      console.log("[Leo Audit] AudioContext closed and nodes destroyed successfully.");
+    } catch (err) {
+      console.warn("Error closing AudioContext during cleanup:", err);
+    }
+  };
+
   // ==========================================
   // 3. AUDIO ENGINE INITIALIZATION & ROUTING
   // ==========================================
 
   const initAudio = async () => {
-    if (audioCtxRef.current) return;
-
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (audioCtxRef.current || isInitializingRef.current) return;
+    isInitializingRef.current = true;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     const ctx = new AudioContextClass({ latencyHint: 'interactive', sampleRate: workstationSampleRate });
     audioCtxRef.current = ctx;
 
@@ -6495,7 +6634,6 @@ export default function Delta7Synth() {
     } catch (err) {
       // Fallback: keep ScriptProcessor if AudioWorklet unavailable
       console.warn('BitcrusherWorklet failed, falling back to ScriptProcessor:', err);
-      URL.revokeObjectURL(bitcrusherBlobUrl);
       bitcrusherNode = ctx.createScriptProcessor(1024, 1, 1);
       bitcrusherNode.onaudioprocess = (e) => {
         const input = e.inputBuffer.getChannelData(0);
@@ -6519,6 +6657,8 @@ export default function Delta7Synth() {
           }
         }
       };
+    } finally {
+      URL.revokeObjectURL(bitcrusherBlobUrl);
     }
     bitcrusherInput.connect(bitcrusherNode);
     bitcrusherNode.connect(bitcrusherOutput);
@@ -6814,6 +6954,7 @@ export default function Delta7Synth() {
       recorderBlobUrlRef.current = recorderBlobUrl;
     } catch (err) {
       console.warn("Failed to load Recorder AudioWorklet module:", err);
+    } finally {
       URL.revokeObjectURL(recorderBlobUrl);
     }
 
@@ -7373,6 +7514,7 @@ export default function Delta7Synth() {
       });
     } catch (err) {
       console.warn("Failed to load Scheduler AudioWorklet module:", err);
+    } finally {
       URL.revokeObjectURL(schedulerBlobUrl);
     }
 
@@ -7425,9 +7567,15 @@ export default function Delta7Synth() {
     limiterAnalyser.connect(analyser);
     analyser.connect(ctx.destination);
 
-    setSynthOn(true);
-    startVisualizer();
-    loadSavedBuffersIntoContext(ctx);
+      setSynthOn(true);
+      startVisualizer();
+      loadSavedBuffersIntoContext(ctx);
+    } catch (err) {
+      console.error("[Leo Audit] Error initializing AudioEngine:", err);
+      audioCtxRef.current = null;
+    } finally {
+      isInitializingRef.current = false;
+    }
   };
 
   const getReversedBuffer = (ctx, originalBuffer) => {
@@ -12693,6 +12841,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         setupMidiListeners(activeInput);
       }
     }
+
+    return () => {
+      midiDevices.forEach(input => {
+        input.onmidimessage = null;
+      });
+    };
   }, [midiDevices, selectedMidiDevice]);
 
   // High-Precision Continuous MIDI Clock Timing Messages (0xF8) Scheduler
@@ -19493,7 +19647,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                           textShadow: '0 0 4px rgba(255,0,255,0.3)',
                           boxShadow: 'inset 0 0 4px rgba(255,0,255,0.1)'
                         }}
-                        onClick={() => setShowLatencyCal(true)}
+                        onClick={openLatencyCalibration}
                       >
                         ⏱️ CALIBRATE
                       </button>
@@ -20818,7 +20972,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         {recLatencyOffset}ms
                       </span>
                       <button
-                        onClick={() => setShowLatencyCal(true)}
+                        onClick={openLatencyCalibration}
                         title="Open latency calibration tool"
                         style={{
                           background: '#1e1e30', border: '1px solid #3a3a55',
