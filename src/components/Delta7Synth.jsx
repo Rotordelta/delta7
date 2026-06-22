@@ -2778,56 +2778,28 @@ export default function Delta7Synth() {
     const isPlaying = metronomeRef.current.isPlaying || perfPlaybackActiveRef.current || perfRecordActiveRef.current;
     const useWorklet = recordingWorkletNodeRef.current !== null;
 
-    if (isPlaying) {
-      const bpm = paramsRef.current.arpBpm || 120;
-      const beatDur = 60 / bpm;
-      const loopBeats = liveRecBeatsRef.current;
-      const loopDur = loopBeats * beatDur;
-      const now = ctx.currentTime;
-
-      let snapTime;
-      const B_curr = seqCurrentBeatRef.current;
-      const L = liveRecBeatsRef.current;
-
-      if (perfPlayStartTimeRef.current > 0) {
-        // Calculate next cycle start beat
-        let B_next = Math.ceil(B_curr / L) * L;
-        // If we are too close to the boundary (less than 0.2 beats), push to the next cycle
-        if (B_next - B_curr < 0.2) {
-          B_next += L;
-        }
-        snapTime = perfPlayStartTimeRef.current + (B_next - seqStartBeatOffsetRef.current) * beatDur;
-      } else {
-        // Sequencer not active — snap to next beat of the MIDI/metronome clock
-        snapTime = metronomeRef.current.nextNoteTime;
-        while (!snapTime || snapTime <= now + 0.01) {
-          snapTime = (snapTime || now) + beatDur;
-        }
-      }
-
-      liveRecStartTimeRef.current = snapTime; // becomes T0 for the next recording
+    if (isPlaying && schedulerNodeRef.current) {
+      // Delegate gate timing to the scheduler worklet — sample-accurate cycle boundary detection.
+      // The worklet fires RECORD_GATE_BOUNDARY when within 250ms of the next L-beat boundary,
+      // carrying the exact AudioContext startTime. The onmessage handler then arms the
+      // RecorderProcessor. No main-thread beat math required.
+      liveLoopInProgressRef.current = true;
       liveRecPendingStartRef.current = true;
       setLiveRecPendingStart(true);
-
-      const beatsUntil = Math.max(1, Math.round((snapTime - now) / beatDur));
-      showEditorStatus(`⏳ Armed — gate opens in ${beatsUntil} beat${beatsUntil !== 1 ? 's' : ''} (beat 1 of next loop)`);
-
-      if (useWorklet) {
-        recordingWorkletNodeRef.current.port.postMessage({
-          type: 'ARM_LIVE_LOOP',
-          startTime: snapTime,
-          targetSamples: liveRecTotalSamplesRef.current,
-          latencySamples: Math.max(0, latencySamples)
-        });
-      }
+      schedulerNodeRef.current.port.postMessage({
+        type: 'ARM_RECORD_GATE',
+        loopBeats: liveRecBeatsRef.current
+      });
+      showEditorStatus(`🎯 Gate armed — waiting for beat 1 of next ${liveRecBeatsRef.current}-beat cycle...`);
     } else {
+      // Not playing or no scheduler — start immediately
       liveRecStartTimeRef.current = ctx.currentTime;
       liveRecPendingStartRef.current = false;
       setLiveRecPendingStart(false);
       isLiveRecordingRef.current = true;
       setIsLiveRecording(true);
       showEditorStatus("Live Recording Started! 🔴");
-      
+
       if (useWorklet) {
         recordingWorkletNodeRef.current.port.postMessage({
           type: 'ARM_LIVE_LOOP',
@@ -3055,6 +3027,10 @@ export default function Delta7Synth() {
       showEditorStatus("Live Recording Cancelled ⏹️");
       if (recordingWorkletNodeRef.current) {
         recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
+      }
+      // Disarm the scheduler gate in case recording was still in the pending-gate state
+      if (schedulerNodeRef.current) {
+        schedulerNodeRef.current.port.postMessage({ type: 'DISARM_RECORD_GATE' });
       }
     } else {
       startLiveLoopRecording();
@@ -6872,6 +6848,10 @@ export default function Delta7Synth() {
           this.eventQueue = [];
           this.sharedFloat32Array = null;
           this.sharedInt32Array = null;
+          // Record gate — armed by main thread, fires RECORD_GATE_BOUNDARY for sample-accurate start
+          this.recordGateArmed = false;
+          this.recordGateLoopBeats = 16;
+          this.recordGateFired = false;
         }
 
         handleMessage(e) {
@@ -6948,6 +6928,18 @@ export default function Delta7Synth() {
 
             case 'SET_SEQ_LENGTH':
               this.seqLength = msg.seqLength;
+              break;
+
+            case 'ARM_RECORD_GATE':
+              // Main thread arms the worklet to detect the next L-beat cycle boundary
+              this.recordGateArmed = true;
+              this.recordGateLoopBeats = msg.loopBeats || 16;
+              this.recordGateFired = false;
+              break;
+
+            case 'DISARM_RECORD_GATE':
+              this.recordGateArmed = false;
+              this.recordGateFired = false;
               break;
           }
         }
@@ -7180,7 +7172,36 @@ export default function Delta7Synth() {
               this.eventQueue.splice(i, 1);
             }
           }
-          
+
+          // 5. Record gate — sample-accurate L-beat cycle boundary detection
+          // Works for perf playback (playbackActive) and metronome-only mode.
+          if (this.recordGateArmed && !this.recordGateFired) {
+            const isActive = this.playbackActive || this.metronomePlaying;
+            const epochTime = (this.playbackActive && this.playbackStartTime > 0)
+              ? this.playbackStartTime
+              : this.perfStartTime;
+            const beatOffset = this.playbackActive ? (this.playbackStartBeatOffset || 0) : 0;
+            if (isActive && epochTime > 0) {
+              const elapsed = now - epochTime;
+              const currentBeat = elapsed / beatDuration + beatOffset;
+              const L = this.recordGateLoopBeats;
+              let nextBoundaryBeat = Math.ceil(currentBeat / L) * L;
+              // Skip if at/very near a boundary (< 0.1 beats ~50ms at 120bpm) — go to next cycle
+              if (nextBoundaryBeat - currentBeat < 0.1) nextBoundaryBeat += L;
+              const nextBoundaryTime = epochTime + (nextBoundaryBeat - beatOffset) * beatDuration;
+              // Fire 250ms before boundary — enough lookahead for main thread to arm RecorderProcessor
+              if (nextBoundaryTime > now && nextBoundaryTime - now <= 0.25) {
+                this.recordGateFired = true;
+                this.recordGateArmed = false;
+                this.port.postMessage({
+                  type: 'RECORD_GATE_BOUNDARY',
+                  startTime: nextBoundaryTime,
+                  beatsUntil: +(nextBoundaryBeat - currentBeat).toFixed(2)
+                });
+              }
+            }
+          }
+
           return true;
         }
       }
@@ -7285,6 +7306,19 @@ export default function Delta7Synth() {
             msg.sliceIdx,
             false
           );
+        } else if (msg.type === 'RECORD_GATE_BOUNDARY') {
+          // Scheduler worklet detected the next L-beat cycle boundary sample-accurately.
+          // Forward the exact AudioContext startTime to the RecorderProcessor.
+          if (liveLoopInProgressRef.current && recordingWorkletNodeRef.current) {
+            liveRecStartTimeRef.current = msg.startTime;
+            recordingWorkletNodeRef.current.port.postMessage({
+              type: 'ARM_LIVE_LOOP',
+              startTime: msg.startTime,
+              targetSamples: liveRecTotalSamplesRef.current,
+              latencySamples: Math.max(0, liveRecLimitSamplesRef.current - liveRecTotalSamplesRef.current)
+            });
+            showEditorStatus('\u23FA Gate opens in ' + msg.beatsUntil + ' beats \u2014 recording ' + liveRecBeatsRef.current + 'b \uD83D\uDD34');
+          }
         }
       };
       
@@ -11310,6 +11344,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     perfPlayStartTimeRef.current = startTime;
     seqStartBeatOffsetRef.current = 0.0;
     seqCurrentBeatRef.current = 0.0;
+    metronomeRef.current.epochTime = startTime; // anchor epoch to MIDI clock START beat
     
     syncSabPlaybackState(true, startTime, 0.0, bpm);
     
@@ -11857,6 +11892,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     
     metronomeRef.current.isPlaying = true;
     metronomeRef.current.beatIndex = 0;
+    metronomeRef.current.epochTime = ctx.currentTime + 0.02; // same offset sent to scheduler worklet
     metronomeRef.current.nextNoteTime = ctx.currentTime + 0.05;
     
     if (schedulerNodeRef.current) {
@@ -11869,6 +11905,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
   const stopMetronome = () => {
     metronomeRef.current.isPlaying = false;
+    metronomeRef.current.epochTime = 0; // clear epoch so next start gets a fresh one
     if (schedulerNodeRef.current) {
       schedulerNodeRef.current.port.postMessage({ type: 'STOP_METRONOME' });
     }
