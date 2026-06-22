@@ -268,3 +268,13 @@
 - **Jimmy's Preferences**:
   - **Mismatched Loop Length Alignments**: When recording live loops that are longer than or equal to the active sequencer loop length, the record gate must align with the sequencer's wrap-around boundary (`endBeat`).
   - **Natural Wrap-Around Handover**: If a cycle skip occurs near boundaries, the looper should wait to trigger naturally in the next cycle rather than scheduling boundaries past `endBeat` which are unreachable and lead to arming freezes.
+
+## Session: 2026-06-22 (Part 10)
+- **Task**: Audio Context lifecycle sanitization, worklet Blob URL finally-block revocations, WAV export timing delays, MIDI listener unmount cleanup, and calibration playhead silencing.
+- **Jimmy's Preferences**:
+  - **JIT Calibration Voice Halting**: Programmatically halting active performance pad voice scheduling and clearing target pad UI trigger states before opening the Latency Calibration modal ensures residual playback does not bleed into the calibration audio path.
+  - **Delayed WAV Revocation**: Introducing a 1-second timeout before revoking export WAV blobs allows the browser download engine enough time to finalize the file stream.
+  - **Worklet Blob Revocation finally Blocks**: Running URL revocations inside `finally` blocks guarantees memory reclamation even on worklet creation failure.
+  - **MIDI Listener Cleanup**: Cleaning up all `onmidimessage` listeners on component unmount prevents duplicate listener registry leaks and stale event interception.
+  - **JIT Audio Context Initialization Guard**: Using a Ref-based initialization guard (`isInitializingRef`) prevents overlapping async engine initialization runs, avoiding duplicate audio graphs.
+  - **Zero Latency for Digital Resampling**: Internal resampler and monitor modes record directly within the Web Audio graph with 0ms delay. Forcing the recording latency offset to exactly 0ms for internal resampling prevents the gate from staying open too long and capturing the autoplayed handover bleed, yielding perfectly seamless loops with no seam corruption.
