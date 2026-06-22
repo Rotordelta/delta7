@@ -232,3 +232,10 @@
   - **Sequencer Overdub controls**: Providing dedicated `Dub` buttons next to the `Rec` buttons in the sequencer header toolbar is essential. This lets Jimmy capture live pad triggers on the fly, layering notes over the existing sequence instead of starting a clean recording that wipes the previous sequencer state.
   - **Toolbar Width Adjustments**: When adding toolbar controls, the container's width (e.g. `deck-row` width) should be scaled up proportionally (e.g. from `250px` to `280px`) to prevent spacing collisions and preserve visual alignment.
 
+## Session: 2026-06-22 (Part 4)
+- **Task**: Splash card screen and fullscreen intro video.
+- **Jimmy's Preferences**:
+  - **User Interaction Splash Card**: To comply with browser autoplay restrictions (which prevent video playback with sound before a user gesture), rendering a beautiful landing card with an "ENTER WORKSTATION" trigger button is highly effective. It acts as the explicit user click needed to unlock audio permissions.
+  - **Fullscreen Video Viewport**: Playing the intro video on a fullscreen overlay that fades out to black dynamically over 1 second gives a professional, immersive, and high-fidelity console-loading experience.
+  - **Vite Public Assets Pathing**: Placing static videos and big assets in the `public/` directory ensures they are cleanly served by Vite's relative base configuration, resolving perfectly under both local development servers and packaged file system routes (`file://`) inside Electron.
+  - **Skip Button Availability**: Always include a "Skip Intro" option on screens or videos to let users bypass animations and get straight to creating music.
