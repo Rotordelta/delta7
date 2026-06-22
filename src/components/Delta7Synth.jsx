@@ -2788,7 +2788,12 @@ export default function Delta7Synth() {
       setLiveRecPendingStart(true);
       schedulerNodeRef.current.port.postMessage({
         type: 'ARM_RECORD_GATE',
-        loopBeats: liveRecBeatsRef.current
+        loopBeats: liveRecBeatsRef.current,
+        // Pass timing epoch so the worklet can detect the boundary even if
+        // START_PLAYBACK / syncSabPlaybackState was not called in this session
+        playbackStartTime: perfPlayStartTimeRef.current,
+        playbackStartBeatOffset: seqStartBeatOffsetRef.current || 0,
+        bpm: paramsRef.current.arpBpm || 120
       });
       showEditorStatus(`🎯 Gate armed — waiting for beat 1 of next ${liveRecBeatsRef.current}-beat cycle...`);
     } else {
@@ -6931,10 +6936,18 @@ export default function Delta7Synth() {
               break;
 
             case 'ARM_RECORD_GATE':
-              // Main thread arms the worklet to detect the next L-beat cycle boundary
+              // Main thread arms the worklet to detect the next L-beat cycle boundary.
+              // Timing params are also passed so the boundary detection works even when
+              // START_PLAYBACK or syncSabPlaybackState was not called for this session.
               this.recordGateArmed = true;
               this.recordGateLoopBeats = msg.loopBeats || 16;
               this.recordGateFired = false;
+              if (msg.playbackStartTime > 0) {
+                this.playbackActive = true;
+                this.playbackStartTime = msg.playbackStartTime;
+                this.playbackStartBeatOffset = msg.playbackStartBeatOffset || 0;
+                if (msg.bpm > 0) this.bpm = msg.bpm;
+              }
               break;
 
             case 'DISARM_RECORD_GATE':
@@ -7185,19 +7198,50 @@ export default function Delta7Synth() {
               const elapsed = now - epochTime;
               const currentBeat = elapsed / beatDuration + beatOffset;
               const L = this.recordGateLoopBeats;
-              let nextBoundaryBeat = Math.ceil(currentBeat / L) * L;
+              
+              // Calculate current sequencer loop length
+              let endBeat = Infinity;
+              if (this.playbackActive) {
+                const setting = this.seqLength || 'Auto';
+                if (setting === 'Infinite') {
+                  endBeat = Infinity;
+                } else if (setting === 'Auto') {
+                  if (this.sortedEvents.length > 0) {
+                    const lastEvent = this.sortedEvents[this.sortedEvents.length - 1];
+                    endBeat = Math.max(16, Math.ceil(lastEvent.beat / 4) * 4);
+                  } else {
+                    endBeat = 16.0;
+                  }
+                } else {
+                  endBeat = parseFloat(setting) || 16.0;
+                }
+              }
+
+              let nextBoundaryBeat = 0;
+              if (endBeat !== Infinity && L >= endBeat) {
+                nextBoundaryBeat = endBeat;
+              } else {
+                nextBoundaryBeat = Math.ceil(currentBeat / L) * L;
+              }
+              
               // Skip if at/very near a boundary (< 0.1 beats ~50ms at 120bpm) — go to next cycle
-              if (nextBoundaryBeat - currentBeat < 0.1) nextBoundaryBeat += L;
-              const nextBoundaryTime = epochTime + (nextBoundaryBeat - beatOffset) * beatDuration;
-              // Fire 250ms before boundary — enough lookahead for main thread to arm RecorderProcessor
-              if (nextBoundaryTime > now && nextBoundaryTime - now <= 0.25) {
-                this.recordGateFired = true;
-                this.recordGateArmed = false;
-                this.port.postMessage({
-                  type: 'RECORD_GATE_BOUNDARY',
-                  startTime: nextBoundaryTime,
-                  beatsUntil: +(nextBoundaryBeat - currentBeat).toFixed(2)
-                });
+              if (nextBoundaryBeat - currentBeat < 0.1) {
+                nextBoundaryBeat += L;
+              }
+              
+              // Only check/fire if the boundary falls within the current sequencer loop
+              if (endBeat === Infinity || nextBoundaryBeat <= endBeat) {
+                const nextBoundaryTime = epochTime + (nextBoundaryBeat - beatOffset) * beatDuration;
+                // Fire 500ms before boundary — enough lookahead for main thread to arm RecorderProcessor
+                if (nextBoundaryTime > now && nextBoundaryTime - now <= 0.5) {
+                  this.recordGateFired = true;
+                  this.recordGateArmed = false;
+                  this.port.postMessage({
+                    type: 'RECORD_GATE_BOUNDARY',
+                    startTime: nextBoundaryTime,
+                    beatsUntil: +(nextBoundaryBeat - currentBeat).toFixed(2)
+                  });
+                }
               }
             }
           }
@@ -7404,7 +7448,10 @@ export default function Delta7Synth() {
   };
 
   const loadKitPreset = async (kitType, bankType) => {
-    if (!audioCtxRef.current) initAudio();
+    if (!audioCtxRef.current) {
+      initAudio();
+      return;
+    }
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     
@@ -11329,7 +11376,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const startMidiClockPlayback = () => {
-    if (!audioCtxRef.current) initAudio();
+    if (!audioCtxRef.current) {
+      initAudio();
+      return;
+    }
     const ctx = audioCtxRef.current;
     if (!ctx) return;
     const bpm = paramsRef.current.arpBpm || 120;
