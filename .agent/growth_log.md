@@ -262,3 +262,9 @@
 - **Jimmy's Preferences**:
   - **Mount-Time Initialization**: Rather than lazy-loading the Web Audio Context and compiling AudioWorklet modules on the first note/pad trigger (which creates timing race conditions and lost events), the engine should initialize automatically upon mounting after a splash screen gesture.
   - **Null Safety in Async Init**: All call-sites performing lazy context checks must be safeguarded with explicit checks for null `audioCtxRef.current` to prevent TypeError crashes during initialization windows.
+
+## Session: 2026-06-22 (Part 9)
+- **Task**: Looper Record Gate Boundary Cycle Alignment Fix.
+- **Jimmy's Preferences**:
+  - **Mismatched Loop Length Alignments**: When recording live loops that are longer than or equal to the active sequencer loop length, the record gate must align with the sequencer's wrap-around boundary (`endBeat`).
+  - **Natural Wrap-Around Handover**: If a cycle skip occurs near boundaries, the looper should wait to trigger naturally in the next cycle rather than scheduling boundaries past `endBeat` which are unreachable and lead to arming freezes.
