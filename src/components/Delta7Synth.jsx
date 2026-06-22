@@ -1181,6 +1181,11 @@ export default function Delta7Synth() {
     localStorage.setItem('delta7_macros', JSON.stringify(macros));
   }, [macros]);
 
+  // Auto-initialize audio engine on component mount
+  useEffect(() => {
+    initAudio();
+  }, []);
+
   const [macroAssignMode, setMacroAssignMode] = useState(null);
 
   // --- Dynamic Visual Pulse Refs for Platter Rings & Highway Targets ---
@@ -2698,9 +2703,12 @@ export default function Delta7Synth() {
   };
 
   const startLiveLoopRecording = () => {
-    if (!audioCtxRef.current) initAudio();
+    if (!audioCtxRef.current) {
+      initAudio();
+      return;
+    }
     const ctx = audioCtxRef.current;
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
     
     const inputMode = recordingInputModeRef.current;
     if (inputMode === 'resample') {
@@ -3468,9 +3476,12 @@ export default function Delta7Synth() {
   };
 
   const startRecording = () => {
-    if (!audioCtxRef.current) initAudio();
+    if (!audioCtxRef.current) {
+      initAudio();
+      return;
+    }
     const ctx = audioCtxRef.current;
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
 
     recordedChunksL.current = [];
     recordedChunksR.current = [];
@@ -5490,9 +5501,12 @@ export default function Delta7Synth() {
   };
 
   const togglePreviewSample = (slotId) => {
-    if (!audioCtxRef.current) initAudio();
+    if (!audioCtxRef.current) {
+      initAudio();
+      return;
+    }
     const ctx = audioCtxRef.current;
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
     const slot = sampleSlotsRef.current.find(s => s.id === slotId);
     if (!slot || !slot.buffer) return;
 
@@ -10102,9 +10116,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           oscMode: 'single',
         };
         
-        if (!audioCtxRef.current) initAudio();
+        if (!audioCtxRef.current) {
+          initAudio();
+          return;
+        }
         const ctx = audioCtxRef.current;
-        if (ctx.state === 'suspended') ctx.resume();
+        if (ctx && ctx.state === 'suspended') ctx.resume();
         
         const noteToPlay = slot.rootNote + sliceIndex;
         const voice = playProgramVoice(ctx, noteToPlay, velocity, tempProg, `${note}-bankc`);
@@ -10174,9 +10191,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     if (padTriggered) return;
 
-    if (!audioCtxRef.current) initAudio();
+    if (!audioCtxRef.current) {
+      initAudio();
+      return;
+    }
     const ctx = audioCtxRef.current;
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
 
     if (paramsRef.current.arpOn) {
       if (!heldNotesRef.current.includes(note)) {
@@ -10627,7 +10647,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const startPlaybackAutomatically = () => {
-    if (!audioCtxRef.current) initAudio();
+    if (!audioCtxRef.current) {
+      initAudio();
+      return;
+    }
     const ctx = audioCtxRef.current;
     const bpm = paramsRef.current.arpBpm || 120;
     
@@ -10652,9 +10675,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const triggerPerfPadInternal = (deck, type, index, velocity, isNoteOn, shouldRecord = false) => {
-    if (!audioCtxRef.current) initAudio();
+    if (!audioCtxRef.current) {
+      initAudio();
+      return;
+    }
     const ctx = audioCtxRef.current;
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
 
     // 0. Macro Assignment Mode Check
     if (macroAssignMode) {
@@ -11820,9 +11846,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const startMetronome = () => {
-    if (!audioCtxRef.current) initAudio();
+    if (!audioCtxRef.current) {
+      initAudio();
+      return;
+    }
     const ctx = audioCtxRef.current;
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
     
     if (metronomeRef.current.isPlaying) return;
     
@@ -18562,9 +18591,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   setSelectedSliceIndex(idx);
-                                  if (!audioCtxRef.current) initAudio();
+                                  if (!audioCtxRef.current) {
+                                    initAudio();
+                                    return;
+                                  }
                                   const ctx = audioCtxRef.current;
-                                  if (ctx.state === 'suspended') ctx.resume();
+                                  if (ctx && ctx.state === 'suspended') ctx.resume();
                                   
                                   stopVoice(previewNote);
                                   
@@ -18596,9 +18628,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                 onTouchStart={(e) => {
                                   e.preventDefault();
                                   setSelectedSliceIndex(idx);
-                                  if (!audioCtxRef.current) initAudio();
+                                  if (!audioCtxRef.current) {
+                                    initAudio();
+                                    return;
+                                  }
                                   const ctx = audioCtxRef.current;
-                                  if (ctx.state === 'suspended') ctx.resume();
+                                  if (ctx && ctx.state === 'suspended') ctx.resume();
                                   
                                   stopVoice(previewNote);
                                   
