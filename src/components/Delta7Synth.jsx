@@ -14721,7 +14721,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Performance Sequencer Transport controls for Deck A */}
-            <div className="deck-row" style={{ width: '250px', margin: '4px auto 2px auto', display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '3px 6px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.2)' }}>
+            <div className="deck-row" style={{ width: '280px', margin: '4px auto 2px auto', display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '3px 6px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.2)' }}>
               <span style={{ fontSize: '0.45rem', color: '#00f3ff', fontFamily: 'monospace', fontWeight: 'bold', marginRight: 'auto', letterSpacing: '0.5px' }}>SEQ:</span>
               <button
                 className="deck-btn-xs"
@@ -14844,9 +14844,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   cursor: 'pointer',
                   boxShadow: perfRecordActive && !perfIsDubbing ? '0 0 6px #ff0055' : 'none'
                 }}
-                title="Record live pad triggers to performance sequencer"
+                title="Clean record live pad triggers (wipes previous notes)"
               >
                 Rec
+              </button>
+              <button
+                className={`deck-btn-xs ${perfRecordActive && perfIsDubbing ? 'active' : ''}`}
+                onClick={() => togglePerformanceRecord(true)}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: perfRecordActive && perfIsDubbing ? '#ff00ff' : 'rgba(255, 0, 255, 0.05)', 
+                  color: perfRecordActive && perfIsDubbing ? '#000' : '#ff00ff', 
+                  border: '1px solid rgba(255, 0, 255, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer',
+                  boxShadow: perfRecordActive && perfIsDubbing ? '0 0 6px #ff00ff' : 'none'
+                }}
+                title="Overdub live pad triggers onto sequencer (retains previous notes)"
+              >
+                Dub
               </button>
             </div>
 
@@ -15876,7 +15894,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Performance Sequencer Transport controls for Deck B */}
-            <div className="deck-row" style={{ width: '250px', margin: '4px auto 2px auto', display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '3px 6px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.2)' }}>
+            <div className="deck-row" style={{ width: '280px', margin: '4px auto 2px auto', display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '3px 6px', borderRadius: '4px', border: '1px solid rgba(0, 243, 255, 0.2)' }}>
               <span style={{ fontSize: '0.45rem', color: '#00f3ff', fontFamily: 'monospace', fontWeight: 'bold', marginRight: 'auto', letterSpacing: '0.5px' }}>SEQ:</span>
               <button
                 className="deck-btn-xs"
@@ -15999,9 +16017,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   cursor: 'pointer',
                   boxShadow: perfRecordActive && !perfIsDubbing ? '0 0 6px #ff0055' : 'none'
                 }}
-                title="Record live pad triggers to performance sequencer"
+                title="Clean record live pad triggers (wipes previous notes)"
               >
                 Rec
+              </button>
+              <button
+                className={`deck-btn-xs ${perfRecordActive && perfIsDubbing ? 'active' : ''}`}
+                onClick={() => togglePerformanceRecord(true)}
+                style={{ 
+                  fontSize: '0.45rem', 
+                  padding: '2px 4px', 
+                  height: '16px', 
+                  background: perfRecordActive && perfIsDubbing ? '#ff00ff' : 'rgba(255, 0, 255, 0.05)', 
+                  color: perfRecordActive && perfIsDubbing ? '#000' : '#ff00ff', 
+                  border: '1px solid rgba(255, 0, 255, 0.3)', 
+                  borderRadius: '2px', 
+                  cursor: 'pointer',
+                  boxShadow: perfRecordActive && perfIsDubbing ? '0 0 6px #ff00ff' : 'none'
+                }}
+                title="Overdub live pad triggers onto sequencer (retains previous notes)"
+              >
+                Dub
               </button>
             </div>
 
