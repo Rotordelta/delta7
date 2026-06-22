@@ -6450,6 +6450,12 @@ export default function Delta7Synth() {
     } catch (err) {
       console.warn("Error closing AudioContext during cleanup:", err);
     }
+
+    // 10. Revoke recorder blob URL
+    if (recorderBlobUrlRef.current) {
+      try { URL.revokeObjectURL(recorderBlobUrlRef.current); } catch {}
+      recorderBlobUrlRef.current = null;
+    }
   };
 
   // ==========================================
@@ -6959,7 +6965,6 @@ export default function Delta7Synth() {
       recorderBlobUrlRef.current = recorderBlobUrl;
     } catch (err) {
       console.warn("Failed to load Recorder AudioWorklet module:", err);
-    } finally {
       URL.revokeObjectURL(recorderBlobUrl);
     }
 
