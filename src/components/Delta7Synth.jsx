@@ -2668,7 +2668,9 @@ export default function Delta7Synth() {
     liveRecTotalSamplesRef.current = Math.round(ctx.sampleRate * totalSec);
     
     // Calculate latency offset samples to record extra at the end
-    const latencyMs = recLatencyOffsetRef.current || 0;
+    // For internal resample, latency is 0 since it is inside the audio graph
+    const isInternal = (recordingInputModeRef.current === 'resample');
+    const latencyMs = isInternal ? 0 : (recLatencyOffsetRef.current || 0);
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     const limitSamples = liveRecTotalSamplesRef.current + Math.max(0, latencySamples);
     liveRecLimitSamplesRef.current = limitSamples;
@@ -2743,7 +2745,8 @@ export default function Delta7Synth() {
       offset += chunksL[i].length;
     }
 
-    const latencyMs = recLatencyOffsetRef.current || 0;
+    const isInternal = (recordingInputModeRef.current === 'resample');
+    const latencyMs = isInternal ? 0 : (recLatencyOffsetRef.current || 0);
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     const targetLength = liveRecTotalSamplesRef.current || totalLength;
     console.log(`[Looper] saveLiveLoopRecording: latencyMs = ${latencyMs}ms, latencySamples = ${latencySamples}, totalLength = ${totalLength}, targetLength = ${targetLength}`);
@@ -3295,7 +3298,9 @@ export default function Delta7Synth() {
     }
     
     // Apply latency offset shifting
-    const latencyMs = recLatencyOffsetRef.current || 0;
+    // For internal resample, latency is 0 since it is inside the audio graph
+    const isInternal = (recordingInputModeRef.current === 'resample');
+    const latencyMs = isInternal ? 0 : (recLatencyOffsetRef.current || 0);
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     console.log(`[Looper] saveResampledAudio: latencyMs = ${latencyMs}ms, latencySamples = ${latencySamples}, totalLength = ${totalLength}`);
 
@@ -7494,14 +7499,16 @@ export default function Delta7Synth() {
         } else if (msg.type === 'RECORD_GATE_BOUNDARY') {
           // Scheduler worklet detected the next L-beat cycle boundary sample-accurately.
           // Forward the exact AudioContext startTime to the RecorderProcessor.
-          if (liveLoopInProgressRef.current && recordingWorkletNodeRef.current) {
+          if (liveLoopInProgressRef.current) {
             liveRecStartTimeRef.current = msg.startTime;
-            recordingWorkletNodeRef.current.port.postMessage({
-              type: 'ARM_LIVE_LOOP',
-              startTime: msg.startTime,
-              targetSamples: liveRecTotalSamplesRef.current,
-              latencySamples: Math.max(0, liveRecLimitSamplesRef.current - liveRecTotalSamplesRef.current)
-            });
+            if (recordingWorkletNodeRef.current) {
+              recordingWorkletNodeRef.current.port.postMessage({
+                type: 'ARM_LIVE_LOOP',
+                startTime: msg.startTime,
+                targetSamples: liveRecTotalSamplesRef.current,
+                latencySamples: Math.max(0, liveRecLimitSamplesRef.current - liveRecTotalSamplesRef.current)
+              });
+            }
             showEditorStatus('\u23FA Gate opens in ' + msg.beatsUntil + ' beats \u2014 recording ' + liveRecBeatsRef.current + 'b \uD83D\uDD34');
           }
         }
