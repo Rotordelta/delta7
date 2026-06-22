@@ -934,6 +934,7 @@ export default function Delta7Synth() {
   const [localBanks, setLocalBanks] = useState([]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [audioSettingsOpen, setAudioSettingsOpen] = useState(false);
   const [exportSettings, setExportSettings] = useState({
     format: 'stereo-mix',
     sampleRate: 48000,
@@ -1280,6 +1281,10 @@ export default function Delta7Synth() {
     return val !== null ? parseInt(val, 10) : 30;
   });
   const recLatencyOffsetRef = useRef(recLatencyOffset);
+  const [workstationSampleRate, setWorkstationSampleRate] = useState(() => {
+    const val = localStorage.getItem('workstationSampleRate');
+    return val !== null ? parseInt(val, 10) : 48000;
+  });
 
   const [handoverAutoplay, setHandoverAutoplay] = useState(() => {
     const val = localStorage.getItem('handoverAutoplay');
@@ -1405,6 +1410,60 @@ export default function Delta7Synth() {
       }
     }
   }, [recLatencyOffset]);
+
+  const handleWorkstationSampleRateChange = async (newRate) => {
+    setWorkstationSampleRate(newRate);
+    localStorage.setItem('workstationSampleRate', newRate.toString());
+
+    if (audioCtxRef.current) {
+      const ctx = audioCtxRef.current;
+      if (schedulerNodeRef.current) {
+        try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_PLAYBACK' }); } catch {}
+        try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_ARP' }); } catch {}
+        try { schedulerNodeRef.current.port.postMessage({ type: 'STOP_METRONOME' }); } catch {}
+        try { schedulerNodeRef.current.disconnect(); } catch {}
+        schedulerNodeRef.current = null;
+      }
+      
+      activeVoicesRef.current.forEach(voices => {
+        voices.forEach(voice => {
+          const sources = [
+            voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
+            voice.driftLfo, voice.vibratoLfo, voice.filterLfo
+          ];
+          sources.forEach(src => {
+            if (src) { try { src.stop(); } catch {} }
+          });
+          const nodes = [
+            voice.oscA, voice.oscB, voice.oscA_L, voice.oscA_R, voice.subOsc, voice.noiseSource,
+            voice.driftLfo, voice.vibratoLfo, voice.filterLfo,
+            voice.gainA, voice.gainB, voice.gainA_L, voice.gainA_R, voice.subGain, voice.noiseGain,
+            voice.vibratoLfoGain, voice.filterLfoGain, voice.filter1, voice.filter2,
+            voice.eqLowNode, voice.eqMidNode, voice.eqHighNode, voice.sendGainNode, voice.slotGainNode, voice.voiceOutGain
+          ];
+          nodes.forEach(node => {
+            if (node && typeof node.disconnect === 'function') {
+              try { node.disconnect(); } catch {}
+            }
+          });
+        });
+      });
+      activeVoicesRef.current.clear();
+      
+      try {
+        await ctx.close();
+      } catch (err) {
+        console.warn("Error closing context on sample rate change:", err);
+      }
+      audioCtxRef.current = null;
+
+      // Re-initialize audio engine
+      setTimeout(() => {
+        initAudio();
+        showEditorStatus(`⚡ Audio engine restarted at ${newRate / 1000}kHz`);
+      }, 50);
+    }
+  };
 
   const [midiClockSync, setMidiClockSync] = useState(() => {
     return localStorage.getItem('midiClockSync') === 'true';
@@ -6263,7 +6322,7 @@ export default function Delta7Synth() {
     if (audioCtxRef.current) return;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioContextClass({ latencyHint: 'interactive', sampleRate: 48000 });
+    const ctx = new AudioContextClass({ latencyHint: 'interactive', sampleRate: workstationSampleRate });
     audioCtxRef.current = ctx;
 
     const now = ctx.currentTime;
@@ -16702,7 +16761,87 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         <div style={{ position: 'relative', marginLeft: 'auto', marginRight: '16px' }}>
           <button
             className="btn btn-xs"
-            onClick={() => setProjectMenuOpen(!projectMenuOpen)}
+            onClick={() => {
+              setAudioSettingsOpen(!audioSettingsOpen);
+              setProjectMenuOpen(false);
+            }}
+            style={{
+              borderColor: '#ff0055',
+              color: '#ff0055',
+              fontSize: '0.58rem',
+              padding: '2px 8px',
+              fontWeight: 'bold',
+              letterSpacing: '0.8px',
+              background: 'transparent',
+              boxShadow: '0 0 6px rgba(255, 0, 85, 0.15)',
+              cursor: 'pointer',
+              fontFamily: 'monospace'
+            }}
+          >
+            ⚡ ENGINE: {workstationSampleRate / 1000}kHz
+          </button>
+          {audioSettingsOpen && (
+            <div 
+              className="project-dropdown-menu"
+              style={{
+                position: 'absolute',
+                top: '25px',
+                right: '0',
+                width: '180px',
+                background: 'rgba(13, 18, 30, 0.95)',
+                border: '1px solid rgba(255, 0, 85, 0.25)',
+                boxShadow: '0 8px 16px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 0, 85, 0.05)',
+                borderRadius: '4px',
+                padding: '8px',
+                zIndex: 999,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                animation: 'slide-up 0.15s ease-out'
+              }}
+            >
+              <div style={{ fontSize: '0.52rem', color: '#888', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', fontFamily: 'monospace' }}>
+                AUDIO ENGINE RATE
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {[44100, 48000].map(rate => (
+                  <button
+                    key={rate}
+                    className={`btn btn-seg-sm ${workstationSampleRate === rate ? 'btn-active' : ''}`}
+                    onClick={() => {
+                      handleWorkstationSampleRateChange(rate);
+                      setAudioSettingsOpen(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      fontSize: '0.55rem',
+                      textAlign: 'center',
+                      background: workstationSampleRate === rate ? '#ff0055' : 'transparent',
+                      color: workstationSampleRate === rate ? '#000' : '#ff0055',
+                      borderColor: 'rgba(255, 0, 85, 0.2)',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold'
+                    }}
+                  >
+                    {rate / 1000} kHz
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: '0.48rem', color: '#888', fontFamily: 'monospace', lineHeight: '1.2', marginTop: '2px' }}>
+                Note: Changing rate restarts the engine and resets active voices.
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ position: 'relative', marginRight: '16px' }}>
+          <button
+            className="btn btn-xs"
+            onClick={() => {
+              setProjectMenuOpen(!projectMenuOpen);
+              setAudioSettingsOpen(false);
+            }}
             style={{
               borderColor: projectDirHandle ? '#ffe600' : '#00f3ff',
               color: projectDirHandle ? '#ffe600' : '#00f3ff',
