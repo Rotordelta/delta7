@@ -219,3 +219,9 @@
   - **Modal Accessibility Safeguards**: The Focus Zoom hover effect should automatically bypass when fullscreen overlays or modals are open to avoid visual conflicts and preserve pointer interaction on popups.
   - **Header Toggle Buttons**: A clear, dedicated controller in the header rack with color-coded states (ON/OFF) makes accessibility toggles easily discoverable and cohesive.
 
+## Session: 2026-06-22 (Part 2)
+- **Task**: Dynamic Focus Zoom Settings and Z-Index Stacking Elevate.
+- **Jimmy's Preferences**:
+  - **Dynamic Zoom & Speed Sliders**: Providing fine-grained controls (ZOOM from `1.005x` to `1.15x`, SPEED from `50ms` to `1000ms`) directly in the top header bar next to the Focus Zoom switch makes it incredibly easy to dial in the perfect, comfortable UI zoom behavior.
+  - **CSS Custom Variable Injection**: Mapping UI states directly to inline CSS variables on the chassis container is a highly performant and clean way to bind React state to stylesheet transformations.
+  - **Layering and Stacking Order (Z-Index)**: Zoomed/hovered panels must stack *above* the top rack menu (`z-index: 1000`) to avoid clipping the top of the panels. Applying `position: relative` and `z-index: 2000 !important` on hover resolves this cleanly while remaining below fullscreen modals (`z-index: 9999`).
