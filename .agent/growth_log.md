@@ -279,3 +279,18 @@
   - **JIT Audio Context Initialization Guard**: Using a Ref-based initialization guard (`isInitializingRef`) prevents overlapping async engine initialization runs, avoiding duplicate audio graphs.
   - **Zero Latency for Digital Resampling**: Internal resampler and monitor modes record directly within the Web Audio graph with 0ms delay. Forcing the recording latency offset to exactly 0ms for internal resampling prevents the gate from staying open too long and capturing the autoplayed handover bleed, yielding perfectly seamless loops with no seam corruption.
   - **Numeric Type Coercion for Worklet State**: Values received from React UI dropdowns/inputs (like `liveRecBeats`) are passed as strings. To prevent implicit string operations inside AudioWorklets (e.g. `nextBoundaryBeat += L` resulting in `"1616"`), all parameters must be strictly coerced to a number (`Number(...)`) before being utilized in scheduler and clock arithmetic.
+
+## Session: 2026-06-23
+- **Task**: Verified JIT handover playback routing and synchronized target slot select inputs.
+- **Jimmy's Preferences**:
+  - **Rust Sequencer Option**: Interest in migrating the high-precision loop sequencer engine to Rust (via WebAssembly) in the future to improve timing accuracy and eliminate potential browser scheduler drift/slipping.
+  - **Tight Control Focus**: Ensuring that looper target changes immediately focus editor selections to maintain context while setting up live takes.
+
+## Session: 2026-06-23 (Part 2)
+- **Task**: Completed Latency-Compensated Handover & Targeting verification, and verified successful build.
+- **Jimmy's Preferences**:
+  - **Zero-error Build Check**: Ensuring that the project compiles with zero warnings or errors (`npm run build`) before pushing/committing changes to git is highly valued to maintain codebase stability.
+  - **Comprehensive Calibration Mode Support**: Aligning all sample slots, including the auxiliary Bank C slots, across all UI helper labeling functions (e.g. `getSlotLabel`) ensures UI consistency and prevents `NaN` errors.
+  - **Autoplay Latency Handover Phase Alignment**: Standard sampler playback offsets (`finalStartOffsetA` / `finalStartOffsetB`) must include the calibration nudge offset (`nudgeSecA` / `nudgeSecB`) even when using `fluxOffset` to start playback at exactly the correct phase angle, keeping the hand-off perfectly aligned with hardware direct monitoring.
+
+

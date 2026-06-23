@@ -1,0 +1,765 @@
+﻿diff --git a/src/components/Delta7Synth.jsx b/src/components/Delta7Synth.jsx
+index 13b73e7..34c6a67 100644
+--- a/src/components/Delta7Synth.jsx
++++ b/src/components/Delta7Synth.jsx
+@@ -785,6 +785,8 @@ export default function Delta7Synth() {
+   const isInitializingRef = useRef(false);
+   const activeVoicesRef = useRef(new Map()); // voiceKey (e.g. note-progId) -> voiceObjects
+   const schedulerNodeRef = useRef(null);
++  const looperNodeRef = useRef(null);
++  const looperBlobUrlRef = useRef(null);
+   const masterGainRef = useRef(null);
+   const analyserRef = useRef(null);
+   const midiOutputsRef = useRef([]); // Add this for MIDI outputs caching
+@@ -1224,6 +1226,75 @@ export default function Delta7Synth() {
+   const liveLoopInProgressRef = useRef(false);
+   useEffect(() => { liveRecTargetSlotRef.current = liveRecTargetSlot; }, [liveRecTargetSlot]);
+ 
++  useEffect(() => {
++    if (selectedEditSlotId && selectedEditSlotId !== liveRecTargetSlot) {
++      setLiveRecTargetSlot(selectedEditSlotId);
++    }
++  }, [selectedEditSlotId]);
++
++  useEffect(() => {
++    if (liveRecTargetSlot && liveRecTargetSlot !== selectedEditSlotId) {
++      setSelectedEditSlotId(liveRecTargetSlot);
++    }
++  }, [liveRecTargetSlot]);
++
++  // Dedicated Looper states
++  const [looperState, setLooperState] = useState(0); // 0: EMPTY, 1: REC, 2: PLAY, 3: DUB, 4: STOPPED
++  const looperStateRef = useRef(0);
++  useEffect(() => { looperStateRef.current = looperState; }, [looperState]);
++
++  const [looperFeedback, setLooperFeedback] = useState(1.0);
++  const looperFeedbackRef = useRef(1.0);
++  useEffect(() => { looperFeedbackRef.current = looperFeedback; }, [looperFeedback]);
++
++  const [looperVolume, setLooperVolume] = useState(1.0);
++  const looperVolumeRef = useRef(1.0);
++  useEffect(() => { looperVolumeRef.current = looperVolume; }, [looperVolume]);
++
++  const [looperMode, setLooperMode] = useState('quantized'); // 'quantized' or 'free'
++  const looperModeRef = useRef('quantized');
++  useEffect(() => { looperModeRef.current = looperMode; }, [looperMode]);
++
++  const [looperHasUndo, setLooperHasUndo] = useState(false);
++  const [looperLevelIn, setLooperLevelIn] = useState(0);
++  const [looperLevelOut, setLooperLevelOut] = useState(0);
++  const [looperPlayheadPercent, setLooperPlayheadPercent] = useState(0);
++
++  const [chocolateMappings, setChocolateMappings] = useState(() => {
++    try {
++      const saved = localStorage.getItem('delta7_chocolate_mappings');
++      return saved ? JSON.parse(saved) : {
++        switch1: 'C80',
++        switch2: 'C81',
++        switch3: 'C82',
++        switch4: 'C83'
++      };
++    } catch {
++      return {
++        switch1: 'C80',
++        switch2: 'C81',
++        switch3: 'C82',
++        switch4: 'C83'
++      };
++    }
++  });
++
++  const chocolateMappingsRef = useRef(chocolateMappings);
++  useEffect(() => {
++    chocolateMappingsRef.current = chocolateMappings;
++    try {
++      localStorage.setItem('delta7_chocolate_mappings', JSON.stringify(chocolateMappings));
++    } catch (e) {
++      console.warn("Could not save chocolate mappings to localStorage", e);
++    }
++  }, [chocolateMappings]);
++
++  const [midiLearnChocolate, setMidiLearnChocolate] = useState(null);
++  const midiLearnChocolateRef = useRef(midiLearnChocolate);
++  useEffect(() => { midiLearnChocolateRef.current = midiLearnChocolate; }, [midiLearnChocolate]);
++
++  const chocolateSwitch2TimerRef = useRef(null);
++
+   const [isLiveRecording, setIsLiveRecording] = useState(false);
+   const isLiveRecordingRef = useRef(false);
+ 
+@@ -1241,6 +1312,9 @@ export default function Delta7Synth() {
+   const liveRecOverdubRef = useRef(false);
+   useEffect(() => { liveRecOverdubRef.current = liveRecOverdub; }, [liveRecOverdub]);
+ 
++  const overdubOriginalBufferRef = useRef(null);
++  const overdubOriginalRawBufferRef = useRef(null);
++
+   const [liveRecProgress, setLiveRecProgress] = useState(0);
+ 
+   useEffect(() => {
+@@ -1296,6 +1370,10 @@ export default function Delta7Synth() {
+     const val = localStorage.getItem('handoverAutoplay');
+     return val !== null ? val === 'true' : true;
+   });
++  const handoverAutoplayRef = useRef(handoverAutoplay);
++  useEffect(() => {
++    handoverAutoplayRef.current = handoverAutoplay;
++  }, [handoverAutoplay]);
+ 
+   const [waveformZoom, setWaveformZoom] = useState(1);
+   const [waveformScroll, setWaveformScroll] = useState(0);
+@@ -2473,6 +2551,25 @@ export default function Delta7Synth() {
+           isRecordingRef.current = true;
+           manualRecPendingStartRef.current = false;
+           
++          setTimeout(() => {
++            setIsRecording(true);
++            setManualRecPendingStart(false);
++            showEditorStatus("Recording Started... ÔÅ║´©Å");
++          }, 0);
++          return;
++        } else if (blockTime > targetStartTime) {
++          // Missed start time fallback (start recording immediately)
++          recordedChunksL.current = [];
++          recordedChunksR.current = [];
++          
++          const chunkL = new Float32Array(inputL);
++          const chunkR = new Float32Array(inputR);
++          recordedChunksL.current.push(chunkL);
++          recordedChunksR.current.push(chunkR);
++          
++          isRecordingRef.current = true;
++          manualRecPendingStartRef.current = false;
++          
+           setTimeout(() => {
+             setIsRecording(true);
+             setManualRecPendingStart(false);
+@@ -2537,6 +2634,27 @@ export default function Delta7Synth() {
+           isLiveRecordingRef.current = true;
+           liveRecPendingStartRef.current = false;
+           
++          setTimeout(() => {
++            setIsLiveRecording(true);
++            setLiveRecPendingStart(false);
++            showEditorStatus("Live Recording Started! ­ƒö┤");
++          }, 0);
++          return;
++        } else if (blockTime > targetStartTime) {
++          // Missed start time fallback (start recording immediately)
++          recordedChunksL.current = [];
++          recordedChunksR.current = [];
++          liveRecCollectedSamplesRef.current = 0;
++          
++          const chunkL = new Float32Array(inputL);
++          const chunkR = new Float32Array(inputR);
++          recordedChunksL.current.push(chunkL);
++          recordedChunksR.current.push(chunkR);
++          liveRecCollectedSamplesRef.current += blockLength;
++          
++          isLiveRecordingRef.current = true;
++          liveRecPendingStartRef.current = false;
++          
+           setTimeout(() => {
+             setIsLiveRecording(true);
+             setLiveRecPendingStart(false);
+@@ -2563,25 +2681,6 @@ export default function Delta7Synth() {
+ 
+           if (!liveRecHandoverStartedRef.current && liveRecCollectedSamplesRef.current >= liveRecTotalSamplesRef.current) {
+             liveRecHandoverStartedRef.current = true;
+-            
+-            let totalCollected = 0;
+-            for (let i = 0; i < recordedChunksL.current.length; i++) {
+-              totalCollected += recordedChunksL.current[i].length;
+-            }
+-            const bufferL = new Float32Array(totalCollected);
+-            const bufferR = new Float32Array(totalCollected);
+-            let offset = 0;
+-            for (let i = 0; i < recordedChunksL.current.length; i++) {
+-              bufferL.set(recordedChunksL.current[i], offset);
+-              bufferR.set(recordedChunksR.current[i], offset);
+-              offset += recordedChunksL.current[i].length;
+-            }
+-            const slicedL = bufferL.subarray(0, liveRecTotalSamplesRef.current);
+-            const slicedR = bufferR.subarray(0, liveRecTotalSamplesRef.current);
+-            
+-            setTimeout(() => {
+-              saveLiveLoopHandoverStart(slicedL, slicedR);
+-            }, 0);
+           }
+ 
+           if (liveRecCollectedSamplesRef.current >= liveRecLimitSamplesRef.current) {
+@@ -2824,8 +2923,9 @@ export default function Delta7Synth() {
+     if (updatedSlot) {
+       // Auto-play directly via main-thread DSP ÔÇö the SAB/worklet path won't see the
+       // freshly created buffer yet, but sampleSlotsRef.current was just updated above.
+-      const deck = targetSlotId.startsWith('b') ? 'B' : 'A';
+-      const index = parseInt(targetSlotId.replace(/[ab]0*/, ''), 10) - 1;
++      const firstChar = targetSlotId[0].toUpperCase();
++      const deck = (firstChar === 'B') ? 'B' : (firstChar === 'C') ? 'C' : 'A';
++      const index = parseInt(targetSlotId.slice(1), 10) - 1;
+       const ctx = audioCtxRef.current;
+ 
+       const isPlaying = metronomeRef.current.isPlaying || perfPlaybackActiveRef.current || perfRecordActiveRef.current;
+@@ -2840,11 +2940,11 @@ export default function Delta7Synth() {
+         customOffset = Math.max(0, elapsed);
+       }
+ 
+-      if (!showLatencyCal && handoverAutoplay) {
++      if (handoverAutoplay) {
+         console.log(`[Looper] Autoplay handover: deck = ${deck}, slotIndex = ${index}, customOffset = ${customOffset}s, triggerMode = ${updatedSlot.triggerMode || 'latch'}`);
+         triggerPerfPadDSP(deck, 'slot', index, 100, true, false, ctx ? ctx.currentTime : 0, 0, undefined, false, customOffset, true);
+       } else {
+-        console.log(`[Looper] Autoplay handover bypassed. showLatencyCal = ${showLatencyCal}, handoverAutoplay = ${handoverAutoplay}`);
++        console.log(`[Looper] Autoplay handover bypassed. handoverAutoplay = ${handoverAutoplay}`);
+       }
+ 
+       saveSampleToDb(updatedSlot)
+@@ -2902,8 +3002,9 @@ export default function Delta7Synth() {
+   const triggerSlotInSync = (slotId) => {
+     const ctx = audioCtxRef.current;
+     if (!ctx) return;
+-    const deck = slotId.startsWith('b') ? 'B' : 'A';
+-    const index = parseInt(slotId.replace(/[ab]0*/, ''), 10) - 1;
++    const firstChar = slotId[0].toUpperCase();
++    const deck = (firstChar === 'B') ? 'B' : (firstChar === 'C') ? 'C' : 'A';
++    const index = parseInt(slotId.slice(1), 10) - 1;
+     const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+     if (!slot || !slot.buffer) return;
+ 
+@@ -2969,6 +3070,236 @@ export default function Delta7Synth() {
+     // Intentionally empty ÔÇö the gate closes itself when the loop length is reached
+   };
+ 
++  const lastSwitch2PressTimeRef = useRef(0);
++
++  const clearLooperBuffer = () => {
++    const targetSlotId = liveRecTargetSlotRef.current;
++    const firstChar = targetSlotId[0].toUpperCase();
++    const deck = (firstChar === 'B') ? 'B' : (firstChar === 'C') ? 'C' : 'A';
++    const index = parseInt(targetSlotId.slice(1), 10) - 1;
++    
++    // Stop playback
++    const voiceKey = `perf-${deck.toLowerCase()}-slot-${index}`;
++    stopPerfVoice(voiceKey);
++    setPerfPad(`${deck}-slot-${index}`, false);
++
++    const nextSlots = sampleSlotsRef.current.map(s => {
++      if (s.id === targetSlotId) {
++        return {
++          ...s,
++          name: `Empty Slot`,
++          buffer: null,
++          rawBuffer: null,
++          undoBuffer: null,
++          undoRawBuffer: null,
++          isRecorded: false
++        };
++      }
++      return s;
++    });
++
++    sampleSlotsRef.current = nextSlots;
++    setSampleSlots(nextSlots);
++    setLooperState(0); // EMPTY
++    setLooperHasUndo(false);
++    showEditorStatus("Loop Cleared ­ƒùæ´©Å");
++  };
++
++  const undoLastLooperAction = () => {
++    const targetSlotId = liveRecTargetSlotRef.current;
++    const slot = sampleSlotsRef.current.find(s => s.id === targetSlotId);
++    if (!slot) return;
++    if (!slot.undoBuffer) {
++      showEditorStatus("Nothing to undo Ô£û´©Å");
++      return;
++    }
++
++    const restoredBuffer = slot.undoBuffer;
++    const restoredRawBuffer = slot.undoRawBuffer;
++
++    const nextSlots = sampleSlotsRef.current.map(s => {
++      if (s.id === targetSlotId) {
++        return {
++          ...s,
++          buffer: restoredBuffer,
++          rawBuffer: restoredRawBuffer,
++          undoBuffer: null,
++          undoRawBuffer: null,
++          revBuffer: getReversedBuffer(audioCtxRef.current, restoredBuffer)
++        };
++      }
++      return s;
++    });
++
++    sampleSlotsRef.current = nextSlots;
++    setSampleSlots(nextSlots);
++    setLooperHasUndo(false);
++    showEditorStatus("Undone last overdub Ôå®´©Å");
++
++    // If the slot is currently playing, we should re-trigger it or let it continue with the updated buffer!
++    const firstChar = targetSlotId[0].toUpperCase();
++    const deck = (firstChar === 'B') ? 'B' : (firstChar === 'C') ? 'C' : 'A';
++    const index = parseInt(targetSlotId.slice(1), 10) - 1;
++    const voiceKey = `perf-${deck.toLowerCase()}-slot-${index}`;
++    stopPerfVoice(voiceKey);
++    
++    // Play in sync
++    const isPlaying = metronomeRef.current.isPlaying || perfPlaybackActiveRef.current || perfRecordActiveRef.current;
++    let customOffset = 0;
++    if (isPlaying) {
++      const bpm = paramsRef.current.arpBpm || 120;
++      const beatDuration = 60 / bpm;
++      const loopBeats = slot.warpOn ? slot.warpBeats : 4;
++      const currentBeat = seqCurrentBeatRef.current > 0 ? seqCurrentBeatRef.current : (metronomeRef.current.isPlaying ? metronomeRef.current.currentBeat : 0);
++      const beatPhase = currentBeat % loopBeats;
++      customOffset = beatPhase * beatDuration;
++    }
++    triggerPerfPadDSP(deck, 'slot', index, 100, true, false, audioCtxRef.current.currentTime, 0, undefined, false, customOffset, true);
++  };
++
++  const handleChocolateSwitch = (switchNum) => {
++    console.log(`[Chocolate Pedal] Switch ${switchNum} triggered`);
++    const targetSlotId = liveRecTargetSlotRef.current;
++    const firstChar = targetSlotId[0].toUpperCase();
++    const deck = (firstChar === 'B') ? 'B' : (firstChar === 'C') ? 'C' : 'A';
++    const index = parseInt(targetSlotId.slice(1), 10) - 1;
++
++    if (switchNum === 1) {
++      // REC / PLAY / DUB switch
++      const currState = looperStateRef.current;
++      if (currState === 0) {
++        // EMPTY -> REC
++        console.log(`[Looper Pedal] Switch 1: EMPTY -> REC on slot ${targetSlotId}`);
++        liveRecOverdubRef.current = false;
++        setLooperState(1);
++        startLiveLoopRecording();
++      } else if (currState === 1) {
++        // REC -> PLAY
++        console.log(`[Looper Pedal] Switch 1: REC -> PLAY on slot ${targetSlotId}`);
++        setLooperState(2);
++        // If free mode, stop recording now
++        if (recordingWorkletNodeRef.current) {
++          recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
++        }
++        // In case of quantized armed recording that hasn't completed:
++        if (isLiveRecordingRef.current) {
++          isLiveRecordingRef.current = false;
++          setIsLiveRecording(false);
++        }
++      } else if (currState === 2) {
++        // PLAY -> DUB
++        console.log(`[Looper Pedal] Switch 1: PLAY -> DUB on slot ${targetSlotId}`);
++        liveRecOverdubRef.current = true;
++        setLooperState(3);
++        startLiveLoopRecording();
++      } else if (currState === 3) {
++        // DUB -> PLAY
++        console.log(`[Looper Pedal] Switch 1: DUB -> PLAY on slot ${targetSlotId}`);
++        setLooperState(2);
++        if (recordingWorkletNodeRef.current) {
++          recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
++        }
++      } else if (currState === 4) {
++        // STOPPED -> PLAY
++        console.log(`[Looper Pedal] Switch 1: STOPPED -> PLAY on slot ${targetSlotId}`);
++        setLooperState(2);
++        // Play the pad in sync
++        const isPlaying = metronomeRef.current.isPlaying || perfPlaybackActiveRef.current || perfRecordActiveRef.current;
++        let customOffset = 0;
++        if (isPlaying) {
++          const bpm = paramsRef.current.arpBpm || 120;
++          const beatDuration = 60 / bpm;
++          const slot = sampleSlotsRef.current.find(s => s.id === targetSlotId);
++          const loopBeats = slot && slot.warpOn ? slot.warpBeats : 4;
++          const currentBeat = seqCurrentBeatRef.current > 0 ? seqCurrentBeatRef.current : (metronomeRef.current.isPlaying ? metronomeRef.current.currentBeat : 0);
++          const beatPhase = currentBeat % loopBeats;
++          customOffset = beatPhase * beatDuration;
++        }
++        triggerPerfPadDSP(deck, 'slot', index, 100, true, false, audioCtxRef.current.currentTime, 0, undefined, false, customOffset, true);
++      }
++    } else if (switchNum === 2) {
++      // Switch 2: UNDO / CLEAR (Double Tap/Hold)
++      const now = Date.now();
++      const timeSinceLast = now - lastSwitch2PressTimeRef.current;
++      lastSwitch2PressTimeRef.current = now;
++
++      if (timeSinceLast < 350) {
++        // Double tap -> Clear
++        console.log(`[Looper Pedal] Switch 2: Double Tap -> CLEAR`);
++        if (chocolateSwitch2TimerRef.current) {
++          clearTimeout(chocolateSwitch2TimerRef.current);
++          chocolateSwitch2TimerRef.current = null;
++        }
++        clearLooperBuffer();
++      } else {
++        // Single tap or start of hold -> queue undo or clear timer
++        console.log(`[Looper Pedal] Switch 2: Single Tap/Start of Hold`);
++        if (chocolateSwitch2TimerRef.current) {
++          clearTimeout(chocolateSwitch2TimerRef.current);
++        }
++        chocolateSwitch2TimerRef.current = setTimeout(() => {
++          // If held for 1.2s -> Clear
++          console.log(`[Looper Pedal] Switch 2: Long Press -> CLEAR`);
++          clearLooperBuffer();
++          chocolateSwitch2TimerRef.current = null;
++        }, 1200);
++
++        // Trigger Undo after a short delay if it's not a double-tap
++        setTimeout(() => {
++          if (lastSwitch2PressTimeRef.current === now && !chocolateSwitch2TimerRef.current) {
++            // It was a single tap! Trigger Undo
++            console.log(`[Looper Pedal] Switch 2: Single Tap verified -> UNDO`);
++            undoLastLooperAction();
++          }
++        }, 360);
++      }
++    } else if (switchNum === 3) {
++      // Switch 3: PLAY / STOP
++      const currState = looperStateRef.current;
++      if (currState === 1 || currState === 3) {
++        // Recording/Overdubbing -> Stop recording and go to PLAY
++        setLooperState(2);
++        if (recordingWorkletNodeRef.current) {
++          recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
++        }
++      } else if (currState === 2) {
++        // Playing -> Stop
++        console.log(`[Looper Pedal] Switch 3: Stop playback`);
++        setLooperState(4);
++        const voiceKey = `perf-${deck.toLowerCase()}-slot-${index}`;
++        stopPerfVoice(voiceKey);
++        setPerfPad(`${deck}-slot-${index}`, false);
++      } else if (currState === 4) {
++        // Stopped -> Play
++        console.log(`[Looper Pedal] Switch 3: Start playback`);
++        setLooperState(2);
++        // Play the pad in sync
++        const isPlaying = metronomeRef.current.isPlaying || perfPlaybackActiveRef.current || perfRecordActiveRef.current;
++        let customOffset = 0;
++        if (isPlaying) {
++          const bpm = paramsRef.current.arpBpm || 120;
++          const beatDuration = 60 / bpm;
++          const slot = sampleSlotsRef.current.find(s => s.id === targetSlotId);
++          const loopBeats = slot && slot.warpOn ? slot.warpBeats : 4;
++          const currentBeat = seqCurrentBeatRef.current > 0 ? seqCurrentBeatRef.current : (metronomeRef.current.isPlaying ? metronomeRef.current.currentBeat : 0);
++          const beatPhase = currentBeat % loopBeats;
++          customOffset = beatPhase * beatDuration;
++        }
++        triggerPerfPadDSP(deck, 'slot', index, 100, true, false, audioCtxRef.current.currentTime, 0, undefined, false, customOffset, true);
++      }
++    } else if (switchNum === 4) {
++      // Switch 4: METRONOME toggle
++      console.log(`[Looper Pedal] Switch 4: Metronome toggle`);
++      if (metronomeOn) {
++        setMetronomeOn(false);
++        stopMetronome();
++      } else {
++        setMetronomeOn(true);
++        startMetronome();
++      }
++    }
++  };
++
+   // Issue 7: selectedAudioDeviceRef prevents stale closure in devicechange listener
+   const selectedAudioDeviceRef = useRef('');
+   useEffect(() => { selectedAudioDeviceRef.current = selectedAudioDevice; }, [selectedAudioDevice]);
+@@ -4713,7 +5044,7 @@ export default function Delta7Synth() {
+     if (!ctx) return;
+     const now = ctx.currentTime;
+ 
+-    const deck = slotId.startsWith('a') ? 'a' : 'b';
++    const deck = slotId.startsWith('a') ? 'a' : slotId.startsWith('b') ? 'b' : 'c';
+     const index = parseInt(slotId.slice(1)) - 1;
+ 
+     const voices = [];
+@@ -4814,7 +5145,7 @@ export default function Delta7Synth() {
+       if (param === 'nudgeMs') {
+         const slot = sampleSlotsRef.current.find(s => s.id === slotId);
+         if (slot && slot.buffer) {
+-          const isDeckA = slotId.startsWith('a');
++          const isDeckA = slotId.startsWith('a') || slotId.startsWith('c');
+           const nudgeSec = (val || 0) / 1000;
+           
+           if (isDeckA) {
+@@ -6898,6 +7229,21 @@ export default function Delta7Synth() {
+               this.isRecording = true;
+               this.pendingStart = false;
+ 
++              this.port.postMessage({ type: 'STARTED' });
++            } else if (blockTime > this.startTime) {
++              // Missed start time fallback (e.g., immediate record trigger or message delay)
++              // Start recording immediately from sample 0 of the current block
++              this.recordedL = [];
++              this.recordedR = [];
++              this.collectedSamples = 0;
++
++              this.recordedL.push(new Float32Array(inputL));
++              this.recordedR.push(new Float32Array(inputR));
++              this.collectedSamples += length;
++
++              this.isRecording = true;
++              this.pendingStart = false;
++
+               this.port.postMessage({ type: 'STARTED' });
+             }
+           } else if (this.isRecording) {
+@@ -9849,20 +10195,25 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+     const voiceOutGain = ctx.createGain();
+     let initialVolume = 1.0;
+     if (voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
+-      const isDeckA = voiceKey.includes('perf-a');
+-      const faderVol = isDeckA ? deckAVolFaderRef.current : deckBVolFaderRef.current;
+-      const x = crossfaderValRef.current;
+-      let cfGain = 1.0;
+-      if (isDeckA) {
+-        if (x > 0) {
+-          cfGain = Math.cos(x * Math.PI / 2);
+-        }
++      const isDeckC = voiceKey.includes('perf-c');
++      if (isDeckC) {
++        initialVolume = 1.0;
+       } else {
+-        if (x < 0) {
+-          cfGain = Math.cos(x * Math.PI / 2);
++        const isDeckA = voiceKey.includes('perf-a');
++        const faderVol = isDeckA ? deckAVolFaderRef.current : deckBVolFaderRef.current;
++        const x = crossfaderValRef.current;
++        let cfGain = 1.0;
++        if (isDeckA) {
++          if (x > 0) {
++            cfGain = Math.cos(x * Math.PI / 2);
++          }
++        } else {
++          if (x < 0) {
++            cfGain = Math.cos(x * Math.PI / 2);
++          }
+         }
++        initialVolume = faderVol * cfGain;
+       }
+-      initialVolume = faderVol * cfGain;
+     }
+     voiceOutGain.gain.setValueAtTime(initialVolume, now);
+ 
+@@ -9891,7 +10242,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+     const isPerfVoice = voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-');
+     const slotGainNode = ctx.createGain();
+     const initialSlotVol = isPerfVoice
+-      ? (voiceKey.includes('perf-a') ? slotAVol : slotBVol)
++      ? ((voiceKey.includes('perf-a') || voiceKey.includes('perf-c')) ? slotAVol : slotBVol)
+       : 1.0;
+     slotGainNode.gain.setValueAtTime(initialSlotVol, now);
+     voiceObj.slotGainNode = slotGainNode;
+@@ -9930,7 +10281,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+     let nextDestNode = voiceOutGain;
+     let vEqLow = null, vEqMid = null, vEqHigh = null;
+ 
+-    if (voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
++    if (voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-') && !voiceKey.startsWith('perf-c')) {
+       const isDeckA = voiceKey.includes('perf-a');
+       const now = ctx.currentTime;
+       
+@@ -10184,7 +10535,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+       if (prog.fluxOffset !== undefined) {
+         const loopDuration = durationToPlayA || 0.01;
+         const wrappedFlux = prog.fluxOffset % loopDuration;
+-        finalStartOffsetA = startOffsetA + wrappedFlux;
++        finalStartOffsetA = Math.max(0, Math.min(bufferA.duration, startOffsetA + wrappedFlux + nudgeSecA));
+         if (!isLoopA) {
+           finalDurationA = durationToPlayA - wrappedFlux;
+         }
+@@ -10229,7 +10580,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+       if (prog.fluxOffset !== undefined) {
+         const loopDuration = durationToPlayB || 0.01;
+         const wrappedFlux = prog.fluxOffset % loopDuration;
+-        finalStartOffsetB = startOffsetB + wrappedFlux;
++        finalStartOffsetB = Math.max(0, Math.min(bufferB.duration, startOffsetB + wrappedFlux + nudgeSecB));
+         if (!isLoopB) {
+           finalDurationB = durationToPlayB - wrappedFlux;
+         }
+@@ -11043,6 +11394,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+   const handlePadGridMouseDown = useCallback((e) => {
+     if (e.button !== 0) return; // Only trigger on left-click
+     const d = getPadData(e); if (!d) return;
++    const targetId = (d.deck === 'A' ? 'a0' : d.deck === 'B' ? 'b0' : 'c0') + (d.idx + 1);
++    setSelectedEditSlotId(targetId);
++    setLiveRecTargetSlot(targetId);
++    if (d.deck === 'A') {
++      setParams(prev => ({ ...prev, oscAWave: targetId }));
++    } else if (d.deck === 'B') {
++      setParams(prev => ({ ...prev, oscBWave: targetId }));
++    }
+     triggerPerfPadInternal(d.deck, 'slot', d.idx, 100, true, true);
+   }, []);
+   const handlePadGridMouseUp = useCallback((e) => {
+@@ -11065,6 +11424,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+   const handlePadGridTouchStart = useCallback((e) => {
+     const d = getPadData(e); if (!d) return;
+     e.preventDefault();
++    const targetId = (d.deck === 'A' ? 'a0' : d.deck === 'B' ? 'b0' : 'c0') + (d.idx + 1);
++    setSelectedEditSlotId(targetId);
++    setLiveRecTargetSlot(targetId);
++    if (d.deck === 'A') {
++      setParams(prev => ({ ...prev, oscAWave: targetId }));
++    } else if (d.deck === 'B') {
++      setParams(prev => ({ ...prev, oscBWave: targetId }));
++    }
+     triggerPerfPadInternal(d.deck, 'slot', d.idx, 100, true, true);
+   }, []);
+   const handlePadGridTouchEnd = useCallback((e) => {
+@@ -11121,7 +11488,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+     const currentParams = paramsRef.current;
+     let slotId = '';
+     if (type === 'slot' || type === 'slice') {
+-      slotId = (deck === 'A' ? 'a0' : 'b0') + (index + 1);
++      slotId = (deck === 'A' ? 'a0' : deck === 'B' ? 'b0' : 'c0') + (index + 1);
+     } else {
+       slotId = deck === 'A' ? currentParams.oscAWave : currentParams.oscBWave;
+     }
+@@ -11349,12 +11716,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+     } : {
+       ...currentParams,
+       oscMode: 'double',
+-      oscAWave: deck === 'A' ? slotId : currentParams.oscAWave,
++      oscAWave: (deck === 'A' || deck === 'C') ? slotId : currentParams.oscAWave,
+       oscBWave: deck === 'B' ? slotId : currentParams.oscBWave,
+       oscATriggerMode: 'normal',
+       oscBTriggerMode: 'normal',
+-      oscAVol: deck === 'A' ? currentParams.oscAVol : 0,
+-      oscBVol: deck === 'B' ? currentParams.oscBVol : 0,
++      oscAVol: (deck === 'A' || deck === 'C') ? (currentParams.oscAVol || 1.0) : 0,
++      oscBVol: deck === 'B' ? (currentParams.oscBVol || 1.0) : 0,
+       perfPadPan: slot ? (slot.pan !== undefined ? slot.pan : 0) : 0,
+       perfPadFxType: slot ? (slot.fxType || 'None') : 'None',
+       perfPadFxSend: slot ? (slot.fxSend !== undefined ? slot.fxSend : 0) : 0,
+@@ -13061,6 +13428,58 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+       if (isDrumMachine) return;
+ 
+       const [status, data1, data2] = message.data;
++      const cmd = status >> 4;
++
++      // Check MIDI Learn for Chocolate Pedal
++      if (midiLearnChocolateRef.current) {
++        let learnedKey = '';
++        if (cmd === 9 && data2 > 0) { // Note On
++          learnedKey = `N${data1}`;
++        } else if (cmd === 11 && data2 > 0) { // CC
++          learnedKey = `C${data1}`;
++        }
++
++        if (learnedKey) {
++          console.log(`[Chocolate Learn] Mapping ${midiLearnChocolateRef.current} to ${learnedKey}`);
++          setChocolateMappings(prev => ({
++            ...prev,
++            [midiLearnChocolateRef.current]: learnedKey
++          }));
++          setMidiLearnChocolate(null);
++          if (typeof showEditorStatus === 'function') {
++            showEditorStatus(`Mapped ${midiLearnChocolateRef.current} to ${learnedKey}!`);
++          }
++          return;
++        }
++      }
++
++      // Check active mappings for Chocolate Pedal
++      let incomingKey = '';
++      if (cmd === 9 && data2 > 0) {
++        incomingKey = `N${data1}`;
++      } else if (cmd === 11 && data2 > 0) {
++        incomingKey = `C${data1}`;
++      }
++
++      if (incomingKey) {
++        const mappings = chocolateMappingsRef.current;
++        if (mappings.switch1 === incomingKey) {
++          handleChocolateSwitch(1);
++          return;
++        }
++        if (mappings.switch2 === incomingKey) {
++          handleChocolateSwitch(2);
++          return;
++        }
++        if (mappings.switch3 === incomingKey) {
++          handleChocolateSwitch(3);
++          return;
++        }
++        if (mappings.switch4 === incomingKey) {
++          handleChocolateSwitch(4);
++          return;
++        }
++      }
+ 
+       // Handle MIDI Clock System Real-Time Messages
+       if (status === 0xF8) {
+@@ -13110,7 +13529,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+         return;
+       }
+ 
+-      const cmd = status >> 4;
+       const channel = status & 0xf;
+ 
+       setMidiActivity(true);
+@@ -15796,7 +16214,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+                   <span style={{ fontSize: '0.34rem', color: '#8c9ba5', fontFamily: 'monospace', marginBottom: '2px' }}>TARGET</span>
+                   <select
+                     value={liveRecTargetSlot}
+-                    onChange={(e) => setLiveRecTargetSlot(e.target.value)}
++                    onChange={(e) => {
++                      setLiveRecTargetSlot(e.target.value);
++                      setSelectedEditSlotId(e.target.value);
++                    }}
+                     style={{
+                       background: 'rgba(21, 26, 33, 0.85)',
+                       border: '1px solid rgba(255,255,255,0.15)',
+@@ -15818,6 +16239,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+                     {EIGHT_INDICES.map((_, i) => (
+                       <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>
+                     ))}
++                    {EIGHT_INDICES.map((_, i) => (
++                      <option key={`c-${i}`} value={`c0${i+1}`}>C{i+1}</option>
++                    ))}
+                   </select>
+                 </div>
+                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+@@ -18670,8 +19094,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+                               cursor: 'pointer'
+                             }}
+                             onClick={() => {
+-                              const deck = selectedEditSlotId.startsWith('b') ? 'B' : 'A';
+-                              const index = parseInt(selectedEditSlotId.replace(/[ab]0*/, ''), 10) - 1;
++                              const firstChar = selectedEditSlotId[0].toUpperCase();
++                              const deck = (firstChar === 'B') ? 'B' : (firstChar === 'C') ? 'C' : 'A';
++                              const index = parseInt(selectedEditSlotId.slice(1), 10) - 1;
+                               setCircularAlignState({
+                                 visible: true,
+                                 deck,
+@@ -20894,7 +21319,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+                   <span style={{ fontSize: '0.4rem', color: '#888' }}>TARGET PAD:</span>
+                   <select
+                     value={liveRecTargetSlot}
+-                    onChange={(e) => setLiveRecTargetSlot(e.target.value)}
++                    onChange={(e) => {
++                      setLiveRecTargetSlot(e.target.value);
++                      setSelectedEditSlotId(e.target.value);
++                    }}
+                     style={{
+                       background: 'rgba(0, 0, 0, 0.5)',
+                       border: '1px solid rgba(255,255,255,0.15)',
+@@ -20915,6 +21343,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+                     {Array.from({ length: 8 }).map((_, i) => (
+                       <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>
+                     ))}
++                    {Array.from({ length: 8 }).map((_, i) => (
++                      <option key={`c-${i}`} value={`c0${i+1}`}>C{i+1}</option>
++                    ))}
+                   </select>
+                 </div>
+ 
+@@ -21902,7 +22333,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
+ 
+       {showLatencyCal && (
+         <LatencyCalModal
+-          referenceBuffer={sampleSlots.find(s => s.id === liveRecTargetSlot)?.buffer}
++          referenceBuffer={sampleSlots.find(s => s.id === liveRecTargetSlot)?.rawBuffer || sampleSlots.find(s => s.id === liveRecTargetSlot)?.buffer}
+           sampleSlots={sampleSlots}
+           targetSlotId={liveRecTargetSlot}
+           sampleRate={audioCtxRef.current ? audioCtxRef.current.sampleRate : 48000}

@@ -85,8 +85,8 @@ function autoDetect(refPeaks, recPeaks, sampleRate, bufferLength, maxMs = 150, s
 
 function getSlotLabel(id) {
   if (!id) return '';
-  const deck = id.startsWith('b') ? 'B' : 'A';
-  const index = parseInt(id.replace(/[ab]0*/, ''), 10);
+  const deck = id.startsWith('b') ? 'B' : id.startsWith('c') ? 'C' : 'A';
+  const index = parseInt(id.replace(/[abc]0*/i, ''), 10);
   return `${deck}${index}`;
 }
 
@@ -363,7 +363,7 @@ export default function LatencyCalModal({
 
       const delayRec = ctx.createDelay(1.0);
       // Align initial delay time to current local offset value
-      delayRec.delayTime.value = 0.2 + (localOffset / 1000);
+      delayRec.delayTime.value = 0.2 - (localOffset / 1000);
       delayRecNodeRef.current = delayRec;
 
       const gainRec = ctx.createGain();
@@ -399,7 +399,7 @@ export default function LatencyCalModal({
   // Dynamically update variable delay as slider drags
   useEffect(() => {
     if (delayRecNodeRef.current && audioCtx) {
-      const timeVal = 0.2 + (localOffset / 1000);
+      const timeVal = 0.2 - (localOffset / 1000);
       delayRecNodeRef.current.delayTime.setValueAtTime(timeVal, audioCtx.currentTime);
     }
   }, [localOffset, audioCtx]);
