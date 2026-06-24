@@ -44,63 +44,60 @@ export default function Knob({
   // Percentage of 270 degrees arc length
   const strokeDashoffset = circumference - (percentage * 270 / 360) * circumference;
 
-  // Store handlers in refs to allow cleanups with stable references
+  // Stable refs for drag handler functions — MUST be created once so that
+  // addEventListener and removeEventListener always receive the same reference.
+  // Using plain functions recreated each render caused removeEventListener to
+  // silently no-op (different ref), leaving handlers permanently attached.
   const handleMouseMoveRef = useRef(null);
-  const handleMouseUpRef = useRef(null);
+  const handleMouseUpRef   = useRef(null);
 
-  useEffect(() => {
-    handleMouseMoveRef.current = handleMouseMove;
-    handleMouseUpRef.current = handleMouseUp;
-  });
+  // Keep the latest closure values accessible inside the stable wrappers
+  const dragActiveRef = useRef(false);
+  const onChangeRef   = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; });
 
-  const runMouseMove = (e) => {
-    if (handleMouseMoveRef.current) handleMouseMoveRef.current(e);
-  };
+  // Create the stable wrapper functions exactly once
+  if (!handleMouseMoveRef.current) {
+    handleMouseMoveRef.current = (e) => {
+      if (!dragActiveRef.current) return;
+      const deltaY = dragStartRef.current.y - e.clientY;
+      const range = max - min;
+      const valueDelta = (deltaY / 150) * range;
+      let newValue = dragStartRef.current.val + valueDelta;
+      newValue = Math.max(min, Math.min(max, newValue));
+      if (step) {
+        newValue = Math.round(newValue / step) * step;
+        newValue = parseFloat(newValue.toFixed(4));
+      }
+      onChangeRef.current(newValue);
+    };
 
-  const runMouseUp = () => {
-    if (handleMouseUpRef.current) handleMouseUpRef.current();
-  };
+    handleMouseUpRef.current = () => {
+      dragActiveRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMoveRef.current);
+      window.removeEventListener('mouseup',   handleMouseUpRef.current);
+    };
+  }
 
-  // Vertical drag handlers
+  // Vertical drag start
   const handleMouseDown = (e) => {
     e.preventDefault();
-    dragStartRef.current = {
-      y: e.clientY,
-      val: value,
-    };
-    window.addEventListener('mousemove', runMouseMove);
-    window.addEventListener('mouseup', runMouseUp);
+    dragStartRef.current = { y: e.clientY, val: value };
+    dragActiveRef.current = true;
+    window.addEventListener('mousemove', handleMouseMoveRef.current);
+    window.addEventListener('mouseup',   handleMouseUpRef.current);
   };
 
-  const handleMouseMove = (e) => {
-    const deltaY = dragStartRef.current.y - e.clientY; // drag up is positive value
-    const range = max - min;
-    // 150px of vertical movement to go from min to max
-    const valueDelta = (deltaY / 150) * range;
-    let newValue = dragStartRef.current.val + valueDelta;
-    
-    // Clamp values
-    newValue = Math.max(min, Math.min(max, newValue));
-    
-    // Apply step resolution
-    if (step) {
-      newValue = Math.round(newValue / step) * step;
-      // Truncate decimal issues
-      newValue = parseFloat(newValue.toFixed(4));
-    }
-    onChange(newValue);
-  };
+  // Scroll wheel — fine adjustment
+  const handleMouseMove = () => {}; // kept for linter; logic is in ref above
+  const handleMouseUp   = () => {}; // kept for linter; logic is in ref above
 
-  const handleMouseUp = () => {
-    window.removeEventListener('mousemove', runMouseMove);
-    window.removeEventListener('mouseup', runMouseUp);
-  };
-
-  // Cleanup on unmount if drag was active
+  // Cleanup on unmount in case drag was in progress
   useEffect(() => {
     return () => {
-      window.removeEventListener('mousemove', runMouseMove);
-      window.removeEventListener('mouseup', runMouseUp);
+      dragActiveRef.current = false;
+      if (handleMouseMoveRef.current) window.removeEventListener('mousemove', handleMouseMoveRef.current);
+      if (handleMouseUpRef.current)   window.removeEventListener('mouseup',   handleMouseUpRef.current);
     };
   }, []);
 

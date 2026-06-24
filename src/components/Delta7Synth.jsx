@@ -3120,14 +3120,12 @@ export default function Delta7Synth() {
       // REC / PLAY / DUB switch
       const currState = looperStateRef.current;
       if (currState === 0) {
-        // EMPTY state: single press arms input AND queues gate atomically
+        // EMPTY state: single press arms input AND queues gate atomically.
+        // liveRecBeatsRef already holds the user's selected loop length — don't overwrite it.
         // startLiveLoopRecording() handles arming internally (mic/monitor/resample)
         // then immediately sends ARM_RECORD_GATE to the scheduler worklet which
         // waits for bar beat 1 — no second press needed.
-        console.log(`[Looper Pedal] Switch 1: EMPTY -> ARM + QUEUE GATE on slot ${targetSlotId}`);
-        const barBeats = parseInt(perfTimeSignatureRef.current.split('/')[0]) || 4;
-        liveRecBeatsRef.current = barBeats;
-        setLiveRecBeats(barBeats);
+        console.log(`[Looper Pedal] Switch 1: EMPTY -> ARM + QUEUE GATE on slot ${targetSlotId} (${liveRecBeatsRef.current} beats)`);
         liveRecOverdubRef.current = false;
         setLooperState(1);
         startLiveLoopRecording();
@@ -3275,14 +3273,13 @@ export default function Delta7Synth() {
         }
         showEditorStatus('ARM cancelled ✖️');
       } else {
-        // Not recording — arm + queue gate atomically for next beat 1
-        const barBeats = parseInt(perfTimeSignatureRef.current.split('/')[0]) || 4;
-        liveRecBeatsRef.current = barBeats;
-        setLiveRecBeats(barBeats);
+        // Not recording — arm + queue gate atomically for next beat 1.
+        // liveRecBeatsRef already holds the user's selected loop length.
+        console.log(`[Chocolate Pedal] Switch 5: ARM + QUEUE GATE (${liveRecBeatsRef.current} beats)`);
         liveRecOverdubRef.current = false;
         setLooperState(1);
         startLiveLoopRecording();
-        showEditorStatus('⏱️ ARM + gate queued — waiting for beat 1...');
+        showEditorStatus(`⏱️ ARM + gate queued — waiting for beat 1 (${liveRecBeatsRef.current}b)...`);
       }
     }
   };
@@ -21424,10 +21421,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       }
                       showEditorStatus('ARM cancelled ✖️');
                     } else {
-                      // Arm + queue gate atomically
-                      const barBeats = parseInt(perfTimeSignatureRef.current.split('/')[0]) || 4;
-                      liveRecBeatsRef.current = barBeats;
-                      setLiveRecBeats(barBeats);
+                      // Arm + queue gate atomically.
+                      // liveRecBeatsRef already holds the user's selected loop length — don't overwrite it.
                       liveRecOverdubRef.current = false;
                       setLooperState(1);
                       startLiveLoopRecording();
