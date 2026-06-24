@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Knob from './Knob.jsx';
-import LatencyCalModal from './LatencyCalModal.jsx';
+
 import CircularAlignModal from './CircularAlignModal.jsx';
 import HelpMenuModal from './HelpMenuModal.jsx';
 import './delta7-styles.css';
@@ -1267,14 +1267,16 @@ export default function Delta7Synth() {
         switch1: 'C80',
         switch2: 'C81',
         switch3: 'C82',
-        switch4: 'C83'
+        switch4: 'C83',
+        switch5: 'C84'
       };
     } catch {
       return {
         switch1: 'C80',
         switch2: 'C81',
         switch3: 'C82',
-        switch4: 'C83'
+        switch4: 'C83',
+        switch5: 'C84'
       };
     }
   });
@@ -1356,11 +1358,9 @@ export default function Delta7Synth() {
 
   const [showLatencyCal, setShowLatencyCal] = useState(false);
   const [circularAlignState, setCircularAlignState] = useState({ visible: false, deck: 'A', index: 0, initialOffset: 0 });
-  const [recLatencyOffset, setRecLatencyOffset] = useState(() => {
-    const val = localStorage.getItem('recLatencyOffset');
-    return val !== null ? parseInt(val, 10) : 30;
-  });
-  const recLatencyOffsetRef = useRef(recLatencyOffset);
+  // Latency calibration removed — offset is always 0ms
+  const recLatencyOffset = 0;
+  const recLatencyOffsetRef = useRef(0);
   const [workstationSampleRate, setWorkstationSampleRate] = useState(() => {
     const val = localStorage.getItem('workstationSampleRate');
     return val !== null ? parseInt(val, 10) : 48000;
@@ -1443,57 +1443,7 @@ export default function Delta7Synth() {
     return (isReverse ? (1.0 - progress) : progress) * 360;
   };
 
-  useEffect(() => {
-    localStorage.setItem('recLatencyOffset', recLatencyOffset);
-    recLatencyOffsetRef.current = recLatencyOffset;
 
-    // Recalculate shifted buffers for any slots that have a rawBuffer
-    const ctx = audioCtxRef.current;
-    if (ctx && sampleSlotsRef.current) {
-      let changed = false;
-      const nextSlots = sampleSlotsRef.current.map(slot => {
-        if (slot.isRecorded && slot.rawBuffer && slot.liveRecTotalSamples) {
-          const latencySamples = Math.round((recLatencyOffset / 1000) * ctx.sampleRate);
-          const targetLength = slot.liveRecTotalSamples;
-          const totalLength = slot.rawBuffer.length;
-          
-          const buffer = ctx.createBuffer(2, targetLength, ctx.sampleRate);
-          const channelL = buffer.getChannelData(0);
-          const channelR = buffer.getChannelData(1);
-          
-          const rawL = slot.rawBuffer.getChannelData(0);
-          const rawR = slot.rawBuffer.getChannelData(1);
-          
-          let srcStart = 0;
-          let dstStart = 0;
-          if (latencySamples > 0) {
-            srcStart = latencySamples;
-          } else if (latencySamples < 0) {
-            dstStart = -latencySamples;
-          }
-          
-          const lengthToCopy = Math.min(targetLength - dstStart, totalLength - srcStart);
-          if (lengthToCopy > 0) {
-            channelL.set(rawL.subarray(srcStart, srcStart + lengthToCopy), dstStart);
-            channelR.set(rawR.subarray(srcStart, srcStart + lengthToCopy), dstStart);
-          }
-          
-          normalizeBuffer(buffer);
-          changed = true;
-          return {
-            ...slot,
-            buffer: buffer,
-            revBuffer: getReversedBuffer(ctx, buffer)
-          };
-        }
-        return slot;
-      });
-      if (changed) {
-        sampleSlotsRef.current = nextSlots;
-        setSampleSlots(nextSlots);
-      }
-    }
-  }, [recLatencyOffset]);
 
   const handleWorkstationSampleRateChange = async (newRate) => {
     setWorkstationSampleRate(newRate);
@@ -1603,6 +1553,8 @@ export default function Delta7Synth() {
   const [bankCPreset, setBankCPreset] = useState(1);
   const [isRecording, setIsRecording] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
+  const isArmedRef = useRef(false);
+  useEffect(() => { isArmedRef.current = isArmed; }, [isArmed]);
   const [recordingInputGain, setRecordingInputGain] = useState(1.0);
   const recordingInputGainRef = useRef(1.0);
 
@@ -3168,8 +3120,14 @@ export default function Delta7Synth() {
       // REC / PLAY / DUB switch
       const currState = looperStateRef.current;
       if (currState === 0) {
-        // EMPTY -> REC
-        console.log(`[Looper Pedal] Switch 1: EMPTY -> REC on slot ${targetSlotId}`);
+        // EMPTY state: single press arms input AND queues gate atomically
+        // startLiveLoopRecording() handles arming internally (mic/monitor/resample)
+        // then immediately sends ARM_RECORD_GATE to the scheduler worklet which
+        // waits for bar beat 1 — no second press needed.
+        console.log(`[Looper Pedal] Switch 1: EMPTY -> ARM + QUEUE GATE on slot ${targetSlotId}`);
+        const barBeats = parseInt(perfTimeSignatureRef.current.split('/')[0]) || 4;
+        liveRecBeatsRef.current = barBeats;
+        setLiveRecBeats(barBeats);
         liveRecOverdubRef.current = false;
         setLooperState(1);
         startLiveLoopRecording();
@@ -3289,13 +3247,42 @@ export default function Delta7Synth() {
       }
     } else if (switchNum === 4) {
       // Switch 4: METRONOME toggle
-      console.log(`[Looper Pedal] Switch 4: Metronome toggle`);
+      console.log(`[Chocolate Pedal] Switch 4: Metronome toggle`);
       if (metronomeOn) {
         setMetronomeOn(false);
         stopMetronome();
       } else {
         setMetronomeOn(true);
         startMetronome();
+      }
+    } else if (switchNum === 5) {
+      // Switch 5: ARM INPUT — atomic arm + gate queue, or cancel if in progress
+      console.log(`[Chocolate Pedal] Switch 5: Looper ARM input`);
+      if (isLiveRecordingRef.current || liveRecPendingStartRef.current) {
+        // Already armed/recording — cancel
+        console.log(`[Chocolate Pedal] Switch 5: Cancelling active gate/recording`);
+        liveLoopInProgressRef.current = false;
+        isLiveRecordingRef.current = false;
+        liveRecPendingStartRef.current = false;
+        setIsLiveRecording(false);
+        setLiveRecPendingStart(false);
+        setLooperState(0);
+        if (recordingWorkletNodeRef.current) {
+          recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
+        }
+        if (schedulerNodeRef.current) {
+          schedulerNodeRef.current.port.postMessage({ type: 'DISARM_RECORD_GATE' });
+        }
+        showEditorStatus('ARM cancelled ✖️');
+      } else {
+        // Not recording — arm + queue gate atomically for next beat 1
+        const barBeats = parseInt(perfTimeSignatureRef.current.split('/')[0]) || 4;
+        liveRecBeatsRef.current = barBeats;
+        setLiveRecBeats(barBeats);
+        liveRecOverdubRef.current = false;
+        setLooperState(1);
+        startLiveLoopRecording();
+        showEditorStatus('⏱️ ARM + gate queued — waiting for beat 1...');
       }
     }
   };
@@ -6550,30 +6537,7 @@ export default function Delta7Synth() {
     }
   };
 
-  const openLatencyCalibration = () => {
-    const targetSlot = liveRecTargetSlot;
-    if (targetSlot && targetSlot.length >= 3) {
-      const targetDeck = targetSlot[0].toLowerCase();
-      const targetIndex = parseInt(targetSlot.slice(2), 10) - 1;
-      
-      if (!isNaN(targetIndex) && targetIndex >= 0) {
-        // Halt active performance voice playback for this slot
-        const voiceKeySlot = `perf-${targetDeck}-slot-${targetIndex}`;
-        stopPerfVoice(voiceKeySlot);
-        
-        // Also stop slice voices for this pad index if any are active
-        for (let s = 0; s < 16; s++) {
-          stopPerfVoice(`perf-${targetDeck}-slice-${targetIndex}-${s}`);
-        }
-        
-        // Reset pad triggers state in UI
-        const padKey = `${targetDeck === 'a' ? 'A' : 'B'}-slot-${targetIndex}`;
-        setPerfPad(padKey, false);
-        setPerfPad(`${padKey}-pending`, false);
-      }
-    }
-    setShowLatencyCal(true);
-  };
+
 
   const cleanupAudioEngine = async (ctx) => {
     if (!ctx) return;
@@ -13479,6 +13443,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           handleChocolateSwitch(4);
           return;
         }
+        if (mappings.switch5 === incomingKey) {
+          handleChocolateSwitch(5);
+          return;
+        }
       }
 
       // Handle MIDI Clock System Real-Time Messages
@@ -17439,7 +17407,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     );
   };
 
-  const isFocusZoomActive = focusZoomEnabled && !helpMenuOpen && !showExportModal && !showLatencyCal && !circularAlignState.visible;
+  const isFocusZoomActive = focusZoomEnabled && !helpMenuOpen && !showExportModal && !circularAlignState.visible;
 
   const toggleFocusZoom = () => {
     const nextVal = !focusZoomEnabled;
@@ -20044,8 +20012,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       </div>
                     </div>
 
-                    {/* Autoplay & Calibration Controls */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '6px', marginTop: '6px', alignItems: 'center' }}>
+                    {/* Autoplay Controls */}
+                    <div style={{ display: 'flex', marginTop: '6px', alignItems: 'center' }}>
                       <label style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
@@ -20071,23 +20039,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                         />
                         HANDOVER AUTOPLAY
                       </label>
-                      
-                      <button
-                        className="btn btn-xs"
-                        style={{
-                          borderColor: '#ff00ff',
-                          color: '#ff00ff',
-                          margin: 0,
-                          fontSize: '0.6rem',
-                          padding: '3px 6px',
-                          background: 'rgba(255,0,255,0.05)',
-                          textShadow: '0 0 4px rgba(255,0,255,0.3)',
-                          boxShadow: 'inset 0 0 4px rgba(255,0,255,0.1)'
-                        }}
-                        onClick={openLatencyCalibration}
-                      >
-                        ⏱️ CALIBRATE
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -21405,35 +21356,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </div>
               </div>
 
-              {/* Latency Compensation Slider */}
-              {(recordingInputMode === 'mic' || recordingInputMode === 'monitor') && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.4rem', color: '#888' }} title="Compensate for audio interface round-trip delay">LATENCY OFFSET:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ color: '#ff9f00', fontSize: '0.48rem', fontFamily: 'monospace' }}>
-                        {recLatencyOffset}ms
-                      </span>
-                      <button
-                        onClick={openLatencyCalibration}
-                        title="Open latency calibration tool"
-                        style={{
-                          background: '#1e1e30', border: '1px solid #3a3a55',
-                          borderRadius: '3px', color: '#a0a0cc',
-                          fontSize: '0.38rem', padding: '1px 4px',
-                          cursor: 'pointer', fontWeight: 600, letterSpacing: '0.05em',
-                        }}
-                      >⚙ CAL</button>
-                    </div>
-                  </div>
-                  <input 
-                    type="range" min="-150" max="150" step="1"
-                    value={recLatencyOffset}
-                    onChange={(e) => setRecLatencyOffset(parseInt(e.target.value))}
-                    style={{ width: '100%', height: '8px', accentColor: '#ff9f00', cursor: 'pointer', margin: 0 }}
-                  />
-                </div>
-              )}
+
 
               {/* Input Gain Slider */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginTop: '2px' }}>
@@ -21481,43 +21404,62 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 />
               </div>
 
-              {/* ARM & REC Buttons */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '6px', width: '100%', marginTop: '4px' }}>
+              {/* ARM → gate queue → record — single atomic button */}
+              <div style={{ width: '100%', marginTop: '4px' }}>
                 <button
-                  onClick={armLooperInput}
-                  className={`btn btn-xs ${isArmed ? 'active-yellow' : ''}`}
+                  onClick={() => {
+                    if (isLiveRecording || liveRecPendingStart) {
+                      // Cancel in-progress gate or recording
+                      liveLoopInProgressRef.current = false;
+                      isLiveRecordingRef.current = false;
+                      liveRecPendingStartRef.current = false;
+                      setIsLiveRecording(false);
+                      setLiveRecPendingStart(false);
+                      setLooperState(0);
+                      if (recordingWorkletNodeRef.current) {
+                        recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
+                      }
+                      if (schedulerNodeRef.current) {
+                        schedulerNodeRef.current.port.postMessage({ type: 'DISARM_RECORD_GATE' });
+                      }
+                      showEditorStatus('ARM cancelled ✖️');
+                    } else {
+                      // Arm + queue gate atomically
+                      const barBeats = parseInt(perfTimeSignatureRef.current.split('/')[0]) || 4;
+                      liveRecBeatsRef.current = barBeats;
+                      setLiveRecBeats(barBeats);
+                      liveRecOverdubRef.current = false;
+                      setLooperState(1);
+                      startLiveLoopRecording();
+                    }
+                  }}
+                  className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : (isArmed ? 'active-yellow' : ''))}`}
                   style={{
+                    width: '100%',
                     fontSize: '0.45rem',
-                    padding: '4px 0',
+                    padding: '5px 0',
                     fontWeight: 'bold',
                     margin: 0,
-                    borderColor: isArmed ? '#ffe600' : 'rgba(255,255,255,0.15)',
-                    background: isArmed ? 'rgba(255, 230, 0, 0.2)' : 'rgba(0,0,0,0.3)',
-                    color: isArmed ? '#ffe600' : '#aaa',
+                    letterSpacing: '0.05em',
+                    color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : (isArmed ? '#ffe600' : '#aaa')),
+                    borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : (isArmed ? '#ffe600' : 'rgba(255,255,255,0.15)')),
+                    background: isLiveRecording
+                      ? 'rgba(255, 0, 85, 0.25)'
+                      : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.85)' : (isArmed ? 'rgba(255,230,0,0.12)' : 'rgba(0,0,0,0.3)')),
+                    boxShadow: isLiveRecording
+                      ? '0 0 10px rgba(255, 0, 85, 0.5)'
+                      : (liveRecPendingStart ? '0 0 10px rgba(255, 230, 0, 0.5)' : 'none'),
+                    animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  {isArmed ? 'DISARM IN' : 'ARM INPUT'}
-                </button>
-                <button
-                  onClick={toggleLiveLoopRecording}
-                  className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : '')}`}
-                  style={{
-                    fontSize: '0.45rem',
-                    padding: '4px 0',
-                    fontWeight: 'bold',
-                    margin: 0,
-                    color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : '#aaa'),
-                    borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : 'rgba(255,255,255,0.15)'),
-                    background: isLiveRecording 
-                      ? 'rgba(255, 0, 85, 0.25)' 
-                      : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.8)' : 'rgba(0,0,0,0.3)'),
-                    boxShadow: isLiveRecording 
-                      ? '0 0 8px rgba(255, 0, 85, 0.4)' 
-                      : (liveRecPendingStart ? '0 0 8px rgba(255, 230, 0, 0.4)' : 'none'),
-                    animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none'
-                  }}
-                >
-                  {isLiveRecording ? '⏹️ STOP REC' : (liveRecPendingStart ? '⏳ ARMED...' : '🔴 START REC')}
+                  {isLiveRecording
+                    ? '⏹️ STOP REC'
+                    : liveRecPendingStart
+                      ? '⏳ WAITING BEAT 1...'
+                      : isArmed
+                        ? '⚡ ARM → QUEUE GATE'
+                        : '🔴 ARM + REC'}
                 </button>
               </div>
 
@@ -22116,6 +22058,10 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           setMidiMappings={setMidiMappings}
           midiLearnParam={midiLearnParam}
           setMidiLearnParam={setMidiLearnParam}
+          chocolateMappings={chocolateMappings}
+          setChocolateMappings={setChocolateMappings}
+          midiLearnChocolate={midiLearnChocolate}
+          setMidiLearnChocolate={setMidiLearnChocolate}
           onClose={() => setMidiMenuOpen(false)}
         />
       )}
@@ -22331,18 +22277,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         </div>
       )}
 
-      {showLatencyCal && (
-        <LatencyCalModal
-          referenceBuffer={sampleSlots.find(s => s.id === liveRecTargetSlot)?.rawBuffer || sampleSlots.find(s => s.id === liveRecTargetSlot)?.buffer}
-          sampleSlots={sampleSlots}
-          targetSlotId={liveRecTargetSlot}
-          sampleRate={audioCtxRef.current ? audioCtxRef.current.sampleRate : 48000}
-          recLatencyOffset={recLatencyOffset}
-          onOffsetChange={(ms) => setRecLatencyOffset(ms)}
-          onClose={() => setShowLatencyCal(false)}
-          audioCtx={audioCtxRef.current}
-        />
-      )}
+
 
       {circularAlignState.visible && (
         <CircularAlignModal
@@ -22354,15 +22289,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           sampleRate={audioCtxRef.current ? audioCtxRef.current.sampleRate : 48000}
           audioCtx={audioCtxRef.current}
           initialOffset={circularAlignState.initialOffset}
-          recLatencyOffset={recLatencyOffset}
+          recLatencyOffset={0}
           onUpdateNudge={(nudgeMs) => {
             updateSlotParam(circularAlignState.slotId, 'nudgeMs', nudgeMs);
           }}
           onNudgeChangeInMemory={(nudgeMs) => {
             updateSlotParamInMemory(circularAlignState.slotId, 'nudgeMs', nudgeMs);
           }}
-          onUpdateGlobalLatency={(latencyMs) => {
-            setRecLatencyOffset(latencyMs);
+          onUpdateGlobalLatency={() => {
+            // Latency calibration removed — no-op
           }}
           triggerPerfPadInternal={triggerPerfPadInternal}
           getRingAngle={getRingAngle}
@@ -22388,6 +22323,10 @@ function MidiMappingMenu({
   setMidiMappings,
   midiLearnParam,
   setMidiLearnParam,
+  chocolateMappings,
+  setChocolateMappings,
+  midiLearnChocolate,
+  setMidiLearnChocolate,
   onClose
 }) {
   const groups = [
@@ -22474,6 +22413,14 @@ function MidiMappingMenu({
         { key: "selectedSlotReverse", name: "Slot Reverse Toggle" }
       ]
     }
+  ];
+
+  const chocolateSwitches = [
+    { key: 'switch1', name: 'SW1 — REC / PLAY / DUB' },
+    { key: 'switch2', name: 'SW2 — UNDO / CLEAR' },
+    { key: 'switch3', name: 'SW3 — PLAY / STOP' },
+    { key: 'switch4', name: 'SW4 — METRONOME' },
+    { key: 'switch5', name: 'SW5 — ARM INPUT' },
   ];
 
   const handleClear = (key) => {
@@ -22589,6 +22536,65 @@ function MidiMappingMenu({
               </div>
             </div>
           ))}
+
+          {/* ── Vave Chocolate Pedal Section ── */}
+          {chocolateMappings && setChocolateMappings && (
+            <div className="midi-group-section">
+              <div className="midi-group-header" style={{ color: '#ff9f00', borderColor: 'rgba(255,159,0,0.3)' }}>
+                🍫 Vave Chocolate Pedal Bindings
+              </div>
+              <div style={{ fontSize: '0.45rem', color: '#666', marginBottom: '6px', paddingLeft: '2px' }}>
+                Map your Chocolate switches to MIDI notes or CCs. Press LEARN then tap the pedal switch.
+              </div>
+              <div className="midi-group-grid">
+                {chocolateSwitches.map((sw) => {
+                  const mapping = chocolateMappings[sw.key];
+                  const isLearning = midiLearnChocolate === sw.key;
+                  return (
+                    <div key={sw.key} className="midi-mapping-row">
+                      <div className="midi-param-name" style={{ color: '#ff9f00' }}>{sw.name}</div>
+                      <div className="midi-mapping-val font-mono">{formatMapping(mapping)}</div>
+                      <div className="midi-row-actions">
+                        <button
+                          className={`btn btn-xs ${isLearning ? 'learning-pulse' : ''}`}
+                          onClick={() => setMidiLearnChocolate(isLearning ? null : sw.key)}
+                          style={{
+                            minWidth: '55px',
+                            background: isLearning ? '#ff9f00' : 'transparent',
+                            color: isLearning ? '#000' : '#ff9f00',
+                            borderColor: isLearning ? '#ff9f00' : 'rgba(255,159,0,0.4)',
+                            fontWeight: 'bold',
+                            fontSize: '0.52rem',
+                            padding: '1px 4px'
+                          }}
+                        >
+                          {isLearning ? "LRN..." : "LEARN"}
+                        </button>
+                        {mapping !== undefined && (
+                          <button
+                            className="btn btn-xs"
+                            onClick={() => setChocolateMappings(prev => {
+                              const next = { ...prev };
+                              delete next[sw.key];
+                              return next;
+                            })}
+                            style={{
+                              borderColor: 'rgba(255, 0, 85, 0.4)',
+                              color: '#ff0055',
+                              fontSize: '0.52rem',
+                              padding: '1px 4px'
+                            }}
+                          >
+                            CLEAR
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
