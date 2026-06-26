@@ -155,7 +155,12 @@ const ECHO_PRESETS = [
   { name: 'Dub Self-Oscillator', params: { spaceEchoActive: true, spaceEchoTime: 0.45, spaceEchoFeedback: 0.88, spaceEchoWow: 0.4, spaceEchoSaturation: 0.7, spaceEchoSpring: 0.25 } },
   { name: 'Slapback Tape', params: { spaceEchoActive: true, spaceEchoTime: 0.08, spaceEchoFeedback: 0.15, spaceEchoWow: 0.1, spaceEchoSaturation: 0.5, spaceEchoSpring: 0.05 } },
   { name: 'Spring Reverb Tank', params: { spaceEchoActive: true, spaceEchoTime: 0.2, spaceEchoFeedback: 0.1, spaceEchoWow: 0.05, spaceEchoSaturation: 0.1, spaceEchoSpring: 0.8 } },
-  { name: 'Clean Stereo Delay', params: { spaceEchoActive: false, spaceEchoTime: 0.375, spaceEchoFeedback: 0.4 } }
+  { name: 'Clean Stereo Delay', params: { spaceEchoActive: false, spaceEchoTime: 0.375, spaceEchoFeedback: 0.4 } },
+  { name: 'Fluttering Ping Pong', params: { spaceEchoActive: true, spaceEchoTime: 0.5, spaceEchoFeedback: 0.65, spaceEchoWow: 0.55, spaceEchoSaturation: 0.4, spaceEchoSpring: 0.2 } },
+  { name: 'Overdriven BBD', params: { spaceEchoActive: true, spaceEchoTime: 0.18, spaceEchoFeedback: 0.75, spaceEchoWow: 0.15, spaceEchoSaturation: 0.95, spaceEchoSpring: 0.3 } },
+  { name: 'Haunted Tape Loop', params: { spaceEchoActive: true, spaceEchoTime: 0.8, spaceEchoFeedback: 0.8, spaceEchoWow: 0.8, spaceEchoSaturation: 0.6, spaceEchoSpring: 0.4 } },
+  { name: 'Springy Slap', params: { spaceEchoActive: true, spaceEchoTime: 0.09, spaceEchoFeedback: 0.25, spaceEchoWow: 0.05, spaceEchoSaturation: 0.3, spaceEchoSpring: 0.85 } },
+  { name: 'Ethereal Diffusion', params: { spaceEchoActive: true, spaceEchoTime: 0.65, spaceEchoFeedback: 0.5, spaceEchoWow: 0.35, spaceEchoSaturation: 0.15, spaceEchoSpring: 0.6 } }
 ];
 
 const ROTOR_PRESETS = [
