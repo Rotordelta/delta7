@@ -310,6 +310,7 @@
   - **Colorful & Glowy Aesthetics**: High-contrast, colorful visualizer grids using rich CSS glow filters (`shadowBlur`, `shadowColor`) and multi-colored timeline wedges map well to the hardware workstation theme.
   - **Real-Time PCM Sculpting**: Interacting directly with the visual circular waveform via brush tools (Gate/Mute, Boost, Attenuate, Reverse Sector) to paint and slice the audio data on the fly.
   - **FX Motion Recording**: Capturing knobs sweeps (filters, space echo, rotor, reverb) dynamically over the loop cycle and replaying them with a visual polar envelope trace inside the dial.
+  - **Diagnostic Color Alignment**: Ensuring visual color indicators (concentric platter rings and waveforms) in separate views like the Vinyl Diagnostic Tool align exactly with their corresponding pad colors to preserve visual clarity.
 
 
 
