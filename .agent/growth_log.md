@@ -293,4 +293,12 @@
   - **Comprehensive Calibration Mode Support**: Aligning all sample slots, including the auxiliary Bank C slots, across all UI helper labeling functions (e.g. `getSlotLabel`) ensures UI consistency and prevents `NaN` errors.
   - **Autoplay Latency Handover Phase Alignment**: Standard sampler playback offsets (`finalStartOffsetA` / `finalStartOffsetB`) must include the calibration nudge offset (`nudgeSecA` / `nudgeSecB`) even when using `fluxOffset` to start playback at exactly the correct phase angle, keeping the hand-off perfectly aligned with hardware direct monitoring.
 
+## Session: 2026-06-26
+- **Task**: Persistent timing alignment (nudgeMs) and visual waveform shifting in sampler editor.
+- **Jimmy's Preferences**:
+  - **Visual Waveform Alignment**: Shifting the linear waveform drawing (using nudgeMs timing offset) along with all its overlay markers (start, end, loop boundaries, slice points, active voice indicators, and playheads) ensures that the visual representation matches exactly what plays back in the engine.
+  - **Coordinate Map Recalibration**: When the waveform is shifted visually, click selection coordinates (`pixelToBufferPct`) must be mapped backward by the same offset ratio so that mouse/touch edits (like setting slice markers or selection ranges) remain sample-accurate.
+  - **Complete Project Persistence**: Timing offsets (nudgeMs) must be saved inside IndexedDB (via `saveSampleToDb`) and restored correctly on boot (metadata useEffect) so that the user's manual waveform calibrations persist across reloads.
+
+
 

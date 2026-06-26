@@ -163,15 +163,25 @@ const ROTOR_PRESETS = [
   { name: 'Gritty Rock Fast', params: { leslieSpeed: 'Fast', leslieDrive: 0.65, leslieWidth: 0.7, leslieCrossover: 800 } },
   { name: 'Deep Stereo Swirl', params: { leslieSpeed: 'Fast', leslieDrive: 0.2, leslieWidth: 1.0, leslieCrossover: 500 } },
   { name: 'Cabinet Growl (Stop)', params: { leslieSpeed: 'Off', leslieDrive: 0.8, leslieWidth: 0.0, leslieCrossover: 700 } },
-  { name: 'Vocal Horn Crossover', params: { leslieSpeed: 'Slow', leslieDrive: 0.25, leslieWidth: 0.6, leslieCrossover: 1400 } }
+  { name: 'Vocal Horn Crossover', params: { leslieSpeed: 'Slow', leslieDrive: 0.25, leslieWidth: 0.6, leslieCrossover: 1400 } },
+  { name: 'Psychedelic Warp', params: { leslieSpeed: 'Fast', leslieDrive: 0.45, leslieWidth: 1.0, leslieCrossover: 250 } },
+  { name: 'Gospel Shimmer', params: { leslieSpeed: 'Slow', leslieDrive: 0.15, leslieWidth: 0.85, leslieCrossover: 1100 } },
+  { name: 'Heavy Metal Rotary', params: { leslieSpeed: 'Fast', leslieDrive: 0.95, leslieWidth: 0.65, leslieCrossover: 900 } },
+  { name: 'Subtle Vibrato', params: { leslieSpeed: 'Slow', leslieDrive: 0.05, leslieWidth: 0.3, leslieCrossover: 600 } },
+  { name: 'Tornado Spin', params: { leslieSpeed: 'Fast', leslieDrive: 0.5, leslieWidth: 0.9, leslieCrossover: 1600 } }
 ];
 
 const REVERB_PRESETS = [
-  { name: 'Small Room', params: { reverbMix: 0.15, reverbDecay: 1.0, reverbPreDelay: 0.01, reverbHighCut: 12000 } },
-  { name: 'Medium Hall', params: { reverbMix: 0.25, reverbDecay: 2.2, reverbPreDelay: 0.02, reverbHighCut: 8000 } },
-  { name: 'Large Cathedral', params: { reverbMix: 0.40, reverbDecay: 4.5, reverbPreDelay: 0.04, reverbHighCut: 6000 } },
-  { name: 'Ambient Space', params: { reverbMix: 0.60, reverbDecay: 8.0, reverbPreDelay: 0.08, reverbHighCut: 4000 } },
-  { name: 'Dark Void', params: { reverbMix: 0.50, reverbDecay: 6.0, reverbPreDelay: 0.05, reverbHighCut: 1500 } }
+  { name: 'Small Room', params: { reverbMix: 0.15, reverbDecay: 1.0, reverbPreDelay: 0.01, reverbHighCut: 12000, reverbType: 'short' } },
+  { name: 'Medium Hall', params: { reverbMix: 0.25, reverbDecay: 2.2, reverbPreDelay: 0.02, reverbHighCut: 8000, reverbType: 'hall' } },
+  { name: 'Large Cathedral', params: { reverbMix: 0.40, reverbDecay: 4.5, reverbPreDelay: 0.04, reverbHighCut: 6000, reverbType: 'long' } },
+  { name: 'Ambient Space', params: { reverbMix: 0.60, reverbDecay: 8.0, reverbPreDelay: 0.08, reverbHighCut: 4000, reverbType: 'long' } },
+  { name: 'Dark Void', params: { reverbMix: 0.50, reverbDecay: 6.0, reverbPreDelay: 0.05, reverbHighCut: 1500, reverbType: 'hall' } },
+  { name: 'Plate Shimmer', params: { reverbMix: 0.35, reverbDecay: 3.2, reverbPreDelay: 0.015, reverbHighCut: 15000, reverbType: 'plate' } },
+  { name: 'Reverse Gate', params: { reverbMix: 0.45, reverbDecay: 2.0, reverbPreDelay: 0.03, reverbHighCut: 7500, reverbType: 'reverse' } },
+  { name: 'Tiled Bathroom', params: { reverbMix: 0.20, reverbDecay: 0.6, reverbPreDelay: 0.005, reverbHighCut: 10000, reverbType: 'short' } },
+  { name: 'Deep Cosmic Ocean', params: { reverbMix: 0.70, reverbDecay: 12.0, reverbPreDelay: 0.12, reverbHighCut: 3500, reverbType: 'long' } },
+  { name: 'Haunted Warehouse', params: { reverbMix: 0.55, reverbDecay: 5.5, reverbPreDelay: 0.06, reverbHighCut: 5000, reverbType: 'hall' } }
 ];
 
 // Helper to synthesize sample kits on-the-fly
@@ -3917,7 +3927,7 @@ export default function Delta7Synth() {
   };
 
   // --- Waveform Selection Mouse & Touch Handlers ---
-  const pixelToBufferPct = (x, rectWidth, bufferLength) => {
+  const pixelToBufferPct = (x, rectWidth, bufferLength, nudgeMs, sampleRate) => {
     const pctVisible = Math.max(0.0, Math.min(1.0, x / rectWidth));
     const zoom = waveformZoom;
     const scroll = waveformScroll;
@@ -3925,7 +3935,8 @@ export default function Delta7Synth() {
     const maxStartSample = Math.max(0, bufferLength - visibleSamples);
     const startSample = Math.round(scroll * maxStartSample);
     const clickedSample = startSample + pctVisible * visibleSamples;
-    return Math.max(0.0, Math.min(1.0, clickedSample / bufferLength));
+    const nudgeRatio = nudgeMs ? ((nudgeMs / 1000) * sampleRate) / bufferLength : 0;
+    return Math.max(0.0, Math.min(1.0, (clickedSample / bufferLength) + nudgeRatio));
   };
 
   const handleCanvasMouseDown = (e) => {
@@ -3936,7 +3947,7 @@ export default function Delta7Synth() {
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length);
+    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length, slot.nudgeMs || 0, slot.buffer.sampleRate);
 
     setSelectionStart(pct);
     setSelectionEnd(pct);
@@ -3951,7 +3962,7 @@ export default function Delta7Synth() {
     if (!slot || !slot.buffer) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length);
+    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length, slot.nudgeMs || 0, slot.buffer.sampleRate);
     setSelectionEnd(pct);
   };
 
@@ -3974,7 +3985,7 @@ export default function Delta7Synth() {
 
     const rect = canvas.getBoundingClientRect();
     const x = e.touches[0].clientX - rect.left;
-    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length);
+    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length, slot.nudgeMs || 0, slot.buffer.sampleRate);
 
     setSelectionStart(pct);
     setSelectionEnd(pct);
@@ -3989,7 +4000,7 @@ export default function Delta7Synth() {
     if (!slot || !slot.buffer) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.touches[0].clientX - rect.left;
-    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length);
+    const pct = pixelToBufferPct(x, rect.width, slot.buffer.length, slot.nudgeMs || 0, slot.buffer.sampleRate);
     setSelectionEnd(pct);
   };
 
@@ -4892,6 +4903,7 @@ export default function Delta7Synth() {
               }
               return {
                 ...slot,
+                nudgeMs: saved.nudgeMs ?? slot.nudgeMs,
                 buffer: buffer,
                 revBuffer: getReversedBuffer(ctx, buffer)
               };
@@ -4949,6 +4961,7 @@ export default function Delta7Synth() {
                 sliceMasterKey: saved.sliceMasterKey ?? slot.sliceMasterKey,
                 sliceMasterOctave: saved.sliceMasterOctave ?? slot.sliceMasterOctave,
                 eq: saved.eq ?? slot.eq,
+                nudgeMs: saved.nudgeMs ?? slot.nudgeMs,
               };
             }
             return slot;
@@ -5824,8 +5837,11 @@ export default function Delta7Synth() {
       const step = Math.max(1, (endSample - startSample) / canvas.width);
       const amp = canvas.height / 2;
       
+      const nudgeRatio = slot.nudgeMs ? ((slot.nudgeMs / 1000) / buffer.duration) : 0;
+      const sampleOffset = Math.round(((slot.nudgeMs || 0) / 1000) * buffer.sampleRate);
+
       // Helper to map 0-1 ratio to canvas pixel x
-      const getCanvasX = (p) => ((p * data.length - startSample) / (endSample - startSample)) * canvas.width;
+      const getCanvasX = (p) => (((p - nudgeRatio) * data.length - startSample) / (endSample - startSample)) * canvas.width;
 
       // Draw Waveform
       ctx.strokeStyle = '#00f3ff';
@@ -5834,10 +5850,10 @@ export default function Delta7Synth() {
       for (let i = 0; i < canvas.width; i++) {
         let min = 1.0;
         let max = -1.0;
-        const startIdx = startSample + Math.round(i * step);
-        const endIdx = startSample + Math.round((i + 1) * step);
+        const startIdx = startSample + Math.round(i * step) + sampleOffset;
+        const endIdx = startSample + Math.round((i + 1) * step) + sampleOffset;
         for (let idx = startIdx; idx < endIdx; idx++) {
-          if (idx < data.length) {
+          if (idx >= 0 && idx < data.length) {
             const dat = data[idx];
             if (dat < min) min = dat;
             if (dat > max) max = dat;
@@ -5952,8 +5968,9 @@ export default function Delta7Synth() {
       const selStartNorm = selSliceParam.start !== undefined ? selSliceParam.start : (slot.start + (selectedSliceIndex / sliceCount) * (slot.end - slot.start));
       const selEndNorm = selSliceParam.end !== undefined ? selSliceParam.end : (slot.start + ((selectedSliceIndex + 1) / sliceCount) * (slot.end - slot.start));
       
-      const selStartX = selStartNorm * canvas.width;
-      const selWidth = (selEndNorm - selStartNorm) * canvas.width;
+      const selStartX = getCanvasX(selStartNorm);
+      const selEndX = getCanvasX(selEndNorm);
+      const selWidth = selEndX - selStartX;
       
       ctx.fillStyle = 'rgba(0, 243, 255, 0.06)';
       ctx.fillRect(selStartX, 0, selWidth, canvas.height);
@@ -5978,8 +5995,9 @@ export default function Delta7Synth() {
                 const vStartNorm = vSliceParam.start !== undefined ? vSliceParam.start : (slot.start + (sliceIndex / sliceCount) * (slot.end - slot.start));
                 const vEndNorm = vSliceParam.end !== undefined ? vSliceParam.end : (slot.start + ((sliceIndex + 1) / sliceCount) * (slot.end - slot.start));
                 
-                const vStartX = vStartNorm * canvas.width;
-                const vWidth = (vEndNorm - vStartNorm) * canvas.width;
+                const vStartX = getCanvasX(vStartNorm);
+                const vEndX = getCanvasX(vEndNorm);
+                const vWidth = vEndX - vStartX;
                 
                 ctx.fillStyle = 'rgba(255, 230, 0, 0.15)'; // yellow highlight for OSC A slice
                 ctx.fillRect(vStartX, 0, vWidth, canvas.height);
@@ -5990,8 +6008,9 @@ export default function Delta7Synth() {
                 const vStartNorm = vSliceParam.start !== undefined ? vSliceParam.start : (slot.start + (sliceIndex / sliceCount) * (slot.end - slot.start));
                 const vEndNorm = vSliceParam.end !== undefined ? vSliceParam.end : (slot.start + ((sliceIndex + 1) / sliceCount) * (slot.end - slot.start));
                 
-                const vStartX = vStartNorm * canvas.width;
-                const vWidth = (vEndNorm - vStartNorm) * canvas.width;
+                const vStartX = getCanvasX(vStartNorm);
+                const vEndX = getCanvasX(vEndNorm);
+                const vWidth = vEndX - vStartX;
                 
                 ctx.fillStyle = 'rgba(255, 0, 255, 0.15)'; // magenta highlight for OSC B slice
                 ctx.fillRect(vStartX, 0, vWidth, canvas.height);
@@ -6020,7 +6039,7 @@ export default function Delta7Synth() {
         
         if (playheadSec <= buffer.duration && playheadSec >= 0) {
           const ratio = slot.reverseOn ? (1.0 - (playheadSec / buffer.duration)) : (playheadSec / buffer.duration);
-          const playheadX = ratio * canvas.width;
+          const playheadX = getCanvasX(ratio);
           ctx.strokeStyle = '#00f3ff';
           ctx.lineWidth = 2.0;
           ctx.beginPath();
@@ -6102,7 +6121,7 @@ export default function Delta7Synth() {
                 
                 if (valid && playheadSec <= buffer.duration && playheadSec >= 0) {
                   const ratio = isReverseForRatioA ? (1.0 - (playheadSec / buffer.duration)) : (playheadSec / buffer.duration);
-                  const playheadX = ratio * canvas.width;
+                  const playheadX = getCanvasX(ratio);
                   ctx.strokeStyle = '#ffe600';
                   ctx.lineWidth = 1.5;
                   ctx.beginPath();
@@ -6168,7 +6187,7 @@ export default function Delta7Synth() {
                 
                 if (valid && playheadSec <= buffer.duration && playheadSec >= 0) {
                   const ratio = slot.reverseOn ? (1.0 - (playheadSec / buffer.duration)) : (playheadSec / buffer.duration);
-                  const playheadX = ratio * canvas.width;
+                  const playheadX = getCanvasX(ratio);
                   ctx.strokeStyle = '#ff00ff';
                   ctx.lineWidth = 1.5;
                   ctx.beginPath();
@@ -22887,6 +22906,7 @@ export const saveSampleToDb = async (slot) => {
     sliceMasterKey: slot.sliceMasterKey !== undefined ? slot.sliceMasterKey : 0,
     sliceMasterOctave: slot.sliceMasterOctave !== undefined ? slot.sliceMasterOctave : 0,
     eq: slot.eq,
+    nudgeMs: slot.nudgeMs !== undefined ? slot.nudgeMs : 0,
     channels: channels,
     sampleRate: slot.buffer.sampleRate
   };
