@@ -655,7 +655,45 @@ export default function Delta7Synth() {
   });
 
   // Current operational parameters (dynamically updated from Program or Combi layers)
-  const [params, setParams] = useState({ ...DEFAULT_PARAMS, ...FACTORY_PROGRAMS[0], masterVolume: 80 });
+  const [params, setParamsOriginal] = useState({ ...DEFAULT_PARAMS, ...FACTORY_PROGRAMS[0], masterVolume: 80 });
+
+  const setParams = useCallback((updater) => {
+    setParamsOriginal(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      
+      // Keep paramsRef fresh
+      paramsRef.current = next;
+      
+      // Intercept FX automation recording if active
+      if (isRecordingFxAutomationRef.current) {
+        const currentBeat = seqCurrentBeatRef.current;
+        const loopLength = liveRecBeatsRef.current || 16;
+        const beatPhase = currentBeat % loopLength;
+        
+        const automatableKeys = [
+          'cutoff', 'resonance', 
+          'spaceEchoTime', 'spaceEchoFeedback', 'spaceEchoWow', 'spaceEchoWowRate', 'spaceEchoSaturation', 'spaceEchoSpring', 'spaceEchoLowCut', 'spaceEchoHighCut',
+          'leslieDrive', 'leslieWidth', 'leslieCrossover',
+          'reverbMix', 'reverbDecay', 'reverbPreDelay', 'reverbHighCut'
+        ];
+
+        Object.keys(next).forEach(k => {
+          if (next[k] !== prev[k] && automatableKeys.includes(k)) {
+            const isCluttered = fxAutomationEventsRef.current.some(e => e.paramKey === k && Math.abs(e.beat - beatPhase) < 0.05);
+            if (!isCluttered) {
+              fxAutomationEventsRef.current.push({
+                beat: beatPhase,
+                paramKey: k,
+                value: next[k]
+              });
+            }
+          }
+        });
+      }
+      
+      return next;
+    });
+  }, []);
 
   // Joystick state
   const [joystick, setJoystick] = useState({ x: 0, y: 0 }); // X: Pitch bend (-1 to 1), Y: LFO pitch (+1) or filter modulation (-1)
@@ -716,6 +754,123 @@ export default function Delta7Synth() {
   useEffect(() => {
     padReturnModeRef.current = padReturnMode;
   }, [padReturnMode]);
+
+  // The Loom Looper & FX automation states & refs
+  const [isRecordingFxAutomation, setIsRecordingFxAutomation] = useState(false);
+  const [isPlayingFxAutomation, setIsPlayingFxAutomation] = useState(false);
+  const [fxAutomationEvents, setFxAutomationEvents] = useState([]);
+  const [selectedSlotNudge, setSelectedSlotNudge] = useState(0);
+
+  const isRecordingFxAutomationRef = useRef(false);
+  const isPlayingFxAutomationRef = useRef(false);
+  const fxAutomationEventsRef = useRef([]); // holds { beat, paramKey, value }
+  const lastPlaybackBeatRef = useRef(0.0);
+  const chronoCanvasRef = useRef(null);
+  const chronoPeaksRef = useRef([]);
+
+  const updateChronoPeaks = useCallback((buffer) => {
+    if (!buffer) {
+      chronoPeaksRef.current = [];
+      return;
+    }
+    try {
+      const data = buffer.getChannelData(0);
+      const step = Math.floor(data.length / 360) || 1;
+      const peaks = [];
+      for (let i = 0; i < 360; i++) {
+        let max = 0;
+        const start = i * step;
+        const end = Math.min(data.length, start + step);
+        for (let j = start; j < end; j++) {
+          const val = Math.abs(data[j]);
+          if (val > max) max = val;
+        }
+        peaks.push(max);
+      }
+      let maxVal = 0;
+      peaks.forEach(p => { if (p > maxVal) maxVal = p; });
+      if (maxVal > 0) {
+        chronoPeaksRef.current = peaks.map(p => p / maxVal);
+      } else {
+        chronoPeaksRef.current = peaks;
+      }
+    } catch (e) {
+      console.error("[The Loom] Error downsampling buffer:", e);
+      chronoPeaksRef.current = [];
+    }
+  }, []);
+
+  useEffect(() => {
+    const slot = slots[liveRecTargetSlot];
+    updateChronoPeaks(slot?.buffer);
+  }, [liveRecTargetSlot, slots, updateChronoPeaks]);
+
+  useEffect(() => {
+    const slot = slots[liveRecTargetSlot];
+    if (slot) {
+      setSelectedSlotNudge(slot.nudgeMs || 0);
+    }
+  }, [liveRecTargetSlot, slots]);
+
+  const [sculptTool, setSculptTool] = useState('none'); // 'none', 'mute', 'boost', 'attenuate', 'reverse'
+
+  const sculptWaveform = useCallback((clientX, clientY, rect, tool) => {
+    const canvas = chronoCanvasRef.current;
+    if (!canvas || tool === 'none') return;
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    const dx = clientX - rect.left - w / 2;
+    const dy = clientY - rect.top - h / 2;
+    const angle = Math.atan2(dy, dx);
+    
+    let normalizedAngle = angle + Math.PI / 2;
+    if (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
+    const pct = normalizedAngle / (2 * Math.PI);
+    
+    const slot = slots[liveRecTargetSlot];
+    const buffer = slot?.buffer;
+    if (!buffer) return;
+    
+    try {
+      const data = buffer.getChannelData(0);
+      const centerIndex = Math.floor(pct * data.length);
+      const brushWidthPct = 0.035; // 3.5% loop length brush size
+      const radius = Math.floor(brushWidthPct * data.length);
+      
+      if (tool === 'mute') {
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          data[idx] = 0;
+        }
+      } else if (tool === 'boost') {
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          data[idx] = Math.max(-1.0, Math.min(1.0, data[idx] * 1.4));
+        }
+      } else if (tool === 'attenuate') {
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          data[idx] = data[idx] * 0.35;
+        }
+      } else if (tool === 'reverse') {
+        const segment = [];
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          segment.push(data[idx]);
+        }
+        segment.reverse();
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          data[idx] = segment[i + radius];
+        }
+      }
+      
+      updateChronoPeaks(buffer);
+    } catch (e) {
+      console.error("[The Loom] Error sculpting waveform:", e);
+    }
+  }, [liveRecTargetSlot, slots, updateChronoPeaks]);
 
   const kaossPhysicsRef = useRef({
     x: 0.5,
@@ -12629,218 +12784,289 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     formantF3Ref.current.frequency.setTargetAtTime(f3, now, 0.05);
   };
 
-  // Physics and Render loop for Kaoss Pad
+  // FX Motion Automation transport helpers for The Loom
+  const toggleFxAutomationRec = () => {
+    const nextRec = !isRecordingFxAutomation;
+    setIsRecordingFxAutomation(nextRec);
+    isRecordingFxAutomationRef.current = nextRec;
+    if (nextRec) {
+      fxAutomationEventsRef.current = [];
+      setFxAutomationEvents([]);
+      setIsPlayingFxAutomation(false);
+      isPlayingFxAutomationRef.current = false;
+      showEditorStatus("FX Motion Rec: SWEEP THE KNOBS! 🔴");
+    } else {
+      setFxAutomationEvents([...fxAutomationEventsRef.current]);
+      showEditorStatus(`FX Motion Recorded: ${fxAutomationEventsRef.current.length} events 💾`);
+    }
+  };
+
+  const toggleFxAutomationPlay = () => {
+    const nextPlay = !isPlayingFxAutomation;
+    setIsPlayingFxAutomation(nextPlay);
+    isPlayingFxAutomationRef.current = nextPlay;
+    if (nextPlay) {
+      lastPlaybackBeatRef.current = seqCurrentBeatRef.current % (liveRecBeatsRef.current || 16);
+      showEditorStatus("FX Motion Playback: ON ▶️");
+    } else {
+      showEditorStatus("FX Motion Playback: OFF ⏹️");
+    }
+  };
+
+  const clearFxAutomation = () => {
+    fxAutomationEventsRef.current = [];
+    setFxAutomationEvents([]);
+    setIsPlayingFxAutomation(false);
+    isPlayingFxAutomationRef.current = false;
+    showEditorStatus("FX Motion Automation Cleared 🗑️");
+  };
+
+  // Rendering and Automation Playback loop for The Loom
   useEffect(() => {
     let active = true;
-    let lastTime = performance.now();
     
     const tick = () => {
       if (!active) return;
       
-      const now = performance.now();
-      let dt = (now - lastTime) / 1000;
-      if (dt > 0.1) dt = 0.1; // clamp delta
-      lastTime = now;
-      
-      const physics = kaossPhysicsRef.current;
-      const gesture = gestureRef.current;
-      
-      // 1. Gesture Recording
-      if (gesture.isRecording && physics.isTouched) {
-        gesture.buffer.push({ x: physics.x, y: physics.y });
-        if (gesture.buffer.length > 240) gesture.buffer.shift();
-      }
-      
-      // 2. Gesture Playback
-      if (gesture.isPlaying && gesture.buffer.length > 0 && !physics.isTouched) {
-        const pt = gesture.buffer[Math.floor(gesture.playIndex)];
-        if (pt) {
-          physics.x = pt.x;
-          physics.y = pt.y;
-          physics.vx = 0;
-          physics.vy = 0;
+      const canvas = chronoCanvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        
+        const centerX = w / 2;
+        const centerY = h / 2;
+        const outerRad = Math.min(w, h) / 2 - 10;
+        const innerRad = outerRad - 22;
+        const centerRad = (outerRad + innerRad) / 2;
+        
+        // 1. Draw radar sweep background
+        ctx.fillStyle = '#020712';
+        ctx.fillRect(0, 0, w, h);
+        
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.03)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let r = 20; r < w / 2; r += 20) {
+          ctx.arc(centerX, centerY, r, 0, 2 * Math.PI);
+        }
+        ctx.stroke();
+        
+        // 2. Latency Offset Sector (Amber lookahead sector preceding Beat 1)
+        const beats = liveRecBeatsRef.current || 16;
+        const bpm = paramsRef.current.arpBpm || 120;
+        const beatDuration = 60 / bpm;
+        const loopDuration = beats * beatDuration;
+        const latencySec = (recLatencyOffsetRef.current || 0) / 1000;
+        const latencyAngle = (latencySec / loopDuration) * 2 * Math.PI;
+        
+        if (latencyAngle > 0) {
+          ctx.fillStyle = 'rgba(255, 110, 0, 0.16)';
+          ctx.strokeStyle = 'rgba(255, 110, 0, 0.45)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.arc(centerX, centerY, outerRad, -Math.PI / 2 - latencyAngle, -Math.PI / 2, false);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
           
-          setKaossPad(prev => ({ ...prev, x: pt.x, y: pt.y }));
-          modulateKaossParameters(pt.x, pt.y, false);
-          sendKaossMidiOut(pt.x, pt.y, false);
+          // Draw small text label for latency offset
+          const labelTheta = -Math.PI / 2 - latencyAngle / 2;
+          const labelRad = outerRad - 15;
+          ctx.fillStyle = '#ff7800';
+          ctx.font = '6.5px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${recLatencyOffsetRef.current}ms`, centerX + Math.cos(labelTheta) * labelRad, centerY + Math.sin(labelTheta) * labelRad);
         }
         
-        // Playback movement
-        if (gesture.mode === 'loop') {
-          gesture.playIndex = (gesture.playIndex + 1) % gesture.buffer.length;
-        } else if (gesture.mode === 'one-shot') {
-          gesture.playIndex++;
-          if (gesture.playIndex >= gesture.buffer.length) {
-            gesture.isPlaying = false;
-            setIsPlayingGesture(false);
-            handleKaossRelease();
-          }
-        } else if (gesture.mode === 'ping-pong') {
-          gesture.playIndex += gesture.direction;
-          if (gesture.playIndex >= gesture.buffer.length) {
-            gesture.playIndex = gesture.buffer.length - 1;
-            gesture.direction = -1;
-          } else if (gesture.playIndex < 0) {
-            gesture.playIndex = 0;
-            gesture.direction = 1;
-          }
-        }
-      }
-      
-      // 3. Physics return mode (only if NOT touched and NOT playing a gesture)
-      if (!physics.isTouched && !gesture.isPlaying) {
-        const mode = padReturnModeRef.current;
-        if (mode === 'snap') {
-          if (physics.x !== 0.5 || physics.y !== 0.5) {
-            physics.x = 0.5;
-            physics.y = 0.5;
-            physics.vx = 0;
-            physics.vy = 0;
-            setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
-            modulateKaossParameters(0.5, 0.5, false);
-            sendKaossMidiOut(0.5, 0.5, false);
-          }
-        } else if (mode === 'spring') {
-          const targetX = 0.5;
-          const targetY = 0.5;
-          const k = 15.0; // spring tension
-          const damping = 3.5; // spring friction damping
-          
-          const ax = k * (targetX - physics.x) - damping * physics.vx;
-          const ay = k * (targetY - physics.y) - damping * physics.vy;
-          
-          physics.vx += ax * dt;
-          physics.vy += ay * dt;
-          physics.x += physics.vx * dt;
-          physics.y += physics.vy * dt;
-          
-          // stop spring when close
-          if (Math.abs(physics.x - targetX) < 0.002 && Math.abs(physics.vx) < 0.002) {
-            physics.x = targetX;
-            physics.vx = 0;
-          }
-          if (Math.abs(physics.y - targetY) < 0.002 && Math.abs(physics.vy) < 0.002) {
-            physics.y = targetY;
-            physics.vy = 0;
-          }
-          
-          setKaossPad(prev => ({ ...prev, x: physics.x, y: physics.y }));
-          modulateKaossParameters(physics.x, physics.y, false);
-          sendKaossMidiOut(physics.x, physics.y, false);
-        } else if (mode === 'throw') {
-          if (Math.abs(physics.vx) > 0.005 || Math.abs(physics.vy) > 0.005) {
-            physics.x += physics.vx * dt;
-            physics.y += physics.vy * dt;
-            
-            // drag friction
-            physics.vx *= Math.exp(-1.8 * dt);
-            physics.vy *= Math.exp(-1.8 * dt);
-            
-            // boundaries bounce
-            const coef = -0.7;
-            if (physics.x <= 0) { physics.x = 0; physics.vx *= coef; }
-            else if (physics.x >= 1) { physics.x = 1; physics.vx *= coef; }
-            if (physics.y <= 0) { physics.y = 0; physics.vy *= coef; }
-            else if (physics.y >= 1) { physics.y = 1; physics.vy *= coef; }
-            
-            setKaossPad(prev => ({ ...prev, x: physics.x, y: physics.y }));
-            modulateKaossParameters(physics.x, physics.y, false);
-            sendKaossMidiOut(physics.x, physics.y, false);
-          }
-        }
-      }
-      
-      // Update trail opacity
-      physics.trails.forEach(t => {
-        t.alpha -= 1.8 * dt;
-      });
-      physics.trails = physics.trails.filter(t => t.alpha > 0);
-      
-      // Update ripple
-      if (physics.ripple) {
-        physics.ripple.radius += 110 * dt;
-        physics.ripple.alpha -= 2.2 * dt;
-        if (physics.ripple.alpha <= 0) {
-          physics.ripple = null;
-        }
-      }
-      
-      // Draw elements
-      drawCanvas();
-      
-      physics.rafId = requestAnimationFrame(tick);
-    };
-    
-    const drawCanvas = () => {
-      const canvas = kaossCanvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
-      
-      const physics = kaossPhysicsRef.current;
-      
-      // 1. Gridlines
-      ctx.strokeStyle = 'rgba(0, 243, 255, 0.06)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 1; i < 4; i++) {
-        ctx.moveTo((i / 4) * w, 0);
-        ctx.lineTo((i / 4) * w, h);
-        ctx.moveTo(0, (i / 4) * h);
-        ctx.lineTo(w, (i / 4) * h);
-      }
-      ctx.stroke();
-      
-      // Center cross
-      ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
-      ctx.beginPath();
-      ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h);
-      ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
-      ctx.stroke();
-      
-      // 2. Draw Trails
-      if (physics.trails.length > 1) {
-        ctx.lineWidth = 3.5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        for (let i = 1; i < physics.trails.length; i++) {
-          const p1 = physics.trails[i - 1];
-          const p2 = physics.trails[i];
-          ctx.beginPath();
-          ctx.moveTo(p1.x * w, (1 - p1.y) * h);
-          ctx.lineTo(p2.x * w, (1 - p2.y) * h);
-          ctx.strokeStyle = `rgba(0, 243, 255, ${p2.alpha})`;
-          ctx.stroke();
-        }
-      }
-      
-      // 3. Draw Touch Ripple
-      if (physics.ripple) {
+        // 3. Draw Outer Clock Dial (Cyan Glow)
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#00f3ff';
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.75)';
+        ctx.lineWidth = 2.0;
         ctx.beginPath();
-        ctx.arc(physics.x * w, (1 - physics.y) * h, physics.ripple.radius, 0, 2 * Math.PI);
-        ctx.strokeStyle = `rgba(255, 0, 85, ${physics.ripple.alpha})`;
-        ctx.lineWidth = 2;
+        ctx.arc(centerX, centerY, outerRad, 0, 2 * Math.PI);
         ctx.stroke();
+        ctx.shadowBlur = 0; // reset shadow
+        
+        // 4. Beat Ticks and Labels
+        ctx.fillStyle = 'rgba(0, 243, 255, 0.6)';
+        ctx.font = '7px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        for (let i = 0; i < beats; i++) {
+          const theta = (i / beats) * 2 * Math.PI - Math.PI / 2;
+          const isDownbeat = i % 4 === 0;
+          
+          const rStart = outerRad + (isDownbeat ? 5 : 2);
+          const rEnd = outerRad - (isDownbeat ? 6 : 3);
+          
+          const xS = centerX + Math.cos(theta) * rStart;
+          const yS = centerY + Math.sin(theta) * rStart;
+          const xE = centerX + Math.cos(theta) * rEnd;
+          const yE = centerY + Math.sin(theta) * rEnd;
+          
+          ctx.lineWidth = isDownbeat ? 1.5 : 0.8;
+          ctx.strokeStyle = isDownbeat ? '#00f3ff' : 'rgba(0, 243, 255, 0.3)';
+          ctx.beginPath();
+          ctx.moveTo(xS, yS);
+          ctx.lineTo(xE, yE);
+          ctx.stroke();
+          
+          if (isDownbeat) {
+            const tRad = rStart + 7;
+            const tx = centerX + Math.cos(theta) * tRad;
+            const ty = centerY + Math.sin(theta) * tRad;
+            ctx.fillText(i + 1, tx, ty);
+          }
+        }
+        
+        // 5. Draw Circular Waveform (Green/Cyan Gradient Wrap)
+        const peaks = chronoPeaksRef.current;
+        if (peaks && peaks.length > 0) {
+          const amplitudeScale = 11;
+          
+          const grad = ctx.createRadialGradient(centerX, centerY, innerRad, centerX, centerY, outerRad);
+          grad.addColorStop(0, 'rgba(0, 255, 150, 0.08)');
+          grad.addColorStop(0.5, 'rgba(0, 243, 255, 0.4)');
+          grad.addColorStop(1, 'rgba(0, 85, 255, 0.08)');
+          
+          ctx.fillStyle = grad;
+          ctx.strokeStyle = 'rgba(0, 243, 255, 0.65)';
+          ctx.lineWidth = 1.0;
+          ctx.shadowBlur = 4;
+          ctx.shadowColor = '#00f3ff';
+          
+          ctx.beginPath();
+          for (let i = 0; i <= peaks.length; i++) {
+            const idx = i % peaks.length;
+            const theta = (i / peaks.length) * 2 * Math.PI - Math.PI / 2;
+            const peak = peaks[idx] || 0;
+            const r = centerRad + (peak - 0.5) * amplitudeScale;
+            
+            const x = centerX + Math.cos(theta) * r;
+            const y = centerY + Math.sin(theta) * r;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          ctx.shadowBlur = 0; // reset
+        }
+        
+        // 6. FX Automation Motion Envelope Path (Neon Magenta Loop)
+        const events = fxAutomationEventsRef.current;
+        if (events && events.length > 0) {
+          ctx.strokeStyle = 'rgba(255, 0, 255, 0.8)';
+          ctx.lineWidth = 1.2;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = '#ff00ff';
+          ctx.beginPath();
+          
+          const sorted = [...events].sort((a, b) => a.beat - b.beat);
+          if (sorted.length > 0) {
+            sorted.push({ ...sorted[0], beat: sorted[0].beat + beats });
+          }
+          
+          sorted.forEach((e, idx) => {
+            const theta = ((e.beat % beats) / beats) * 2 * Math.PI - Math.PI / 2;
+            let valNormalized = e.value;
+            if (e.paramKey === 'cutoff') valNormalized = e.value / 20000;
+            else if (e.paramKey === 'resonance') valNormalized = e.value / 1.0;
+            else if (e.paramKey === 'spaceEchoTime') valNormalized = e.value / 1.5;
+            
+            if (typeof valNormalized !== 'number' || isNaN(valNormalized)) valNormalized = 0.5;
+            valNormalized = Math.max(0.05, Math.min(0.95, valNormalized));
+            
+            // Map to inner area radius (between 12px and 38px)
+            const r = 12 + valNormalized * 26;
+            const x = centerX + Math.cos(theta) * r;
+            const y = centerY + Math.sin(theta) * r;
+            if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        
+        // 7. Active Recording Wedge / Ring Highlight (Neon Red)
+        const currentBeat = seqCurrentBeatRef.current;
+        const currentBeatPhase = currentBeat % beats;
+        
+        if (looperStateRef.current === 1) {
+          // Armed: Pulse inner ring yellow
+          const pulseIntensity = Math.abs(Math.sin(performance.now() / 150)) * 0.4 + 0.1;
+          ctx.strokeStyle = `rgba(255, 230, 0, ${pulseIntensity})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, innerRad, 0, 2 * Math.PI);
+          ctx.stroke();
+        } else if (looperStateRef.current === 2 || looperStateRef.current === 3) {
+          // Recording / Dubbing: draw red recording progress trail
+          const recAngle = (currentBeatPhase / beats) * 2 * Math.PI;
+          ctx.strokeStyle = 'rgba(255, 0, 85, 0.85)';
+          ctx.lineWidth = 3.5;
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = '#ff0055';
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, outerRad + 3, -Math.PI / 2, -Math.PI / 2 + recAngle);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        
+        // 8. Rotating Laser Playhead Sweep (White/Cyan Glow)
+        const angle = (currentBeatPhase / beats) * 2 * Math.PI - Math.PI / 2;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00f3ff';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(centerX + Math.cos(angle) * (outerRad + 4), centerY + Math.sin(angle) * (outerRad + 4));
+        ctx.stroke();
+        
+        ctx.fillStyle = '#00f3ff';
+        ctx.beginPath();
+        ctx.arc(centerX + Math.cos(angle) * (outerRad + 4), centerY + Math.sin(angle) * (outerRad + 4), 3.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.shadowBlur = 0; // reset
+        
+        // 9. Process FX Automation Playback Loop
+        const lastBeatPhase = lastPlaybackBeatRef.current;
+        if (isPlayingFxAutomationRef.current && events.length > 0) {
+          let eventsToPlay = [];
+          if (currentBeatPhase < lastBeatPhase) {
+            eventsToPlay = events.filter(e => e.beat >= lastBeatPhase || e.beat < currentBeatPhase);
+          } else {
+            eventsToPlay = events.filter(e => e.beat >= lastBeatPhase && e.beat < currentBeatPhase);
+          }
+          
+          if (eventsToPlay.length > 0) {
+            setParamsOriginal(prev => {
+              const next = { ...prev };
+              eventsToPlay.forEach(e => {
+                next[e.paramKey] = e.value;
+              });
+              paramsRef.current = next;
+              return next;
+            });
+          }
+        }
+        lastPlaybackBeatRef.current = currentBeatPhase;
       }
       
-      // 4. Draw Current Dot
-      ctx.beginPath();
-      ctx.arc(physics.x * w, (1 - physics.y) * h, 6.5, 0, 2 * Math.PI);
-      ctx.fillStyle = physics.isTouched ? '#ff0055' : '#00f3ff';
-      ctx.shadowColor = physics.isTouched ? '#ff0055' : '#00f3ff';
-      ctx.shadowBlur = 10;
-      ctx.fill();
-      ctx.shadowBlur = 0; // reset shadow
+      physicsRef.current.rafId = requestAnimationFrame(tick);
     };
     
-    kaossPhysicsRef.current.rafId = requestAnimationFrame(tick);
+    // Reuse physicsRef for visualizer rafId storage
+    const physicsRef = kaossPhysicsRef;
+    physicsRef.current.rafId = requestAnimationFrame(tick);
     
     return () => {
       active = false;
-      if (kaossPhysicsRef.current.rafId) {
-        cancelAnimationFrame(kaossPhysicsRef.current.rafId);
+      if (physicsRef.current.rafId) {
+        cancelAnimationFrame(physicsRef.current.rafId);
       }
     };
   }, []);
@@ -20637,207 +20863,321 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         {/* ================= RIGHT SIDE CONTROLS & KAOSS PAD ================= */}
         <div className="rack-panel-right steel-plate">
           
-          {/* Glowing Delta Pad Touch pad */}
-          <div className="kaoss-pad-container">
-            <div className="section-label">Delta Pad XY Modulator</div>
-            <div className="kaoss-targets-selectors font-mono" style={{ gap: '4px' }}>
-              <div className="target-select-row-new" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-                <div className="target-row-label" style={{ fontSize: '0.42rem', marginBottom: '2px' }}>X-AXIS TARGET:</div>
-                <div className="target-btn-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px' }}>
-                  {[
-                    { value: 'cutoff', label: 'CUTOFF' },
-                    { value: 'lfoRate', label: 'LFO' },
-                    { value: 'ifxMix', label: 'IFX' },
-                    { value: 'delayTime', label: 'DELAY' },
-                    { value: 'gater', label: 'GATER' },
-                    { value: 'dubSiren', label: 'SIREN' },
-                    { value: 'tapeStop', label: 'T-STOP' },
-                    { value: 'formant', label: 'VOWEL' },
-                    { value: 'bitcrush', label: 'CRUSH' },
-                    { value: 'reverbFreeze', label: 'FREEZE' }
-                  ].map(tgt => (
-                    <button
-                      key={tgt.value}
-                      className={`target-btn ${kaossTargetX === tgt.value ? 'selected-x' : ''}`}
-                      style={{ fontSize: '0.36rem', padding: '2px 0' }}
-                      onClick={() => {
-                        setKaossTargetX(tgt.value);
-                        modulateKaossParameters(kaossPad.x, kaossPad.y, kaossPad.touchActive);
-                      }}
-                    >
-                      {tgt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="target-select-row-new" style={{ flexDirection: 'column', alignItems: 'stretch', marginTop: '4px' }}>
-                <div className="target-row-label" style={{ fontSize: '0.42rem', marginBottom: '2px' }}>Y-AXIS TARGET:</div>
-                <div className="target-btn-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px' }}>
-                  {[
-                    { value: 'resonance', label: 'RESO' },
-                    { value: 'reverbDecay', label: 'REVERB' },
-                    { value: 'chorusRate', label: 'FB' },
-                    { value: 'ringModMix', label: 'RM MIX' },
-                    { value: 'ringModFreq', label: 'RM FREQ' },
-                    { value: 'gater', label: 'GATER' },
-                    { value: 'dubSiren', label: 'SIREN' },
-                    { value: 'tapeStop', label: 'T-STOP' },
-                    { value: 'formant', label: 'VOWEL' },
-                    { value: 'bitcrush', label: 'CRUSH' },
-                    { value: 'reverbFreeze', label: 'FREEZE' }
-                  ].map(tgt => (
-                    <button
-                      key={tgt.value}
-                      className={`target-btn ${kaossTargetY === tgt.value ? 'selected-y' : ''}`}
-                      style={{ fontSize: '0.36rem', padding: '2px 0' }}
-                      onClick={() => {
-                        setKaossTargetY(tgt.value);
-                        modulateKaossParameters(kaossPad.x, kaossPad.y, kaossPad.touchActive);
-                      }}
-                    >
-                      {tgt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          {/* The Loom: Sophisticated Circular Looper & FX Performance Recording Space */}
+          <div className="kaoss-pad-container" style={{ borderColor: '#00f3ff', boxShadow: '0 0 12px rgba(0, 243, 255, 0.15)' }}>
+            <div className="section-label" style={{ color: '#00f3ff', textShadow: '0 0 6px #00f3ff', letterSpacing: '1px' }}>
+              THE LOOM - WAVEFORM & MOTION DECK
             </div>
-
-            {/* Neon Touch pad Screen */}
-            <div 
-              className={`kaoss-touchpad ${kaossPad.touchActive ? 'glow-red' : ''}`}
-              style={{ position: 'relative', overflow: 'hidden', height: '170px', marginTop: '8px' }}
+            
+            {/* Platter Canvas Wrapper */}
+            <div className="chrono-canvas-wrapper" style={{ 
+              position: 'relative', 
+              width: '100%', 
+              height: '180px', 
+              background: '#020712', 
+              border: '1px solid rgba(0, 243, 255, 0.3)', 
+              boxShadow: 'inset 0 0 10px rgba(0,243,255,0.1)',
+              borderRadius: '4px', 
+              overflow: 'hidden',
+              cursor: sculptTool !== 'none' ? 'crosshair' : 'default',
+              marginTop: '4px'
+            }}
               onMouseDown={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                handleKaossTouch(e, rect);
-              }}
-              onMouseMove={(e) => {
-                if (e.buttons === 1) {
+                if (sculptTool !== 'none') {
                   const rect = e.currentTarget.getBoundingClientRect();
-                  handleKaossTouch(e, rect);
+                  sculptWaveform(e.clientX, e.clientY, rect, sculptTool);
                 }
               }}
-              onMouseUp={handleKaossRelease}
-              onMouseLeave={handleKaossRelease}
+              onMouseMove={(e) => {
+                if (e.buttons === 1 && sculptTool !== 'none') {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  sculptWaveform(e.clientX, e.clientY, rect, sculptTool);
+                }
+              }}
             >
-              <canvas
-                ref={kaossCanvasRef}
-                width={280}
-                height={170}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  display: 'block'
-                }}
+              <canvas 
+                ref={chronoCanvasRef} 
+                width={280} 
+                height={180} 
+                style={{ display: 'block', width: '100%', height: '100%' }} 
               />
+              
+              {/* Overlay HUD indicators */}
+              <div style={{ position: 'absolute', top: '6px', left: '6px', pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: '1px', fontFamily: 'monospace', fontSize: '0.42rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <span className={`led-${isLiveRecording ? 'red' : (liveRecPendingStart ? 'yellow' : 'cyan')}`} style={{
+                    width: '5px', height: '5px', borderRadius: '50%',
+                    background: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#00f3ff'),
+                    boxShadow: isLiveRecording ? '0 0 6px #ff0055' : (liveRecPendingStart ? '0 0 6px #ffe600' : '0 0 6px #00f3ff')
+                  }}></span>
+                  <span style={{ color: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#00f3ff'), fontWeight: 'bold' }}>
+                    {isLiveRecording ? 'RECORDING' : (liveRecPendingStart ? 'WAITING BEAT 1' : 'LOOPER READY')}
+                  </span>
+                </div>
+                <span style={{ color: '#888' }}>
+                  SLOT: {liveRecTargetSlot.toUpperCase()} ({liveRecBeats} BEATS)
+                </span>
+              </div>
+              
+              <div style={{ position: 'absolute', top: '6px', right: '6px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: 'monospace', fontSize: '0.42rem' }}>
+                <span className="led-midi" style={{ 
+                  display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', 
+                  background: (seqCurrentBeatRef.current % 1 < 0.15) ? '#ffe600' : '#333', 
+                  boxShadow: (seqCurrentBeatRef.current % 1 < 0.15) ? '0 0 6px #ffe600' : 'none' 
+                }}></span>
+                <span style={{ color: '#aaa' }}>SYNC CLK</span>
+              </div>
             </div>
 
-            {/* Physics Return Modes */}
-            <div className="pad-settings-row font-mono" style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.45rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <span style={{ color: '#aaa', marginRight: '4px', fontSize: '0.38rem' }}>RETURN:</span>
-                <div style={{ display: 'flex', gap: '2px' }}>
-                  {['hold', 'snap', 'spring', 'throw'].map(mode => (
+            {/* Waveform Sculpting Brush Tools Panel */}
+            <div style={{ marginTop: '5px', background: 'rgba(0,0,0,0.4)', padding: '4px', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '3px' }}>
+              <div style={{ fontSize: '0.38rem', color: '#888', fontFamily: 'monospace', marginBottom: '2px', textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+                WAVEFORM SCULPTING BRUSHES
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px' }}>
+                {[
+                  { id: 'none', label: 'SELECT 🔍', color: '#aaa', activeColor: 'rgba(255,255,255,0.12)', border: '#888' },
+                  { id: 'mute', label: 'GATE 🔴', color: '#ff4444', activeColor: 'rgba(255,0,85,0.2)', border: '#ff0055' },
+                  { id: 'boost', label: 'BOOST ⚡', color: '#00f3ff', activeColor: 'rgba(0,243,255,0.2)', border: '#00f3ff' },
+                  { id: 'attenuate', label: 'DAMP ⏳', color: '#ffe600', activeColor: 'rgba(255,230,0,0.2)', border: '#ffe600' },
+                  { id: 'reverse', label: 'FLIP 🔄', color: '#ff00ff', activeColor: 'rgba(255,0,255,0.2)', border: '#ff00ff' }
+                ].map(tool => {
+                  const isSel = sculptTool === tool.id;
+                  return (
                     <button
-                      key={mode}
-                      className={`btn btn-xs ${padReturnMode === mode ? 'active-red' : ''}`}
-                      style={{ fontSize: '0.36rem', padding: '1px 3px' }}
-                      onClick={() => setPadReturnMode(mode)}
+                      key={tool.id}
+                      onClick={() => setSculptTool(tool.id)}
+                      className="btn btn-xs"
+                      style={{
+                        fontSize: '0.36rem',
+                        padding: '3px 0',
+                        margin: 0,
+                        color: isSel ? '#fff' : tool.color,
+                        background: isSel ? tool.activeColor : '#000',
+                        borderColor: isSel ? tool.border : 'rgba(255,255,255,0.1)',
+                        fontWeight: isSel ? 'bold' : 'normal',
+                        boxShadow: isSel ? `0 0 6px ${tool.border}` : 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
                     >
-                      {mode.toUpperCase()}
+                      {tool.label}
                     </button>
-                  ))}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Transport & Routing Selectors */}
+            <div className="chrono-control-panel font-mono" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '5px' }}>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <span style={{ fontSize: '0.36rem', color: '#888' }}>TARGET PAD:</span>
+                  <select
+                    value={liveRecTargetSlot}
+                    onChange={(e) => {
+                      setLiveRecTargetSlot(e.target.value);
+                      setSelectedEditSlotId(e.target.value);
+                    }}
+                    style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#ffe600', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
+                  >
+                    {Array.from({ length: 8 }).map((_, i) => <option key={`a-${i}`} value={`a0${i+1}`}>A{i+1}</option>)}
+                    {Array.from({ length: 8 }).map((_, i) => <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>)}
+                    {Array.from({ length: 8 }).map((_, i) => <option key={`c-${i}`} value={`c0${i+1}`}>C{i+1}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <span style={{ fontSize: '0.36rem', color: '#888' }}>LENGTH:</span>
+                  <select
+                    value={liveRecBeats}
+                    onChange={(e) => setLiveRecBeats(parseInt(e.target.value))}
+                    style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#00f3ff', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
+                  >
+                    {[2, 4, 8, 12, 16, 32, 64].map(b => <option key={b} value={b}>{b} Beats</option>)}
+                  </select>
+                </div>
+
+                <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <span style={{ fontSize: '0.36rem', color: '#888' }}>REC SOURCE:</span>
+                  <select
+                    value={recordingInputMode}
+                    onChange={(e) => setRecordingInputMode(e.target.value)}
+                    style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#00ff96', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
+                  >
+                    <option value="resample">INTERNAL</option>
+                    <option value="mic">MIC/LINE</option>
+                    <option value="monitor">MONITOR</option>
+                  </select>
                 </div>
               </div>
-              <button 
-                className={`btn btn-xs ${kaossPad.holdActive ? 'active-red' : ''}`}
-                style={{ fontSize: '0.36rem', padding: '1px 4px' }}
+
+              {/* Primary Atomic ARM Button */}
+              <button
                 onClick={() => {
-                  const nextHold = !kaossPad.holdActive;
-                  setKaossPad(prev => ({ ...prev, holdActive: nextHold }));
-                  if (!nextHold && !kaossPad.touchActive) {
-                    const physics = kaossPhysicsRef.current;
-                    physics.x = 0.5;
-                    physics.y = 0.5;
-                    physics.vx = 0;
-                    physics.vy = 0;
-                    setKaossPad(prev => ({ ...prev, x: 0.5, y: 0.5 }));
-                    modulateKaossParameters(0.5, 0.5, false);
-                    sendKaossMidiOut(0.5, 0.5, false);
+                  if (isLiveRecording || liveRecPendingStart) {
+                    liveLoopInProgressRef.current = false;
+                    isLiveRecordingRef.current = false;
+                    liveRecPendingStartRef.current = false;
+                    setIsLiveRecording(false);
+                    setLiveRecPendingStart(false);
+                    setLooperState(0);
+                    if (recordingWorkletNodeRef.current) {
+                      recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
+                    }
+                    if (schedulerNodeRef.current) {
+                      schedulerNodeRef.current.port.postMessage({ type: 'DISARM_RECORD_GATE' });
+                    }
+                    showEditorStatus('ARM cancelled ✖️');
                   } else {
-                    modulateKaossParameters(kaossPad.x, kaossPad.y, kaossPad.touchActive);
+                    liveRecOverdubRef.current = false;
+                    setLooperState(1);
+                    startLiveLoopRecording();
                   }
                 }}
+                className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : (isArmed ? 'active-yellow' : ''))}`}
+                style={{
+                  width: '100%',
+                  fontSize: '0.42rem',
+                  padding: '4px 0',
+                  fontWeight: 'bold',
+                  margin: '1px 0',
+                  color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : (isArmed ? '#ffe600' : '#aaa')),
+                  borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : (isArmed ? '#ffe600' : 'rgba(255,255,255,0.15)')),
+                  background: isLiveRecording
+                    ? 'rgba(255, 0, 85, 0.25)'
+                    : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.85)' : (isArmed ? 'rgba(255,230,0,0.12)' : 'rgba(0,0,0,0.3)')),
+                  boxShadow: isLiveRecording
+                    ? '0 0 10px rgba(255, 0, 85, 0.5)'
+                    : (liveRecPendingStart ? '0 0 10px rgba(255, 230, 0, 0.5)' : 'none'),
+                  animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none',
+                  transition: 'all 0.15s ease',
+                  cursor: 'pointer'
+                }}
               >
-                HOLD
+                {isLiveRecording
+                  ? '⏹️ STOP REC'
+                  : liveRecPendingStart
+                    ? '⏳ WAITING BEAT 1...'
+                    : isArmed
+                      ? '⚡ ARM → QUEUE GATE'
+                      : '🔴 ARM + REC'}
               </button>
-            </div>
 
-            {/* Gesture Recorder & Player */}
-            <div className="pad-settings-row font-mono" style={{ marginTop: '4px', display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.45rem' }}>
-              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              {/* Overdub & Clear & Undo Row */}
+              <div style={{ display: 'flex', gap: '3px' }}>
                 <button
-                  className={`btn btn-xs ${isRecordingGesture ? 'active-red' : ''}`}
-                  style={{ fontSize: '0.36rem', padding: '1px 3px', borderColor: isRecordingGesture ? '#ff0055' : '#888' }}
-                  onClick={() => {
-                    const nextRec = !isRecordingGesture;
-                    setIsRecordingGesture(nextRec);
-                    gestureRef.current.isRecording = nextRec;
-                    if (nextRec) {
-                      gestureRef.current.buffer = [];
-                      gestureRef.current.playIndex = 0;
-                      gestureRef.current.isPlaying = false;
-                      setIsPlayingGesture(false);
-                    }
+                  onClick={() => setLiveRecOverdub(prev => !prev)}
+                  className="btn btn-xs"
+                  style={{
+                    flex: 1,
+                    background: liveRecOverdub ? 'rgba(0, 243, 255, 0.15)' : '#000',
+                    borderColor: liveRecOverdub ? '#00f3ff' : 'rgba(255,255,255,0.15)',
+                    color: liveRecOverdub ? '#00f3ff' : '#aaa',
+                    fontSize: '0.38rem',
+                    padding: '2.5px 0',
+                    cursor: 'pointer'
                   }}
                 >
-                  REC
+                  {liveRecOverdub ? 'OVERDUB: ON 🔄' : 'OVERDUB: OFF'}
                 </button>
                 <button
-                  className={`btn btn-xs ${isPlayingGesture ? 'active-cyan' : ''}`}
-                  style={{ fontSize: '0.36rem', padding: '1px 3px', borderColor: isPlayingGesture ? '#00f3ff' : '#888', opacity: gestureRef.current.buffer.length > 0 ? 1 : 0.5 }}
-                  disabled={gestureRef.current.buffer.length === 0}
-                  onClick={() => {
-                    const nextPlay = !isPlayingGesture;
-                    setIsPlayingGesture(nextPlay);
-                    gestureRef.current.isPlaying = nextPlay;
-                    if (nextPlay) {
-                      gestureRef.current.playIndex = 0;
-                    }
+                  onClick={clearLooperBuffer}
+                  className="btn btn-xs"
+                  style={{ flex: 1, borderColor: '#ff4444', color: '#ff4444', fontSize: '0.38rem', padding: '2.5px 0', cursor: 'pointer' }}
+                >
+                  🗑️ CLEAR LOOP
+                </button>
+                <button
+                  onClick={undoLastLooperAction}
+                  disabled={!looperHasUndo}
+                  className="btn btn-xs"
+                  style={{
+                    flex: 0.8,
+                    borderColor: '#ffe600',
+                    color: '#ffe600',
+                    fontSize: '0.38rem',
+                    padding: '2.5px 0',
+                    opacity: looperHasUndo ? 1 : 0.4,
+                    cursor: looperHasUndo ? 'pointer' : 'default'
                   }}
                 >
-                  ▶️ PLAY
+                  ↩️ UNDO
                 </button>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <span style={{ color: '#aaa', marginRight: '4px', fontSize: '0.38rem' }}>MODE:</span>
-                <select
-                  value={gestureMode}
-                  onChange={(e) => setGestureMode(e.target.value)}
-                  style={{ background: '#051122', color: '#00f3ff', border: '1px solid #0a2a4d', fontSize: '0.38rem', padding: '0 2px', borderRadius: '3px' }}
-                >
-                  <option value="loop">LOOP</option>
-                  <option value="one-shot">1-SHOT</option>
-                  <option value="ping-pong">PINGPONG</option>
-                </select>
-              </div>
-            </div>
 
-            <div className="kaoss-footer-actions" style={{ marginTop: '8px' }}>
-              <button
-                className={`btn btn-sm ${glitchActive ? 'btn-glitch-active' : ''}`}
-                onMouseDown={() => toggleGlitch(true)}
-                onMouseUp={() => toggleGlitch(false)}
-                onMouseLeave={() => { if (glitchActive) toggleGlitch(false); }}
-                style={{ borderColor: '#ffe600', color: '#ffe600', flex: 1 }}
-              >
-                GLITCH
-              </button>
-              <div className="coord-readout font-mono" style={{ fontSize: '0.42rem' }}>
-                X:{Math.round(kaossPad.x * 127)} | Y:{Math.round(kaossPad.y * 127)}
+              {/* Latency & Nudge Calibration Sliders */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '3px', padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '1px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.38rem', color: '#888' }}>
+                    <span>LATENCY COMPENSATION:</span>
+                    <span style={{ color: '#ffe600', fontFamily: 'monospace', fontWeight: 'bold' }}>{recLatencyOffset} ms</span>
+                  </div>
+                  <input
+                    type="range" min="0" max="200" step="1"
+                    value={recLatencyOffset}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setRecLatencyOffset(val);
+                      recLatencyOffsetRef.current = val;
+                      localStorage.setItem('delta7_rec_latency_offset', val);
+                    }}
+                    style={{ width: '100%', height: '8px', accentColor: '#ffe600', cursor: 'pointer', margin: 0 }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.38rem', color: '#888' }}>
+                    <span>MICRO-TIMING SLIP:</span>
+                    <span style={{ color: '#00f3ff', fontFamily: 'monospace', fontWeight: 'bold' }}>{selectedSlotNudge} ms</span>
+                  </div>
+                  <input
+                    type="range" min="-100" max="100" step="1"
+                    value={selectedSlotNudge}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setSelectedSlotNudge(val);
+                      updateSlotParam(liveRecTargetSlot, 'nudgeMs', val);
+                    }}
+                    style={{ width: '100%', height: '8px', accentColor: '#00f3ff', cursor: 'pointer', margin: 0 }}
+                  />
+                </div>
               </div>
+
+              {/* FX Motion Performance Automation Recorder */}
+              <div style={{ background: 'rgba(255,0,255,0.02)', border: '1px solid rgba(255,0,255,0.15)', borderRadius: '3px', padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '1px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.38rem', color: '#ff00ff', fontWeight: 'bold', letterSpacing: '0.5px' }}>FX MOTION RECORDER</span>
+                  <span style={{ fontSize: '0.36rem', color: isPlayingFxAutomation ? '#00f3ff' : (isRecordingFxAutomation ? '#ff0055' : '#666'), fontWeight: 'bold' }}>
+                    {isRecordingFxAutomation ? '● REC' : (isPlayingFxAutomation ? '▶ PLAY' : 'IDLE')}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '3px' }}>
+                  <button
+                    onClick={toggleFxAutomationRec}
+                    className={`btn btn-xs ${isRecordingFxAutomation ? 'active-red blinking' : ''}`}
+                    style={{ flex: 1.1, borderColor: '#ff0055', color: '#ff0055', fontSize: '0.38rem', padding: '2.5px 0', cursor: 'pointer' }}
+                  >
+                    {isRecordingFxAutomation ? '⏹️ STOP REC' : '🔴 REC MOTION'}
+                  </button>
+                  <button
+                    onClick={toggleFxAutomationPlay}
+                    disabled={fxAutomationEvents.length === 0}
+                    className={`btn btn-xs ${isPlayingFxAutomation ? 'active-cyan' : ''}`}
+                    style={{ flex: 1.1, borderColor: '#00f3ff', color: '#00f3ff', fontSize: '0.38rem', padding: '2.5px 0', cursor: fxAutomationEvents.length > 0 ? 'pointer' : 'default', opacity: fxAutomationEvents.length > 0 ? 1 : 0.4 }}
+                  >
+                    {isPlayingFxAutomation ? '⏹️ STOP PLAY' : '▶️ PLAY MOTION'}
+                  </button>
+                  <button
+                    onClick={clearFxAutomation}
+                    className="btn btn-xs"
+                    style={{ flex: 0.6, borderColor: '#aaa', color: '#aaa', fontSize: '0.38rem', padding: '2.5px 0', cursor: 'pointer' }}
+                  >
+                    CLEAR
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
 
