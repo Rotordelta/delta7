@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Color palette matching the visual rings
+// Color palette matching the visual rings on the workstation
 const RING_COLORS = [
-  '#00f3ff', // cyan
-  '#ff0055', // pink/magenta
-  '#ffe600', // yellow
-  '#00ff66', // neon green
-  '#ff00ff', // purple
-  '#ffaa00', // orange
-  '#a300ff', // violet
-  '#00ffcc'  // teal
+  '#ff0055', // Neon Pink/Red
+  '#ff5500', // Neon Orange
+  '#ffcc00', // Neon Yellow
+  '#00ff66', // Neon Green
+  '#00f3ff', // Neon Cyan
+  '#0066ff', // Neon Blue
+  '#9900ff', // Neon Purple
+  '#ff00ff'  // Neon Magenta
 ];
 
 export default function CircularAlignModal({
