@@ -294,11 +294,14 @@
   - **Autoplay Latency Handover Phase Alignment**: Standard sampler playback offsets (`finalStartOffsetA` / `finalStartOffsetB`) must include the calibration nudge offset (`nudgeSecA` / `nudgeSecB`) even when using `fluxOffset` to start playback at exactly the correct phase angle, keeping the hand-off perfectly aligned with hardware direct monitoring.
 
 ## Session: 2026-06-26
-- **Task**: Persistent timing alignment (nudgeMs) and visual waveform shifting in sampler editor.
+- **Task**: Persistent timing alignment (nudgeMs) and visual waveform shifting in sampler editor; expanded Leslie, Reverb, and Space Echo presets; and added Space Echo fine-tune controls.
 - **Jimmy's Preferences**:
   - **Visual Waveform Alignment**: Shifting the linear waveform drawing (using nudgeMs timing offset) along with all its overlay markers (start, end, loop boundaries, slice points, active voice indicators, and playheads) ensures that the visual representation matches exactly what plays back in the engine.
   - **Coordinate Map Recalibration**: When the waveform is shifted visually, click selection coordinates (`pixelToBufferPct`) must be mapped backward by the same offset ratio so that mouse/touch edits (like setting slice markers or selection ranges) remain sample-accurate.
   - **Complete Project Persistence**: Timing offsets (nudgeMs) must be saved inside IndexedDB (via `saveSampleToDb`) and restored correctly on boot (metadata useEffect) so that the user's manual waveform calibrations persist across reloads.
+  - **Symmetrical Knobs Layout**: Sizing controls in the Left Panel to fit grid rows symmetrically (e.g. 8 Space Echo knobs in a 2x4 layout) keeps the panel highly readable and professional.
+  - **Space Echo Fine-Tune controls**: Having adjustable Low Cut, High Cut, and Wow Rate (LFO Speed) parameters in the delay path allows customizing tape characteristics from warm, dark dub-style delays to bright slapback tape sweeps and unstable, warbling lofi tape loops.
+  - **Expanded Preset Diversity**: Adding more factory settings that showcase these filter cuts and wow modulations gives users instant access to highly distinct delay behaviors.
 
 
 
