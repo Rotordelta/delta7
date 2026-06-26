@@ -303,5 +303,13 @@
   - **Space Echo Fine-Tune controls**: Having adjustable Low Cut, High Cut, and Wow Rate (LFO Speed) parameters in the delay path allows customizing tape characteristics from warm, dark dub-style delays to bright slapback tape sweeps and unstable, warbling lofi tape loops.
   - **Expanded Preset Diversity**: Adding more factory settings that showcase these filter cuts and wow modulations gives users instant access to highly distinct delay behaviors.
 
+## Session: 2026-06-27
+- **Task**: Replace Kaoss Pad with The Loom circular looper, visualizer, waveform sculpting brushes, and FX performance automation recorder.
+- **Jimmy's Preferences**:
+  - **The Loom**: A dedicated, visually engaging looper console replacing the Kaoss Pad XY modulator, with fancy circular timeline playheads, beat subdivisions, and latency calibration sectors.
+  - **Colorful & Glowy Aesthetics**: High-contrast, colorful visualizer grids using rich CSS glow filters (`shadowBlur`, `shadowColor`) and multi-colored timeline wedges map well to the hardware workstation theme.
+  - **Real-Time PCM Sculpting**: Interacting directly with the visual circular waveform via brush tools (Gate/Mute, Boost, Attenuate, Reverse Sector) to paint and slice the audio data on the fly.
+  - **FX Motion Recording**: Capturing knobs sweeps (filters, space echo, rotor, reverb) dynamically over the loop cycle and replaying them with a visual polar envelope trace inside the dial.
+
 
 
