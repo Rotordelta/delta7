@@ -64,6 +64,9 @@ const DEFAULT_PARAMS = {
   spaceEchoWow: 0.15,
   spaceEchoSaturation: 0.2,
   spaceEchoSpring: 0.15,
+  spaceEchoLowCut: 150,
+  spaceEchoHighCut: 1800,
+  spaceEchoWowRate: 0.4,
   leslieSpeed: 'Off',
   leslieDrive: 0.25,
   leslieWidth: 0.5,
@@ -151,16 +154,16 @@ const FACTORY_COMBIS = Array.from({ length: 3 }, (_, i) => ({
 }));
 
 const ECHO_PRESETS = [
-  { name: 'Default Space Echo', params: { spaceEchoActive: true, spaceEchoTime: 0.35, spaceEchoFeedback: 0.5, spaceEchoWow: 0.25, spaceEchoSaturation: 0.3, spaceEchoSpring: 0.15 } },
-  { name: 'Dub Self-Oscillator', params: { spaceEchoActive: true, spaceEchoTime: 0.45, spaceEchoFeedback: 0.88, spaceEchoWow: 0.4, spaceEchoSaturation: 0.7, spaceEchoSpring: 0.25 } },
-  { name: 'Slapback Tape', params: { spaceEchoActive: true, spaceEchoTime: 0.08, spaceEchoFeedback: 0.15, spaceEchoWow: 0.1, spaceEchoSaturation: 0.5, spaceEchoSpring: 0.05 } },
-  { name: 'Spring Reverb Tank', params: { spaceEchoActive: true, spaceEchoTime: 0.2, spaceEchoFeedback: 0.1, spaceEchoWow: 0.05, spaceEchoSaturation: 0.1, spaceEchoSpring: 0.8 } },
-  { name: 'Clean Stereo Delay', params: { spaceEchoActive: false, spaceEchoTime: 0.375, spaceEchoFeedback: 0.4 } },
-  { name: 'Fluttering Ping Pong', params: { spaceEchoActive: true, spaceEchoTime: 0.5, spaceEchoFeedback: 0.65, spaceEchoWow: 0.55, spaceEchoSaturation: 0.4, spaceEchoSpring: 0.2 } },
-  { name: 'Overdriven BBD', params: { spaceEchoActive: true, spaceEchoTime: 0.18, spaceEchoFeedback: 0.75, spaceEchoWow: 0.15, spaceEchoSaturation: 0.95, spaceEchoSpring: 0.3 } },
-  { name: 'Haunted Tape Loop', params: { spaceEchoActive: true, spaceEchoTime: 0.8, spaceEchoFeedback: 0.8, spaceEchoWow: 0.8, spaceEchoSaturation: 0.6, spaceEchoSpring: 0.4 } },
-  { name: 'Springy Slap', params: { spaceEchoActive: true, spaceEchoTime: 0.09, spaceEchoFeedback: 0.25, spaceEchoWow: 0.05, spaceEchoSaturation: 0.3, spaceEchoSpring: 0.85 } },
-  { name: 'Ethereal Diffusion', params: { spaceEchoActive: true, spaceEchoTime: 0.65, spaceEchoFeedback: 0.5, spaceEchoWow: 0.35, spaceEchoSaturation: 0.15, spaceEchoSpring: 0.6 } }
+  { name: 'Default Space Echo', params: { spaceEchoActive: true, spaceEchoTime: 0.35, spaceEchoFeedback: 0.5, spaceEchoWow: 0.25, spaceEchoSaturation: 0.3, spaceEchoSpring: 0.15, spaceEchoLowCut: 150, spaceEchoHighCut: 1800, spaceEchoWowRate: 0.4 } },
+  { name: 'Dub Self-Oscillator', params: { spaceEchoActive: true, spaceEchoTime: 0.45, spaceEchoFeedback: 0.88, spaceEchoWow: 0.4, spaceEchoSaturation: 0.7, spaceEchoSpring: 0.25, spaceEchoLowCut: 100, spaceEchoHighCut: 1200, spaceEchoWowRate: 0.2 } },
+  { name: 'Slapback Tape', params: { spaceEchoActive: true, spaceEchoTime: 0.08, spaceEchoFeedback: 0.15, spaceEchoWow: 0.1, spaceEchoSaturation: 0.5, spaceEchoSpring: 0.05, spaceEchoLowCut: 200, spaceEchoHighCut: 3500, spaceEchoWowRate: 1.2 } },
+  { name: 'Spring Reverb Tank', params: { spaceEchoActive: true, spaceEchoTime: 0.2, spaceEchoFeedback: 0.1, spaceEchoWow: 0.05, spaceEchoSaturation: 0.1, spaceEchoSpring: 0.8, spaceEchoLowCut: 150, spaceEchoHighCut: 4000, spaceEchoWowRate: 0.3 } },
+  { name: 'Clean Stereo Delay', params: { spaceEchoActive: false, spaceEchoTime: 0.375, spaceEchoFeedback: 0.4, spaceEchoLowCut: 20, spaceEchoHighCut: 20000, spaceEchoWowRate: 0.1 } },
+  { name: 'Fluttering Ping Pong', params: { spaceEchoActive: true, spaceEchoTime: 0.5, spaceEchoFeedback: 0.65, spaceEchoWow: 0.55, spaceEchoSaturation: 0.4, spaceEchoSpring: 0.2, spaceEchoLowCut: 150, spaceEchoHighCut: 2200, spaceEchoWowRate: 0.8 } },
+  { name: 'Overdriven BBD', params: { spaceEchoActive: true, spaceEchoTime: 0.18, spaceEchoFeedback: 0.75, spaceEchoWow: 0.15, spaceEchoSaturation: 0.95, spaceEchoSpring: 0.3, spaceEchoLowCut: 200, spaceEchoHighCut: 1000, spaceEchoWowRate: 0.5 } },
+  { name: 'Haunted Tape Loop', params: { spaceEchoActive: true, spaceEchoTime: 0.8, spaceEchoFeedback: 0.8, spaceEchoWow: 0.8, spaceEchoSaturation: 0.6, spaceEchoSpring: 0.4, spaceEchoLowCut: 300, spaceEchoHighCut: 1500, spaceEchoWowRate: 1.8 } },
+  { name: 'Springy Slap', params: { spaceEchoActive: true, spaceEchoTime: 0.09, spaceEchoFeedback: 0.25, spaceEchoWow: 0.05, spaceEchoSaturation: 0.3, spaceEchoSpring: 0.85, spaceEchoLowCut: 150, spaceEchoHighCut: 3000, spaceEchoWowRate: 0.6 } },
+  { name: 'Ethereal Diffusion', params: { spaceEchoActive: true, spaceEchoTime: 0.65, spaceEchoFeedback: 0.5, spaceEchoWow: 0.35, spaceEchoSaturation: 0.15, spaceEchoSpring: 0.6, spaceEchoLowCut: 100, spaceEchoHighCut: 5000, spaceEchoWowRate: 0.25 } }
 ];
 
 const ROTOR_PRESETS = [
@@ -5634,7 +5637,10 @@ export default function Delta7Synth() {
         spaceEchoFeedback: paramsRef.current.spaceEchoFeedback,
         spaceEchoWow: paramsRef.current.spaceEchoWow,
         spaceEchoSaturation: paramsRef.current.spaceEchoSaturation,
-        spaceEchoSpring: paramsRef.current.spaceEchoSpring
+        spaceEchoSpring: paramsRef.current.spaceEchoSpring,
+        spaceEchoLowCut: paramsRef.current.spaceEchoLowCut,
+        spaceEchoHighCut: paramsRef.current.spaceEchoHighCut,
+        spaceEchoWowRate: paramsRef.current.spaceEchoWowRate
       }
     };
     setUserEchoPresets(prev => {
@@ -6433,6 +6439,10 @@ export default function Delta7Synth() {
           if (ad.flutterGain2) ad.flutterGain2.gain.setValueAtTime(wow * 0.0008, now);
           if (ad.flutterGain3) ad.flutterGain3.gain.setValueAtTime(wow * 0.0010, now);
 
+          // Wow rate
+          const wowRate = typeof params.spaceEchoWowRate === 'number' && isFinite(params.spaceEchoWowRate) ? params.spaceEchoWowRate : 0.4;
+          if (ad.wowLfo) ad.wowLfo.frequency.setTargetAtTime(wowRate, now, 0.05);
+
           // Feedback levels
           const fb = typeof params.spaceEchoFeedback === 'number' && isFinite(params.spaceEchoFeedback) ? params.spaceEchoFeedback : 0.4;
           if (ad.feedbackGain1) ad.feedbackGain1.gain.setValueAtTime(fb * 0.5, now);
@@ -6445,6 +6455,12 @@ export default function Delta7Synth() {
           
           const sat = typeof params.spaceEchoSaturation === 'number' && isFinite(params.spaceEchoSaturation) ? params.spaceEchoSaturation : 0.2;
           if (ad.tapeSat) ad.tapeSat.curve = makeDistCurve(sat * 0.5);
+
+          // Low Cut and High Cut filters
+          const lowCut = typeof params.spaceEchoLowCut === 'number' && isFinite(params.spaceEchoLowCut) ? params.spaceEchoLowCut : 150;
+          const highCut = typeof params.spaceEchoHighCut === 'number' && isFinite(params.spaceEchoHighCut) ? params.spaceEchoHighCut : 1800;
+          if (ad.hpfNode) ad.hpfNode.frequency.setTargetAtTime(lowCut, now, 0.05);
+          if (ad.lpfNode) ad.lpfNode.frequency.setTargetAtTime(highCut, now, 0.05);
         } else {
           // Standard Stereo Delay update
           const delayTimeVal = typeof params.spaceEchoTime === 'number' && isFinite(params.spaceEchoTime) ? params.spaceEchoTime : 0.35;
@@ -8541,7 +8557,7 @@ export default function Delta7Synth() {
     delay3.delayTime.setValueAtTime(baseTime * 2.0, now);
 
     const wowLfo = ctx.createOscillator();
-    wowLfo.frequency.setValueAtTime(0.4, now);
+    wowLfo.frequency.setValueAtTime(paramsRef.current.spaceEchoWowRate || 0.4, now);
     const wowGain1 = ctx.createGain();
     const wowGain2 = ctx.createGain();
     const wowGain3 = ctx.createGain();
@@ -8601,12 +8617,12 @@ export default function Delta7Synth() {
 
     const hpfNode = ctx.createBiquadFilter();
     hpfNode.type = 'highpass';
-    hpfNode.frequency.setValueAtTime(150, now);
+    hpfNode.frequency.setValueAtTime(paramsRef.current.spaceEchoLowCut !== undefined ? paramsRef.current.spaceEchoLowCut : 150, now);
     hpfNode.Q.setValueAtTime(0.5, now);
 
     const lpfNode = ctx.createBiquadFilter();
     lpfNode.type = 'lowpass';
-    lpfNode.frequency.setValueAtTime(1800, now);
+    lpfNode.frequency.setValueAtTime(paramsRef.current.spaceEchoHighCut !== undefined ? paramsRef.current.spaceEchoHighCut : 1800, now);
     lpfNode.Q.setValueAtTime(0.5, now);
 
     panner1.connect(hpfNode);
@@ -13850,6 +13866,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           setParams(prev => ({ ...prev, spaceEchoSaturation: valNormalized }));
         } else if (paramName === 'spaceEchoSpring') {
           setParams(prev => ({ ...prev, spaceEchoSpring: valNormalized }));
+        } else if (paramName === 'spaceEchoLowCut') {
+          setParams(prev => ({ ...prev, spaceEchoLowCut: Math.round(valNormalized * 980 + 20) })); // 20Hz to 1000Hz
+        } else if (paramName === 'spaceEchoHighCut') {
+          setParams(prev => ({ ...prev, spaceEchoHighCut: Math.round(valNormalized * 19500 + 500) })); // 500Hz to 20000Hz
+        } else if (paramName === 'spaceEchoWowRate') {
+          setParams(prev => ({ ...prev, spaceEchoWowRate: valNormalized * 4.9 + 0.1 })); // 0.1Hz to 5.0Hz
         } else if (paramName === 'leslieDrive') {
           setParams(prev => ({ ...prev, leslieDrive: valNormalized }));
         } else if (paramName === 'leslieWidth') {
@@ -17925,7 +17947,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* Space Echo Knobs Grid */}
-            <div className="tape-knobs-grid">
+            <div className="tape-knobs-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 6px' }}>
               <Knob 
                 label="Time" 
                 value={params.spaceEchoTime} 
@@ -17964,6 +17986,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 size={34}
               />
               <Knob 
+                label="Wow Rate" 
+                value={params.spaceEchoWowRate !== undefined ? params.spaceEchoWowRate : 0.4} 
+                min={0.1} max={5.0} step={0.05}
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, spaceEchoWowRate: v }));
+                  setSelectedEchoPresetIdx('');
+                }} 
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="spaceEchoWowRate"
+                glowColor="cyan"
+                size={34}
+              />
+              <Knob 
                 label="Saturation" 
                 value={params.spaceEchoSaturation} 
                 min={0.0} max={1.0} step={0.01}
@@ -17984,6 +18018,30 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   setSelectedEchoPresetIdx('');
                 }} 
                 midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="spaceEchoSpring"
+                glowColor="cyan"
+                size={34}
+              />
+              <Knob 
+                label="Low Cut" 
+                value={params.spaceEchoLowCut !== undefined ? params.spaceEchoLowCut : 150} 
+                min={20} max={1000} step={1}
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, spaceEchoLowCut: v }));
+                  setSelectedEchoPresetIdx('');
+                }} 
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="spaceEchoLowCut"
+                glowColor="cyan"
+                size={34}
+              />
+              <Knob 
+                label="High Cut" 
+                value={params.spaceEchoHighCut !== undefined ? params.spaceEchoHighCut : 1800} 
+                min={500} max={20000} step={10}
+                onChange={(v) => {
+                  setParams(prev => ({ ...prev, spaceEchoHighCut: v }));
+                  setSelectedEchoPresetIdx('');
+                }} 
+                midiLearnParam={midiLearnParam} midiMappings={midiMappings} setMidiLearnParam={setMidiLearnParam} paramKey="spaceEchoHighCut"
                 glowColor="cyan"
                 size={34}
               />
@@ -22375,8 +22433,11 @@ function MidiMappingMenu({
         { key: "spaceEchoTime", name: "Space Echo Time" },
         { key: "spaceEchoFeedback", name: "Space Echo Feedback" },
         { key: "spaceEchoWow", name: "Space Echo Wow/Flutter" },
+        { key: "spaceEchoWowRate", name: "Space Echo Wow Rate" },
         { key: "spaceEchoSaturation", name: "Space Echo Saturation" },
         { key: "spaceEchoSpring", name: "Space Echo Spring Reverb" },
+        { key: "spaceEchoLowCut", name: "Space Echo Low Cut" },
+        { key: "spaceEchoHighCut", name: "Space Echo High Cut" },
         { key: "leslieDrive", name: "Rotor Cabinet Drive" },
         { key: "leslieWidth", name: "Rotor Cabinet Width" },
         { key: "leslieCrossover", name: "Rotor Cabinet Crossover" },
