@@ -323,3 +323,9 @@
 - **Logical Visual Theme Flow**: Global or modal diagnostic panels that inspect sub-components (like the performance pad slots) must dynamically inherit and follow the matching color theme of the target item (e.g., matching the pad/ring colors) instead of fallback defaults, to maintain spatial and cognitive consistency.
 - **UX Customizability & Focus Zoom**: User prefers larger focal zoom ranges for hardware panels when performing. Increased the maximum focus zoom scale range from `1.15` (15% scale increase) to `1.21` (21% scale increase, representing a 40% increase of the maximum zoom offset) to provide wider customizability options.
 - **Vinyl Platter Visualization**: In alignment/diagnostic widgets, the user prefers a stationary circular waveform (rotated only by user-controlled alignment nudge angles) with a high-visibility radial laser sweep line and orbiting playhead dot indicating real-time playback progress clockwise, providing clear visual alignment coordinates.
+
+## Session: 2026-06-27 (Part 2)
+- **Task**: Non-destructive circular shift Sample Nudge mechanism and playhead offset cleanups.
+- **Jimmy's Preferences**:
+  - **Non-Destructive Timing Calibrations**: Nudge timings should be applied physically inside the Web Audio memory context by circular-shifting the underlying AudioBuffer samples. Keeping the original buffer untouched inside `originalBuffer` prevents progressive degradation or mutation loss during edits.
+  - **Clean playhead tracking**: When the underlying buffer is circular-shifted, linear playhead timing offsets are no longer needed. Disabling linear playhead nudges on playback, preview triggers, and loop wraps prevents phase alignment issues and cutoffs.
