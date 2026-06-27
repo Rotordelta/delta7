@@ -5526,10 +5526,17 @@ export default function Delta7Synth() {
           voice.orig_oscA_L_rate = freqScaleA;
           voice.orig_oscA_R_rate = freqScaleA;
 
-          if (voice.oscA && voice.oscA.playbackRate) {
-            voice.oscA.playbackRate.cancelScheduledValues(now);
-            voice.oscA.playbackRate.setValueAtTime(voice.oscA.playbackRate.value, now);
-            voice.oscA.playbackRate.linearRampToValueAtTime(freqScaleA * stopFactor, now + 0.035);
+          if (voice.oscA) {
+            if (voice.oscA._isSamplerWorklet) {
+              voice.oscA.port.postMessage({
+                type: 'setParams',
+                playbackRate: freqScaleA * stopFactor
+              });
+            } else if (voice.oscA.playbackRate) {
+              voice.oscA.playbackRate.cancelScheduledValues(now);
+              voice.oscA.playbackRate.setValueAtTime(voice.oscA.playbackRate.value, now);
+              voice.oscA.playbackRate.linearRampToValueAtTime(freqScaleA * stopFactor, now + 0.035);
+            }
           }
           if (voice.oscA_L && voice.oscA_L.playbackRate) {
             voice.oscA_L.playbackRate.cancelScheduledValues(now);
@@ -5585,10 +5592,17 @@ export default function Delta7Synth() {
           voice.orig_oscB_L_rate = freqScaleB;
           voice.orig_oscB_R_rate = freqScaleB;
 
-          if (voice.oscB && voice.oscB.playbackRate) {
-            voice.oscB.playbackRate.cancelScheduledValues(now);
-            voice.oscB.playbackRate.setValueAtTime(voice.oscB.playbackRate.value, now);
-            voice.oscB.playbackRate.linearRampToValueAtTime(freqScaleB * stopFactor, now + 0.035);
+          if (voice.oscB) {
+            if (voice.oscB._isSamplerWorklet) {
+              voice.oscB.port.postMessage({
+                type: 'setParams',
+                playbackRate: freqScaleB * stopFactor
+              });
+            } else if (voice.oscB.playbackRate) {
+              voice.oscB.playbackRate.cancelScheduledValues(now);
+              voice.oscB.playbackRate.setValueAtTime(voice.oscB.playbackRate.value, now);
+              voice.oscB.playbackRate.linearRampToValueAtTime(freqScaleB * stopFactor, now + 0.035);
+            }
           }
           if (voice.oscB_L && voice.oscB_L.playbackRate) {
             voice.oscB_L.playbackRate.cancelScheduledValues(now);
@@ -10127,9 +10141,9 @@ export default function Delta7Synth() {
         const keyLock = isVoiceA ? deckAKeyLockRef.current : deckBKeyLockRef.current;
         const stretch = isVoiceA ? deckAStretchRef.current : deckBStretchRef.current;
 
-        const finalPlaybackRate = keyLock 
+        const finalPlaybackRate = (keyLock 
           ? (notePitchFactorA * pitchFactorA) 
-          : (notePitchFactorA * pitchFactorA * (voiceObj.warpFactorA || 1.0));
+          : (notePitchFactorA * pitchFactorA * (voiceObj.warpFactorA || 1.0))) * Math.pow(2, tuningA / 12);
         const finalStretchFactor = keyLock 
           ? (stretch * (voiceObj.warpFactorA || 1.0)) 
           : 1.0;
@@ -10220,9 +10234,9 @@ export default function Delta7Synth() {
         const keyLock = isVoiceA ? deckAKeyLockRef.current : deckBKeyLockRef.current;
         const stretch = isVoiceA ? deckAStretchRef.current : deckBStretchRef.current;
 
-        const finalPlaybackRate = keyLock 
+        const finalPlaybackRate = (keyLock 
           ? (notePitchFactorB * pitchFactorB) 
-          : (notePitchFactorB * pitchFactorB * (voiceObj.warpFactorB || 1.0));
+          : (notePitchFactorB * pitchFactorB * (voiceObj.warpFactorB || 1.0))) * Math.pow(2, tuningB / 12);
         const finalStretchFactor = keyLock 
           ? (stretch * (voiceObj.warpFactorB || 1.0)) 
           : 1.0;
@@ -14205,9 +14219,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const list = Array.isArray(vList) ? vList : [vList];
         list.forEach(voice => {
           if (voice.oscA && voice.oscA._isSamplerWorklet) {
-            const finalPlaybackRate = keyLock 
+            const finalPlaybackRate = (keyLock 
               ? (voice.notePitchFactorA * voice.pitchFactorA) 
-              : (voice.notePitchFactorA * voice.pitchFactorA * (voice.warpFactorA || 1.0));
+              : (voice.notePitchFactorA * voice.pitchFactorA * (voice.warpFactorA || 1.0))) * Math.pow(2, (voice.tuningA || 0) / 12);
             const finalStretchFactor = keyLock 
               ? (stretch * (voice.warpFactorA || 1.0)) 
               : 1.0;
@@ -14220,9 +14234,9 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             });
           }
           if (voice.oscB && voice.oscB._isSamplerWorklet) {
-            const finalPlaybackRate = keyLock 
+            const finalPlaybackRate = (keyLock 
               ? (voice.notePitchFactorB * voice.pitchFactorB) 
-              : (voice.notePitchFactorB * voice.pitchFactorB * (voice.warpFactorB || 1.0));
+              : (voice.notePitchFactorB * voice.pitchFactorB * (voice.warpFactorB || 1.0))) * Math.pow(2, (voice.tuningB || 0) / 12);
             const finalStretchFactor = keyLock 
               ? (stretch * (voice.warpFactorB || 1.0)) 
               : 1.0;
