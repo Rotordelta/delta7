@@ -380,3 +380,11 @@
   - **Quick Recording Actions**: Being able to right-click a performance pad and directly arm/set the DeltaVi synthesizer as the record source for that specific pad significantly speeds up performance capture.
   - **Synchronous Ref & State Alignment**: Updating mutable refs synchronously in the event handler and scheduling the arming trigger (`armLooperInput`) via a short timeout ensures React state updates (like target pad and mode changes) have fully resolved.
 
+## Session: 2026-06-27 (Part 10)
+- **Task**: DeltaVi Direct Recording Pad Routing selector.
+- **Jimmy's Preferences**:
+  - **In-Console Router Access**: Providing a direct `REC ROUTING` selector inside the floating synthesizer console's header eliminates the need to close/shift panels to map audio connections, boosting live performance speed.
+  - **Color-Coded Subgroup Options**: Grouping target selector menus by Bank A/B/C and color-coding options to match their hardware pad glow colors creates high visual cohesiveness.
+  - **Ref/State Double Binding**: Direct prop forwarding to nested subcomponents is reliable for updating audio refs synchronously while refreshing standard React state loops.
+
+

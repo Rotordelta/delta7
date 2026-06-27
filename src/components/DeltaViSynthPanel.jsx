@@ -1,7 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MidiSynth from './MidiSynth.jsx';
 
-export default function DeltaViSynthPanel({ onClose }) {
+export default function DeltaViSynthPanel({
+  onClose,
+  recordingInputMode,
+  setRecordingInputMode,
+  liveRecTargetSlot,
+  setLiveRecTargetSlot,
+  setSelectedEditSlotId,
+  recordingTargetSlotIdRef,
+  recordingInputModeRef
+}) {
   const [position, setPosition] = useState({ x: 100, y: 80 });
   const [isMinimized, setIsMinimized] = useState(false);
   const [size, setSize] = useState({ width: 1180, height: 650 });
@@ -225,7 +234,15 @@ export default function DeltaViSynthPanel({ onClose }) {
             position: 'relative'
           }}
         >
-          <MidiSynth />
+          <MidiSynth 
+            recordingInputMode={recordingInputMode}
+            setRecordingInputMode={setRecordingInputMode}
+            liveRecTargetSlot={liveRecTargetSlot}
+            setLiveRecTargetSlot={setLiveRecTargetSlot}
+            setSelectedEditSlotId={setSelectedEditSlotId}
+            recordingTargetSlotIdRef={recordingTargetSlotIdRef}
+            recordingInputModeRef={recordingInputModeRef}
+          />
         </div>
       )}
 

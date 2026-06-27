@@ -23438,6 +23438,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       {showMidiSynth && (
         <DeltaViSynthPanel 
           onClose={() => setShowMidiSynth(false)}
+          recordingInputMode={recordingInputMode}
+          setRecordingInputMode={setRecordingInputMode}
+          liveRecTargetSlot={liveRecTargetSlot}
+          setLiveRecTargetSlot={setLiveRecTargetSlot}
+          setSelectedEditSlotId={setSelectedEditSlotId}
+          recordingTargetSlotIdRef={recordingTargetSlotIdRef}
+          recordingInputModeRef={recordingInputModeRef}
         />
       )}
 

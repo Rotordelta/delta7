@@ -7202,7 +7202,15 @@ const getDwgsWave = (ctx, type) => {
   return wave;
 };
 
-export default function MidiSynth() {
+export default function MidiSynth({
+  recordingInputMode = 'mic',
+  setRecordingInputMode = () => {},
+  liveRecTargetSlot = 'a01',
+  setLiveRecTargetSlot = () => {},
+  setSelectedEditSlotId = () => {},
+  recordingTargetSlotIdRef = null,
+  recordingInputModeRef = null
+}) {
   const [synthOn, setSynthOn] = useState(false);
   const [dwgsType, setDwgsType] = useState('organ');
   const [midiDevices, setMidiDevices] = useState([]);
@@ -10415,6 +10423,59 @@ export default function MidiSynth() {
               </div>
             </div>
 
+            {/* Sampler Recorder Router */}
+            <div className="preset-dashboard" style={{ borderLeft: '1px solid rgba(0,243,255,0.15)', paddingLeft: '15px' }}>
+              <span className="section-title" style={{ color: '#ff007f', textShadow: '0 0 4px rgba(255,0,127,0.3)' }}>REC ROUTING</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <select 
+                  className="preset-select font-mono"
+                  style={{ 
+                    borderColor: recordingInputMode === 'synth' ? '#ff007f' : 'rgba(255,255,255,0.15)',
+                    color: recordingInputMode === 'synth' ? '#ff007f' : '#888',
+                    maxWidth: '140px',
+                    textShadow: recordingInputMode === 'synth' ? '0 0 3px rgba(255,0,127,0.3)' : 'none'
+                  }}
+                  value={recordingInputMode === 'synth' ? liveRecTargetSlot : 'None'}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'None') {
+                      setRecordingInputMode('mic');
+                      if (recordingInputModeRef) recordingInputModeRef.current = 'mic';
+                    } else {
+                      setLiveRecTargetSlot(val);
+                      setSelectedEditSlotId(val);
+                      setRecordingInputMode('synth');
+                      if (recordingTargetSlotIdRef) recordingTargetSlotIdRef.current = val;
+                      if (recordingInputModeRef) recordingInputModeRef.current = 'synth';
+                    }
+                  }}
+                >
+                  <option value="None">❌ NOT ROUTED</option>
+                  <optgroup label="BANK A" style={{ background: '#000', color: '#00f3ff' }}>
+                    {Array.from({ length: 8 }).map((_, i) => <option key={`a-${i}`} value={`a0${i+1}`}>A{i+1}</option>)}
+                  </optgroup>
+                  <optgroup label="BANK B" style={{ background: '#000', color: '#ff007f' }}>
+                    {Array.from({ length: 8 }).map((_, i) => <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>)}
+                  </optgroup>
+                  <optgroup label="BANK C" style={{ background: '#000', color: '#ffe600' }}>
+                    {Array.from({ length: 8 }).map((_, i) => <option key={`c-${i}`} value={`c0${i+1}`}>C{i+1}</option>)}
+                  </optgroup>
+                </select>
+
+                <div 
+                  className={`power-led ${recordingInputMode === 'synth' ? 'led-on' : ''}`}
+                  style={{
+                    background: recordingInputMode === 'synth' ? '#ff007f' : '#222',
+                    boxShadow: recordingInputMode === 'synth' ? '0 0 8px #ff007f' : 'none',
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%'
+                  }}
+                  title={recordingInputMode === 'synth' ? "Synth output routed to sampler looper" : "Routing inactive"}
+                ></div>
+              </div>
+            </div>
+
             <div className="display-window">
               <div className="telemetry font-mono">
                 <span className="telemetry-lbl">MIDI IN:</span>
@@ -12739,8 +12800,8 @@ export default function MidiSynth() {
         /* Header block */
         .synth-header {
           display: grid;
-          grid-template-columns: auto 80px 180px 1.2fr 1fr;
-          gap: 1.5rem;
+          grid-template-columns: auto 80px 140px 1fr 1fr 1fr;
+          gap: 1rem;
           align-items: center;
           border-bottom: 1.5px solid rgba(0, 243, 255, 0.15);
           padding-bottom: 0.65rem;
