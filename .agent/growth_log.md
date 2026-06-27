@@ -351,3 +351,10 @@
   - **Physical Sifting Metaphor**: Stacking two records together into a pile and letting the user flip the pile (sift) by clicking the offset back record or a `SIFT` tag matches vintage record bin interactions.
   - **Space Maximization**: Shrinking the 8-crate grid down to a 2x2 pile grid optimizes right sidebar vertical space, leaving plenty of room for other controls.
   - **State Page Indicators**: Adding simple visual layout indicators (like small navigation dots) gives instant feedback on which active layer/crate is current.
+
+## Session: 2026-06-27 (Part 6)
+- **Task**: Isolated MIDI Routing & Synth Channel Selector.
+- **Jimmy's Preferences**:
+  - **Shared MIDI Streams**: When multiple modules listen to WebMIDI inputs, they should not fight over the single `input.onmidimessage` handler. Dispatching a custom window event (`delta7_midi_message`) from the main workstation handler allows auxiliary modules to subscribe cleanly.
+  - **MIDI Channel Separation**: Defaulting the main workstation sampler to Channel 1 and the DeltaVi synth to Channel 2 prevents double-triggering notes or sharing CC parameters.
+  - **Configurable Receive Channels**: Providing a simple `RX CHANNEL` dropdown (Omni vs Ch 1-16) inside the synthesizer telemetry screen offers excellent flexibility for physical MIDI keyboard controllers.
