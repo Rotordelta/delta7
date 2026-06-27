@@ -15474,6 +15474,29 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const renderPerformanceDeck = () => {
+    const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
+    let endBeat = 16.0;
+    const setting = perfSeqLength || 'Auto';
+    if (setting === 'Auto') {
+      if (sortedPerfEventsRef.current.length > 0) {
+        const lastEvent = sortedPerfEventsRef.current[sortedPerfEventsRef.current.length - 1];
+        endBeat = Math.max(16, Math.ceil(lastEvent.beat / 4) * 4);
+      }
+    } else if (setting !== 'Infinite') {
+      endBeat = parseFloat(setting) || 16.0;
+    } else {
+      endBeat = Infinity;
+    }
+
+    const lastEventBeat = perfEvents.length > 0 ? Math.max(...perfEvents.map(e => e.beat)) : 0;
+    const gridLength = setting === 'Infinite'
+      ? Math.max(256, Math.ceil((lastEventBeat + 32) / 16) * 16)
+      : endBeat;
+
+    const numBars = Math.ceil(gridLength / beatsPerBar);
+    const barIndices = Array.from({ length: numBars }, (_, i) => i);
+    const gridBeats = Array.from({ length: Math.floor(gridLength) + 1 }, (_, i) => i);
+
     const getPillsForLane = (deck, index) => {
       const pills = [];
       const events = perfEvents.filter(e => e.deck === deck && (e.type === 'slot' || e.type === 'slice') && e.index === index);
@@ -15552,9 +15575,31 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               className="highway-events-container"
               style={{ bottom: '12px' }}
             >
+              {/* Alternating shaded bars */}
+              {barIndices.map((i) => {
+                const startBeat = i * beatsPerBar;
+                const startY = startBeat * highwayZoom;
+                const barHeight = beatsPerBar * highwayZoom;
+                return (
+                  <div 
+                    key={`bar-shading-a-${i}`}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: `${startY}px`,
+                      height: `${barHeight}px`,
+                      background: i % 2 === 1 ? 'rgba(0, 243, 255, 0.02)' : 'rgba(0, 0, 0, 0.25)',
+                      borderTop: i > 0 ? '1px solid rgba(0, 243, 255, 0.06)' : 'none',
+                      pointerEvents: 'none',
+                      zIndex: 0
+                    }}
+                  />
+                );
+              })}
+
               {/* Horizontal Grid lines (Tronesque Cyan) */}
-              {BEAT_INDICES_256.map((_, b) => {
-                const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
+              {gridBeats.map((b) => {
                 const isBarStart = b % beatsPerBar === 0;
                 const barNum = Math.floor(b / beatsPerBar) + 1;
                 const beatInBar = (b % beatsPerBar) + 1;
@@ -15803,7 +15848,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           </div>
         </div>
       );
-    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget, selectedPill, sampleSlots]);
+    }, [perfEvents, highwayZoom, perfTimeSignature, perfSeqLength, highwayEditMode, resizeDragTarget, selectedPill, sampleSlots]);
 
     const highwayB_JSX = useMemo(() => {
       return (
@@ -15843,9 +15888,31 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               className="highway-events-container"
               style={{ bottom: '12px' }}
             >
+              {/* Alternating shaded bars */}
+              {barIndices.map((i) => {
+                const startBeat = i * beatsPerBar;
+                const startY = startBeat * highwayZoom;
+                const barHeight = beatsPerBar * highwayZoom;
+                return (
+                  <div 
+                    key={`bar-shading-b-${i}`}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: `${startY}px`,
+                      height: `${barHeight}px`,
+                      background: i % 2 === 1 ? 'rgba(0, 243, 255, 0.02)' : 'rgba(0, 0, 0, 0.25)',
+                      borderTop: i > 0 ? '1px solid rgba(0, 243, 255, 0.06)' : 'none',
+                      pointerEvents: 'none',
+                      zIndex: 0
+                    }}
+                  />
+                );
+              })}
+
               {/* Horizontal Grid lines (Tronesque Cyan) */}
-              {BEAT_INDICES_256.map((_, b) => {
-                const beatsPerBar = parseInt(perfTimeSignature.split('/')[0]) || 4;
+              {gridBeats.map((b) => {
                 const isBarStart = b % beatsPerBar === 0;
                 const barNum = Math.floor(b / beatsPerBar) + 1;
                 const beatInBar = (b % beatsPerBar) + 1;
@@ -16094,7 +16161,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           </div>
         </div>
       );
-    }, [perfEvents, highwayZoom, perfTimeSignature, highwayEditMode, resizeDragTarget, selectedPill, sampleSlots]);
+    }, [perfEvents, highwayZoom, perfTimeSignature, perfSeqLength, highwayEditMode, resizeDragTarget, selectedPill, sampleSlots]);
 
     return (
       <div className="deck-layout-wrapper">
