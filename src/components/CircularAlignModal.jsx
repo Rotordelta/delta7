@@ -133,7 +133,7 @@ export default function CircularAlignModal({
     ctx.shadowColor = 'transparent';
     
     const playheadAngle = (currentAngleDegrees / 360) * 2 * Math.PI;
-    const dynamicRotate = rotateAngle - playheadAngle;
+    const dynamicRotate = rotateAngle;
 
     for (let i = 0; i < 360; i++) {
       const amp = peaks[i] || 0;
@@ -185,18 +185,28 @@ export default function CircularAlignModal({
     ctx.textAlign = 'center';
     ctx.fillText('GRID START (0ms)', centerX, centerY - 138);
 
-    // Orbiting playhead dot
+    // Orbiting playhead laser line and dot
     if (isPlaying) {
       const phAngle = -Math.PI / 2 + playheadAngle;
+      
+      // Draw glowing radial laser playhead sweep
+      ctx.beginPath();
+      ctx.moveTo(centerX + 72 * Math.cos(phAngle), centerY + 72 * Math.sin(phAngle));
+      ctx.lineTo(centerX + 125 * Math.cos(phAngle), centerY + 125 * Math.sin(phAngle));
+      ctx.strokeStyle = padColor;
+      ctx.lineWidth = 2.0;
+      ctx.shadowColor = padColor;
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Draw orbiting playhead dot
       const phX = centerX + 70 * Math.cos(phAngle);
       const phY = centerY + 70 * Math.sin(phAngle);
       ctx.beginPath();
       ctx.arc(phX, phY, 4, 0, 2 * Math.PI);
-      ctx.fillStyle = padColor;
-      ctx.shadowColor = padColor;
-      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#ffffff';
       ctx.fill();
-      ctx.shadowBlur = 0;
     }
   };
 
