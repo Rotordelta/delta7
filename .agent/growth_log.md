@@ -358,3 +358,10 @@
   - **Shared MIDI Streams**: When multiple modules listen to WebMIDI inputs, they should not fight over the single `input.onmidimessage` handler. Dispatching a custom window event (`delta7_midi_message`) from the main workstation handler allows auxiliary modules to subscribe cleanly.
   - **MIDI Channel Separation**: Defaulting the main workstation sampler to Channel 1 and the DeltaVi synth to Channel 2 prevents double-triggering notes or sharing CC parameters.
   - **Configurable Receive Channels**: Providing a simple `RX CHANNEL` dropdown (Omni vs Ch 1-16) inside the synthesizer telemetry screen offers excellent flexibility for physical MIDI keyboard controllers.
+
+## Session: 2026-06-27 (Part 7)
+- **Task**: Direct DeltaVi Synthesizer Recording into the Looper/Sampler.
+- **Jimmy's Preferences**:
+  - **Internal Audio Graph Routing**: Connecting audio outputs directly between internal nodes (e.g. `window.__rdSynthOutputNode` directly to the looper's `resamplerGainNode`) allows direct, latency-free capture of digital sources within the browser.
+  - **Consistent Input Selections**: Making the new "SYNTH" recording source available in both the primary sidebar looper controls and the sample editor overlay maintains unified workflows.
+  - **Clean Node Disconnection**: Safely disconnecting nodes during disarming prevents memory leaks and audio feedback loops.

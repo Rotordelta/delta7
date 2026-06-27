@@ -8228,7 +8228,7 @@ export default function MidiSynth() {
       finalSplitter.connect(analyserR, 1);
 
       // Expose the final output node for DeltaDecks sampling
-      window.__rdSynthOutputNode = finalSum;
+      window.__rdSynthOutputNode = stereoMerger;
 
       chorusLfo.start();
 

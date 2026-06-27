@@ -2901,6 +2901,28 @@ export default function Delta7Synth() {
       }
       setupLosslessRecorderNode(ctx, resamplerGainNodeRef.current);
       triggerLiveLoopRecInternal();
+    } else if (inputMode === 'synth') {
+      const synthNode = window.__rdSynthOutputNode;
+      if (!synthNode) {
+        showEditorStatus("Error: DeltaVi synth not active! ✖️");
+        return;
+      }
+      if (!resamplerGainNodeRef.current) {
+        const resamplerGainNode = ctx.createGain();
+        resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+        resamplerGainNodeRef.current = resamplerGainNode;
+        try {
+          synthNode.connect(resamplerGainNode);
+        } catch (err) {
+          console.error("Failed to connect synth node to resampler:", err);
+        }
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        micAnalyserRef.current = analyser;
+        resamplerGainNode.connect(analyser);
+      }
+      setupLosslessRecorderNode(ctx, resamplerGainNodeRef.current);
+      triggerLiveLoopRecInternal();
     } else if (!streamRef.current) {
       const isMonitor = inputMode === 'monitor';
       showEditorStatus(isMonitor ? "Arming browser audio monitor... 🖥️" : "Arming mic/instrument input... 🎤");
@@ -2941,7 +2963,7 @@ export default function Delta7Synth() {
     
     // Calculate latency offset samples to record extra at the end
     // For internal resample, latency is 0 since it is inside the audio graph
-    const isInternal = (recordingInputModeRef.current === 'resample');
+    const isInternal = (recordingInputModeRef.current === 'resample' || recordingInputModeRef.current === 'synth');
     const latencyMs = isInternal ? 0 : (recLatencyOffsetRef.current || 0);
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     const limitSamples = liveRecTotalSamplesRef.current + Math.max(0, latencySamples);
@@ -3017,7 +3039,7 @@ export default function Delta7Synth() {
       offset += chunksL[i].length;
     }
 
-    const isInternal = (recordingInputModeRef.current === 'resample');
+    const isInternal = (recordingInputModeRef.current === 'resample' || recordingInputModeRef.current === 'synth');
     const latencyMs = isInternal ? 0 : (recLatencyOffsetRef.current || 0);
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     const targetLength = liveRecTotalSamplesRef.current || totalLength;
@@ -3754,6 +3776,9 @@ export default function Delta7Synth() {
     if (analyserRef.current && resamplerGainNodeRef.current) {
       try { analyserRef.current.disconnect(resamplerGainNodeRef.current); } catch {}
     }
+    if (window.__rdSynthOutputNode && resamplerGainNodeRef.current) {
+      try { window.__rdSynthOutputNode.disconnect(resamplerGainNodeRef.current); } catch {}
+    }
     if (resamplerGainNodeRef.current) {
       try { resamplerGainNodeRef.current.disconnect(); } catch {}
       resamplerGainNodeRef.current = null;
@@ -3832,6 +3857,30 @@ export default function Delta7Synth() {
       setIsArmed(true);
       startMicMonitor();
       showEditorStatus("Internal Resampler armed! ⏺️");
+    } else if (recordingInputMode === 'synth') {
+      if (!audioCtxRef.current) initAudio();
+      const ctx = audioCtxRef.current;
+      const synthNode = window.__rdSynthOutputNode;
+      if (!synthNode) {
+        showEditorStatus("Error: DeltaVi synth not active! ✖️");
+        return;
+      }
+      const resamplerGainNode = ctx.createGain();
+      resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+      resamplerGainNodeRef.current = resamplerGainNode;
+      try {
+        synthNode.connect(resamplerGainNode);
+      } catch (err) {
+        console.error("Failed to connect synth node to resampler:", err);
+      }
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      micAnalyserRef.current = analyser;
+      resamplerGainNode.connect(analyser);
+      setupLosslessRecorderNode(ctx, resamplerGainNode);
+      setIsArmed(true);
+      startMicMonitor();
+      showEditorStatus("DeltaVi Synth Recorder armed! ⏺️");
     }
   };
 
@@ -3905,7 +3954,7 @@ export default function Delta7Synth() {
     
     // Apply latency offset shifting
     // For internal resample, latency is 0 since it is inside the audio graph
-    const isInternal = (recordingInputModeRef.current === 'resample');
+    const isInternal = (recordingInputModeRef.current === 'resample' || recordingInputModeRef.current === 'synth');
     const latencyMs = isInternal ? 0 : (recLatencyOffsetRef.current || 0);
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     console.log(`[Looper] saveResampledAudio: latencyMs = ${latencyMs}ms, latencySamples = ${latencySamples}, totalLength = ${totalLength}`);
@@ -3941,7 +3990,7 @@ export default function Delta7Synth() {
         const isBeatSynced = metronomeRef.current.isPlaying && manualRecBeatsRef.current > 0;
         updatedSlot = {
           ...slot,
-          name: `${recordingInputMode === 'resample' ? 'Resample' : 'Rec'}: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`,
+          name: `${recordingInputMode === 'resample' ? 'Resample' : (recordingInputMode === 'synth' ? 'DeltaVi' : 'Rec')}: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`,
           buffer: buffer,
           revBuffer: getReversedBuffer(ctx, buffer),
           start: 0.0,
@@ -4002,7 +4051,7 @@ export default function Delta7Synth() {
         });
       }
     } else {
-      if (!streamRef.current && recordingInputMode !== 'resample') {
+      if (!streamRef.current && recordingInputMode !== 'resample' && recordingInputMode !== 'synth') {
         showEditorStatus("Arming input first... 🎤");
         const armFunc = recordingInputMode === 'mic' ? armMicrophone : armMonitor;
         armFunc()
@@ -4204,6 +4253,81 @@ export default function Delta7Synth() {
     } catch (err) {
       console.error("Error arming resampler:", err);
       alert("Resampler arming failed.");
+    }
+  };
+
+  const armSynthRecorder = () => {
+    if (isArmed) {
+      disarmMicrophone();
+      return;
+    }
+    
+    // Check if the synth's output node is available
+    const synthNode = window.__rdSynthOutputNode;
+    if (!synthNode) {
+      alert("Error: DeltaVi synth not active! Please open/start it first.");
+      return;
+    }
+    
+    let destInput = window.prompt("Enter destination slot to record to (e.g. A1-A8 or B1-B8):", selectedEditSlotId.toUpperCase());
+    if (destInput === null) return; // User cancelled
+    destInput = destInput.trim().toLowerCase();
+    
+    // Determine bank prefix: 'a' or 'b'
+    let prefix = selectedEditSlotId[0]; // default to current bank
+    if (destInput.startsWith('a')) {
+      prefix = 'a';
+    } else if (destInput.startsWith('b')) {
+      prefix = 'b';
+    }
+    
+    const match = destInput.match(/\d+/);
+    if (!match) {
+      alert("Invalid slot. Please enter a slot like A1-A8 or B1-B8.");
+      return;
+    }
+    const slotNum = parseInt(match[0]);
+    if (slotNum < 1 || slotNum > 8) {
+      alert("Invalid slot number. Please enter a slot between 1 and 8 (e.g., A2 or B3).");
+      return;
+    }
+    const targetSlotId = `${prefix}0${slotNum}`;
+    setSelectedEditSlotId(targetSlotId);
+    
+    // Update active program oscillator routing to point to the new recorded slot
+    if (prefix === 'a') {
+      setParams(prev => ({ ...prev, oscAWave: targetSlotId }));
+    } else {
+      setParams(prev => ({ ...prev, oscBWave: targetSlotId }));
+    }
+    recordingTargetSlotIdRef.current = targetSlotId;
+ 
+    try {
+      if (!audioCtxRef.current) initAudio();
+      const ctx = audioCtxRef.current;
+ 
+      // Create resampler gain node to apply REC GAIN
+      const resamplerGainNode = ctx.createGain();
+      resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+      resamplerGainNodeRef.current = resamplerGainNode;
+ 
+      // Connect synth output node to resamplerGainNode
+      synthNode.connect(resamplerGainNode);
+ 
+      // Connect resamplerGainNode -> level analyser for visual feedback
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      micAnalyserRef.current = analyser;
+      resamplerGainNode.connect(analyser);
+ 
+      setupLosslessRecorderNode(ctx, resamplerGainNode);
+ 
+      setIsArmed(true);
+      startMicMonitor();
+      showEditorStatus(`DeltaVi Synth armed for ${prefix.toUpperCase()}${slotNum}! ⏺️`);
+    } catch (err) {
+      console.error("Error arming synth recorder:", err);
+      alert("Synth recorder arming failed.");
     }
   };
 
@@ -21592,7 +21716,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.62rem', marginTop: '4px', marginBottom: '4px' }}>
                       <span className="label-blue">REC SOURCE:</span>
                       <div className="segmented-strip">
-                        {['mic', 'monitor', 'resample'].map(mode => (
+                        {['mic', 'monitor', 'resample', 'synth'].map(mode => (
                           <button
                             key={mode}
                             className={`segmented-btn btn-xs ${recordingInputMode === mode ? 'active' : ''}`}
@@ -21602,7 +21726,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                             }}
                             style={{ padding: '2px 6px', fontSize: '0.55rem' }}
                           >
-                            {mode.toUpperCase()}
+                            {mode === 'synth' ? 'SYNTH' : mode.toUpperCase()}
                           </button>
                         ))}
                       </div>
@@ -21641,7 +21765,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '6px', marginTop: '4px' }}>
                       <button 
                         className={`btn btn-xs ${isArmed ? 'active-yellow' : ''}`} 
-                        onClick={recordingInputMode === 'mic' ? armMicrophone : (recordingInputMode === 'monitor' ? armMonitor : armResampler)}
+                        onClick={recordingInputMode === 'mic' ? armMicrophone : (recordingInputMode === 'monitor' ? armMonitor : (recordingInputMode === 'synth' ? armSynthRecorder : armResampler))}
                         style={{ margin: 0, fontSize: '0.62rem', padding: '3px' }}
                       >
                         {isArmed ? `DISARM ${recordingInputMode.toUpperCase()}` : `ARM ${recordingInputMode.toUpperCase()}`}
@@ -22470,6 +22594,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     <option value="resample">INTERNAL</option>
                     <option value="mic">MIC/LINE</option>
                     <option value="monitor">MONITOR</option>
+                    <option value="synth">DELTA-VI SYNTH</option>
                   </select>
                 </div>
               </div>
