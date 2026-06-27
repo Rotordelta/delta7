@@ -4,7 +4,7 @@ import MidiSynth from './MidiSynth.jsx';
 export default function DeltaViSynthPanel({ onClose }) {
   const [position, setPosition] = useState({ x: 100, y: 80 });
   const [isMinimized, setIsMinimized] = useState(false);
-  const [size, setSize] = useState({ width: 780, height: 600 });
+  const [size, setSize] = useState({ width: 1180, height: 650 });
   
   const dragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
   const resizeStartRef = useRef({ x: 0, y: 0, startWidth: 0, startHeight: 0 });

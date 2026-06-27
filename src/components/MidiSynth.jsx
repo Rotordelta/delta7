@@ -10212,7 +10212,7 @@ export default function MidiSynth() {
     e.preventDefault();
     const startY = e.clientY;
     const startValue = pitchBend;
-    const range = 60; // drag travel pixels
+    const range = 90; // drag travel pixels
 
     const handleMouseMove = (moveEvent) => {
       const deltaY = moveEvent.clientY - startY;
@@ -10235,7 +10235,7 @@ export default function MidiSynth() {
     const touch = e.touches[0];
     const startY = touch.clientY;
     const startValue = pitchBend;
-    const range = 60;
+    const range = 90;
 
     const handleTouchMove = (moveEvent) => {
       const touchMove = moveEvent.touches[0];
@@ -10277,7 +10277,7 @@ export default function MidiSynth() {
     e.preventDefault();
     const startY = e.clientY;
     const startValue = modWheel;
-    const range = 60;
+    const range = 90;
 
     const handleMouseMove = (moveEvent) => {
       const deltaY = moveEvent.clientY - startY;
@@ -10299,7 +10299,7 @@ export default function MidiSynth() {
     const touch = e.touches[0];
     const startY = touch.clientY;
     const startValue = modWheel;
-    const range = 60;
+    const range = 90;
 
     const handleTouchMove = (moveEvent) => {
       const touchMove = moveEvent.touches[0];
@@ -12134,7 +12134,7 @@ export default function MidiSynth() {
                 >
                   <div 
                     className="wheel-body" 
-                    style={{ top: `${13 + (1 - (pitchBend + 1) / 2) * 22}px` }}
+                    style={{ top: `${4 + (1 - (pitchBend + 1) / 2) * 44}px` }}
                   >
                     <div className="wheel-ridge"></div>
                     <div className="wheel-ridge center-ridge"></div>
@@ -12153,7 +12153,7 @@ export default function MidiSynth() {
                 >
                   <div 
                     className="wheel-body" 
-                    style={{ top: `${13 + (1 - modWheel) * 22}px` }}
+                    style={{ top: `${4 + (1 - modWheel) * 44}px` }}
                   >
                     <div className="wheel-ridge"></div>
                     <div className="wheel-ridge center-ridge"></div>
@@ -12881,11 +12881,23 @@ export default function MidiSynth() {
         }
 
         .display-window {
-          background: #050608;
-          border: 1px solid rgba(0, 243, 255, 0.2);
-          border-radius: 4px;
+          background: #02060c;
+          border: 1.5px solid rgba(0, 243, 255, 0.45);
+          border-radius: 6px;
           padding: 0.4rem 0.6rem;
-          box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.1);
+          box-shadow: inset 0 0 15px rgba(0, 243, 255, 0.15), 0 0 8px rgba(0, 243, 255, 0.08);
+          position: relative;
+          overflow: hidden;
+        }
+        .display-window::before {
+          content: " ";
+          display: block;
+          position: absolute;
+          top: 0; left: 0; bottom: 0; right: 0;
+          background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+          z-index: 2;
+          background-size: 100% 3px, 3px 100%;
+          pointer-events: none;
         }
 
         .telemetry {
@@ -12917,7 +12929,7 @@ export default function MidiSynth() {
           align-items: stretch;
         }
 
-        @media (max-width: 1100px) {
+        @media (max-width: 900px) {
           .synth-modules-horizontal {
             grid-template-columns: repeat(2, 1fr);
           }
@@ -12929,7 +12941,7 @@ export default function MidiSynth() {
           }
         }
 
-        @media (min-width: 1101px) {
+        @media (min-width: 901px) {
           .arp-fx-panel-span {
             grid-column: span 2;
           }
@@ -12968,43 +12980,48 @@ export default function MidiSynth() {
 
         /* Unique section glowing border colors */
         .neon-glow-cyan {
-          border-color: rgba(0, 243, 255, 0.18) !important;
+          border-color: rgba(0, 243, 255, 0.35) !important;
+          box-shadow: 0 0 10px rgba(0, 243, 255, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
         }
         .neon-glow-cyan:hover {
-          border-color: rgba(0, 243, 255, 0.6) !important;
-          box-shadow: 0 0 15px rgba(0, 243, 255, 0.2) !important;
+          border-color: rgba(0, 243, 255, 0.8) !important;
+          box-shadow: 0 0 20px rgba(0, 243, 255, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
         }
 
         .neon-glow-pink {
-          border-color: rgba(255, 0, 127, 0.18) !important;
+          border-color: rgba(255, 0, 127, 0.35) !important;
+          box-shadow: 0 0 10px rgba(255, 0, 127, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
         }
         .neon-glow-pink:hover {
-          border-color: rgba(255, 0, 127, 0.6) !important;
-          box-shadow: 0 0 15px rgba(255, 0, 127, 0.2) !important;
+          border-color: rgba(255, 0, 127, 0.8) !important;
+          box-shadow: 0 0 20px rgba(255, 0, 127, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
         }
 
         .neon-glow-magenta {
-          border-color: rgba(255, 0, 255, 0.18) !important;
+          border-color: rgba(255, 0, 255, 0.35) !important;
+          box-shadow: 0 0 10px rgba(255, 0, 255, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
         }
         .neon-glow-magenta:hover {
-          border-color: rgba(255, 0, 255, 0.6) !important;
-          box-shadow: 0 0 15px rgba(255, 0, 255, 0.2) !important;
+          border-color: rgba(255, 0, 255, 0.8) !important;
+          box-shadow: 0 0 20px rgba(255, 0, 255, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
         }
 
         .neon-glow-yellow {
-          border-color: rgba(255, 230, 0, 0.18) !important;
+          border-color: rgba(255, 230, 0, 0.35) !important;
+          box-shadow: 0 0 10px rgba(255, 230, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
         }
         .neon-glow-yellow:hover {
-          border-color: rgba(255, 230, 0, 0.6) !important;
-          box-shadow: 0 0 15px rgba(255, 230, 0, 0.2) !important;
+          border-color: rgba(255, 230, 0, 0.8) !important;
+          box-shadow: 0 0 20px rgba(255, 230, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
         }
 
         .neon-glow-green {
-          border-color: rgba(0, 255, 150, 0.18) !important;
+          border-color: rgba(0, 255, 150, 0.35) !important;
+          box-shadow: 0 0 10px rgba(0, 255, 150, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
         }
         .neon-glow-green:hover {
-          border-color: rgba(0, 255, 150, 0.6) !important;
-          box-shadow: 0 0 15px rgba(0, 255, 150, 0.2) !important;
+          border-color: rgba(0, 255, 150, 0.8) !important;
+          box-shadow: 0 0 20px rgba(0, 255, 150, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
         }
 
         .scope-outer {
@@ -13171,15 +13188,16 @@ export default function MidiSynth() {
 
         /* Scope bezel alignment inside equal-width column */
         .scope-bezel {
-          background: #060709;
-          border: 1px solid rgba(0, 243, 255, 0.2);
-          border-radius: 2px;
+          background: #020406;
+          border: 1.5px solid rgba(0, 243, 255, 0.45);
+          border-radius: 4px;
           overflow: hidden;
           width: 100%;
           height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
+          box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 243, 255, 0.15);
         }
 
         .scope-canvas {
@@ -13273,7 +13291,7 @@ export default function MidiSynth() {
           gap: 0.8rem;
           justify-content: center;
           align-items: center;
-          height: 60px;
+          height: 95px;
           background: #050608;
           border: 1px solid rgba(0, 243, 255, 0.2);
           border-radius: 4px;
@@ -13283,7 +13301,7 @@ export default function MidiSynth() {
         .wheel-well {
           position: relative;
           width: 22px;
-          height: 50px;
+          height: 76px;
           background: #020203;
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 3px;
@@ -13360,7 +13378,7 @@ export default function MidiSynth() {
           border: 2.2px solid #1f2833;
           border-radius: 4px;
           box-shadow: 0 8px 24px rgba(0,0,0,0.85);
-          height: 60px;
+          height: 95px;
           overflow: hidden;
           width: 100%;
         }
@@ -13388,7 +13406,7 @@ export default function MidiSynth() {
 
         .black-key {
           width: 1.8%;
-          height: 36px;
+          height: 58px;
           background: linear-gradient(to bottom, #0f1013 0%, #1c1f25 85%, #0b0c0e 100%);
           border: 1px solid #000;
           border-radius: 0 0 1.2px 1.2px;
