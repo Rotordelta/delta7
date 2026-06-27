@@ -10143,7 +10143,7 @@ export default function Delta7Synth() {
 
         const finalPlaybackRate = (keyLock 
           ? (notePitchFactorA * pitchFactorA) 
-          : (notePitchFactorA * pitchFactorA * (voiceObj.warpFactorA || 1.0))) * Math.pow(2, tuningA / 12);
+          : (notePitchFactorA * pitchFactorA * (voiceObj.warpFactorA || 1.0))) * Math.pow(2, voiceObj.tuningA / 12);
         const finalStretchFactor = keyLock 
           ? (stretch * (voiceObj.warpFactorA || 1.0)) 
           : 1.0;
@@ -10236,7 +10236,7 @@ export default function Delta7Synth() {
 
         const finalPlaybackRate = (keyLock 
           ? (notePitchFactorB * pitchFactorB) 
-          : (notePitchFactorB * pitchFactorB * (voiceObj.warpFactorB || 1.0))) * Math.pow(2, tuningB / 12);
+          : (notePitchFactorB * pitchFactorB * (voiceObj.warpFactorB || 1.0))) * Math.pow(2, voiceObj.tuningB / 12);
         const finalStretchFactor = keyLock 
           ? (stretch * (voiceObj.warpFactorB || 1.0)) 
           : 1.0;
