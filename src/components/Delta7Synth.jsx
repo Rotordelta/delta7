@@ -800,77 +800,7 @@ export default function Delta7Synth() {
     }
   }, []);
 
-  useEffect(() => {
-    const slot = slots[liveRecTargetSlot];
-    updateChronoPeaks(slot?.buffer);
-  }, [liveRecTargetSlot, slots, updateChronoPeaks]);
 
-  useEffect(() => {
-    const slot = slots[liveRecTargetSlot];
-    if (slot) {
-      setSelectedSlotNudge(slot.nudgeMs || 0);
-    }
-  }, [liveRecTargetSlot, slots]);
-
-  const [sculptTool, setSculptTool] = useState('none'); // 'none', 'mute', 'boost', 'attenuate', 'reverse'
-
-  const sculptWaveform = useCallback((clientX, clientY, rect, tool) => {
-    const canvas = chronoCanvasRef.current;
-    if (!canvas || tool === 'none') return;
-    const w = canvas.width;
-    const h = canvas.height;
-    
-    const dx = clientX - rect.left - w / 2;
-    const dy = clientY - rect.top - h / 2;
-    const angle = Math.atan2(dy, dx);
-    
-    let normalizedAngle = angle + Math.PI / 2;
-    if (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
-    const pct = normalizedAngle / (2 * Math.PI);
-    
-    const slot = slots[liveRecTargetSlot];
-    const buffer = slot?.buffer;
-    if (!buffer) return;
-    
-    try {
-      const data = buffer.getChannelData(0);
-      const centerIndex = Math.floor(pct * data.length);
-      const brushWidthPct = 0.035; // 3.5% loop length brush size
-      const radius = Math.floor(brushWidthPct * data.length);
-      
-      if (tool === 'mute') {
-        for (let i = -radius; i <= radius; i++) {
-          const idx = (centerIndex + i + data.length) % data.length;
-          data[idx] = 0;
-        }
-      } else if (tool === 'boost') {
-        for (let i = -radius; i <= radius; i++) {
-          const idx = (centerIndex + i + data.length) % data.length;
-          data[idx] = Math.max(-1.0, Math.min(1.0, data[idx] * 1.4));
-        }
-      } else if (tool === 'attenuate') {
-        for (let i = -radius; i <= radius; i++) {
-          const idx = (centerIndex + i + data.length) % data.length;
-          data[idx] = data[idx] * 0.35;
-        }
-      } else if (tool === 'reverse') {
-        const segment = [];
-        for (let i = -radius; i <= radius; i++) {
-          const idx = (centerIndex + i + data.length) % data.length;
-          segment.push(data[idx]);
-        }
-        segment.reverse();
-        for (let i = -radius; i <= radius; i++) {
-          const idx = (centerIndex + i + data.length) % data.length;
-          data[idx] = segment[i + radius];
-        }
-      }
-      
-      updateChronoPeaks(buffer);
-    } catch (e) {
-      console.error("[The Loom] Error sculpting waveform:", e);
-    }
-  }, [liveRecTargetSlot, slots, updateChronoPeaks]);
 
   const kaossPhysicsRef = useRef({
     x: 0.5,
@@ -1402,6 +1332,81 @@ export default function Delta7Synth() {
   const liveRecTargetSlotRef = useRef('a01');
   const liveLoopInProgressRef = useRef(false);
   useEffect(() => { liveRecTargetSlotRef.current = liveRecTargetSlot; }, [liveRecTargetSlot]);
+
+  useEffect(() => {
+    const slots = sampleSlotsRef.current || sampleSlots;
+    const slot = slots.find(s => s.id === liveRecTargetSlot);
+    updateChronoPeaks(slot?.buffer);
+  }, [liveRecTargetSlot, sampleSlots, updateChronoPeaks]);
+
+  useEffect(() => {
+    const slots = sampleSlotsRef.current || sampleSlots;
+    const slot = slots.find(s => s.id === liveRecTargetSlot);
+    if (slot) {
+      setSelectedSlotNudge(slot.nudgeMs || 0);
+    }
+  }, [liveRecTargetSlot, sampleSlots]);
+
+  const [sculptTool, setSculptTool] = useState('none'); // 'none', 'mute', 'boost', 'attenuate', 'reverse'
+
+  const sculptWaveform = useCallback((clientX, clientY, rect, tool) => {
+    const canvas = chronoCanvasRef.current;
+    if (!canvas || tool === 'none') return;
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    const dx = clientX - rect.left - w / 2;
+    const dy = clientY - rect.top - h / 2;
+    const angle = Math.atan2(dy, dx);
+    
+    let normalizedAngle = angle + Math.PI / 2;
+    if (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
+    const pct = normalizedAngle / (2 * Math.PI);
+    
+    const slots = sampleSlotsRef.current || sampleSlots;
+    const slot = slots.find(s => s.id === liveRecTargetSlot);
+    const buffer = slot?.buffer;
+    if (!buffer) return;
+    
+    try {
+      const data = buffer.getChannelData(0);
+      const centerIndex = Math.floor(pct * data.length);
+      const brushWidthPct = 0.035; // 3.5% loop length brush size
+      const radius = Math.floor(brushWidthPct * data.length);
+      
+      if (tool === 'mute') {
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          data[idx] = 0;
+        }
+      } else if (tool === 'boost') {
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          data[idx] = Math.max(-1.0, Math.min(1.0, data[idx] * 1.4));
+        }
+      } else if (tool === 'attenuate') {
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          data[idx] = data[idx] * 0.35;
+        }
+      } else if (tool === 'reverse') {
+        const segment = [];
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          segment.push(data[idx]);
+        }
+        segment.reverse();
+        for (let i = -radius; i <= radius; i++) {
+          const idx = (centerIndex + i + data.length) % data.length;
+          data[idx] = segment[i + radius];
+        }
+      }
+      
+      updateChronoPeaks(buffer);
+    } catch (e) {
+      console.error("[The Loom] Error sculpting waveform:", e);
+    }
+  }, [liveRecTargetSlot, sampleSlots, updateChronoPeaks]);
 
   useEffect(() => {
     if (selectedEditSlotId && selectedEditSlotId !== liveRecTargetSlot) {
