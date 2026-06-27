@@ -23503,6 +23503,43 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </button>
               </div>
 
+              <div className="popover-field" style={{ borderBottom: '1px solid rgba(0, 243, 255, 0.15)', paddingBottom: '8px', marginBottom: '8px' }}>
+                <button
+                  className="btn btn-xs"
+                  onClick={() => {
+                    recordingTargetSlotIdRef.current = slotId;
+                    recordingInputModeRef.current = 'synth';
+                    setLiveRecTargetSlot(slotId);
+                    setSelectedEditSlotId(slotId);
+                    setRecordingInputMode('synth');
+                    setPadMenuState(prev => ({ ...prev, visible: false }));
+                    if (isArmed) {
+                      disarmMicrophone();
+                    }
+                    setTimeout(() => {
+                      armLooperInput();
+                    }, 50);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255, 0, 127, 0.15)',
+                    border: '1px solid #ff007f',
+                    color: '#ff007f',
+                    fontWeight: 'bold',
+                    fontSize: '0.52rem',
+                    padding: '4px 0',
+                    cursor: 'pointer',
+                    borderRadius: '3px',
+                    boxShadow: '0 0 6px rgba(255, 0, 127, 0.25)',
+                    textTransform: 'uppercase',
+                    fontFamily: 'monospace',
+                    transition: 'all 0.12s ease'
+                  }}
+                >
+                  ⚡ RECORD DELTAVI SYNTH TO THIS PAD
+                </button>
+              </div>
+
               <div className="popover-field">
                 <label>FX Target</label>
                 <select 

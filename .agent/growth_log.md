@@ -365,3 +365,18 @@
   - **Internal Audio Graph Routing**: Connecting audio outputs directly between internal nodes (e.g. `window.__rdSynthOutputNode` directly to the looper's `resamplerGainNode`) allows direct, latency-free capture of digital sources within the browser.
   - **Consistent Input Selections**: Making the new "SYNTH" recording source available in both the primary sidebar looper controls and the sample editor overlay maintains unified workflows.
   - **Clean Node Disconnection**: Safely disconnecting nodes during disarming prevents memory leaks and audio feedback loops.
+
+## Session: 2026-06-27 (Part 8)
+- **Task**: DeltaVi Floating Window Resizing & Spacing Optimization.
+- **Jimmy's Preferences**:
+  - **Drag-to-Resize persistent window dimensions**: Storing window size in local state (`size` state) and dragging custom corners bypasses React re-render resets of native CSS `resize: both` elements.
+  - **localStorage size persistence**: Storing both window size and position in `localStorage` (`deltavi_panel_size`) creates a premium, persistent, desktop-like floating experience.
+  - **Tight Padding/Spacing**: Eliminating dead padding (like bottom padding on wrap wrappers and reducing chassis edge padding) lets the window border hug the keys and dials tightly.
+  - **Discrete Minimization Heights**: Hardcoding collapse height to standard titlebar bounds (`38px`) ensures clean minimization logic that overrides user-resized bounds.
+
+## Session: 2026-06-27 (Part 9)
+- **Task**: Right-click Pad DeltaVi Synth Direct Recording Action.
+- **Jimmy's Preferences**:
+  - **Quick Recording Actions**: Being able to right-click a performance pad and directly arm/set the DeltaVi synthesizer as the record source for that specific pad significantly speeds up performance capture.
+  - **Synchronous Ref & State Alignment**: Updating mutable refs synchronously in the event handler and scheduling the arming trigger (`armLooperInput`) via a short timeout ensures React state updates (like target pad and mode changes) have fully resolved.
+
