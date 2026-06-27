@@ -3062,6 +3062,7 @@ export default function Delta7Synth() {
         updatedSlot = {
           ...slot,
           name: `Live Loop (${liveRecBeatsRef.current}b)`,
+          originalBuffer: finalBuffer,
           buffer: finalBuffer,
           rawBuffer: finalRawBuffer,
           liveRecTotalSamples: targetLength,
@@ -3073,7 +3074,8 @@ export default function Delta7Synth() {
           loopOn: true,
           warpOn: true,
           warpBeats: liveRecBeatsRef.current,
-          isRecorded: true
+          isRecorded: true,
+          nudgeMs: 0
         };
         return updatedSlot;
       }
@@ -4338,12 +4340,14 @@ export default function Delta7Synth() {
         return {
           ...slot,
           name: name.slice(0, 24),
+          originalBuffer: buffer,
           buffer: buffer,
           revBuffer: buffer ? getReversedBuffer(ctx, buffer) : null,
           start: 0.0,
           end: 1.0,
           loopStart: 0.0,
-          loopEnd: 1.0
+          loopEnd: 1.0,
+          nudgeMs: 0
         };
       }
       return slot;
@@ -4709,8 +4713,11 @@ export default function Delta7Synth() {
             const arrayBuffer = await sampleFile.arrayBuffer();
             
             const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
-            updatedSlot.buffer = decodedBuffer;
-            updatedSlot.revBuffer = getReversedBuffer(ctx, decodedBuffer);
+            const nudge = metadata.nudgeMs || 0;
+            const shiftedBuffer = nudge !== 0 ? getCircularShiftedBuffer(ctx, decodedBuffer, nudge) : decodedBuffer;
+            updatedSlot.originalBuffer = decodedBuffer;
+            updatedSlot.buffer = shiftedBuffer;
+            updatedSlot.revBuffer = getReversedBuffer(ctx, shiftedBuffer);
             
             await saveSampleToDb(updatedSlot);
           } catch (err) {
@@ -5169,11 +5176,14 @@ export default function Delta7Synth() {
               for (let c = 0; c < numChannels; c++) {
                 buffer.getChannelData(c).set(saved.channels[c]);
               }
+              const nudge = saved.nudgeMs ?? slot.nudgeMs ?? 0;
+              const shifted = nudge !== 0 ? getCircularShiftedBuffer(ctx, buffer, nudge) : buffer;
               return {
                 ...slot,
-                nudgeMs: saved.nudgeMs ?? slot.nudgeMs,
-                buffer: buffer,
-                revBuffer: getReversedBuffer(ctx, buffer)
+                nudgeMs: nudge,
+                originalBuffer: buffer,
+                buffer: shifted,
+                revBuffer: getReversedBuffer(ctx, shifted)
               };
             } catch (err) {
               console.error(`Error reconstructing buffer for slot ${slot.id}:`, err);
@@ -5806,7 +5816,20 @@ export default function Delta7Synth() {
   const updateSlotParam = (slotId, param, val) => {
     const nextSlots = sampleSlotsRef.current.map(s => {
       if (s.id === slotId) {
-        return { ...s, [param]: val };
+        let updatedSlot = { ...s, [param]: val };
+        if (param === 'nudgeMs') {
+          const pristine = s.originalBuffer || s.buffer;
+          if (pristine) {
+            const ctx = audioCtxRef.current;
+            if (ctx) {
+              const shifted = getCircularShiftedBuffer(ctx, pristine, val);
+              updatedSlot.originalBuffer = pristine;
+              updatedSlot.buffer = shifted;
+              updatedSlot.revBuffer = getReversedBuffer(ctx, shifted);
+            }
+          }
+        }
+        return updatedSlot;
       }
       return s;
     });
@@ -5819,7 +5842,20 @@ export default function Delta7Synth() {
   const updateSlotParamInMemory = (slotId, param, val) => {
     const nextSlots = sampleSlotsRef.current.map(s => {
       if (s.id === slotId) {
-        return { ...s, [param]: val };
+        let updatedSlot = { ...s, [param]: val };
+        if (param === 'nudgeMs') {
+          const pristine = s.originalBuffer || s.buffer;
+          if (pristine) {
+            const ctx = audioCtxRef.current;
+            if (ctx) {
+              const shifted = getCircularShiftedBuffer(ctx, pristine, val);
+              updatedSlot.originalBuffer = pristine;
+              updatedSlot.buffer = shifted;
+              updatedSlot.revBuffer = getReversedBuffer(ctx, shifted);
+            }
+          }
+        }
+        return updatedSlot;
       }
       return s;
     });
@@ -8461,6 +8497,33 @@ export default function Delta7Synth() {
     return reversed;
   };
 
+  const getCircularShiftedBuffer = (ctx, originalBuffer, nudgeMs) => {
+    if (!originalBuffer) return null;
+    if (!nudgeMs) return originalBuffer;
+
+    const sampleRate = originalBuffer.sampleRate;
+    const length = originalBuffer.length;
+    const numChannels = originalBuffer.numberOfChannels;
+    
+    let shiftSamples = Math.round((nudgeMs / 1000) * sampleRate);
+    shiftSamples = ((shiftSamples % length) + length) % length;
+    if (shiftSamples === 0) return originalBuffer;
+
+    const shiftedBuffer = ctx.createBuffer(numChannels, length, sampleRate);
+    
+    for (let ch = 0; ch < numChannels; ch++) {
+      const srcData = originalBuffer.getChannelData(ch);
+      const destData = shiftedBuffer.getChannelData(ch);
+      
+      destData.set(srcData.subarray(shiftSamples), 0);
+      destData.set(srcData.subarray(0, shiftSamples), length - shiftSamples);
+    }
+    
+    return shiftedBuffer;
+  };
+
+
+
   const loadKitPreset = async (kitType, bankType) => {
     if (!audioCtxRef.current) {
       initAudio();
@@ -8481,6 +8544,7 @@ export default function Delta7Synth() {
             return {
               ...slot,
               name: item.name,
+              originalBuffer: item.buffer,
               buffer: item.buffer,
               revBuffer: getReversedBuffer(ctx, item.buffer),
               start: 0.0,
@@ -8489,6 +8553,7 @@ export default function Delta7Synth() {
               loopEnd: 1.0,
               loopOn: false,
               reverseOn: false,
+              nudgeMs: 0,
               sliceCount: 16,
               sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false }))
             };
@@ -10141,7 +10206,7 @@ export default function Delta7Synth() {
           loopEndSec = slotA.loopEnd * bufferA.duration;
         }
 
-        const nudgeSecA = (slotA.nudgeMs || 0) / 1000;
+        const nudgeSecA = 0;
         if (!isSliceA) {
           startOffsetSec = Math.max(0, Math.min(bufferA.duration, startOffsetSec + nudgeSecA));
           loopStartSec = Math.max(0, Math.min(bufferA.duration, loopStartSec + nudgeSecA));
@@ -10234,7 +10299,7 @@ export default function Delta7Synth() {
           loopEndSec = slotB.loopEnd * bufferB.duration;
         }
 
-        const nudgeSecB = (slotB.nudgeMs || 0) / 1000;
+        const nudgeSecB = 0;
         if (!isSliceB) {
           startOffsetSec = Math.max(0, Math.min(bufferB.duration, startOffsetSec + nudgeSecB));
           loopStartSec = Math.max(0, Math.min(bufferB.duration, loopStartSec + nudgeSecB));
@@ -10318,8 +10383,7 @@ export default function Delta7Synth() {
           isLoopA = true;
         }
 
-        const isPlayback = prog.isPlaybackTrigger || false;
-        const nudgeSecA = isPlayback ? 0 : ((slotA.nudgeMs || 0) / 1000);
+        const nudgeSecA = 0;
         if (!isSliceGranular) {
           startOffsetA = Math.max(0, Math.min(bufferA.duration, startOffsetA + nudgeSecA));
           endOffsetA = Math.max(0, Math.min(bufferA.duration, endOffsetA + nudgeSecA));
@@ -10693,8 +10757,7 @@ export default function Delta7Synth() {
           isLoopB = !!slotB.loopOn;
         }
 
-        const isPlayback = prog.isPlaybackTrigger || false;
-        const nudgeSecB = isPlayback ? 0 : ((slotB.nudgeMs || 0) / 1000);
+        const nudgeSecB = 0;
         startOffsetB = Math.max(0, Math.min(bufferB.duration, startOffsetB + nudgeSecB));
         endOffsetB = Math.max(0, Math.min(bufferB.duration, endOffsetB + nudgeSecB));
 
@@ -11221,8 +11284,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         durationToPlayA = (slotA.end - slotA.start) * bufferA.duration;
       }
 
-      const isPlayback = prog.isPlaybackTrigger || false;
-      const nudgeSecA = isPlayback ? 0 : ((slotA.nudgeMs || 0) / 1000);
+      const nudgeSecA = 0;
       let finalStartOffsetA = Math.max(0, Math.min(bufferA.duration, startOffsetA + nudgeSecA));
       let finalDurationA = durationToPlayA;
 
@@ -11266,8 +11328,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         durationToPlayB = (slotB.end - slotB.start) * bufferB.duration;
       }
 
-      const isPlayback = prog.isPlaybackTrigger || false;
-      const nudgeSecB = isPlayback ? 0 : ((slotB.nudgeMs || 0) / 1000);
+      const nudgeSecB = 0;
       let finalStartOffsetB = Math.max(0, Math.min(bufferB.duration, startOffsetB + nudgeSecB));
       let finalDurationB = durationToPlayB;
 
@@ -21221,12 +21282,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                                     return {
                                       ...slot,
                                       name: file.name.slice(0, 20),
+                                      originalBuffer: buffer,
                                       buffer: buffer,
                                       revBuffer: getReversedBuffer(ctx, buffer),
                                       start: 0.0,
                                       end: 1.0,
                                       loopStart: 0.0,
-                                      loopEnd: 1.0
+                                      loopEnd: 1.0,
+                                      nudgeMs: 0
                                     };
                                   }
                                   return slot;
