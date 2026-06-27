@@ -1205,6 +1205,8 @@ export default function Delta7Synth() {
   const ringDotsRefB = useRef([]);
   const ringsContainerRefA = useRef(null);
   const ringsContainerRefB = useRef(null);
+  const hoveredRingRefA = useRef(-1);
+  const hoveredRingRefB = useRef(-1);
 
   useEffect(() => {
     const createRings = (container, tracksRef, dotsRef) => {
@@ -1279,8 +1281,10 @@ export default function Delta7Synth() {
   const [deckBLoopSize, setDeckBLoopSize] = useState(4);
   const [deckALoopActive, setDeckALoopActive] = useState(false);
   const [deckBLoopActive, setDeckBLoopActive] = useState(false);
-  const [deckAKeyLock, setDeckAKeyLock] = useState(true);
-  const [deckBKeyLock, setDeckBKeyLock] = useState(true);
+  const [deckAKeyLock, setDeckAKeyLock] = useState(false);
+  const [deckBKeyLock, setDeckBKeyLock] = useState(false);
+  const [deckAStretch, setDeckAStretch] = useState(1.0);
+  const [deckBStretch, setDeckBStretch] = useState(1.0);
 
   // deckAPlaying/deckBPlaying are now ref-only — sync effects removed
   useEffect(() => { crossfaderValRef.current = crossfaderVal; }, [crossfaderVal]);
@@ -1651,6 +1655,15 @@ export default function Delta7Synth() {
   const deckBPitchRef = useRef(0.0);
   useEffect(() => { deckAPitchRef.current = deckAPitch; }, [deckAPitch]);
   useEffect(() => { deckBPitchRef.current = deckBPitch; }, [deckBPitch]);
+
+  const deckAKeyLockRef = useRef(false);
+  const deckBKeyLockRef = useRef(false);
+  const deckAStretchRef = useRef(1.0);
+  const deckBStretchRef = useRef(1.0);
+  useEffect(() => { deckAKeyLockRef.current = deckAKeyLock; }, [deckAKeyLock]);
+  useEffect(() => { deckBKeyLockRef.current = deckBKeyLock; }, [deckBKeyLock]);
+  useEffect(() => { deckAStretchRef.current = deckAStretch; }, [deckAStretch]);
+  useEffect(() => { deckBStretchRef.current = deckBStretch; }, [deckBStretch]);
 
   const perfEventsRef = useRef([]);
   useEffect(() => {
@@ -2181,7 +2194,16 @@ export default function Delta7Synth() {
           
           if (trackA) {
             trackA.style.transform = `translate3d(0, 0, 0) rotate(${angleA}deg) scale(${ringPulsesRefA.current[i]})`;
-            trackA.style.opacity = isActiveA ? '0.9' : '0.18';
+            const isHoveredA = hoveredRingRefA.current === i;
+            if (isHoveredA) {
+              trackA.style.opacity = '1.0';
+              trackA.style.borderWidth = '2.5px';
+              trackA.style.boxShadow = `0 0 12px ${ringColors[i]}, inset 0 0 6px ${ringColors[i]}`;
+            } else {
+              trackA.style.opacity = isActiveA ? '0.9' : '0.18';
+              trackA.style.borderWidth = '1.8px';
+              trackA.style.boxShadow = 'none';
+            }
           }
           if (dotA) {
             dotA.style.opacity = isActiveA ? '1' : '0';
@@ -2202,7 +2224,16 @@ export default function Delta7Synth() {
           
           if (trackB) {
             trackB.style.transform = `translate3d(0, 0, 0) rotate(${angleB}deg) scale(${ringPulsesRefB.current[i]})`;
-            trackB.style.opacity = isActiveB ? '0.9' : '0.18';
+            const isHoveredB = hoveredRingRefB.current === i;
+            if (isHoveredB) {
+              trackB.style.opacity = '1.0';
+              trackB.style.borderWidth = '2.5px';
+              trackB.style.boxShadow = `0 0 12px ${ringColors[i]}, inset 0 0 6px ${ringColors[i]}`;
+            } else {
+              trackB.style.opacity = isActiveB ? '0.9' : '0.18';
+              trackB.style.borderWidth = '1.8px';
+              trackB.style.boxShadow = 'none';
+            }
           }
           if (dotB) {
             dotB.style.opacity = isActiveB ? '1' : '0';
@@ -3123,6 +3154,60 @@ export default function Delta7Synth() {
       }
     }
   };
+
+  const handleRingsMouseMove = (deck, e) => {
+    const container = deck === 'A' ? ringsContainerRefA.current : ringsContainerRefB.current;
+    if (!container) return;
+    
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const dx = x - 125;
+    const dy = y - 125;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    const radii = [115, 106, 97, 88, 79, 70, 61, 52];
+    let closestIdx = -1;
+    let minDiff = Infinity;
+    for (let i = 0; i < radii.length; i++) {
+      const diff = Math.abs(dist - radii[i]);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestIdx = i;
+      }
+    }
+    
+    const bankOffset = deck === 'A' ? 0 : 8;
+    const slots = sampleSlotsRef.current || sampleSlots;
+    
+    if (closestIdx !== -1 && minDiff < 7) {
+      const slot = slots[bankOffset + closestIdx];
+      if (slot && slot.buffer) {
+        if (deck === 'A') {
+          hoveredRingRefA.current = closestIdx;
+        } else {
+          hoveredRingRefB.current = closestIdx;
+        }
+        return;
+      }
+    }
+    
+    if (deck === 'A') {
+      hoveredRingRefA.current = -1;
+    } else {
+      hoveredRingRefB.current = -1;
+    }
+  };
+
+  const handleRingsMouseLeave = (deck) => {
+    if (deck === 'A') {
+      hoveredRingRefA.current = -1;
+    } else {
+      hoveredRingRefB.current = -1;
+    }
+  };
+
 
   const triggerSlotInSync = (slotId) => {
     const ctx = audioCtxRef.current;
@@ -8040,6 +8125,226 @@ export default function Delta7Synth() {
     }
     if (ctx !== audioCtxRef.current) return;
 
+    // --- Custom Sampler AudioWorklet ('sampler-processor') ---
+    const samplerCode = `
+      class SamplerProcessor extends AudioWorkletProcessor {
+        static get parameterDescriptors() {
+          return [
+            {
+              name: 'detune',
+              defaultValue: 0,
+              minValue: -12000,
+              maxValue: 12000
+            }
+          ];
+        }
+
+        constructor() {
+          super();
+          this.bufferL = null;
+          this.bufferR = null;
+          this.sampleRate = 44100;
+          this.playing = false;
+          
+          this.playbackPointer = 0;
+          this.isLoop = false;
+          this.loopStart = 0;
+          this.loopEnd = 0;
+          this.keyLock = false;
+          this.playbackRate = 1.0;
+          this.stretchFactor = 1.0;
+          
+          this.grains = [
+            { active: false, startOffset: 0, progress: 0, length: 0 },
+            { active: false, startOffset: 0, progress: 0, length: 0 },
+            { active: false, startOffset: 0, progress: 0, length: 0 },
+            { active: false, startOffset: 0, progress: 0, length: 0 }
+          ];
+          this.nextGrainIndex = 0;
+          this.grainTimer = 99999;
+          
+          this.port.onmessage = (e) => {
+            const msg = e.data;
+            if (msg.type === 'loadBuffer') {
+              this.bufferL = msg.leftChannel;
+              this.bufferR = msg.rightChannel;
+              this.sampleRate = msg.sampleRate || 44100;
+            } else if (msg.type === 'trigger') {
+              this.playbackPointer = (msg.startOffset || 0) * this.sampleRate;
+              this.loopStart = (msg.loopStart || 0) * this.sampleRate;
+              this.loopEnd = (msg.loopEnd || 0) * this.sampleRate;
+              this.isLoop = !!msg.isLoop;
+              this.keyLock = !!msg.keyLock;
+              this.playbackRate = msg.playbackRate !== undefined ? msg.playbackRate : 1.0;
+              this.stretchFactor = msg.stretchFactor !== undefined ? msg.stretchFactor : 1.0;
+              this.playing = true;
+              
+              for (let i = 0; i < 4; i++) {
+                this.grains[i].active = false;
+              }
+              this.grainTimer = 99999;
+              this.nextGrainIndex = 0;
+            } else if (msg.type === 'setParams') {
+              if (msg.playbackRate !== undefined) this.playbackRate = msg.playbackRate;
+              if (msg.stretchFactor !== undefined) this.stretchFactor = msg.stretchFactor;
+              if (msg.keyLock !== undefined) this.keyLock = msg.keyLock;
+            } else if (msg.type === 'STOP') {
+              this.playing = false;
+            }
+          };
+        }
+
+        process(inputs, outputs, parameters) {
+          if (!this.playing || !this.bufferL) {
+            return true;
+          }
+
+          const output = outputs[0];
+          const outL = output[0];
+          const outR = output[1] || output[0];
+          const numFrames = outL.length;
+          const bufferLength = this.bufferL.length;
+          const detuneValues = parameters.detune;
+          const isDetuneConstant = !detuneValues || detuneValues.length === 1;
+
+          for (let i = 0; i < numFrames; i++) {
+            if (!this.playing) {
+              outL[i] = 0;
+              outR[i] = 0;
+              continue;
+            }
+
+            const currentDetune = isDetuneConstant ? (detuneValues ? detuneValues[0] : 0) : detuneValues[i];
+            const detuneFactor = Math.pow(2, currentDetune / 1200);
+            const effectivePlaybackRate = this.playbackRate * detuneFactor;
+
+            if (!this.keyLock) {
+              // --- Coupled variable-speed sampler ---
+              const pointer = this.playbackPointer;
+              if (pointer < 0 || pointer >= bufferLength) {
+                if (this.isLoop) {
+                  const loopLen = this.loopEnd - this.loopStart;
+                  if (loopLen > 0) {
+                    this.playbackPointer = this.loopStart + ((pointer - this.loopStart) % loopLen);
+                    if (this.playbackPointer < this.loopStart) this.playbackPointer += loopLen;
+                  } else {
+                    this.playing = false;
+                    outL[i] = 0;
+                    outR[i] = 0;
+                    continue;
+                  }
+                } else {
+                  this.playing = false;
+                  outL[i] = 0;
+                  outR[i] = 0;
+                  continue;
+                }
+              }
+
+              const idx = Math.floor(this.playbackPointer);
+              const frac = this.playbackPointer - idx;
+              const nextIdx = (idx + 1 < bufferLength) ? idx + 1 : (this.isLoop ? Math.floor(this.loopStart) : idx);
+
+              if (idx >= 0 && idx < bufferLength) {
+                outL[i] = this.bufferL[idx] * (1 - frac) + (this.bufferL[nextIdx] || 0) * frac;
+                if (this.bufferR) {
+                  outR[i] = this.bufferR[idx] * (1 - frac) + (this.bufferR[nextIdx] || 0) * frac;
+                } else {
+                  outR[i] = outL[i];
+                }
+              } else {
+                outL[i] = 0;
+                outR[i] = 0;
+              }
+
+              this.playbackPointer += effectivePlaybackRate;
+            } else {
+              // --- Decoupled Granular Key-Lock & Time Stretcher ---
+              const grainSizeSamples = Math.floor(0.12 * this.sampleRate);
+              const grainSpacing = Math.floor(grainSizeSamples / 4);
+
+              if (this.grainTimer >= grainSpacing) {
+                this.grainTimer = 0;
+                const g = this.grains[this.nextGrainIndex];
+                g.active = true;
+                g.startOffset = this.playbackPointer;
+                g.progress = 0;
+                g.length = grainSizeSamples;
+                this.nextGrainIndex = (this.nextGrainIndex + 1) % 4;
+              }
+              this.grainTimer++;
+
+              let sumL = 0;
+              let sumR = 0;
+
+              for (let gIdx = 0; gIdx < 4; gIdx++) {
+                const g = this.grains[gIdx];
+                if (!g.active) continue;
+
+                const grainReadPointer = g.startOffset + g.progress * effectivePlaybackRate;
+
+                if (grainReadPointer >= 0 && grainReadPointer < bufferLength - 1) {
+                  const idx = Math.floor(grainReadPointer);
+                  const frac = grainReadPointer - idx;
+                  const sL = this.bufferL[idx] * (1 - frac) + this.bufferL[idx + 1] * frac;
+                  const sR = this.bufferR ? (this.bufferR[idx] * (1 - frac) + this.bufferR[idx + 1] * frac) : sL;
+
+                  // Hann Window
+                  const x = g.progress / g.length;
+                  const window = Math.sin(Math.PI * x);
+                  const env = window * window;
+
+                  sumL += sL * env;
+                  sumR += sR * env;
+                }
+
+                g.progress += 1;
+                if (g.progress >= g.length) {
+                  g.active = false;
+                }
+              }
+
+              outL[i] = sumL;
+              outR[i] = sumR;
+
+              this.playbackPointer += this.stretchFactor;
+
+              const pointer = this.playbackPointer;
+              if (pointer < 0 || pointer >= bufferLength) {
+                if (this.isLoop) {
+                  const loopLen = this.loopEnd - this.loopStart;
+                  if (loopLen > 0) {
+                    this.playbackPointer = this.loopStart + ((pointer - this.loopStart) % loopLen);
+                    if (this.playbackPointer < this.loopStart) this.playbackPointer += loopLen;
+                  } else {
+                    this.playing = false;
+                  }
+                } else {
+                  this.playing = false;
+                }
+              }
+            }
+          }
+
+          return true;
+        }
+      }
+      registerProcessor('sampler-processor', SamplerProcessor);
+    `;
+
+    const samplerBlob = new Blob([samplerCode], { type: 'application/javascript' });
+    const samplerBlobUrl = URL.createObjectURL(samplerBlob);
+    try {
+      await ctx.audioWorklet.addModule(samplerBlobUrl);
+      if (ctx !== audioCtxRef.current) return;
+      console.log('Loaded sampler-processor AudioWorklet successfully.');
+    } catch (err) {
+      console.warn("Failed to load Sampler AudioWorklet module:", err);
+    } finally {
+      URL.revokeObjectURL(samplerBlobUrl);
+    }
+    if (ctx !== audioCtxRef.current) return;
+
     // Parallel Glue Compressor
     const masterGlueCompressor = ctx.createDynamicsCompressor();
     masterGlueCompressor.threshold.setValueAtTime(-18, now);
@@ -9754,7 +10059,192 @@ export default function Delta7Synth() {
     const isWarpedGranularA = !!(slotA && bufferA && (slotA.warpOn || masterSyncActiveRef.current) && (slotA.tuning || 0) !== 0 && prog.oscATriggerMode !== 'slice');
     const isWarpedGranularB = !!(slotB && bufferB && (slotB.warpOn || masterSyncActiveRef.current) && (slotB.tuning || 0) !== 0 && prog.oscBTriggerMode !== 'slice');
 
-    if (prog.granularActive || (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0 && bufferA) || isWarpedGranularA) {
+    const isDeckPerfVoice = voiceKey && typeof voiceKey === 'string' && (voiceKey.startsWith('perf-a') || voiceKey.startsWith('perf-b'));
+
+    if (isDeckPerfVoice) {
+      // --- Performance Deck Sampler with custom AudioWorklet 'sampler-processor' ---
+      // OSC A
+      if (bufferA) {
+        const workletNode = new AudioWorkletNode(ctx, 'sampler-processor');
+        workletNode._isSamplerWorklet = true;
+        
+        const leftData = bufferA.getChannelData(0);
+        const rightData = bufferA.numberOfChannels > 1 ? bufferA.getChannelData(1) : leftData;
+        
+        workletNode.port.postMessage({
+          type: 'loadBuffer',
+          leftChannel: leftData,
+          rightChannel: rightData,
+          sampleRate: bufferA.sampleRate
+        });
+
+        const detuneParam = workletNode.parameters.get('detune');
+        if (vibratoLfoGain) vibratoLfoGain.connect(detuneParam);
+        driftGain.connect(detuneParam);
+
+        let startOffsetSec = 0;
+        let loopStartSec = 0;
+        let loopEndSec = bufferA.duration;
+
+        const isSliceA = prog.oscATriggerMode === 'slice';
+        if (isSliceA) {
+          startOffsetSec = sliceStartOffsetAPrecalc;
+          if (sliceSustainA) {
+            loopEndSec = sliceStartOffsetAPrecalc + sliceDurationAPrecalc;
+            loopStartSec = loopEndSec - Math.min(0.05, sliceDurationAPrecalc * 0.2);
+          } else {
+            loopStartSec = sliceStartOffsetAPrecalc;
+            loopEndSec = loopStartSec + sliceDurationAPrecalc;
+          }
+        } else {
+          startOffsetSec = slotA.start * bufferA.duration;
+          loopStartSec = slotA.loopStart * bufferA.duration;
+          loopEndSec = slotA.loopEnd * bufferA.duration;
+        }
+
+        const nudgeSecA = (slotA.nudgeMs || 0) / 1000;
+        if (!isSliceA) {
+          startOffsetSec = Math.max(0, Math.min(bufferA.duration, startOffsetSec + nudgeSecA));
+          loopStartSec = Math.max(0, Math.min(bufferA.duration, loopStartSec + nudgeSecA));
+          loopEndSec = Math.max(0, Math.min(bufferA.duration, loopEndSec + nudgeSecA));
+        }
+
+        const isVoiceA = voiceKey.includes('perf-a');
+        const keyLock = isVoiceA ? deckAKeyLockRef.current : deckBKeyLockRef.current;
+        const stretch = isVoiceA ? deckAStretchRef.current : deckBStretchRef.current;
+
+        const finalPlaybackRate = keyLock 
+          ? (notePitchFactorA * pitchFactorA) 
+          : (notePitchFactorA * pitchFactorA * (voiceObj.warpFactorA || 1.0));
+        const finalStretchFactor = keyLock 
+          ? (stretch * (voiceObj.warpFactorA || 1.0)) 
+          : 1.0;
+
+        workletNode.port.postMessage({
+          type: 'trigger',
+          startOffset: startOffsetSec,
+          loopStart: loopStartSec,
+          loopEnd: loopEndSec,
+          isLoop: isLoopA,
+          keyLock: keyLock,
+          playbackRate: finalPlaybackRate * tapeStopFactorRef.current,
+          stretchFactor: finalStretchFactor
+        });
+
+        workletNode.connect(gainA);
+        
+        workletNode.stop = () => {
+          try {
+            workletNode.port.postMessage({ type: 'STOP' });
+          } catch (e) {}
+        };
+
+        oscA = workletNode;
+
+        const panner = ctx.createStereoPanner();
+        panner.pan.setValueAtTime(prog.oscAPan || 0, now);
+        gainA.connect(panner);
+        panner.connect(filter1);
+
+        voiceObj.origLoopStartA = loopStartSec;
+        voiceObj.origLoopEndA = loopEndSec;
+        voiceObj.isLoopA = isLoopA;
+      }
+
+      // OSC B
+      if (prog.oscMode === 'double' && bufferB) {
+        gainB = ctx.createGain();
+        gainB.gain.value = 0;
+        gainB.gain.setValueAtTime(0, now);
+
+        const workletNode = new AudioWorkletNode(ctx, 'sampler-processor');
+        workletNode._isSamplerWorklet = true;
+        
+        const leftData = bufferB.getChannelData(0);
+        const rightData = bufferB.numberOfChannels > 1 ? bufferB.getChannelData(1) : leftData;
+        
+        workletNode.port.postMessage({
+          type: 'loadBuffer',
+          leftChannel: leftData,
+          rightChannel: rightData,
+          sampleRate: bufferB.sampleRate
+        });
+
+        const detuneParam = workletNode.parameters.get('detune');
+        if (vibratoLfoGain) vibratoLfoGain.connect(detuneParam);
+        driftGain.connect(detuneParam);
+
+        let startOffsetSec = 0;
+        let loopStartSec = 0;
+        let loopEndSec = bufferB.duration;
+
+        const isSliceB = prog.oscBTriggerMode === 'slice';
+        if (isSliceB) {
+          startOffsetSec = sliceStartOffsetBPrecalc;
+          if (sliceSustainB) {
+            loopEndSec = sliceStartOffsetBPrecalc + sliceDurationBPrecalc;
+            loopStartSec = loopEndSec - Math.min(0.05, sliceDurationBPrecalc * 0.2);
+          } else {
+            loopStartSec = sliceStartOffsetBPrecalc;
+            loopEndSec = loopStartSec + sliceDurationBPrecalc;
+          }
+        } else {
+          startOffsetSec = slotB.start * bufferB.duration;
+          loopStartSec = slotB.loopStart * bufferB.duration;
+          loopEndSec = slotB.loopEnd * bufferB.duration;
+        }
+
+        const nudgeSecB = (slotB.nudgeMs || 0) / 1000;
+        if (!isSliceB) {
+          startOffsetSec = Math.max(0, Math.min(bufferB.duration, startOffsetSec + nudgeSecB));
+          loopStartSec = Math.max(0, Math.min(bufferB.duration, loopStartSec + nudgeSecB));
+          loopEndSec = Math.max(0, Math.min(bufferB.duration, loopEndSec + nudgeSecB));
+        }
+
+        const isVoiceA = voiceKey.includes('perf-a');
+        const keyLock = isVoiceA ? deckAKeyLockRef.current : deckBKeyLockRef.current;
+        const stretch = isVoiceA ? deckAStretchRef.current : deckBStretchRef.current;
+
+        const finalPlaybackRate = keyLock 
+          ? (notePitchFactorB * pitchFactorB) 
+          : (notePitchFactorB * pitchFactorB * (voiceObj.warpFactorB || 1.0));
+        const finalStretchFactor = keyLock 
+          ? (stretch * (voiceObj.warpFactorB || 1.0)) 
+          : 1.0;
+
+        workletNode.port.postMessage({
+          type: 'trigger',
+          startOffset: startOffsetSec,
+          loopStart: loopStartSec,
+          loopEnd: loopEndSec,
+          isLoop: isLoopB,
+          keyLock: keyLock,
+          playbackRate: finalPlaybackRate * tapeStopFactorRef.current,
+          stretchFactor: finalStretchFactor
+        });
+
+        workletNode.connect(gainB);
+        
+        workletNode.stop = () => {
+          try {
+            workletNode.port.postMessage({ type: 'STOP' });
+          } catch (e) {}
+        };
+
+        oscB = workletNode;
+
+        const pannerB = ctx.createStereoPanner();
+        pannerB.pan.setValueAtTime(prog.oscBPan || 0, now);
+        gainB.connect(pannerB);
+        pannerB.connect(filter1);
+
+        voiceObj.origLoopStartB = loopStartSec;
+        voiceObj.origLoopEndB = loopEndSec;
+        voiceObj.isLoopB = isLoopB;
+      }
+    } else {
+      // --- Existing Synth/Keyboard triggers (Bank C) ---
+      if (prog.granularActive || (prog.oscATriggerMode === 'slice' && sliceStretchA !== 0 && bufferA) || isWarpedGranularA) {
       // --- Granular Synthesis Engine ---
       if (bufferA) {
         
@@ -10356,6 +10846,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
 
 
+    }
     const voiceOutGain = ctx.createGain();
     let initialVolume = 1.0;
     if (voiceKey && typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
@@ -13201,11 +13692,25 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         if (voice.routeToXyPad === false) return;
         ['oscA', 'oscA_L', 'oscA_R', 'oscB', 'oscB_L', 'oscB_R'].forEach(key => {
           const node = voice[key];
-          if (node && node.playbackRate) {
-            if (voice[`orig_${key}_rate`] === undefined) {
-              voice[`orig_${key}_rate`] = node.playbackRate.value;
+          if (node) {
+            if (node._isSamplerWorklet) {
+              const isOscA = key.includes('oscA');
+              const baseRate = isOscA ? voice.base_oscA_rate : voice.base_oscB_rate;
+              const pitchFactor = isOscA ? voice.pitchFactorA : voice.pitchFactorB;
+              if (voice[`orig_${key}_rate`] === undefined) {
+                voice[`orig_${key}_rate`] = (baseRate || 1.0) * (pitchFactor || 1.0);
+              }
+              const finalRate = voice[`orig_${key}_rate`] * stopAmt;
+              node.port.postMessage({
+                type: 'setParams',
+                playbackRate: finalRate
+              });
+            } else if (node.playbackRate) {
+              if (voice[`orig_${key}_rate`] === undefined) {
+                voice[`orig_${key}_rate`] = node.playbackRate.value;
+              }
+              node.playbackRate.setTargetAtTime(voice[`orig_${key}_rate`] * stopAmt, now, 0.06);
             }
-            node.playbackRate.setTargetAtTime(voice[`orig_${key}_rate`] * stopAmt, now, 0.06);
           }
         });
         ['oscA', 'oscB'].forEach(key => {
@@ -13605,9 +14110,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             
             const oscs = [voice.oscA, voice.oscA_L, voice.oscA_R].filter(Boolean);
             oscs.forEach(osc => {
-              osc.playbackRate.cancelScheduledValues(now);
-              osc.playbackRate.setValueAtTime(osc.playbackRate.value, now);
-              osc.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
+              if (osc._isSamplerWorklet) {
+                osc.port.postMessage({
+                  type: 'setParams',
+                  playbackRate: finalRate
+                });
+              } else if (osc.playbackRate) {
+                osc.playbackRate.cancelScheduledValues(now);
+                osc.playbackRate.setValueAtTime(osc.playbackRate.value, now);
+                osc.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
+              }
             });
           } else {
             const baseRate = voice.base_oscB_rate || 1.0;
@@ -13619,15 +14131,68 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             
             const oscs = [voice.oscB, voice.oscB_L, voice.oscB_R].filter(Boolean);
             oscs.forEach(osc => {
-              osc.playbackRate.cancelScheduledValues(now);
-              osc.playbackRate.setValueAtTime(osc.playbackRate.value, now);
-              osc.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
+              if (osc._isSamplerWorklet) {
+                osc.port.postMessage({
+                  type: 'setParams',
+                  playbackRate: finalRate
+                });
+              } else if (osc.playbackRate) {
+                osc.playbackRate.cancelScheduledValues(now);
+                osc.playbackRate.setValueAtTime(osc.playbackRate.value, now);
+                osc.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
+              }
             });
           }
         });
       }
     });
   }, [deckAPitch, deckBPitch]);
+
+  // Update keyLock and stretchFactor of active performance voices in real-time
+  useEffect(() => {
+    if (!audioCtxRef.current) return;
+    activeVoicesRef.current.forEach((vList, voiceKey) => {
+      if (typeof voiceKey === 'string' && voiceKey.startsWith('perf-')) {
+        const isVoiceA = voiceKey.includes('perf-a');
+        const keyLock = isVoiceA ? deckAKeyLock : deckBKeyLock;
+        const stretch = isVoiceA ? deckAStretch : deckBStretch;
+
+        const list = Array.isArray(vList) ? vList : [vList];
+        list.forEach(voice => {
+          if (voice.oscA && voice.oscA._isSamplerWorklet) {
+            const finalPlaybackRate = keyLock 
+              ? (voice.notePitchFactorA * voice.pitchFactorA) 
+              : (voice.notePitchFactorA * voice.pitchFactorA * (voice.warpFactorA || 1.0));
+            const finalStretchFactor = keyLock 
+              ? (stretch * (voice.warpFactorA || 1.0)) 
+              : 1.0;
+            
+            voice.oscA.port.postMessage({
+              type: 'setParams',
+              keyLock,
+              playbackRate: finalPlaybackRate,
+              stretchFactor: finalStretchFactor
+            });
+          }
+          if (voice.oscB && voice.oscB._isSamplerWorklet) {
+            const finalPlaybackRate = keyLock 
+              ? (voice.notePitchFactorB * voice.pitchFactorB) 
+              : (voice.notePitchFactorB * voice.pitchFactorB * (voice.warpFactorB || 1.0));
+            const finalStretchFactor = keyLock 
+              ? (stretch * (voice.warpFactorB || 1.0)) 
+              : 1.0;
+
+            voice.oscB.port.postMessage({
+              type: 'setParams',
+              keyLock,
+              playbackRate: finalPlaybackRate,
+              stretchFactor: finalStretchFactor
+            });
+          }
+        });
+      }
+    });
+  }, [deckAKeyLock, deckBKeyLock, deckAStretch, deckBStretch]);
 
   // MIDI Start (0xFA) / Stop (0xFC) on Arpeggiator On/Off state toggle
   const isMidiArpMountedRef = useRef(false);
@@ -15479,6 +16044,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 ref={ringsContainerRefA} 
                 style={{ position: 'absolute', top: 0, left: 0, width: '250px', height: '250px', pointerEvents: 'auto', cursor: 'pointer', zIndex: 3 }}
                 onClick={(e) => handlePlatterClick('A', e)}
+                onMouseMove={(e) => handleRingsMouseMove('A', e)}
+                onMouseLeave={() => handleRingsMouseLeave('A')}
               />
 
               {/* Central display Hub SVG (Stationary Overlay) */}
@@ -15558,6 +16125,95 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 <span style={{ fontSize: '0.3rem', opacity: 0.7, fontWeight: 'normal' }}>MOMENT</span>
                 <span>STUTTER</span>
               </button>
+            </div>
+
+            {/* Granular Time-Stretcher and Key-Lock Controls */}
+            <div className="deck-row" style={{ 
+              width: '100%', 
+              marginTop: '4px', 
+              marginBottom: '4px',
+              padding: '4px 6px', 
+              background: 'rgba(0,0,0,0.4)', 
+              borderRadius: '4px', 
+              border: '1px solid rgba(0, 243, 255, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '6px',
+              boxSizing: 'border-box'
+            }}>
+              {/* Key Lock Button */}
+              <button
+                className="deck-btn-xs"
+                onClick={() => {
+                  const nextLock = !deckAKeyLock;
+                  setDeckAKeyLock(nextLock);
+                  showEditorStatus(`Deck A Key Lock: ${nextLock ? 'ON' : 'OFF'} 🔒`);
+                }}
+                style={{
+                  fontSize: '0.45rem',
+                  padding: '2px 4px',
+                  height: '22px',
+                  background: deckAKeyLock ? '#00f3ff' : 'rgba(0, 243, 255, 0.05)',
+                  color: deckAKeyLock ? '#000' : '#00f3ff',
+                  border: '1px solid rgba(0, 243, 255, 0.3)',
+                  borderRadius: '2px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  boxShadow: deckAKeyLock ? '0 0 6px #00f3ff' : 'none',
+                  flexShrink: 0,
+                  transition: 'all 0.1s ease'
+                }}
+                title="Toggle Key Lock (Pitch Lock)"
+              >
+                KEY LOCK
+              </button>
+
+              {/* Pitch Fader */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexGrow: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.36rem', color: '#666', fontFamily: 'monospace' }}>
+                  <span>PITCH</span>
+                  <span style={{ color: '#00f3ff' }}>{deckAPitch > 0 ? `+${Math.round(deckAPitch)}` : Math.round(deckAPitch)}%</span>
+                </div>
+                <input 
+                  type="range" min="-100" max="100" step="1" 
+                  value={deckAPitch} 
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setDeckAPitch(val);
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '4px',
+                    margin: '3px 0',
+                    cursor: 'pointer',
+                    accentColor: '#00f3ff'
+                  }}
+                />
+              </div>
+
+              {/* Stretch Fader */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexGrow: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.36rem', color: '#666', fontFamily: 'monospace' }}>
+                  <span>STRETCH</span>
+                  <span style={{ color: '#00f3ff' }}>{deckAStretch.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" min="0.25" max="4.0" step="0.05" 
+                  value={deckAStretch} 
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setDeckAStretch(val);
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '4px',
+                    margin: '3px 0',
+                    cursor: 'pointer',
+                    accentColor: '#00f3ff'
+                  }}
+                />
+              </div>
             </div>
 
             {/* 2 Rows of 4 Pads (2x4 Grid) for Deck A */}
@@ -16658,6 +17314,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 ref={ringsContainerRefB} 
                 style={{ position: 'absolute', top: 0, left: 0, width: '250px', height: '250px', pointerEvents: 'auto', cursor: 'pointer', zIndex: 3 }}
                 onClick={(e) => handlePlatterClick('B', e)}
+                onMouseMove={(e) => handleRingsMouseMove('B', e)}
+                onMouseLeave={() => handleRingsMouseLeave('B')}
               />
 
               {/* Central display Hub SVG (Stationary Overlay) */}
@@ -16737,6 +17395,95 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 <span style={{ fontSize: '0.3rem', opacity: 0.7, fontWeight: 'normal' }}>MOMENT</span>
                 <span>STUTTER</span>
               </button>
+            </div>
+
+            {/* Granular Time-Stretcher and Key-Lock Controls */}
+            <div className="deck-row" style={{ 
+              width: '100%', 
+              marginTop: '4px', 
+              marginBottom: '4px',
+              padding: '4px 6px', 
+              background: 'rgba(0,0,0,0.4)', 
+              borderRadius: '4px', 
+              border: '1px solid rgba(255, 0, 255, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '6px',
+              boxSizing: 'border-box'
+            }}>
+              {/* Key Lock Button */}
+              <button
+                className="deck-btn-xs"
+                onClick={() => {
+                  const nextLock = !deckBKeyLock;
+                  setDeckBKeyLock(nextLock);
+                  showEditorStatus(`Deck B Key Lock: ${nextLock ? 'ON' : 'OFF'} 🔒`);
+                }}
+                style={{
+                  fontSize: '0.45rem',
+                  padding: '2px 4px',
+                  height: '22px',
+                  background: deckBKeyLock ? '#ff00ff' : 'rgba(255, 0, 255, 0.05)',
+                  color: deckBKeyLock ? '#000' : '#ff00ff',
+                  border: '1px solid rgba(255, 0, 255, 0.3)',
+                  borderRadius: '2px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  boxShadow: deckBKeyLock ? '0 0 6px #ff00ff' : 'none',
+                  flexShrink: 0,
+                  transition: 'all 0.1s ease'
+                }}
+                title="Toggle Key Lock (Pitch Lock)"
+              >
+                KEY LOCK
+              </button>
+
+              {/* Pitch Fader */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexGrow: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.36rem', color: '#666', fontFamily: 'monospace' }}>
+                  <span>PITCH</span>
+                  <span style={{ color: '#ff00ff' }}>{deckBPitch > 0 ? `+${Math.round(deckBPitch)}` : Math.round(deckBPitch)}%</span>
+                </div>
+                <input 
+                  type="range" min="-100" max="100" step="1" 
+                  value={deckBPitch} 
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setDeckBPitch(val);
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '4px',
+                    margin: '3px 0',
+                    cursor: 'pointer',
+                    accentColor: '#ff00ff'
+                  }}
+                />
+              </div>
+
+              {/* Stretch Fader */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexGrow: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.36rem', color: '#666', fontFamily: 'monospace' }}>
+                  <span>STRETCH</span>
+                  <span style={{ color: '#ff00ff' }}>{deckBStretch.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" min="0.25" max="4.0" step="0.05" 
+                  value={deckBStretch} 
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setDeckBStretch(val);
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '4px',
+                    margin: '3px 0',
+                    cursor: 'pointer',
+                    accentColor: '#ff00ff'
+                  }}
+                />
+              </div>
             </div>
 
             {/* 2 Rows of 4 Pads (2x4 Grid) for Deck B */}
@@ -17996,7 +18743,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span style={{ fontWeight: 'bold', letterSpacing: '0.5px' }}>ZOOM:</span>
               <input 
-                type="range" min="1.005" max="1.15" step="0.005"
+                type="range" min="1.005" max="1.21" step="0.005"
                 value={focusZoomScale}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);

@@ -192,8 +192,8 @@ export default function CircularAlignModal({
       const phY = centerY + 70 * Math.sin(phAngle);
       ctx.beginPath();
       ctx.arc(phX, phY, 4, 0, 2 * Math.PI);
-      ctx.fillStyle = '#00f3ff';
-      ctx.shadowColor = '#00f3ff';
+      ctx.fillStyle = padColor;
+      ctx.shadowColor = padColor;
       ctx.shadowBlur = 8;
       ctx.fill();
       ctx.shadowBlur = 0;
@@ -463,8 +463,8 @@ export default function CircularAlignModal({
 
         <div style={applySection}>
           <button 
-            className="action-btn glow-cyan" 
-            style={{ ...applyBtnStyle('#00f3ff'), fontSize: '0.75rem', padding: '10px' }} 
+            className="action-btn" 
+            style={{ ...applyBtnStyle(padColor), fontSize: '0.75rem', padding: '10px', boxShadow: `0 0 12px ${padColor}33` }} 
             onClick={() => {
               onUpdateNudge(offsetMs);
               handleClose();

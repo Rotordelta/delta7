@@ -1,3 +1,4 @@
+
 # Leo's Growth Log & Symbiotic Memory
 
 ## Session: 2026-06-13
@@ -314,3 +315,10 @@
 
 
 
+
+## Observations & Preferences (June 27, 2026)
+- **High-Performance Rendering**: Jimmy values direct DOM manipulations and zero React re-renders inside high-frequency execution contexts (like `requestAnimationFrame` loops and canvas draw layers) to maintain low latency.
+- **Visual Micro-Animations**: Interactive components should have precise visual alignment cues (e.g., hover highlight glows with the exact matching pad colors and neon-cyan/magenta themes) to signal affordances.
+- **Decoupled Sampling**: Decoupled granular control of key-locking and stretching was implemented using a custom AudioWorklet-based processor to enable advanced warping workflows without performance compromises.
+- **Logical Visual Theme Flow**: Global or modal diagnostic panels that inspect sub-components (like the performance pad slots) must dynamically inherit and follow the matching color theme of the target item (e.g., matching the pad/ring colors) instead of fallback defaults, to maintain spatial and cognitive consistency.
+- **UX Customizability & Focus Zoom**: User prefers larger focal zoom ranges for hardware panels when performing. Increased the maximum focus zoom scale range from `1.15` (15% scale increase) to `1.21` (21% scale increase, representing a 40% increase of the maximum zoom offset) to provide wider customizability options.
