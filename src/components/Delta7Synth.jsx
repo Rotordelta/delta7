@@ -1339,6 +1339,14 @@ export default function Delta7Synth() {
   const liveRecBeatsRef = useRef(8);
   useEffect(() => { liveRecBeatsRef.current = Number(liveRecBeats) || 8; }, [liveRecBeats]);
 
+  const [recAlignGrid, setRecAlignGrid] = useState('cycle'); // 'cycle', 'bar', 'beat', 'immediate'
+  const recAlignGridRef = useRef('cycle');
+  useEffect(() => { recAlignGridRef.current = recAlignGrid; }, [recAlignGrid]);
+
+  const [quantizeOnBeat, setQuantizeOnBeat] = useState(true);
+  const quantizeOnBeatRef = useRef(true);
+  useEffect(() => { quantizeOnBeatRef.current = quantizeOnBeat; }, [quantizeOnBeat]);
+
   const [liveRecTargetSlot, setLiveRecTargetSlot] = useState('a01');
   const liveRecTargetSlotRef = useRef('a01');
   const liveLoopInProgressRef = useRef(false);
@@ -2988,13 +2996,24 @@ export default function Delta7Synth() {
       schedulerNodeRef.current.port.postMessage({
         type: 'ARM_RECORD_GATE',
         loopBeats: liveRecBeatsRef.current,
+        alignGrid: recAlignGridRef.current || 'cycle',
         // Pass timing epoch so the worklet can detect the boundary even if
         // START_PLAYBACK / syncSabPlaybackState was not called in this session
         playbackStartTime: perfPlayStartTimeRef.current,
         playbackStartBeatOffset: seqStartBeatOffsetRef.current || 0,
         bpm: paramsRef.current.arpBpm || 120
       });
-      showEditorStatus(`🎯 Gate armed — waiting for beat 1 of next ${liveRecBeatsRef.current}-beat cycle...`);
+      
+      const align = recAlignGridRef.current;
+      if (align === 'immediate') {
+        showEditorStatus("🔴 Recording starting immediately...");
+      } else if (align === 'beat') {
+        showEditorStatus("⏳ Gate armed — waiting for next beat...");
+      } else if (align === 'bar') {
+        showEditorStatus("⏳ Gate armed — waiting for next bar...");
+      } else {
+        showEditorStatus(`⏳ Gate armed — waiting for beat 1 of next ${liveRecBeatsRef.current}-beat cycle...`);
+      }
     } else {
       // Not playing or no scheduler — start immediately
       liveRecStartTimeRef.current = ctx.currentTime;
@@ -3134,7 +3153,13 @@ export default function Delta7Synth() {
         const T_start = liveRecStartTimeRef.current;
         const T_play = T_start + loopDuration;
         const elapsed = (ctx ? ctx.currentTime : 0) - T_play;
-        customOffset = Math.max(0, elapsed);
+        
+        if (quantizeOnBeatRef.current) {
+          const beatPhase = (elapsed / beatDuration) % liveRecBeatsRef.current;
+          customOffset = beatPhase * beatDuration;
+        } else {
+          customOffset = Math.max(0, elapsed);
+        }
       }
 
       if (handoverAutoplay) {
@@ -7890,6 +7915,7 @@ export default function Delta7Synth() {
               // START_PLAYBACK or syncSabPlaybackState was not called for this session.
               this.recordGateArmed = true;
               this.recordGateLoopBeats = Number(msg.loopBeats) || 16;
+              this.recordGateAlignGrid = msg.alignGrid || 'cycle';
               this.recordGateFired = false;
               if (msg.playbackStartTime > 0) {
                 this.playbackActive = true;
@@ -8172,15 +8198,24 @@ export default function Delta7Synth() {
               }
 
               let nextBoundaryBeat = 0;
-              if (endBeat !== Infinity && L >= endBeat) {
-                nextBoundaryBeat = endBeat;
+              const align = this.recordGateAlignGrid || 'cycle';
+              if (align === 'immediate') {
+                nextBoundaryBeat = currentBeat + 0.02;
+              } else if (align === 'beat') {
+                nextBoundaryBeat = Math.ceil(currentBeat);
+              } else if (align === 'bar') {
+                nextBoundaryBeat = Math.ceil(currentBeat / 4) * 4;
               } else {
-                nextBoundaryBeat = Math.ceil(currentBeat / L) * L;
+                if (endBeat !== Infinity && L >= endBeat) {
+                  nextBoundaryBeat = endBeat;
+                } else {
+                  nextBoundaryBeat = Math.ceil(currentBeat / L) * L;
+                }
               }
               
-              // Skip if at/very near a boundary (< 0.1 beats ~50ms at 120bpm) — go to next cycle
-              if (nextBoundaryBeat - currentBeat < 0.1) {
-                nextBoundaryBeat += L;
+              // Skip if at/very near a boundary (< 0.1 beats ~50ms at 120bpm) — go to next division
+              if (align !== 'immediate' && (nextBoundaryBeat - currentBeat < 0.1)) {
+                nextBoundaryBeat += (align === 'beat' ? 1 : align === 'bar' ? 4 : L);
               }
               
               // Only check/fire if the boundary falls within the current sequencer loop
@@ -12654,12 +12689,14 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
     // 2. Free Mode Routing
     if (triggerMode === 'free') {
-      dispatchLiveTrigger(deck, resolvedType, index, velocity, isNoteOn, actualShouldRecord, 'None', resolvedSliceIdx);
+      const qGrid = (isNoteOn && quantizeOnBeatRef.current) ? '1/4' : 'None';
+      dispatchLiveTrigger(deck, resolvedType, index, velocity, isNoteOn, actualShouldRecord, qGrid, resolvedSliceIdx);
       return;
     }
 
     // 3. Hold and Flux Modes Routing (Default instant trigger)
-    dispatchLiveTrigger(deck, resolvedType, index, velocity, isNoteOn, actualShouldRecord, 'None', resolvedSliceIdx);
+    const qGrid = (isNoteOn && quantizeOnBeatRef.current) ? '1/4' : 'None';
+    dispatchLiveTrigger(deck, resolvedType, index, velocity, isNoteOn, actualShouldRecord, qGrid, resolvedSliceIdx);
   };
 
   // -- Event-delegated pad grid handlers
@@ -14141,6 +14178,88 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           ctx.stroke();
           ctx.shadowBlur = 0;
         }
+        
+        // 6.5 Nixie/Tron Projector Core (Center Bar/Beat Display)
+        const barNumber = Math.floor(currentBeatPhase / 4) + 1;
+        const beatOfBar = Math.floor(currentBeatPhase % 4) + 1;
+        
+        // Draw glass envelope bulb background
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 38, 0, 2 * Math.PI);
+        ctx.fillStyle = '#01040a';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        // Fine anode wire mesh grid
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.035)';
+        ctx.lineWidth = 0.5;
+        for (let x = centerX - 38; x <= centerX + 38; x += 4) {
+          const dyMax = Math.sqrt(Math.max(0, 38*38 - (x-centerX)*(x-centerX)));
+          ctx.beginPath();
+          ctx.moveTo(x, centerY - dyMax);
+          ctx.lineTo(x, centerY + dyMax);
+          ctx.stroke();
+        }
+        for (let y = centerY - 38; y <= centerY + 38; y += 4) {
+          const dxMax = Math.sqrt(Math.max(0, 38*38 - (y-centerY)*(y-centerY)));
+          ctx.beginPath();
+          ctx.moveTo(centerX - dxMax, y);
+          ctx.lineTo(centerX + dxMax, y);
+          ctx.stroke();
+        }
+        
+        // Orbiting beat indicator dots (1-4)
+        for (let b = 0; b < 4; b++) {
+          const dotAngle = (b / 4) * 2 * Math.PI - Math.PI / 2;
+          const dotX = centerX + Math.cos(dotAngle) * 26;
+          const dotY = centerY + Math.sin(dotAngle) * 26;
+          const isCurrentBeat = (beatOfBar - 1) === b;
+          
+          ctx.beginPath();
+          ctx.arc(dotX, dotY, isCurrentBeat ? 2.5 : 1.2, 0, 2 * Math.PI);
+          if (isCurrentBeat) {
+            ctx.fillStyle = '#ff0055';
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#ff0055';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          } else {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fill();
+          }
+        }
+        
+        // Large digital 70s projector bar number readout
+        const barStr = String(barNumber);
+        ctx.font = 'bold 36px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Ambient projector orange glow
+        ctx.strokeStyle = 'rgba(255, 85, 0, 0.15)';
+        ctx.lineWidth = 8;
+        ctx.strokeText(barStr, centerX, centerY - 2);
+        
+        // Filament neon orange glow
+        ctx.strokeStyle = 'rgba(255, 110, 0, 0.45)';
+        ctx.lineWidth = 4;
+        ctx.strokeText(barStr, centerX, centerY - 2);
+        
+        // Inner hot neon orange filament line
+        ctx.strokeStyle = '#ffe600';
+        ctx.lineWidth = 1.8;
+        ctx.strokeText(barStr, centerX, centerY - 2);
+        
+        // Hot white core text
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(barStr, centerX, centerY - 2);
+        
+        // "BAR" subtext label
+        ctx.fillStyle = 'rgba(0, 243, 255, 0.45)';
+        ctx.font = 'bold 5px monospace';
+        ctx.fillText('BAR', centerX, centerY + 16);
         
         // 7. Active Recording Wedge / Ring Highlight (Neon Red)
         const currentBeat = seqCurrentBeatRef.current;
@@ -22556,7 +22675,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
             {/* Transport & Routing Selectors */}
             <div className="chrono-control-panel font-mono" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '5px' }}>
-              <div style={{ display: 'flex', gap: '4px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
                   <span style={{ fontSize: '0.36rem', color: '#888' }}>TARGET PAD:</span>
                   <select
@@ -22584,6 +22703,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   </select>
                 </div>
 
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <span style={{ fontSize: '0.36rem', color: '#888' }}>REC ALIGN:</span>
+                  <select
+                    value={recAlignGrid}
+                    onChange={(e) => setRecAlignGrid(e.target.value)}
+                    style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#ffe600', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
+                  >
+                    <option value="cycle">LOOP</option>
+                    <option value="bar">BAR</option>
+                    <option value="beat">BEAT</option>
+                    <option value="immediate">IMMED</option>
+                  </select>
+                </div>
+
                 <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '1px' }}>
                   <span style={{ fontSize: '0.36rem', color: '#888' }}>REC SOURCE:</span>
                   <select
@@ -22599,6 +22732,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </div>
               </div>
 
+              {/* Snap Playback to Beat checkbox row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1px', background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '3px', border: '1px solid rgba(0,243,255,0.08)' }}>
+                <span style={{ fontSize: '0.36rem', color: '#888', letterSpacing: '0.5px' }}>SNAP PLAYBACK TO BEAT:</span>
+                <input 
+                  type="checkbox" 
+                  checked={quantizeOnBeat}
+                  onChange={(e) => setQuantizeOnBeat(e.target.checked)}
+                  style={{ accentColor: '#00f3ff', cursor: 'pointer', margin: 0, width: '10px', height: '10px' }}
+                />
+              </div>
               {/* Input Gain & Saturation Row */}
               <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
