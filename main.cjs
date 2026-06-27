@@ -1,5 +1,10 @@
-const { app, BrowserWindow, desktopCapturer, session } = require('electron');
+const { app, BrowserWindow, desktopCapturer, session, protocol, net } = require('electron');
 const path = require('path');
+const { pathToFileURL } = require('url');
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { standard: true, secure: true, bypassCSP: true, corsEnabled: true } }
+]);
 
 let mainWindow;
 
@@ -26,7 +31,7 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    mainWindow.loadURL('app://-/index.html');
   }
 
   mainWindow.on('closed', () => {
@@ -48,6 +53,20 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    // Intercept app:// requests and serve from dist directory
+    protocol.handle('app', (request) => {
+      const url = new URL(request.url);
+      let relativePath = url.pathname;
+      if (relativePath.startsWith('/')) {
+        relativePath = relativePath.slice(1);
+      }
+      if (!relativePath || relativePath === '/') {
+        relativePath = 'index.html';
+      }
+      const absolutePath = path.join(__dirname, 'dist', relativePath);
+      return net.fetch(pathToFileURL(absolutePath).toString());
+    });
+
     session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
       desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
         const source = sources.find(s => s.id.startsWith('screen:')) || sources[0];

@@ -6943,6 +6943,8 @@ export default function Delta7Synth() {
       try { URL.revokeObjectURL(recorderBlobUrlRef.current); } catch {}
       recorderBlobUrlRef.current = null;
     }
+    audioCtxRef.current = null;
+    isInitializingRef.current = false;
   };
 
   // ==========================================
@@ -7125,11 +7127,13 @@ export default function Delta7Synth() {
     let bitcrusherNode;
     try {
       await ctx.audioWorklet.addModule(bitcrusherBlobUrl);
+      if (ctx !== audioCtxRef.current) return;
       bitcrusherNode = new AudioWorkletNode(ctx, 'bitcrusher-processor');
       // Expose parameter setters on the node for compatibility with existing update code
       bitcrusherNode._isBitcrusherWorklet = true;
       bitcrusherNode._blobUrl = bitcrusherBlobUrl;
     } catch (err) {
+      if (ctx !== audioCtxRef.current) return;
       // Fallback: keep ScriptProcessor if AudioWorklet unavailable
       console.warn('BitcrusherWorklet failed, falling back to ScriptProcessor:', err);
       bitcrusherNode = ctx.createScriptProcessor(1024, 1, 1);
@@ -7158,6 +7162,7 @@ export default function Delta7Synth() {
     } finally {
       URL.revokeObjectURL(bitcrusherBlobUrl);
     }
+    if (ctx !== audioCtxRef.current) return;
     bitcrusherInput.connect(bitcrusherNode);
     bitcrusherNode.connect(bitcrusherOutput);
     bitcrusherInputRef.current = bitcrusherInput;
@@ -7469,6 +7474,7 @@ export default function Delta7Synth() {
       console.warn("Failed to load Recorder AudioWorklet module:", err);
       URL.revokeObjectURL(recorderBlobUrl);
     }
+    if (ctx !== audioCtxRef.current) return;
 
     // Register Scheduler AudioWorklet module
     const schedulerCode = `
@@ -7908,6 +7914,7 @@ export default function Delta7Synth() {
     const schedulerBlobUrl = URL.createObjectURL(schedulerBlob);
     try {
       await ctx.audioWorklet.addModule(schedulerBlobUrl);
+      if (ctx !== audioCtxRef.current) return;
       const schedulerNode = new AudioWorkletNode(ctx, 'scheduler-processor');
       schedulerNode.connect(ctx.destination);
       
@@ -8031,6 +8038,7 @@ export default function Delta7Synth() {
     } finally {
       URL.revokeObjectURL(schedulerBlobUrl);
     }
+    if (ctx !== audioCtxRef.current) return;
 
     // Parallel Glue Compressor
     const masterGlueCompressor = ctx.createDynamicsCompressor();
