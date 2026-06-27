@@ -14093,10 +14093,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           v.playheadRateA = warpFactor;
           v.warpFactorA = warpFactor;
           
-          if (v.oscA && v.oscA.playbackRate) {
-            v.oscA.playbackRate.cancelScheduledValues(now);
-            v.oscA.playbackRate.setValueAtTime(v.oscA.playbackRate.value, now);
-            v.oscA.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
+          if (v.oscA) {
+            if (v.oscA._isSamplerWorklet) {
+              const keyLock = deckAKeyLockRef.current;
+              const stretch = deckAStretchRef.current;
+              const finalPlaybackRate = (keyLock 
+                ? (v.notePitchFactorA * v.pitchFactorA) 
+                : (v.notePitchFactorA * v.pitchFactorA * warpFactor)) * Math.pow(2, (v.tuningA || 0) / 12);
+              const finalStretchFactor = keyLock 
+                ? (stretch * warpFactor) 
+                : 1.0;
+              v.oscA.port.postMessage({
+                type: 'setParams',
+                playbackRate: finalPlaybackRate,
+                stretchFactor: finalStretchFactor
+              });
+            } else if (v.oscA.playbackRate) {
+              v.oscA.playbackRate.cancelScheduledValues(now);
+              v.oscA.playbackRate.setValueAtTime(v.oscA.playbackRate.value, now);
+              v.oscA.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
+            }
           }
           if (v.oscA_L && v.oscA_L.playbackRate) {
             v.oscA_L.playbackRate.cancelScheduledValues(now);
@@ -14121,10 +14137,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           v.playheadRateB = warpFactor;
           v.warpFactorB = warpFactor;
           
-          if (v.oscB && v.oscB.playbackRate) {
-            v.oscB.playbackRate.cancelScheduledValues(now);
-            v.oscB.playbackRate.setValueAtTime(v.oscB.playbackRate.value, now);
-            v.oscB.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
+          if (v.oscB) {
+            if (v.oscB._isSamplerWorklet) {
+              const keyLock = deckBKeyLockRef.current;
+              const stretch = deckBStretchRef.current;
+              const finalPlaybackRate = (keyLock 
+                ? (v.notePitchFactorB * v.pitchFactorB) 
+                : (v.notePitchFactorB * v.pitchFactorB * warpFactor)) * Math.pow(2, (v.tuningB || 0) / 12);
+              const finalStretchFactor = keyLock 
+                ? (stretch * warpFactor) 
+                : 1.0;
+              v.oscB.port.postMessage({
+                type: 'setParams',
+                playbackRate: finalPlaybackRate,
+                stretchFactor: finalStretchFactor
+              });
+            } else if (v.oscB.playbackRate) {
+              v.oscB.playbackRate.cancelScheduledValues(now);
+              v.oscB.playbackRate.setValueAtTime(v.oscB.playbackRate.value, now);
+              v.oscB.playbackRate.linearRampToValueAtTime(finalRate, now + 0.035);
+            }
           }
           if (v.oscB_L && v.oscB_L.playbackRate) {
             v.oscB_L.playbackRate.cancelScheduledValues(now);
