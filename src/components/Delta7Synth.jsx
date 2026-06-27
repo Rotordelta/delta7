@@ -7948,7 +7948,12 @@ export default function Delta7Synth() {
             }
 
             if (endBeat !== Infinity && elapsedBeats >= endBeat) {
-              this.playbackStartTime = now;
+              const overshoot = elapsedBeats - endBeat;
+              if (overshoot < 2.0) {
+                this.playbackStartTime += endBeat * beatDuration;
+              } else {
+                this.playbackStartTime = now;
+              }
               this.playbackStartBeatOffset = 0.0;
               this.playbackNextEventIdx = 0;
             }
