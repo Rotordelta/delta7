@@ -14800,6 +14800,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       if (isDrumMachine) return;
 
       const [status, data1, data2] = message.data;
+      
+      window.dispatchEvent(new CustomEvent('delta7_midi_message', { 
+        detail: { data: message.data, deviceName: input.name } 
+      }));
+
       const cmd = status >> 4;
 
       // Check MIDI Learn for Chocolate Pedal
@@ -14910,17 +14915,19 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       setMidiActivity(true);
       setTimeout(() => setMidiActivity(false), 80);
 
-      if (cmd === 9 && data2 > 0) { // Note On
-        if (playVoiceRef.current) playVoiceRef.current(data1, data2);
-      } else if (cmd === 8 || (cmd === 9 && data2 === 0)) { // Note Off
-        if (stopVoiceRef.current) stopVoiceRef.current(data1);
-      } else if (cmd === 11) { // Control Change (CC)
-        if (handleMidiCCRef.current) handleMidiCCRef.current(data1, data2);
-      } else if (cmd === 14) { // Pitch Bend
-        const normalizedPb = ((data2 << 7) + data1 - 8192) / 8192; // -1 to 1
-        setJoystick(prev => ({ ...prev, x: normalizedPb }));
-        const joyY = joystickRef.current ? joystickRef.current.y : 0;
-        applyRealtimeModulation(normalizedPb, joyY);
+      if (channel === 0) { // Respond only on MIDI Channel 1
+        if (cmd === 9 && data2 > 0) { // Note On
+          if (playVoiceRef.current) playVoiceRef.current(data1, data2);
+        } else if (cmd === 8 || (cmd === 9 && data2 === 0)) { // Note Off
+          if (stopVoiceRef.current) stopVoiceRef.current(data1);
+        } else if (cmd === 11) { // Control Change (CC)
+          if (handleMidiCCRef.current) handleMidiCCRef.current(data1, data2);
+        } else if (cmd === 14) { // Pitch Bend
+          const normalizedPb = ((data2 << 7) + data1 - 8192) / 8192; // -1 to 1
+          setJoystick(prev => ({ ...prev, x: normalizedPb }));
+          const joyY = joystickRef.current ? joystickRef.current.y : 0;
+          applyRealtimeModulation(normalizedPb, joyY);
+        }
       }
     };
   };

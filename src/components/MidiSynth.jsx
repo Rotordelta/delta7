@@ -7208,6 +7208,11 @@ export default function MidiSynth() {
   const [midiDevices, setMidiDevices] = useState([]);
   const [connectedDevice, setConnectedDevice] = useState('NO CONTROLLER DETECTED');
   const [lastMidiEvent, setLastMidiEvent] = useState('IDLE');
+  const [synthMidiChannel, setSynthMidiChannel] = useState(() => parseInt(localStorage.getItem('deltaiv_midi_channel') || '2', 10));
+  const synthMidiChannelRef = useRef(synthMidiChannel);
+  useEffect(() => {
+    synthMidiChannelRef.current = synthMidiChannel;
+  }, [synthMidiChannel]);
   
   // UI scaling & range states
   const [uiScale, setUiScale] = useState(0.85);
@@ -8605,47 +8610,51 @@ export default function MidiSynth() {
 
   // --- Web MIDI Access & CC Controller Mapping ---
   useEffect(() => {
-    if (!navigator.requestMIDIAccess) {
-      console.warn("Web MIDI API not supported in this browser");
-      return;
-    }
-
-    let midiAccessObj = null;
-
-    const onMIDISuccess = (midiAccess) => {
-      midiAccessObj = midiAccess;
-      const inputs = Array.from(midiAccess.inputs.values());
-      setMidiDevices(inputs.map(i => i.name));
-      if (inputs.length > 0) {
-        setConnectedDevice(inputs[0].name);
-      } else {
-        setConnectedDevice('NO CONTROLLER DETECTED');
-      }
-
-      inputs.forEach(input => {
-        input.onmidimessage = onMIDIMessage;
-      });
-
-      midiAccess.onstatechange = (e) => {
-        const currentInputs = Array.from(midiAccess.inputs.values());
-        setMidiDevices(currentInputs.map(i => i.name));
-        if (currentInputs.length > 0) {
-          setConnectedDevice(currentInputs[0].name);
+    if (navigator.requestMIDIAccess) {
+      navigator.requestMIDIAccess().then(access => {
+        const inputs = Array.from(access.inputs.values());
+        setMidiDevices(inputs.map(i => i.name));
+        if (inputs.length > 0) {
+          setConnectedDevice(inputs[0].name);
         } else {
           setConnectedDevice('NO CONTROLLER DETECTED');
         }
-      };
+        
+        access.onstatechange = () => {
+          const currentInputs = Array.from(access.inputs.values());
+          setMidiDevices(currentInputs.map(i => i.name));
+          if (currentInputs.length > 0) {
+            setConnectedDevice(currentInputs[0].name);
+          } else {
+            setConnectedDevice('NO CONTROLLER DETECTED');
+          }
+        };
+      }).catch(err => {
+        console.warn("Could not access MIDI devices:", err);
+      });
+    }
+
+    const handleGlobalMidi = (e) => {
+      const { data, deviceName } = e.detail;
+      if (deviceName && deviceName !== connectedDevice) {
+        setConnectedDevice(deviceName);
+      }
+      onMIDIMessage({ data });
     };
 
-    const onMIDIFailure = () => {
-      console.warn("Could not access MIDI devices");
-      setConnectedDevice('NO CONTROLLER DETECTED');
-    };
+    window.addEventListener('delta7_midi_message', handleGlobalMidi);
 
     const onMIDIMessage = (event) => {
       const [status, data1, data2] = event.data;
       const command = status & 0xf0;
       
+      if (status < 240) {
+        const channel = (status & 0x0f) + 1;
+        if (synthMidiChannelRef.current !== 0 && channel !== synthMidiChannelRef.current) {
+          return;
+        }
+      }
+
       // Note On
       if (command === 144 && data2 > 0) {
         const noteName = getNoteName(data1);
@@ -8726,16 +8735,8 @@ export default function MidiSynth() {
       }
     };
 
-    navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
-
     return () => {
-      if (midiAccessObj) {
-        midiAccessObj.onstatechange = null;
-        const inputs = Array.from(midiAccessObj.inputs.values());
-        inputs.forEach(input => {
-          input.onmidimessage = null;
-        });
-      }
+      window.removeEventListener('delta7_midi_message', handleGlobalMidi);
     };
   }, []);
 
@@ -10418,6 +10419,35 @@ export default function MidiSynth() {
               <div className="telemetry font-mono">
                 <span className="telemetry-lbl">MIDI IN:</span>
                 <span className="telemetry-val text-cyan">{connectedDevice}</span>
+              </div>
+              <div className="telemetry font-mono" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', borderBottom: '1px dashed rgba(0, 243, 255, 0.1)', paddingBottom: '2px' }}>
+                <span className="telemetry-lbl">RX CHANNEL:</span>
+                <select
+                  value={synthMidiChannel}
+                  onChange={(e) => {
+                    const ch = parseInt(e.target.value, 10);
+                    setSynthMidiChannel(ch);
+                    localStorage.setItem('deltaiv_midi_channel', ch);
+                  }}
+                  style={{
+                    background: '#000',
+                    border: '1px solid rgba(0, 243, 255, 0.4)',
+                    color: '#00f3ff',
+                    fontSize: '0.45rem',
+                    fontFamily: 'monospace',
+                    padding: '0 2px',
+                    borderRadius: '2px',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    height: '14px',
+                    lineHeight: '12px'
+                  }}
+                >
+                  <option value={0}>Omni (All)</option>
+                  {Array.from({ length: 16 }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>Ch {i + 1}</option>
+                  ))}
+                </select>
               </div>
               <div className="telemetry font-mono">
                 <span className="telemetry-lbl">EVENT:</span>
