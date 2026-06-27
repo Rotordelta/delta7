@@ -337,3 +337,10 @@
   - **Floating Panel Windows**: Floating, resizable and draggable overlays are highly valued for secondary synth panels to keep the main workstation view readable.
   - **Drag-and-Drop Operations**: Dragging items (like record crates) to trigger targeted deck loading is highly interactive and matches hardware workflows. Visual drop highlights (dashed cyan/magenta glows) provide excellent spatial feedback.
   - **Non-Destructive Crate Storage**: Reusing IndexedDB stores (`samples` and `banks`) with unique key prefixes (`crate_${crateIdx}_slot_${slotIdx}`) allows storing entire session sample kits and parameters persistently without database schema alterations.
+
+## Session: 2026-06-27 (Part 4)
+- **Task**: Unified Loom & Sampler panel and sidebar Record Crates.
+- **Jimmy's Preferences**:
+  - **Control Consolidation**: Grouping related panels (like The Loom visualizer and Live Sampler controls) into a single, unified container removes redundant options and saves valuable screen space.
+  - **Sidebar Crate Storage**: Organizing Record Crates as a 2x4 vertical grid inside the sidebar keeps the main chassis bottom layout clean.
+  - **Space-Conscious Animations**: Adjusting hover effects to match the visual boundaries (e.g. pulling vinyl discs upward from sleeves, rather than sliding horizontally to the right) ensures that elements don't get clipped near panel edges.
