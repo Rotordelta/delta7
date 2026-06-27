@@ -4,17 +4,29 @@ import MidiSynth from './MidiSynth.jsx';
 export default function DeltaViSynthPanel({ onClose }) {
   const [position, setPosition] = useState({ x: 100, y: 80 });
   const [isMinimized, setIsMinimized] = useState(false);
+  const [size, setSize] = useState({ width: 780, height: 600 });
+  
   const dragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
+  const resizeStartRef = useRef({ x: 0, y: 0, startWidth: 0, startHeight: 0 });
   const panelRef = useRef(null);
 
-  // Load saved window position from localStorage if available
+  // Load saved window position & size from localStorage if available
   useEffect(() => {
-    const saved = localStorage.getItem('deltavi_panel_position');
-    if (saved) {
+    const savedPos = localStorage.getItem('deltavi_panel_position');
+    if (savedPos) {
       try {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(savedPos);
         if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
           setPosition(parsed);
+        }
+      } catch (e) {}
+    }
+    const savedSize = localStorage.getItem('deltavi_panel_size');
+    if (savedSize) {
+      try {
+        const parsed = JSON.parse(savedSize);
+        if (parsed && typeof parsed.width === 'number' && typeof parsed.height === 'number') {
+          setSize(parsed);
         }
       } catch (e) {}
     }
@@ -63,11 +75,50 @@ export default function DeltaViSynthPanel({ onClose }) {
     window.removeEventListener('mouseup', handleMouseUp);
     
     // Save position to localStorage
-    localStorage.setItem('deltavi_panel_position', JSON.stringify(dragStartRef.current.startX !== position.x ? position : dragStartRef.current));
+    setPosition(currentPos => {
+      localStorage.setItem('deltavi_panel_position', JSON.stringify(currentPos));
+      return currentPos;
+    });
   };
 
   const handleDoubleClick = () => {
     setIsMinimized(prev => !prev);
+  };
+
+  const handleResizeMouseDown = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    resizeStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      startWidth: size.width,
+      startHeight: size.height,
+    };
+
+    window.addEventListener('mousemove', handleResizeMouseMove);
+    window.addEventListener('mouseup', handleResizeMouseUp);
+  };
+
+  const handleResizeMouseMove = (e) => {
+    const deltaX = e.clientX - resizeStartRef.current.x;
+    const deltaY = e.clientY - resizeStartRef.current.y;
+
+    const newWidth = Math.max(500, resizeStartRef.current.startWidth + deltaX);
+    const newHeight = Math.max(250, resizeStartRef.current.startHeight + deltaY);
+
+    setSize({ width: newWidth, height: newHeight });
+  };
+
+  const handleResizeMouseUp = () => {
+    window.removeEventListener('mousemove', handleResizeMouseMove);
+    window.removeEventListener('mouseup', handleResizeMouseUp);
+
+    setSize(currentSize => {
+      localStorage.setItem('deltavi_panel_size', JSON.stringify(currentSize));
+      return currentSize;
+    });
   };
 
   return (
@@ -77,6 +128,8 @@ export default function DeltaViSynthPanel({ onClose }) {
         position: 'fixed',
         left: `${position.x}px`,
         top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: isMinimized ? '38px' : `${size.height}px`,
         zIndex: 9999,
         background: 'rgba(8, 9, 13, 0.95)',
         border: '2px solid rgba(0, 243, 255, 0.65)',
@@ -87,9 +140,10 @@ export default function DeltaViSynthPanel({ onClose }) {
         flexDirection: 'column',
         userSelect: 'none',
         overflow: 'hidden',
-        minWidth: '550px',
-        maxWidth: '92vw',
-        maxHeight: isMinimized ? 'auto' : '90vh',
+        minWidth: '400px',
+        minHeight: isMinimized ? '38px' : '250px',
+        maxWidth: '96vw',
+        maxHeight: isMinimized ? '38px' : '96vh',
         transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
       }}
     >
@@ -106,7 +160,8 @@ export default function DeltaViSynthPanel({ onClose }) {
           borderBottom: isMinimized ? 'none' : '1px solid rgba(0, 243, 255, 0.3)',
           padding: '5px 12px',
           cursor: 'move',
-          height: '24px'
+          height: '24px',
+          flexShrink: 0
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -163,13 +218,40 @@ export default function DeltaViSynthPanel({ onClose }) {
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '12px 18px 0px 18px',
-            maxHeight: 'calc(90vh - 35px)',
+            padding: '8px 8px 0px 8px',
+            maxHeight: 'calc(100% - 34px)',
             scrollbarWidth: 'thin',
-            scrollbarColor: '#00f3ff rgba(0,0,0,0.3)'
+            scrollbarColor: '#00f3ff rgba(0,0,0,0.3)',
+            position: 'relative'
           }}
         >
           <MidiSynth />
+        </div>
+      )}
+
+      {/* Resize Handle */}
+      {!isMinimized && (
+        <div
+          onMouseDown={handleResizeMouseDown}
+          style={{
+            position: 'absolute',
+            bottom: '0',
+            right: '0',
+            width: '16px',
+            height: '16px',
+            cursor: 'se-resize',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'flex-end',
+            padding: '0 2px 2px 0',
+          }}
+        >
+          <svg width="8" height="8" viewBox="0 0 8 8" style={{ pointerEvents: 'none' }}>
+            <line x1="6" y1="0" x2="0" y2="6" stroke="rgba(0, 243, 255, 0.5)" strokeWidth="1.5" />
+            <line x1="6" y1="3" x2="3" y2="6" stroke="rgba(0, 243, 255, 0.5)" strokeWidth="1.5" />
+            <line x1="6" y1="6" x2="6" y2="6" stroke="rgba(0, 243, 255, 0.5)" strokeWidth="1.5" />
+          </svg>
         </div>
       )}
     </div>

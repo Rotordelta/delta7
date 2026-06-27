@@ -12649,7 +12649,7 @@ export default function MidiSynth() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding-bottom: 2rem;
+          padding-bottom: 0px;
         }
 
         .synth-ui-scaler {
@@ -12675,7 +12675,7 @@ export default function MidiSynth() {
           background: #08090d;
           border: 2px solid #1f2833;
           border-radius: 8px;
-          padding: 1.25rem 2rem;
+          padding: 1.25rem 1.25rem 0.5rem 1.25rem;
           box-shadow: 
             0 30px 60px rgba(0,0,0,0.85),
             inset 0 1px 2px rgba(255,255,255,0.05);
