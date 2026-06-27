@@ -3142,15 +3142,29 @@ export default function Delta7Synth() {
     if (closestIdx !== -1 && minDiff < 7) {
       const bankOffset = deck === 'A' ? 0 : 8;
       const slot = sampleSlots[bankOffset + closestIdx];
-      if (slot && slot.buffer) {
-        console.log(`[Platter Click] Deck ${deck}, Ring ${closestIdx + 1} clicked. Slot ID: ${slot.id}`);
-        setCircularAlignState({
-          visible: true,
-          deck,
-          index: closestIdx,
-          slotId: slot.id,
-          initialOffset: slot.nudgeMs || 0
-        });
+      if (slot) {
+        // 1. ALWAYS select the slot/pad for editing in the main UI
+        setSelectedEditSlotId(slot.id);
+        setLiveRecTargetSlot(slot.id);
+        if (deck === 'A') {
+          setParams(prev => ({ ...prev, oscAWave: slot.id }));
+        } else if (deck === 'B') {
+          setParams(prev => ({ ...prev, oscBWave: slot.id }));
+        }
+
+        // 2. Open diagnostic modal ONLY if a buffer exists
+        if (slot.buffer) {
+          console.log(`[Platter Click] Deck ${deck}, Ring ${closestIdx + 1} clicked. Slot ID: ${slot.id}`);
+          setCircularAlignState({
+            visible: true,
+            deck,
+            index: closestIdx,
+            slotId: slot.id,
+            initialOffset: slot.nudgeMs || 0
+          });
+        } else {
+          showEditorStatus(`Selected Empty Pad ${deck}${closestIdx + 1} 🎛️`);
+        }
       }
     }
   };
@@ -10138,6 +10152,7 @@ export default function Delta7Synth() {
             workletNode.port.postMessage({ type: 'STOP' });
           } catch (e) {}
         };
+        workletNode.start = () => {};
 
         oscA = workletNode;
 
@@ -10230,6 +10245,7 @@ export default function Delta7Synth() {
             workletNode.port.postMessage({ type: 'STOP' });
           } catch (e) {}
         };
+        workletNode.start = () => {};
 
         oscB = workletNode;
 
@@ -12106,11 +12122,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   // Badge click handlers using data-slot-id
   const handleRevBadgeClick = useCallback((e) => {
     e.stopPropagation();
-    const slotId = e.currentTarget.closest('.perf-pad[data-deck]')?.dataset.deck
-      ? (e.currentTarget.closest('.perf-pad[data-deck]').dataset.deck === 'A' ? 'a0' : 'b0') +
-        (parseInt(e.currentTarget.closest('.perf-pad[data-deck]').dataset.idx, 10) + 1)
-      : null;
+    const pad = e.currentTarget.closest('.perf-pad[data-deck]');
+    if (!pad) return;
+    const deck = pad.dataset.deck;
+    const slotId = (deck === 'A' ? 'a0' : 'b0') + (parseInt(pad.dataset.idx, 10) + 1);
     if (!slotId) return;
+
+    setSelectedEditSlotId(slotId);
+    setLiveRecTargetSlot(slotId);
+    if (deck === 'A') {
+      setParams(prev => ({ ...prev, oscAWave: slotId }));
+    } else if (deck === 'B') {
+      setParams(prev => ({ ...prev, oscBWave: slotId }));
+    }
+
     const slot = sampleSlotsRef.current.find(s => s.id === slotId);
     if (!slot) return;
     slot.reverseOn = !slot.reverseOn;
@@ -12123,7 +12148,17 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     e.stopPropagation();
     const pad = e.currentTarget.closest('.perf-pad[data-deck]');
     if (!pad) return;
-    const slotId = (pad.dataset.deck === 'A' ? 'a0' : 'b0') + (parseInt(pad.dataset.idx, 10) + 1);
+    const deck = pad.dataset.deck;
+    const slotId = (deck === 'A' ? 'a0' : 'b0') + (parseInt(pad.dataset.idx, 10) + 1);
+
+    setSelectedEditSlotId(slotId);
+    setLiveRecTargetSlot(slotId);
+    if (deck === 'A') {
+      setParams(prev => ({ ...prev, oscAWave: slotId }));
+    } else if (deck === 'B') {
+      setParams(prev => ({ ...prev, oscBWave: slotId }));
+    }
+
     toggleSlotLoop(slotId, e);
   }, []);
 
@@ -12131,7 +12166,17 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     e.stopPropagation();
     const pad = e.currentTarget.closest('.perf-pad[data-deck]');
     if (!pad) return;
-    const slotId = (pad.dataset.deck === 'A' ? 'a0' : 'b0') + (parseInt(pad.dataset.idx, 10) + 1);
+    const deck = pad.dataset.deck;
+    const slotId = (deck === 'A' ? 'a0' : 'b0') + (parseInt(pad.dataset.idx, 10) + 1);
+
+    setSelectedEditSlotId(slotId);
+    setLiveRecTargetSlot(slotId);
+    if (deck === 'A') {
+      setParams(prev => ({ ...prev, oscAWave: slotId }));
+    } else if (deck === 'B') {
+      setParams(prev => ({ ...prev, oscBWave: slotId }));
+    }
+
     cycleTriggerMode(slotId, e);
   }, []);
 
@@ -16237,10 +16282,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 const ringColor = ringColors[idx];
                 const padKey = `A-slot-${idx}`;
 
+                const isSelected = selectedEditSlotId === slotId;
                 return (
                   <div
                     key={slotId}
-                    className="perf-pad"
+                    className={`perf-pad ${isSelected ? 'selected' : ''}`}
                     ref={(el) => { if (el) padDomRefsA.current[idx] = el; }}
                     data-deck="A"
                     data-idx={idx}
@@ -17507,10 +17553,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 const ringColor = ringColors[idx];
                 const padKey = `B-slot-${idx}`;
 
+                const isSelected = selectedEditSlotId === slotId;
                 return (
                   <div
                     key={slotId}
-                    className="perf-pad"
+                    className={`perf-pad ${isSelected ? 'selected' : ''}`}
                     ref={(el) => { if (el) padDomRefsB.current[idx] = el; }}
                     data-deck="B"
                     data-idx={idx}

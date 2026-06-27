@@ -325,6 +325,12 @@
           transform: scale(0.96);
         }
 
+        .perf-pad.selected {
+          border-color: #ffffff !important;
+          box-shadow: 0 0 10px var(--pad-color, #00f3ff), inset 0 0 6px var(--pad-color, #00f3ff) !important;
+          z-index: 2;
+        }
+
         /* Zero-waste pad styling via data attributes + CSS custom properties (--pad-color) */
         .perf-pad[data-loaded="true"] {
           border-color: color-mix(in srgb, var(--pad-color, #fff) 45%, transparent);
