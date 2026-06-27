@@ -329,3 +329,11 @@
 - **Jimmy's Preferences**:
   - **Non-Destructive Timing Calibrations**: Nudge timings should be applied physically inside the Web Audio memory context by circular-shifting the underlying AudioBuffer samples. Keeping the original buffer untouched inside `originalBuffer` prevents progressive degradation or mutation loss during edits.
   - **Clean playhead tracking**: When the underlying buffer is circular-shifted, linear playhead timing offsets are no longer needed. Disabling linear playhead nudges on playback, preview triggers, and loop wraps prevents phase alignment issues and cutoffs.
+
+## Session: 2026-06-27 (Part 3)
+- **Task**: DeltaVi Synth integration and bottom Record Crates (banks of 8) with drag-and-drop loading.
+- **Jimmy's Preferences**:
+  - **Zero-Dependency Modules**: Integrating external modules like synthesizers is easiest when they are self-contained (i.e. having styles injected directly via JSX dangerouslySetInnerHTML), avoiding stylesheet merge conflicts.
+  - **Floating Panel Windows**: Floating, resizable and draggable overlays are highly valued for secondary synth panels to keep the main workstation view readable.
+  - **Drag-and-Drop Operations**: Dragging items (like record crates) to trigger targeted deck loading is highly interactive and matches hardware workflows. Visual drop highlights (dashed cyan/magenta glows) provide excellent spatial feedback.
+  - **Non-Destructive Crate Storage**: Reusing IndexedDB stores (`samples` and `banks`) with unique key prefixes (`crate_${crateIdx}_slot_${slotIdx}`) allows storing entire session sample kits and parameters persistently without database schema alterations.
