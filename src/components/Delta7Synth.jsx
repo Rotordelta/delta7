@@ -3,6 +3,8 @@ import Knob from './Knob.jsx';
 
 import CircularAlignModal from './CircularAlignModal.jsx';
 import HelpMenuModal from './HelpMenuModal.jsx';
+import DeltaViSynthPanel from './DeltaViSynthPanel.jsx';
+import RecordCrates from './RecordCrates.jsx';
 import './delta7-styles.css';
 
 // SharedArrayBuffer configuration constants
@@ -622,6 +624,14 @@ export default function Delta7Synth() {
   // MIDI Learn State
   const [midiMenuOpen, setMidiMenuOpen] = useState(false);
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
+  const [showMidiSynth, setShowMidiSynth] = useState(false);
+  const [dragOverDeck, setDragOverDeck] = useState(null);
+  const [crates, setCrates] = useState(Array.from({ length: 8 }, (_, idx) => ({
+    id: `crate_${idx}`,
+    name: `Crate ${idx + 1}`,
+    loaded: false,
+    slotMetadata: []
+  })));
   const [focusZoomEnabled, setFocusZoomEnabled] = useState(() => {
     return localStorage.getItem('focusZoomEnabled') === 'true';
   });
@@ -1291,9 +1301,10 @@ export default function Delta7Synth() {
     localStorage.setItem('delta7_macros', JSON.stringify(macros));
   }, [macros]);
 
-  // Auto-initialize audio engine on component mount
+  // Auto-initialize audio engine and load crates on component mount
   useEffect(() => {
     initAudio();
+    loadCratesFromDb();
   }, []);
 
   const [macroAssignMode, setMacroAssignMode] = useState(null);
@@ -8521,7 +8532,394 @@ export default function Delta7Synth() {
     
     return shiftedBuffer;
   };
+  const saveCrateSlotSampleToDb = async (crateIdx, slotIdx, slot) => {
+    if (!slot.buffer) return;
+    const db = await openSamplerDB();
+    const tx = db.transaction('samples', 'readwrite');
+    const store = tx.objectStore('samples');
+    
+    const bufferToSave = slot.originalBuffer || slot.buffer;
+    const channels = [];
+    for (let c = 0; c < bufferToSave.numberOfChannels; c++) {
+      channels.push(bufferToSave.getChannelData(c).slice());
+    }
+    
+    const record = {
+      id: `crate_${crateIdx}_slot_${slotIdx}`,
+      name: slot.name,
+      rootNote: slot.rootNote,
+      volume: slot.volume,
+      sliceCount: slot.sliceCount,
+      start: slot.start,
+      end: slot.end,
+      loopStart: slot.loopStart,
+      loopEnd: slot.loopEnd,
+      loopOn: slot.loopOn,
+      reverseOn: slot.reverseOn,
+      sliceParams: slot.sliceParams,
+      warpOn: slot.warpOn,
+      warpBeats: slot.warpBeats,
+      pan: slot.pan,
+      fxType: slot.fxType,
+      fxSend: slot.fxSend,
+      routeToXyPad: slot.routeToXyPad,
+      tuning: slot.tuning,
+      triggerMode: slot.triggerMode || 'hold',
+      attack: slot.attack !== undefined ? slot.attack : 0.01,
+      decay: slot.decay !== undefined ? slot.decay : 0.3,
+      lfoType: slot.lfoType || 'sine',
+      lfoRateMode: slot.lfoRateMode || 'hz',
+      lfoFade: slot.lfoFade !== undefined ? slot.lfoFade : 0,
+      lfoRetrigger: slot.lfoRetrigger !== undefined ? slot.lfoRetrigger : true,
+      randomPan: slot.randomPan !== undefined ? slot.randomPan : 0.0,
+      sliceMasterKey: slot.sliceMasterKey !== undefined ? slot.sliceMasterKey : 0,
+      sliceMasterOctave: slot.sliceMasterOctave !== undefined ? slot.sliceMasterOctave : 0,
+      eq: slot.eq,
+      nudgeMs: slot.nudgeMs !== undefined ? slot.nudgeMs : 0,
+      channels: channels,
+      sampleRate: bufferToSave.sampleRate
+    };
+    
+    return new Promise((resolve, reject) => {
+      const req = store.put(record);
+      req.onsuccess = () => resolve();
+      req.onerror = (e) => reject(e.target.error);
+    });
+  };
 
+  const saveDeckToCrate = async (crateIdx, deckType) => {
+    try {
+      showEditorStatus(`Saving Deck ${deckType.toUpperCase()} to Crate ${crateIdx + 1}... ⏳`);
+      const prefix = deckType === 'a' ? 'a' : 'b';
+      const deckSlots = sampleSlotsRef.current.filter(s => s.id.startsWith(prefix));
+      
+      const slotMetadata = [];
+      
+      for (let i = 0; i < 8; i++) {
+        const slot = deckSlots[i];
+        if (slot) {
+          const hasBuffer = !!slot.buffer;
+          slotMetadata.push({
+            name: slot.name,
+            rootNote: slot.rootNote,
+            volume: slot.volume,
+            sliceCount: slot.sliceCount,
+            start: slot.start,
+            end: slot.end,
+            loopStart: slot.loopStart,
+            loopEnd: slot.loopEnd,
+            loopOn: slot.loopOn,
+            reverseOn: slot.reverseOn,
+            sliceParams: slot.sliceParams,
+            warpOn: slot.warpOn,
+            warpBeats: slot.warpBeats,
+            pan: slot.pan,
+            fxType: slot.fxType,
+            fxSend: slot.fxSend,
+            routeToXyPad: slot.routeToXyPad,
+            tuning: slot.tuning,
+            triggerMode: slot.triggerMode || 'hold',
+            attack: slot.attack,
+            decay: slot.decay,
+            lfoType: slot.lfoType,
+            lfoRateMode: slot.lfoRateMode,
+            lfoFade: slot.lfoFade,
+            lfoRetrigger: slot.lfoRetrigger,
+            randomPan: slot.randomPan,
+            sliceMasterKey: slot.sliceMasterKey,
+            sliceMasterOctave: slot.sliceMasterOctave,
+            eq: slot.eq,
+            nudgeMs: slot.nudgeMs,
+            hasBuffer: hasBuffer
+          });
+          
+          if (hasBuffer) {
+            await saveCrateSlotSampleToDb(crateIdx, i, slot);
+          } else {
+            const db = await openSamplerDB();
+            const tx = db.transaction('samples', 'readwrite');
+            const store = tx.objectStore('samples');
+            await new Promise((resolve) => {
+              const req = store.delete(`crate_${crateIdx}_slot_${i}`);
+              req.onsuccess = () => resolve();
+              req.onerror = () => resolve();
+            });
+          }
+        }
+      }
+      
+      const crateId = `crate_${crateIdx}`;
+      const record = {
+        id: crateId,
+        name: crates[crateIdx]?.name || `Crate ${crateIdx + 1}`,
+        slotMetadata: slotMetadata
+      };
+      
+      await saveBankToDb(record);
+      
+      setCrates(prev => {
+        const next = [...prev];
+        next[crateIdx] = {
+          ...next[crateIdx],
+          loaded: true,
+          slotMetadata: slotMetadata
+        };
+        return next;
+      });
+      
+      showEditorStatus(`Crate ${crateIdx + 1} saved successfully! 💾`);
+    } catch (e) {
+      console.error("Failed to save deck to crate:", e);
+      showEditorStatus(`Error saving Crate ❌`);
+    }
+  };
+
+  const loadCrateToDeck = async (crateIdx, deckType) => {
+    try {
+      const dt = deckType.toUpperCase();
+      showEditorStatus(`Loading Crate ${crateIdx + 1} into Deck ${dt}... ⏳`);
+      
+      const crateRecord = crates[crateIdx];
+      if (!crateRecord || !crateRecord.loaded) {
+        showEditorStatus(`Crate ${crateIdx + 1} is empty! ✖️`);
+        return;
+      }
+      
+      const ctx = audioCtxRef.current;
+      const targetPrefix = deckType.toLowerCase() === 'a' ? 'a0' : 'b0';
+      
+      const newSlots = await Promise.all(
+        Array.from({ length: 8 }).map(async (_, i) => {
+          const targetSlotId = targetPrefix + (i + 1);
+          const meta = crateRecord.slotMetadata[i];
+          const defaultSlot = {
+            id: targetSlotId,
+            name: `Bank ${dt} Slot ${i + 1}`,
+            buffer: null,
+            revBuffer: null,
+            originalBuffer: null,
+            rootNote: 60,
+            volume: 1.0,
+            sliceCount: 16,
+            start: 0.0,
+            end: 1.0,
+            loopStart: 0.0,
+            loopEnd: 1.0,
+            loopOn: false,
+            reverseOn: false,
+            warpOn: false,
+            warpBeats: 4,
+            tuning: 0,
+            triggerMode: 'hold',
+            sliceParams: Array.from({ length: 16 }, () => ({ attack: 0.01, decay: 0.3, pitch: 0, stretch: 0, loop: false, reverse: false, sustain: false })),
+            attack: 0.01,
+            decay: 0.3,
+            lfoType: 'sine',
+            lfoRateMode: 'hz',
+            lfoFade: 0,
+            lfoRetrigger: true,
+            randomPan: 0.0,
+            nudgeMs: 0,
+            isRecorded: false,
+            eq: createDefaultEq()
+          };
+          
+          if (!meta) return defaultSlot;
+          
+          let buffer = null;
+          let originalBuffer = null;
+          let revBuffer = null;
+          
+          if (meta.hasBuffer && ctx) {
+            const savedSample = await getSavedSampleFromDb(`crate_${crateIdx}_slot_${i}`);
+            if (savedSample && savedSample.channels && savedSample.channels.length > 0) {
+              const numChannels = savedSample.channels.length;
+              const length = savedSample.channels[0].length;
+              const sampleRate = savedSample.sampleRate || ctx.sampleRate;
+              try {
+                originalBuffer = ctx.createBuffer(numChannels, length, sampleRate);
+                for (let c = 0; c < numChannels; c++) {
+                  originalBuffer.getChannelData(c).set(savedSample.channels[c]);
+                }
+                const nudge = meta.nudgeMs ?? 0;
+                buffer = nudge !== 0 ? getCircularShiftedBuffer(ctx, originalBuffer, nudge) : originalBuffer;
+                revBuffer = getReversedBuffer(ctx, buffer);
+              } catch (err) {
+                console.error(`Error reconstructing buffer for crate load:`, err);
+              }
+            }
+          }
+          
+          const loadedSlot = {
+            ...defaultSlot,
+            name: meta.name || defaultSlot.name,
+            buffer: buffer,
+            originalBuffer: originalBuffer,
+            revBuffer: revBuffer,
+            rootNote: meta.rootNote ?? defaultSlot.rootNote,
+            volume: meta.volume ?? defaultSlot.volume,
+            sliceCount: meta.sliceCount ?? defaultSlot.sliceCount,
+            start: meta.start ?? defaultSlot.start,
+            end: meta.end ?? defaultSlot.end,
+            loopStart: meta.loopStart ?? defaultSlot.loopStart,
+            loopEnd: meta.loopEnd ?? defaultSlot.loopEnd,
+            loopOn: !!meta.loopOn,
+            reverseOn: !!meta.reverseOn,
+            warpOn: !!meta.warpOn,
+            warpBeats: meta.warpBeats ?? defaultSlot.warpBeats,
+            pan: meta.pan ?? 0.0,
+            fxType: meta.fxType || 'None',
+            fxSend: meta.fxSend ?? 0.0,
+            routeToXyPad: meta.routeToXyPad ?? true,
+            tuning: meta.tuning ?? defaultSlot.tuning,
+            triggerMode: meta.triggerMode || defaultSlot.triggerMode,
+            attack: meta.attack ?? defaultSlot.attack,
+            decay: meta.decay ?? defaultSlot.decay,
+            lfoType: meta.lfoType || defaultSlot.lfoType,
+            lfoRateMode: meta.lfoRateMode || defaultSlot.lfoRateMode,
+            lfoFade: meta.lfoFade ?? defaultSlot.lfoFade,
+            lfoRetrigger: meta.lfoRetrigger ?? defaultSlot.lfoRetrigger,
+            randomPan: meta.randomPan ?? defaultSlot.randomPan,
+            sliceMasterKey: meta.sliceMasterKey ?? 0,
+            sliceMasterOctave: meta.sliceMasterOctave ?? 0,
+            eq: meta.eq || defaultSlot.eq,
+            nudgeMs: meta.nudgeMs ?? defaultSlot.nudgeMs,
+            isRecorded: !!meta.hasBuffer
+          };
+          
+          if (loadedSlot.buffer) {
+            await saveSampleToDb(loadedSlot);
+          } else {
+            await deleteSampleFromDb(loadedSlot.id);
+          }
+          
+          return loadedSlot;
+        })
+      );
+      
+      setSampleSlots(prev => {
+        const next = prev.map(s => {
+          if (s.id.startsWith(targetPrefix)) {
+            const idx = parseInt(s.id.substring(2), 10) - 1;
+            return newSlots[idx] || s;
+          }
+          return s;
+        });
+        sampleSlotsRef.current = next;
+        return next;
+      });
+      
+      showEditorStatus(`Crate ${crateIdx + 1} loaded into Deck ${dt}! 🎉`);
+    } catch (e) {
+      console.error("Failed to load crate to deck:", e);
+      showEditorStatus(`Error loading Crate ❌`);
+    }
+  };
+
+  const deleteCrate = async (crateIdx) => {
+    try {
+      showEditorStatus(`Clearing Crate ${crateIdx + 1}... ⏳`);
+      const db = await openSamplerDB();
+      
+      const txBanks = db.transaction('banks', 'readwrite');
+      const storeBanks = txBanks.objectStore('banks');
+      await new Promise((resolve) => {
+        const req = storeBanks.delete(`crate_${crateIdx}`);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      });
+      
+      const txSamples = db.transaction('samples', 'readwrite');
+      const storeSamples = txSamples.objectStore('samples');
+      for (let i = 0; i < 8; i++) {
+        await new Promise((resolve) => {
+          const req = storeSamples.delete(`crate_${crateIdx}_slot_${i}`);
+          req.onsuccess = () => resolve();
+          req.onerror = () => resolve();
+        });
+      }
+      
+      setCrates(prev => {
+        const next = [...prev];
+        next[crateIdx] = {
+          id: `crate_${crateIdx}`,
+          name: `Crate ${crateIdx + 1}`,
+          loaded: false,
+          slotMetadata: []
+        };
+        return next;
+      });
+      
+      showEditorStatus(`Crate ${crateIdx + 1} cleared! 🗑️`);
+    } catch (e) {
+      console.error("Failed to delete crate:", e);
+      showEditorStatus(`Error clearing Crate ❌`);
+    }
+  };
+
+  const renameCrate = async (crateIdx, newName) => {
+    try {
+      const targetCrate = crates[crateIdx];
+      if (!targetCrate) return;
+      
+      setCrates(prev => {
+        const next = [...prev];
+        next[crateIdx] = {
+          ...next[crateIdx],
+          name: newName
+        };
+        return next;
+      });
+      
+      if (targetCrate.loaded) {
+        const crateId = `crate_${crateIdx}`;
+        const record = {
+          id: crateId,
+          name: newName,
+          slotMetadata: targetCrate.slotMetadata
+        };
+        await saveBankToDb(record);
+      }
+    } catch (e) {
+      console.error("Failed to rename crate:", e);
+    }
+  };
+
+  const loadCratesFromDb = async () => {
+    try {
+      const db = await openSamplerDB();
+      if (!db.objectStoreNames.contains('banks')) return;
+      const tx = db.transaction('banks', 'readonly');
+      const store = tx.objectStore('banks');
+      
+      const newCrates = Array.from({ length: 8 }, (_, idx) => ({
+        id: `crate_${idx}`,
+        name: `Crate ${idx + 1}`,
+        loaded: false,
+        slotMetadata: []
+      }));
+      
+      for (let i = 0; i < 8; i++) {
+        const id = `crate_${i}`;
+        const record = await new Promise((resolve) => {
+          const req = store.get(id);
+          req.onsuccess = (e) => resolve(e.target.result);
+          req.onerror = () => resolve(null);
+        });
+        if (record) {
+          newCrates[i] = {
+            id: id,
+            name: record.name || `Crate ${i + 1}`,
+            loaded: true,
+            slotMetadata: record.slotMetadata || []
+          };
+        }
+      }
+      setCrates(newCrates);
+    } catch (e) {
+      console.error("Failed to load crates from db:", e);
+    }
+  };
 
 
   const loadKitPreset = async (kitType, bankType) => {
@@ -16458,13 +16856,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* 2 Rows of 4 Pads (2x4 Grid) for Deck A */}
-            <div className="performance-pads-grid-2x4"
+            <div className={`performance-pads-grid-2x4 ${dragOverDeck === 'A' ? 'drag-over-active-A' : ''}`}
               onMouseDown={handlePadGridMouseDown}
               onMouseUp={handlePadGridMouseUp}
               onMouseLeave={handlePadGridMouseLeave}
               onTouchStart={handlePadGridTouchStart}
               onTouchEnd={handlePadGridTouchEnd}
               onContextMenu={handlePadGridContextMenu}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOverDeck('A');
+              }}
+              onDragLeave={() => setDragOverDeck(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverDeck(null);
+                const crateId = e.dataTransfer.getData('text/plain');
+                if (crateId && crateId.startsWith('crate_')) {
+                  const crateIdx = parseInt(crateId.split('_')[1], 10);
+                  loadCrateToDeck(crateIdx, 'A');
+                }
+              }}
             >
               {EIGHT_INDICES.map((_, idx) => {
                 const slotId = `a0${idx + 1}`;
@@ -17729,13 +18141,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
 
             {/* 2 Rows of 4 Pads (2x4 Grid) for Deck B */}
-            <div className="performance-pads-grid-2x4"
+            <div className={`performance-pads-grid-2x4 ${dragOverDeck === 'B' ? 'drag-over-active-B' : ''}`}
               onMouseDown={handlePadGridMouseDown}
               onMouseUp={handlePadGridMouseUp}
               onMouseLeave={handlePadGridMouseLeave}
               onTouchStart={handlePadGridTouchStart}
               onTouchEnd={handlePadGridTouchEnd}
               onContextMenu={handlePadGridContextMenu}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOverDeck('B');
+              }}
+              onDragLeave={() => setDragOverDeck(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverDeck(null);
+                const crateId = e.dataTransfer.getData('text/plain');
+                if (crateId && crateId.startsWith('crate_')) {
+                  const crateIdx = parseInt(crateId.split('_')[1], 10);
+                  loadCrateToDeck(crateIdx, 'B');
+                }
+              }}
             >
               {EIGHT_INDICES.map((_, idx) => {
                 const slotId = `b0${idx + 1}`;
@@ -19018,6 +19444,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
           </div>
         )}
+
+        <button 
+          className={`btn btn-xs ${showMidiSynth ? 'active-magenta' : ''}`}
+          onClick={() => setShowMidiSynth(prev => !prev)}
+          style={{
+            marginRight: '12px',
+            borderColor: '#ff00ff',
+            color: '#ff00ff',
+            fontSize: '0.58rem',
+            padding: '2px 8px',
+            fontWeight: 'bold',
+            letterSpacing: '0.8px',
+            background: showMidiSynth ? 'rgba(255, 0, 255, 0.15)' : 'transparent',
+            boxShadow: showMidiSynth ? '0 0 10px #ff00ff' : '0 0 6px rgba(255, 0, 255, 0.15)',
+            cursor: 'pointer',
+            fontFamily: 'monospace'
+          }}
+        >
+          ⚡ DELTAVI
+        </button>
 
         <button 
           className="btn btn-xs" 
@@ -23094,7 +23540,19 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       {/* Computer Keyboard Triggers listener */}
       <KeyboardTrigger playVoice={playVoice} stopVoice={stopVoice} />
 
-      {/* Styles extracted to delta7-styles.css */}
+      <RecordCrates 
+        crates={crates}
+        onSaveCrate={saveDeckToCrate}
+        onLoadCrate={loadCrateToDeck}
+        onDeleteCrate={deleteCrate}
+        onRenameCrate={renameCrate}
+      />
+
+      {showMidiSynth && (
+        <DeltaViSynthPanel 
+          onClose={() => setShowMidiSynth(false)}
+        />
+      )}
 
 
       {padMenuState.visible && (() => {

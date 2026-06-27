@@ -2917,6 +2917,50 @@
   0% { opacity: 0.6; box-shadow: 0 0 2px rgba(255, 230, 0, 0.2); }
   100% { opacity: 1.0; box-shadow: 0 0 8px rgba(255, 230, 0, 0.8); }
 }
+.performance-pads-grid-2x4.drag-over-active-A {
+  border: 2px dashed #00f3ff !important;
+  box-shadow: 0 0 20px rgba(0, 243, 255, 0.45) !important;
+  background: rgba(0, 243, 255, 0.08) !important;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
 
+.performance-pads-grid-2x4.drag-over-active-B {
+  border: 2px dashed #ff00ff !important;
+  box-shadow: 0 0 20px rgba(255, 0, 255, 0.45) !important;
+  background: rgba(255, 0, 255, 0.08) !important;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
 
+.crate-card-container {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.crate-card-container.dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+  border-color: rgba(0, 243, 255, 0.6) !important;
+}
+
+.crate-card-container.is-loaded:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 243, 255, 0.5) !important;
+  box-shadow: 0 4px 15px rgba(0, 243, 255, 0.25);
+  background: rgba(10, 16, 32, 0.7) !important;
+}
+
+.crate-card-container.is-loaded:hover .vinyl-disc {
+  transform: translateX(12px) rotate(45deg);
+}
+
+@keyframes led-blink-cyan {
+  0% { opacity: 0.3; text-shadow: 0 0 2px rgba(0, 243, 255, 0.2); }
+  100% { opacity: 1.0; text-shadow: 0 0 8px rgba(0, 243, 255, 0.8); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
