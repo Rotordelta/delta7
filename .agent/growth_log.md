@@ -387,4 +387,13 @@
   - **Color-Coded Subgroup Options**: Grouping target selector menus by Bank A/B/C and color-coding options to match their hardware pad glow colors creates high visual cohesiveness.
   - **Ref/State Double Binding**: Direct prop forwarding to nested subcomponents is reliable for updating audio refs synchronously while refreshing standard React state loops.
 
+## Session: 2026-06-27 (Part 11)
+- **Task**: Loom Visual Upgrades & Recording Alignment Controls.
+- **Jimmy's Preferences**:
+  - **Retro Projector Aesthetic**: Visualizing sequencer bar values as 70s neon-filament Nixie tube digits complete with glowing orange glass envelopes and fine wire anode mesh grids gives a premium sci-fi instrument console vibe.
+  - **Flexible Timing Alignments**: Offering different snap levels (Loop cycle, Bar boundaries, Beat triggers, or Immediate capture) gives the performer deep control over their loop start times.
+  - **Quantized Playback Handover**: Letting the first onset of a manual pad trigger optionally snap directly to the next transport beat division prevents rhythm drift during live looping performance.
+
+
+
 
