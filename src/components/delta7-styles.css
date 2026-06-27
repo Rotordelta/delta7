@@ -2951,7 +2951,7 @@
 }
 
 .crate-card-container.is-loaded:hover .vinyl-disc {
-  transform: translateX(12px) rotate(45deg);
+  transform: translateY(-12px) rotate(15deg);
 }
 
 @keyframes led-blink-cyan {

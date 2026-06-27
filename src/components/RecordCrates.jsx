@@ -23,47 +23,34 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
   };
 
   return (
-    <div className="record-crates-panel steel-plate" style={{ 
-      marginTop: '1.25rem', 
-      background: 'linear-gradient(180deg, rgba(8, 12, 22, 0.95) 0%, rgba(3, 5, 10, 0.98) 100%)', 
-      border: '2px solid rgba(0, 243, 255, 0.35)', 
-      borderRadius: '6px',
-      padding: '10px 16px',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.85), inset 0 0 15px rgba(0, 243, 255, 0.1)',
+    <div className="patches-quick-category font-mono" style={{ 
+      marginTop: '8px', 
+      background: 'rgba(0,0,0,0.3)', 
+      border: '1px solid rgba(0, 243, 255, 0.15)', 
+      borderRadius: '4px',
+      padding: '8px',
       userSelect: 'none'
     }}>
       {/* Panel Header */}
-      <div style={{ 
+      <span className="knob-label" style={{ 
+        color: '#ffe600', 
         display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        borderBottom: '1px solid rgba(0, 243, 255, 0.2)',
-        paddingBottom: '6px',
-        marginBottom: '10px'
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '6px',
+        fontWeight: 'bold',
+        fontSize: '0.55rem',
+        letterSpacing: '0.5px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.75rem', animation: 'led-blink-cyan 1.5s infinite alternate' }}>⚡</span>
-          <span style={{ 
-            fontFamily: 'monospace', 
-            fontSize: '0.72rem', 
-            fontWeight: 'bold', 
-            color: '#ffe600', 
-            letterSpacing: '1px',
-            textShadow: '0 0 5px rgba(255, 230, 0, 0.4)'
-          }}>
-            RECORD CRATES &mdash; 8-BANK SAMPLE GROOVE STORAGE
-          </span>
-        </div>
-        <span style={{ fontFamily: 'monospace', fontSize: '0.52rem', color: '#888' }}>
-          DRAG & DROP RECORD SLEEVES TO LOAD INTO DECK A OR DECK B PADS GRID
-        </span>
-      </div>
+        <span>⚡ RECORD CRATES (BANKS OF 8)</span>
+        <span style={{ fontSize: '0.38rem', color: '#666', fontWeight: 'normal' }}>DRAG TO DECK</span>
+      </span>
 
-      {/* Crates Grid */}
+      {/* Crates 2x4 Grid */}
       <div className="crates-grid" style={{ 
         display: 'grid', 
-        gridTemplateColumns: 'repeat(8, 1fr)', 
-        gap: '12px' 
+        gridTemplateColumns: 'repeat(2, 1fr)', 
+        gap: '6px' 
       }}>
         {crates.map((crate, idx) => {
           const isLoaded = crate.loaded;
@@ -74,7 +61,6 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
               draggable={isLoaded}
               onDragStart={(e) => {
                 if (!isLoaded) return;
-                // Add dragging state/classes
                 e.currentTarget.classList.add('dragging');
                 e.dataTransfer.effectAllowed = 'copy';
                 e.dataTransfer.setData('text/plain', `crate_${idx}`);
@@ -83,16 +69,16 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
                 e.currentTarget.classList.remove('dragging');
               }}
               style={{
-                background: 'rgba(5, 8, 16, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '4px',
-                padding: '6px',
+                background: 'rgba(5, 8, 16, 0.65)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '3px',
+                padding: '4px 5px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 position: 'relative',
                 overflow: 'visible',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.15s ease',
                 cursor: isLoaded ? 'grab' : 'default'
               }}
             >
@@ -100,18 +86,18 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
               <div 
                 className="vinyl-sleeve-wrapper"
                 style={{
-                  width: '78px',
-                  height: '78px',
+                  width: '56px',
+                  height: '56px',
                   position: 'relative',
-                  background: 'linear-gradient(135deg, #141b29 0%, #080c14 100%)',
-                  border: isLoaded ? '1px solid rgba(0, 243, 255, 0.4)' : '1px dashed rgba(255, 255, 255, 0.15)',
-                  boxShadow: isLoaded ? '0 5px 12px rgba(0,0,0,0.6)' : 'none',
+                  background: 'linear-gradient(135deg, #101622 0%, #06090e 100%)',
+                  border: isLoaded ? '1px solid rgba(0, 243, 255, 0.35)' : '1px dashed rgba(255, 255, 255, 0.12)',
+                  boxShadow: isLoaded ? '0 3px 8px rgba(0,0,0,0.6)' : 'none',
                   borderRadius: '3px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   overflow: 'visible',
-                  marginBottom: '6px'
+                  marginBottom: '4px'
                 }}
               >
                 {/* Vinyl record disc sticking out slightly when loaded */}
@@ -120,35 +106,35 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
                     className="vinyl-disc"
                     style={{
                       position: 'absolute',
-                      right: '-8px',
-                      top: '4px',
-                      width: '70px',
-                      height: '70px',
+                      right: '-6px',
+                      top: '3px',
+                      width: '50px',
+                      height: '50px',
                       borderRadius: '50%',
-                      background: 'repeating-radial-gradient(circle, #0e121a 0px, #0e121a 1px, #181f2c 2px, #0e121a 3px)',
-                      boxShadow: '2px 4px 8px rgba(0,0,0,0.7)',
+                      background: 'repeating-radial-gradient(circle, #0c1017 0px, #0c1017 1px, #141b26 2px, #0c1017 3px)',
+                      boxShadow: '1px 2px 4px rgba(0,0,0,0.6)',
                       zIndex: -1,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transition: 'transform 0.3s ease'
+                      transition: 'transform 0.25s ease'
                     }}
                   >
                     {/* Vinyl Label */}
                     <div style={{
-                      width: '24px',
-                      height: '24px',
+                      width: '18px',
+                      height: '18px',
                       borderRadius: '50%',
                       background: '#ffe600',
-                      border: '2px solid #000',
+                      border: '1px solid #000',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: 'inset 0 0 3px rgba(0,0,0,0.8)'
+                      boxShadow: 'inset 0 0 2px rgba(0,0,0,0.8)'
                     }}>
                       <div style={{
-                        width: '4px',
-                        height: '4px',
+                        width: '3px',
+                        height: '3px',
                         borderRadius: '50%',
                         background: '#000'
                       }} />
@@ -160,21 +146,20 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
                 <div style={{
                   color: isLoaded ? '#00f3ff' : '#444',
                   fontFamily: 'monospace',
-                  fontSize: '0.45rem',
+                  fontSize: '0.4rem',
                   fontWeight: 'bold',
                   textAlign: 'center',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '2px'
+                  gap: '1px'
                 }}>
-                  <span style={{ fontSize: '0.52rem', color: isLoaded ? '#ffe600' : '#444' }}>CRATE</span>
+                  <span style={{ fontSize: '0.45rem', color: isLoaded ? '#ffe600' : '#444' }}>CRT</span>
                   <span>{String(idx + 1).padStart(2, '0')}</span>
-                  {isLoaded && <span style={{ color: '#00ff96', fontSize: '0.4rem', marginTop: '3px' }}>● LOADED</span>}
                 </div>
               </div>
 
               {/* Title / Rename Area */}
-              <div style={{ width: '100%', minHeight: '18px', display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
+              <div style={{ width: '100%', minHeight: '13px', display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
                 {editingCrateIdx === idx ? (
                   <input
                     type="text"
@@ -185,14 +170,14 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
                     autoFocus
                     maxLength={16}
                     style={{
-                      width: '90%',
+                      width: '95%',
                       background: '#000',
                       border: '1px solid #ffe600',
                       color: '#ffe600',
-                      fontSize: '0.48rem',
+                      fontSize: '0.44rem',
                       fontFamily: 'monospace',
                       textAlign: 'center',
-                      padding: '1px 2px',
+                      padding: '0px 1px',
                       outline: 'none',
                       borderRadius: '2px'
                     }}
@@ -202,14 +187,14 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
                     onClick={() => handleRenameStart(idx, crate.name)}
                     style={{
                       fontFamily: 'monospace',
-                      fontSize: '0.5rem',
-                      color: isLoaded ? '#fff' : '#666',
+                      fontSize: '0.46rem',
+                      color: isLoaded ? '#fff' : '#555',
                       cursor: 'pointer',
                       textAlign: 'center',
                       textOverflow: 'ellipsis',
                       overflow: 'hidden',
                       whiteSpace: 'nowrap',
-                      maxWidth: '85px',
+                      maxWidth: '105px',
                       display: 'block'
                     }}
                     title="Click to rename"
@@ -224,7 +209,7 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
                 width: '100%', 
                 display: 'flex', 
                 flexDirection: 'column', 
-                gap: '3px',
+                gap: '2.5px',
                 opacity: editingCrateIdx === idx ? 0.3 : 1,
                 pointerEvents: editingCrateIdx === idx ? 'none' : 'auto'
               }}>
@@ -235,10 +220,10 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
                     className="btn btn-xs"
                     style={{
                       flex: 1,
-                      fontSize: '0.36rem',
-                      padding: '2px 0',
+                      fontSize: '0.34rem',
+                      padding: '1.5px 0',
                       margin: 0,
-                      borderColor: 'rgba(0, 243, 255, 0.3)',
+                      borderColor: 'rgba(0, 243, 255, 0.25)',
                       color: '#00f3ff',
                       cursor: 'pointer'
                     }}
@@ -251,10 +236,10 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
                     className="btn btn-xs"
                     style={{
                       flex: 1,
-                      fontSize: '0.36rem',
-                      padding: '2px 0',
+                      fontSize: '0.34rem',
+                      padding: '1.5px 0',
                       margin: 0,
-                      borderColor: 'rgba(255, 0, 255, 0.3)',
+                      borderColor: 'rgba(255, 0, 255, 0.25)',
                       color: '#ff00ff',
                       cursor: 'pointer'
                     }}
@@ -272,42 +257,42 @@ export default function RecordCrates({ crates, onSaveCrate, onLoadCrate, onDelet
                       className="btn btn-xs"
                       style={{
                         flex: 1,
-                        fontSize: '0.36rem',
-                        padding: '1.5px 0',
+                        fontSize: '0.34rem',
+                        padding: '1px 0',
                         margin: 0,
                         borderColor: '#00f3ff',
                         color: '#00f3ff',
-                        background: 'rgba(0, 243, 255, 0.1)',
+                        background: 'rgba(0, 243, 255, 0.08)',
                         cursor: 'pointer'
                       }}
                       title="Load crate samples into Deck A"
                     >
-                      LOAD A
+                      LD A
                     </button>
                     <button 
                       onClick={() => onLoadCrate(idx, 'b')}
                       className="btn btn-xs"
                       style={{
                         flex: 1,
-                        fontSize: '0.36rem',
-                        padding: '1.5px 0',
+                        fontSize: '0.34rem',
+                        padding: '1px 0',
                         margin: 0,
                         borderColor: '#ff00ff',
                         color: '#ff00ff',
-                        background: 'rgba(255, 0, 255, 0.1)',
+                        background: 'rgba(255, 0, 255, 0.08)',
                         cursor: 'pointer'
                       }}
                       title="Load crate samples into Deck B"
                     >
-                      LOAD B
+                      LD B
                     </button>
                     <button 
                       onClick={() => onDeleteCrate(idx)}
                       className="btn btn-xs"
                       style={{
                         flex: 0.4,
-                        fontSize: '0.36rem',
-                        padding: '1.5px 0',
+                        fontSize: '0.34rem',
+                        padding: '1px 0',
                         margin: 0,
                         borderColor: '#ff4444',
                         color: '#ff4444',

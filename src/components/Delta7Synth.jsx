@@ -22310,16 +22310,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         <div className="rack-panel-right steel-plate">
           
           {/* The Loom: Sophisticated Circular Looper & FX Performance Recording Space */}
-          <div className="kaoss-pad-container" style={{ borderColor: '#00f3ff', boxShadow: '0 0 12px rgba(0, 243, 255, 0.15)' }}>
+          <div className="kaoss-pad-container" style={{ borderColor: '#00f3ff', boxShadow: '0 0 12px rgba(0, 243, 255, 0.15)', marginBottom: '8px' }}>
             <div className="section-label" style={{ color: '#00f3ff', textShadow: '0 0 6px #00f3ff', letterSpacing: '1px' }}>
-              THE LOOM - WAVEFORM & MOTION DECK
+              THE LOOM - MULTI-TOUCH DECK
             </div>
             
             {/* Platter Canvas Wrapper */}
             <div className="chrono-canvas-wrapper" style={{ 
               position: 'relative', 
               width: '100%', 
-              height: '180px', 
+              height: '160px', 
               background: '#020712', 
               border: '1px solid rgba(0, 243, 255, 0.3)', 
               boxShadow: 'inset 0 0 10px rgba(0,243,255,0.1)',
@@ -22344,7 +22344,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               <canvas 
                 ref={chronoCanvasRef} 
                 width={280} 
-                height={180} 
+                height={160} 
                 style={{ display: 'block', width: '100%', height: '100%' }} 
               />
               
@@ -22375,9 +22375,18 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </div>
             </div>
 
+            {/* Mic Recording Level Meter */}
+            <div style={{ width: '100%', marginTop: '3px' }}>
+              <div className="mic-level-meter-container" style={{ padding: '1px 2px', height: '7px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '2px' }}>
+                <div className="mic-level-bar-track" style={{ height: '3px', background: 'rgba(255,255,255,0.02)', borderRadius: '1px', overflow: 'hidden' }}>
+                  <div id="looper-level-bar-fill" className="mic-level-bar-fill" style={{ width: '0%', height: '100%', background: 'linear-gradient(90deg, #00ff96 70%, #ffc000 85%, #ff0055 100%)', borderRadius: '1px', transition: 'width 0.05s ease' }}></div>
+                </div>
+              </div>
+            </div>
+
             {/* Waveform Sculpting Brush Tools Panel */}
             <div style={{ marginTop: '5px', background: 'rgba(0,0,0,0.4)', padding: '4px', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '3px' }}>
-              <div style={{ fontSize: '0.38rem', color: '#888', fontFamily: 'monospace', marginBottom: '2px', textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+              <div style={{ fontSize: '0.36rem', color: '#888', fontFamily: 'monospace', marginBottom: '2px', textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.5px' }}>
                 WAVEFORM SCULPTING BRUSHES
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px' }}>
@@ -22395,8 +22404,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       onClick={() => setSculptTool(tool.id)}
                       className="btn btn-xs"
                       style={{
-                        fontSize: '0.36rem',
-                        padding: '3px 0',
+                        fontSize: '0.34rem',
+                        padding: '2px 0',
                         margin: 0,
                         color: isSel ? '#fff' : tool.color,
                         background: isSel ? tool.activeColor : '#000',
@@ -22458,6 +22467,43 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </div>
               </div>
 
+              {/* Input Gain & Saturation Row */}
+              <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.36rem', color: '#888' }}>
+                    <span>IN GAIN:</span>
+                    <span style={{ color: '#00f3ff' }}>{Math.round(recordingInputGain * 100)}%</span>
+                  </div>
+                  <input 
+                    type="range" min="0" max="2" step="0.01"
+                    value={recordingInputGain}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setRecordingInputGain(val);
+                      recordingInputGainRef.current = val;
+                      updateLiveInputSaturation();
+                      const ctx = audioCtxRef.current;
+                      if (ctx && resamplerGainNodeRef.current) {
+                        resamplerGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
+                      }
+                    }}
+                    style={{ width: '100%', height: '5px', accentColor: '#00f3ff', cursor: 'pointer', margin: 0 }}
+                  />
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.36rem', color: '#888' }}>
+                    <span>SAT DRIVE:</span>
+                    <span style={{ color: '#ff4c4c' }}>{Math.round(inputGainSat)}%</span>
+                  </div>
+                  <input 
+                    type="range" min="0" max="100" step="1"
+                    value={inputGainSat}
+                    onChange={(e) => setInputGainSat(parseFloat(e.target.value))}
+                    style={{ width: '100%', height: '5px', accentColor: '#ff4c4c', cursor: 'pointer', margin: 0 }}
+                  />
+                </div>
+              </div>
+
               {/* Primary Atomic ARM Button */}
               <button
                 onClick={() => {
@@ -22487,7 +22533,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   fontSize: '0.42rem',
                   padding: '4px 0',
                   fontWeight: 'bold',
-                  margin: '1px 0',
+                  margin: '2px 0 1px 0',
                   color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : (isArmed ? '#ffe600' : '#aaa')),
                   borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : (isArmed ? '#ffe600' : 'rgba(255,255,255,0.15)')),
                   background: isLiveRecording
@@ -22517,20 +22563,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   className="btn btn-xs"
                   style={{
                     flex: 1,
-                    background: liveRecOverdub ? 'rgba(0, 243, 255, 0.15)' : '#000',
+                    background: liveRecOverdub ? 'rgba(0, 243, 255, 0.08)' : '#000',
                     borderColor: liveRecOverdub ? '#00f3ff' : 'rgba(255,255,255,0.15)',
                     color: liveRecOverdub ? '#00f3ff' : '#aaa',
-                    fontSize: '0.38rem',
+                    fontSize: '0.36rem',
                     padding: '2.5px 0',
                     cursor: 'pointer'
                   }}
                 >
-                  {liveRecOverdub ? 'OVERDUB: ON 🔄' : 'OVERDUB: OFF'}
+                  {liveRecOverdub ? 'DUB: ON 🔄' : 'DUB: OFF'}
                 </button>
                 <button
                   onClick={clearLooperBuffer}
                   className="btn btn-xs"
-                  style={{ flex: 1, borderColor: '#ff4444', color: '#ff4444', fontSize: '0.38rem', padding: '2.5px 0', cursor: 'pointer' }}
+                  style={{ flex: 1, borderColor: '#ff4444', color: '#ff4444', fontSize: '0.36rem', padding: '2.5px 0', cursor: 'pointer' }}
                 >
                   🗑️ CLEAR LOOP
                 </button>
@@ -22542,7 +22588,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     flex: 0.8,
                     borderColor: '#ffe600',
                     color: '#ffe600',
-                    fontSize: '0.38rem',
+                    fontSize: '0.36rem',
                     padding: '2.5px 0',
                     opacity: looperHasUndo ? 1 : 0.4,
                     cursor: looperHasUndo ? 'pointer' : 'default'
@@ -22552,11 +22598,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </button>
               </div>
 
-              {/* Latency & Nudge Calibration Sliders */}
+              {/* Latency & Timing sliders */}
               <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '3px', padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '1px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.38rem', color: '#888' }}>
-                    <span>LATENCY COMPENSATION:</span>
+                    <span>LATENCY:</span>
                     <span style={{ color: '#ffe600', fontFamily: 'monospace', fontWeight: 'bold' }}>{recLatencyOffset} ms</span>
                   </div>
                   <input
@@ -22568,13 +22614,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       recLatencyOffsetRef.current = val;
                       localStorage.setItem('delta7_rec_latency_offset', val);
                     }}
-                    style={{ width: '100%', height: '8px', accentColor: '#ffe600', cursor: 'pointer', margin: 0 }}
+                    style={{ width: '100%', height: '5px', accentColor: '#ffe600', cursor: 'pointer', margin: 0 }}
                   />
                 </div>
-
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.38rem', color: '#888' }}>
-                    <span>MICRO-TIMING SLIP:</span>
+                    <span>NUDGE SLIP:</span>
                     <span style={{ color: '#00f3ff', fontFamily: 'monospace', fontWeight: 'bold' }}>{selectedSlotNudge} ms</span>
                   </div>
                   <input
@@ -22585,15 +22630,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       setSelectedSlotNudge(val);
                       updateSlotParam(liveRecTargetSlot, 'nudgeMs', val);
                     }}
-                    style={{ width: '100%', height: '8px', accentColor: '#00f3ff', cursor: 'pointer', margin: 0 }}
+                    style={{ width: '100%', height: '5px', accentColor: '#00f3ff', cursor: 'pointer', margin: 0 }}
                   />
                 </div>
               </div>
 
-              {/* FX Motion Performance Automation Recorder */}
+              {/* FX Motion Automation Recorder Controls */}
               <div style={{ background: 'rgba(255,0,255,0.02)', border: '1px solid rgba(255,0,255,0.15)', borderRadius: '3px', padding: '4px 6px', display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '1px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.38rem', color: '#ff00ff', fontWeight: 'bold', letterSpacing: '0.5px' }}>FX MOTION RECORDER</span>
+                  <span style={{ fontSize: '0.38rem', color: '#ff00ff', fontWeight: 'bold', letterSpacing: '0.5px' }}>FX MOTION AUTOMATION</span>
                   <span style={{ fontSize: '0.36rem', color: isPlayingFxAutomation ? '#00f3ff' : (isRecordingFxAutomation ? '#ff0055' : '#666'), fontWeight: 'bold' }}>
                     {isRecordingFxAutomation ? '● REC' : (isPlayingFxAutomation ? '▶ PLAY' : 'IDLE')}
                   </span>
@@ -23051,296 +23096,13 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
             </div>
           </div>
 
-          {/* Live Sampler / Loop Recorder Panel */}
-          <div className="patches-quick-category font-mono" style={{ marginTop: '8px' }}>
-            <span className="knob-label" style={{ color: '#00f3ff' }}>Live Sampler / Loop Rec</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '4px', padding: '8px' }}>
-              
-              {/* Visual Feedback Status Ring/Indicator */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ position: 'relative', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {/* Status Circle */}
-                  <div style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    background: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#222'),
-                    boxShadow: isLiveRecording 
-                      ? '0 0 10px #ff0055' 
-                      : (liveRecPendingStart ? '0 0 10px #ffe600' : 'none'),
-                    animation: isLiveRecording 
-                      ? 'pulse-red 0.5s infinite alternate' 
-                      : (liveRecPendingStart ? 'pulse-yellow 0.5s infinite alternate' : 'none')
-                  }} />
-                  {/* Rotating progress border if active */}
-                  {isLiveRecording && (
-                    <div style={{
-                      position: 'absolute',
-                      top: 0, left: 0, right: 0, bottom: 0,
-                      border: '2px solid transparent',
-                      borderTopColor: '#ff0055',
-                      borderRadius: '50%',
-                      animation: 'spin 1.5s linear infinite'
-                    }} />
-                  )}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.52rem', fontWeight: 'bold', color: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#888') }}>
-                    {isLiveRecording ? '● RECORDING' : (liveRecPendingStart ? '⏳ ARMED (WAITING)' : 'STANDBY')}
-                  </span>
-                  <span style={{ fontSize: '0.44rem', color: '#fff', opacity: 0.7 }}>
-                    {isLiveRecording || liveRecPendingStart ? `Target: Pad ${liveRecTargetSlot.toUpperCase()} (${liveRecBeats} Beats)` : 'Resampler ready'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Source Selector */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.4rem', color: '#888' }}>SOURCE:</span>
-                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.4)', borderRadius: '3px', padding: '1.5px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  {[
-                    { mode: 'resample', label: 'INTERNAL' },
-                    { mode: 'mic', label: 'MIC/LINE' },
-                    { mode: 'monitor', label: 'MONITOR' }
-                  ].map(item => {
-                    const isSel = recordingInputMode === item.mode;
-                    return (
-                      <button
-                        key={item.mode}
-                        onClick={() => setRecordingInputMode(item.mode)}
-                        style={{
-                          flex: 1,
-                          fontSize: '0.42rem',
-                          padding: '2.5px 0',
-                          border: 'none',
-                          background: isSel ? 'rgba(0, 243, 255, 0.2)' : 'transparent',
-                          color: isSel ? '#00f3ff' : '#aaa',
-                          cursor: 'pointer',
-                          borderRadius: '2px',
-                          fontWeight: isSel ? 'bold' : 'normal',
-                          textAlign: 'center'
-                        }}
-                      >
-                        {item.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Target Pad & Beats Row */}
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {/* Target Pad Selector */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.4rem', color: '#888' }}>TARGET PAD:</span>
-                  <select
-                    value={liveRecTargetSlot}
-                    onChange={(e) => {
-                      setLiveRecTargetSlot(e.target.value);
-                      setSelectedEditSlotId(e.target.value);
-                    }}
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.5)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      color: '#ffe600',
-                      fontSize: '0.48rem',
-                      borderRadius: '3px',
-                      padding: '2px 4px',
-                      fontFamily: 'monospace',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      height: '22px',
-                      width: '100%'
-                    }}
-                  >
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <option key={`a-${i}`} value={`a0${i+1}`}>A{i+1}</option>
-                    ))}
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>
-                    ))}
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <option key={`c-${i}`} value={`c0${i+1}`}>C{i+1}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Length Selector */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.4rem', color: '#888' }}>LENGTH:</span>
-                  <select
-                    value={liveRecBeats}
-                    onChange={(e) => setLiveRecBeats(parseInt(e.target.value))}
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.5)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      color: '#00f3ff',
-                      fontSize: '0.48rem',
-                      borderRadius: '3px',
-                      padding: '2px 4px',
-                      fontFamily: 'monospace',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      height: '22px',
-                      width: '100%'
-                    }}
-                  >
-                    {[2, 4, 8, 12, 16, 32, 64].map(b => (
-                      <option key={b} value={b}>{b} Beats</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Overdub Toggle */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', position: 'relative' }}>
-                  <span style={{ fontSize: '0.4rem', color: '#888', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                    OVERDUB:
-                    <MidiBadge paramKey="liveRecOverdubToggle" style={{ fontSize: '0.28rem', padding: '0px 1px' }} />
-                  </span>
-                  <button
-                    onClick={() => setLiveRecOverdub(prev => !prev)}
-                    className="btn btn-xs"
-                    style={{
-                      background: liveRecOverdub ? 'rgba(0, 243, 255, 0.2)' : 'rgba(0, 0, 0, 0.5)',
-                      border: liveRecOverdub ? '1px solid #00f3ff' : '1px solid rgba(255,255,255,0.15)',
-                      color: liveRecOverdub ? '#00f3ff' : '#aaa',
-                      fontSize: '0.42rem',
-                      fontWeight: liveRecOverdub ? 'bold' : 'normal',
-                      borderRadius: '3px',
-                      height: '22px',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    {liveRecOverdub ? 'ON 🔄' : 'OFF'}
-                  </button>
-                </div>
-              </div>
-
-
-
-              {/* Input Gain Slider */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginTop: '2px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.4rem', color: '#888' }}>INPUT GAIN:</span>
-                  <span style={{ color: '#00f3ff', fontSize: '0.48rem', fontFamily: 'monospace' }}>
-                    {Math.round(recordingInputGain * 100)}%
-                  </span>
-                </div>
-                <input 
-                  type="range" min="0" max="2" step="0.01"
-                  value={recordingInputGain}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setRecordingInputGain(val);
-                    recordingInputGainRef.current = val;
-                    updateLiveInputSaturation();
-                    const ctx = audioCtxRef.current;
-                    if (ctx) {
-                      if (resamplerGainNodeRef.current) {
-                        resamplerGainNodeRef.current.gain.setValueAtTime(val, ctx.currentTime);
-                      }
-                    }
-                  }}
-                  style={{ width: '100%', height: '8px', accentColor: '#00f3ff', cursor: 'pointer', margin: 0 }}
-                />
-              </div>
-
-              {/* Saturation Drive Slider */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%', marginTop: '2px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.4rem', color: '#888' }}>SAT DRIVE:</span>
-                  <span style={{ color: '#ff4c4c', fontSize: '0.48rem', fontFamily: 'monospace' }}>
-                    {Math.round(inputGainSat)}%
-                  </span>
-                </div>
-                <input 
-                  type="range" min="0" max="100" step="1"
-                  value={inputGainSat}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setInputGainSat(val);
-                  }}
-                  style={{ width: '100%', height: '8px', accentColor: '#ff4c4c', cursor: 'pointer', margin: 0 }}
-                />
-              </div>
-
-              {/* ARM → gate queue → record — single atomic button */}
-              <div style={{ width: '100%', marginTop: '4px' }}>
-                <button
-                  onClick={() => {
-                    if (isLiveRecording || liveRecPendingStart) {
-                      // Cancel in-progress gate or recording
-                      liveLoopInProgressRef.current = false;
-                      isLiveRecordingRef.current = false;
-                      liveRecPendingStartRef.current = false;
-                      setIsLiveRecording(false);
-                      setLiveRecPendingStart(false);
-                      setLooperState(0);
-                      if (recordingWorkletNodeRef.current) {
-                        recordingWorkletNodeRef.current.port.postMessage({ type: 'STOP' });
-                      }
-                      if (schedulerNodeRef.current) {
-                        schedulerNodeRef.current.port.postMessage({ type: 'DISARM_RECORD_GATE' });
-                      }
-                      showEditorStatus('ARM cancelled ✖️');
-                    } else {
-                      // Arm + queue gate atomically.
-                      // liveRecBeatsRef already holds the user's selected loop length — don't overwrite it.
-                      liveRecOverdubRef.current = false;
-                      setLooperState(1);
-                      startLiveLoopRecording();
-                    }
-                  }}
-                  className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : (isArmed ? 'active-yellow' : ''))}`}
-                  style={{
-                    width: '100%',
-                    fontSize: '0.45rem',
-                    padding: '5px 0',
-                    fontWeight: 'bold',
-                    margin: 0,
-                    letterSpacing: '0.05em',
-                    color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : (isArmed ? '#ffe600' : '#aaa')),
-                    borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : (isArmed ? '#ffe600' : 'rgba(255,255,255,0.15)')),
-                    background: isLiveRecording
-                      ? 'rgba(255, 0, 85, 0.25)'
-                      : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.85)' : (isArmed ? 'rgba(255,230,0,0.12)' : 'rgba(0,0,0,0.3)')),
-                    boxShadow: isLiveRecording
-                      ? '0 0 10px rgba(255, 0, 85, 0.5)'
-                      : (liveRecPendingStart ? '0 0 10px rgba(255, 230, 0, 0.5)' : 'none'),
-                    animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {isLiveRecording
-                    ? '⏹️ STOP REC'
-                    : liveRecPendingStart
-                      ? '⏳ WAITING BEAT 1...'
-                      : isArmed
-                        ? '⚡ ARM → QUEUE GATE'
-                        : '🔴 ARM + REC'}
-                </button>
-              </div>
-
-              {/* Input level meter */}
-              <div style={{ width: '100%', marginTop: '3px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.36rem', color: '#888', marginBottom: '2px', fontFamily: 'monospace' }}>
-                  <span>RECORD LEVEL:</span>
-                  <span style={{ color: isArmed ? '#00f3ff' : '#666' }}>{isArmed ? 'MONITORING' : 'OFF'}</span>
-                </div>
-                <div className="mic-level-meter-container" style={{ padding: '2px 4px', height: '10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '2px' }}>
-                  <div className="mic-level-bar-track" style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div id="looper-level-bar-fill" className="mic-level-bar-fill" style={{ width: '0%', height: '100%', background: 'linear-gradient(90deg, #00ff96 70%, #ffc000 85%, #ff0055 100%)', borderRadius: '2px', transition: 'width 0.05s ease' }}></div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
+          <RecordCrates 
+            crates={crates}
+            onSaveCrate={saveDeckToCrate}
+            onLoadCrate={loadCrateToDeck}
+            onDeleteCrate={deleteCrate}
+            onRenameCrate={renameCrate}
+          />
 
         </div>
 
@@ -23540,13 +23302,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       {/* Computer Keyboard Triggers listener */}
       <KeyboardTrigger playVoice={playVoice} stopVoice={stopVoice} />
 
-      <RecordCrates 
-        crates={crates}
-        onSaveCrate={saveDeckToCrate}
-        onLoadCrate={loadCrateToDeck}
-        onDeleteCrate={deleteCrate}
-        onRenameCrate={renameCrate}
-      />
 
       {showMidiSynth && (
         <DeltaViSynthPanel 
