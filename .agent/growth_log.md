@@ -344,3 +344,10 @@
   - **Control Consolidation**: Grouping related panels (like The Loom visualizer and Live Sampler controls) into a single, unified container removes redundant options and saves valuable screen space.
   - **Sidebar Crate Storage**: Organizing Record Crates as a 2x4 vertical grid inside the sidebar keeps the main chassis bottom layout clean.
   - **Space-Conscious Animations**: Adjusting hover effects to match the visual boundaries (e.g. pulling vinyl discs upward from sleeves, rather than sliding horizontally to the right) ensures that elements don't get clipped near panel edges.
+
+## Session: 2026-06-27 (Part 5)
+- **Task**: 4 tactile siftable record stacks (2x2 grid).
+- **Jimmy's Preferences**:
+  - **Physical Sifting Metaphor**: Stacking two records together into a pile and letting the user flip the pile (sift) by clicking the offset back record or a `SIFT` tag matches vintage record bin interactions.
+  - **Space Maximization**: Shrinking the 8-crate grid down to a 2x2 pile grid optimizes right sidebar vertical space, leaving plenty of room for other controls.
+  - **State Page Indicators**: Adding simple visual layout indicators (like small navigation dots) gives instant feedback on which active layer/crate is current.
