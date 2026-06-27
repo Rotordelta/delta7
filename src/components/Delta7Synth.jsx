@@ -2055,6 +2055,8 @@ export default function Delta7Synth() {
     
     const bufferLength = 32;
     const dataArray = new Uint8Array(bufferLength);
+    const limiterBufferLength = limiterAnalyserRef.current ? limiterAnalyserRef.current.frequencyBinCount : 32;
+    const limiterDataArray = new Uint8Array(limiterBufferLength);
     
     // Issue 8: replaced Map spread with early-exit for...of — eliminates 240 array allocations/sec
     const getIsDeckActive = (deck) => {
@@ -2299,8 +2301,7 @@ export default function Delta7Synth() {
       
       // Master Limiter VU peak level meter
       if (limiterAnalyserRef.current) {
-        const limiterBufferLength = limiterAnalyserRef.current.frequencyBinCount;
-        const limiterDataArray = new Uint8Array(limiterBufferLength);
+        const limiterBufferLength = limiterDataArray.length;
         limiterAnalyserRef.current.getByteTimeDomainData(limiterDataArray);
         let limiterSum = 0;
         for (let i = 0; i < limiterBufferLength; i++) {
@@ -13603,19 +13604,30 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         // 9. Process FX Automation Playback Loop
         const lastBeatPhase = lastPlaybackBeatRef.current;
         if (isPlayingFxAutomationRef.current && events.length > 0) {
-          let eventsToPlay = [];
-          if (currentBeatPhase < lastBeatPhase) {
-            eventsToPlay = events.filter(e => e.beat >= lastBeatPhase || e.beat < currentBeatPhase);
-          } else {
-            eventsToPlay = events.filter(e => e.beat >= lastBeatPhase && e.beat < currentBeatPhase);
+          let hasEvents = false;
+          for (let i = 0; i < events.length; i++) {
+            const e = events[i];
+            const isMatch = (currentBeatPhase < lastBeatPhase)
+              ? (e.beat >= lastBeatPhase || e.beat < currentBeatPhase)
+              : (e.beat >= lastBeatPhase && e.beat < currentBeatPhase);
+            if (isMatch) {
+              hasEvents = true;
+              break;
+            }
           }
           
-          if (eventsToPlay.length > 0) {
+          if (hasEvents) {
             setParamsOriginal(prev => {
               const next = { ...prev };
-              eventsToPlay.forEach(e => {
-                next[e.paramKey] = e.value;
-              });
+              for (let i = 0; i < events.length; i++) {
+                const e = events[i];
+                const isMatch = (currentBeatPhase < lastBeatPhase)
+                  ? (e.beat >= lastBeatPhase || e.beat < currentBeatPhase)
+                  : (e.beat >= lastBeatPhase && e.beat < currentBeatPhase);
+                if (isMatch) {
+                  next[e.paramKey] = e.value;
+                }
+              }
               paramsRef.current = next;
               return next;
             });
