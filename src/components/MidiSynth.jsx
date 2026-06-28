@@ -7204,13 +7204,16 @@ const getDwgsWave = (ctx, type) => {
 
 export default function MidiSynth({
   layoutMode = 'horizontal',
+  embeddedCompactMode = false,
   recordingInputMode = 'mic',
   setRecordingInputMode = () => {},
   liveRecTargetSlot = 'a01',
   setLiveRecTargetSlot = () => {},
   setSelectedEditSlotId = () => {},
   recordingTargetSlotIdRef = null,
-  recordingInputModeRef = null
+  recordingInputModeRef = null,
+  selectedMidiDeviceName = 'all',
+  setSelectedMidiDeviceName = () => {}
 }) {
   const [synthOn, setSynthOn] = useState(false);
   const [dwgsType, setDwgsType] = useState('organ');
@@ -7327,9 +7330,11 @@ export default function MidiSynth({
 
   const midiLearnParamRef = useRef(midiLearnParam);
   const midiMappingsRef = useRef(midiMappings);
+  const selectedMidiDeviceNameRef = useRef(selectedMidiDeviceName);
   useEffect(() => {
     midiLearnParamRef.current = midiLearnParam;
     midiMappingsRef.current = midiMappings;
+    selectedMidiDeviceNameRef.current = selectedMidiDeviceName;
   });
 
   // Preset management
@@ -8645,6 +8650,10 @@ export default function MidiSynth({
 
     const handleGlobalMidi = (e) => {
       const { data, deviceName } = e.detail;
+      const targetDevice = selectedMidiDeviceNameRef.current;
+      if (targetDevice && targetDevice !== 'all' && deviceName !== targetDevice) {
+        return;
+      }
       if (deviceName && deviceName !== connectedDevice) {
         setConnectedDevice(deviceName);
       }
@@ -8659,7 +8668,9 @@ export default function MidiSynth({
       
       if (status < 240) {
         const channel = (status & 0x0f) + 1;
-        if (synthMidiChannelRef.current !== 0 && channel !== synthMidiChannelRef.current) {
+        const targetDevice = selectedMidiDeviceNameRef.current;
+        const bypassChannelFilter = targetDevice && targetDevice !== 'all';
+        if (!bypassChannelFilter && synthMidiChannelRef.current !== 0 && channel !== synthMidiChannelRef.current) {
           return;
         }
       }
@@ -10330,25 +10341,29 @@ export default function MidiSynth({
   return (
     <div className="midi-synth-wrapper" style={{ maxWidth: '100%' }}>
       {/* UI Scaler Fader */}
-      <div className="synth-ui-scaler font-mono">
-        <span>UI SCALE: {Math.round(uiScale * 100)}%</span>
-        <input 
-          type="range" 
-          min="0.6" 
-          max="1.0" 
-          step="0.05" 
-          value={uiScale}
-          onChange={(e) => setUiScale(Number(e.target.value))}
-          className="synth-slider scale-slider"
-        />
-      </div>
+      {!embeddedCompactMode && (
+        <div className="synth-ui-scaler font-mono">
+          <span>UI SCALE: {Math.round(uiScale * 100)}%</span>
+          <input 
+            type="range" 
+            min="0.6" 
+            max="1.0" 
+            step="0.05" 
+            value={uiScale}
+            onChange={(e) => setUiScale(Number(e.target.value))}
+            className="synth-slider scale-slider"
+          />
+        </div>
+      )}
 
       <div 
         className={`midi-synth-rack ${layoutMode === 'vertical' ? 'vertical-console' : 'horizontal-console'}`}
         style={{ 
-          transform: `scale(${uiScale})`,
+          transform: embeddedCompactMode ? 'scale(0.85)' : `scale(${uiScale})`,
           transformOrigin: 'top center',
-          marginBottom: layoutMode === 'vertical' ? `${(1 - uiScale) * -800}px` : `${(1 - uiScale) * -520}px` 
+          marginBottom: embeddedCompactMode 
+            ? '-60px' 
+            : (layoutMode === 'vertical' ? `${(1 - uiScale) * -800}px` : `${(1 - uiScale) * -520}px`)
         }}
       >
         <div className="vector-border top"></div>
@@ -10356,100 +10371,67 @@ export default function MidiSynth({
 
         <div className="synth-faceplate">
           {/* Header Panel */}
-          <div className="synth-header">
-            <div className="header-left">
-              <span className="brand-logo">DELTAVI</span>
-              <span className="sub-brand">DUOPHONIC ARIES, LIBRA & LEO CONSOLE</span>
-            </div>
-
-            <div className="power-casing">
-              <span className="section-title">ENGAGE</span>
-              <button 
-                className={`power-switch ${synthOn ? 'power-on' : ''}`}
-                onClick={synthOn ? stopSynth : startSynth}
-                aria-label="Power Switch"
-              >
-                <div className="switch-toggle"></div>
-              </button>
-              <div className={`power-led ${synthOn ? 'led-on' : ''}`}></div>
-            </div>
-
-            <div className="voice-allocator">
-              <span className="section-title">VOICE MODE {renderMidiLearnBadge('voiceMode')}</span>
-              <div className="button-group-row">
-                {['mono', 'duo', 'poly'].map(mode => (
-                  <button
-                    key={mode}
-                    className={`nav-btn ${voiceMode === mode ? 'active' : ''}`}
-                    onClick={() => setVoiceMode(mode)}
-                    disabled={!synthOn}
-                  >
-                    {mode.toUpperCase()}
-                  </button>
-                ))}
+          {!embeddedCompactMode && (
+            <div className="synth-header">
+              <div className="header-left">
+                <span className="brand-logo">DELTAVI</span>
+                <span className="sub-brand">DUOPHONIC ARIES, LIBRA & LEO CONSOLE</span>
               </div>
-            </div>
 
-            {/* Preset Manager Dashboard */}
-            <div className="preset-dashboard">
-              <span className="section-title">PRESET MANAGER</span>
-              <div className="preset-row">
-                <select 
-                  className="preset-select font-mono"
-                  value={selectedPresetName}
-                  onChange={(e) => handleLoadPreset(e.target.value)}
+              <div className="power-casing">
+                <span className="section-title">ENGAGE</span>
+                <button 
+                  className={`power-switch ${synthOn ? 'power-on' : ''}`}
+                  onClick={synthOn ? stopSynth : startSynth}
+                  aria-label="Power Switch"
                 >
-                  {presets.map(p => (
-                    <option key={p.name} value={p.name}>{p.name}</option>
-                  ))}
-                </select>
+                  <div className="switch-toggle"></div>
+                </button>
+                <div className={`power-led ${synthOn ? 'led-on' : ''}`}></div>
+              </div>
 
-                <div className="preset-save-box">
-                  <input 
-                    type="text" 
-                    placeholder="New Patch Name..." 
-                    value={customPresetName}
-                    onChange={(e) => setCustomPresetName(e.target.value)}
-                    className="preset-input font-mono"
-                  />
-                  <button 
-                    onClick={handleSavePreset}
-                    disabled={!customPresetName.trim()}
-                    className="action-btn-small active"
-                    style={{ height: '24px', fontSize: '0.48rem' }}
-                  >
-                    SAVE
-                  </button>
+              <div className="voice-allocator">
+                <span className="section-title">VOICE MODE {renderMidiLearnBadge('voiceMode')}</span>
+                <div className="button-group-row">
+                  {['mono', 'duo', 'poly'].map(mode => (
+                    <button
+                      key={mode}
+                      className={`nav-btn ${voiceMode === mode ? 'active' : ''}`}
+                      onClick={() => setVoiceMode(mode)}
+                      disabled={!synthOn}
+                    >
+                      {mode.toUpperCase()}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* Sampler Recorder Router */}
-            <div className="preset-dashboard" style={{ borderLeft: '1px solid rgba(0,243,255,0.15)', paddingLeft: '15px' }}>
-              <span className="section-title" style={{ color: '#ff007f', textShadow: '0 0 4px rgba(255,0,127,0.3)' }}>REC ROUTING</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <select 
-                  className="preset-select font-mono"
-                  style={{ 
-                    borderColor: recordingInputMode === 'synth' ? '#ff007f' : 'rgba(255,255,255,0.15)',
-                    color: recordingInputMode === 'synth' ? '#ff007f' : '#888',
-                    maxWidth: '140px',
-                    textShadow: recordingInputMode === 'synth' ? '0 0 3px rgba(255,0,127,0.3)' : 'none'
-                  }}
-                  value={recordingInputMode === 'synth' ? liveRecTargetSlot : 'None'}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === 'None') {
-                      setRecordingInputMode('mic');
-                      if (recordingInputModeRef) recordingInputModeRef.current = 'mic';
-                    } else {
-                      setLiveRecTargetSlot(val);
-                      setSelectedEditSlotId(val);
-                      setRecordingInputMode('synth');
-                      if (recordingTargetSlotIdRef) recordingTargetSlotIdRef.current = val;
-                      if (recordingInputModeRef) recordingInputModeRef.current = 'synth';
-                    }
-                  }}
+              {/* Sampler Recorder Router */}
+              <div className="preset-dashboard" style={{ borderLeft: '1px solid rgba(0,243,255,0.15)', paddingLeft: '15px' }}>
+                <span className="section-title" style={{ color: '#ff007f', textShadow: '0 0 4px rgba(255,0,127,0.3)' }}>REC ROUTING</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <select 
+                    className="preset-select font-mono"
+                    style={{ 
+                      borderColor: recordingInputMode === 'synth' ? '#ff007f' : 'rgba(255,255,255,0.15)',
+                      color: recordingInputMode === 'synth' ? '#ff007f' : '#888',
+                      maxWidth: '140px',
+                      textShadow: recordingInputMode === 'synth' ? '0 0 3px rgba(255,0,127,0.3)' : 'none'
+                    }}
+                    value={recordingInputMode === 'synth' ? liveRecTargetSlot : 'None'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === 'None') {
+                        setRecordingInputMode('mic');
+                        if (recordingInputModeRef) recordingInputModeRef.current = 'mic';
+                      } else {
+                        setLiveRecTargetSlot(val);
+                        setSelectedEditSlotId(val);
+                        setRecordingInputMode('synth');
+                        if (recordingTargetSlotIdRef) recordingTargetSlotIdRef.current = val;
+                        if (recordingInputModeRef) recordingInputModeRef.current = 'synth';
+                      }
+                    }}
                 >
                   <option value="None">❌ NOT ROUTED</option>
                   <optgroup label="BANK A" style={{ background: '#000', color: '#00f3ff' }}>
@@ -10478,9 +10460,35 @@ export default function MidiSynth({
             </div>
 
             <div className="display-window">
-              <div className="telemetry font-mono">
+              <div className="telemetry font-mono" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span className="telemetry-lbl">MIDI IN:</span>
-                <span className="telemetry-val text-cyan">{connectedDevice}</span>
+                <select
+                  value={selectedMidiDeviceName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedMidiDeviceName(val);
+                    localStorage.setItem('deltavi_selected_midi_device', val);
+                  }}
+                  style={{
+                    background: '#000',
+                    border: '1px solid rgba(0, 243, 255, 0.4)',
+                    color: '#00f3ff',
+                    fontSize: '0.45rem',
+                    fontFamily: 'monospace',
+                    padding: '0 2px',
+                    borderRadius: '2px',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    width: '100px',
+                    height: '16px',
+                    lineHeight: '14px'
+                  }}
+                >
+                  <option value="all">All Devices</option>
+                  {midiDevices.map(name => (
+                    <option key={name} value={name}>{name.slice(0, 18)}</option>
+                  ))}
+                </select>
               </div>
               <div className="telemetry font-mono" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', borderBottom: '1px dashed rgba(0, 243, 255, 0.1)', paddingBottom: '2px' }}>
                 <span className="telemetry-lbl">RX CHANNEL:</span>
@@ -10542,10 +10550,11 @@ export default function MidiSynth({
               </div>
             </div>
           </div>
+        )}
 
-          {/* MAIN HORIZONTAL MODULES ROW - Restructured to 3x3 Grid */}
-          {/* MAIN WIDESCREEN CONSOLE GRID (4 Columns) */}
           <div className="synth-modules-horizontal">
+            {!embeddedCompactMode && (
+              <>
             
             {/* ROW 1 PANEL 1: ARIES OSCILLATORS */}
             <div className="rack-panel neon-glow-cyan">
@@ -12128,25 +12137,124 @@ export default function MidiSynth({
 
               </div>
             </div>
+          </>)}
 
             {/* ROW 4 PANEL 1: WIDESCREEN CRT VECTORSCOPE (Spans all 4 columns) */}
             <div className="scope-outer vectorscope-full-span neon-glow-cyan">
               <span className="panel-label">CRT VECTORSCOPE VISUALIZER</span>
-              <div className="scope-controls-row">
-                <button
-                  className={`wave-btn-synth ${scopeMode === 'waveform' ? 'active' : ''}`}
-                  onClick={() => setScopeMode('waveform')}
-                  style={{ maxWidth: '100px', fontSize: '0.45rem', padding: '2px 8px' }}
-                >
-                  WAVEFORM
-                </button>
-                <button
-                  className={`wave-btn-synth ${scopeMode === 'lissajous' ? 'active' : ''}`}
-                  onClick={() => setScopeMode('lissajous')}
-                  style={{ maxWidth: '100px', fontSize: '0.45rem', padding: '2px 8px' }}
-                >
-                  LISSAJOUS (L/R)
-                </button>
+              <div className="scope-controls-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  <button
+                    className={`wave-btn-synth ${scopeMode === 'waveform' ? 'active' : ''}`}
+                    onClick={() => setScopeMode('waveform')}
+                    style={{ maxWidth: '100px', fontSize: '0.45rem', padding: '2px 8px' }}
+                  >
+                    WAVEFORM
+                  </button>
+                  <button
+                    className={`wave-btn-synth ${scopeMode === 'lissajous' ? 'active' : ''}`}
+                    onClick={() => setScopeMode('lissajous')}
+                    style={{ maxWidth: '100px', fontSize: '0.45rem', padding: '2px 8px' }}
+                  >
+                    LISSAJOUS (L/R)
+                  </button>
+
+                  <span style={{ fontSize: '0.45rem', color: '#00f3ff', fontFamily: 'monospace', fontWeight: 'bold', marginLeft: '6px' }}>MIDI IN:</span>
+                  <select
+                    value={selectedMidiDeviceName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedMidiDeviceName(val);
+                      localStorage.setItem('deltavi_selected_midi_device', val);
+                    }}
+                    style={{
+                      background: '#000',
+                      border: '1px solid rgba(0, 243, 255, 0.4)',
+                      color: '#00f3ff',
+                      fontSize: '0.48rem',
+                      fontFamily: 'monospace',
+                      padding: '0 3px',
+                      borderRadius: '2px',
+                      outline: 'none',
+                      cursor: 'pointer',
+                      height: '18px',
+                      lineHeight: '16px',
+                      maxWidth: '100px'
+                    }}
+                  >
+                    <option value="all">All Devices</option>
+                    {midiDevices.map(name => (
+                      <option key={name} value={name}>{name.slice(0, 15)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Preset Manager (Moved next to scope buttons above keys) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '3px', border: '1px solid rgba(0, 243, 255, 0.25)' }}>
+                  <span style={{ fontSize: '0.45rem', color: '#00f3ff', fontFamily: 'monospace', fontWeight: 'bold', letterSpacing: '0.5px' }}>PRESET:</span>
+                  <select 
+                    className="preset-select font-mono"
+                    value={selectedPresetName}
+                    onChange={(e) => handleLoadPreset(e.target.value)}
+                    style={{
+                      background: '#000',
+                      border: '1px solid rgba(0, 243, 255, 0.4)',
+                      color: '#ffe600',
+                      fontSize: '0.48rem',
+                      fontFamily: 'monospace',
+                      padding: '0 3px',
+                      borderRadius: '2px',
+                      outline: 'none',
+                      cursor: 'pointer',
+                      height: '18px',
+                      lineHeight: '16px'
+                    }}
+                  >
+                    {presets.map(p => (
+                      <option key={p.name} value={p.name}>{p.name}</option>
+                    ))}
+                  </select>
+
+                  <div className="preset-save-box" style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <input 
+                      type="text" 
+                      placeholder="Save patch..." 
+                      value={customPresetName}
+                      onChange={(e) => setCustomPresetName(e.target.value)}
+                      className="preset-input font-mono"
+                      style={{
+                        background: '#000',
+                        border: '1px solid rgba(0, 243, 255, 0.2)',
+                        color: '#fff',
+                        fontSize: '0.45rem',
+                        padding: '0 4px',
+                        borderRadius: '2px',
+                        outline: 'none',
+                        width: '80px',
+                        height: '18px'
+                      }}
+                    />
+                    <button 
+                      onClick={handleSavePreset}
+                      disabled={!customPresetName.trim()}
+                      className="action-btn-small active"
+                      style={{
+                        height: '18px',
+                        lineHeight: '16px',
+                        fontSize: '0.42rem',
+                        padding: '0 6px',
+                        background: 'rgba(255, 230, 0, 0.2)',
+                        color: '#ffe600',
+                        border: '1px solid #ffe600',
+                        borderRadius: '2px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      SAVE
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="scope-bezel">
                 <canvas 
@@ -12436,9 +12544,39 @@ export default function MidiSynth({
             
             <div className="latency-modal-body" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid rgba(0, 243, 255, 0.15)', paddingBottom: '10px', flexWrap: 'wrap', gap: '10px' }}>
-                <div>
-                  <span style={{ color: '#00f3ff', fontSize: '0.55rem', display: 'block', textTransform: 'uppercase', opacity: 0.8 }}>Active Controller:</span>
-                  <span style={{ color: '#ffffff', fontSize: '#00ff96', fontSize: '0.65rem', fontWeight: 'bold' }}>{connectedDevice}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div>
+                    <span style={{ color: '#00f3ff', fontSize: '0.55rem', display: 'block', textTransform: 'uppercase', opacity: 0.8 }}>MIDI Input Device:</span>
+                    <select
+                      value={selectedMidiDeviceName}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedMidiDeviceName(val);
+                        localStorage.setItem('deltavi_selected_midi_device', val);
+                      }}
+                      style={{
+                        background: '#000',
+                        border: '1px solid rgba(0, 243, 255, 0.4)',
+                        color: '#00f3ff',
+                        fontSize: '0.55rem',
+                        fontFamily: 'monospace',
+                        padding: '2px 4px',
+                        borderRadius: '3px',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        marginTop: '2px'
+                      }}
+                    >
+                      <option value="all">All Devices</option>
+                      {midiDevices.map(name => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ marginLeft: '12px' }}>
+                    <span style={{ color: '#00f3ff', fontSize: '0.55rem', display: 'block', textTransform: 'uppercase', opacity: 0.8 }}>Status:</span>
+                    <span style={{ color: '#00ff96', fontSize: '0.65rem', fontWeight: 'bold' }}>{connectedDevice}</span>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   <button 
@@ -12784,8 +12922,15 @@ export default function MidiSynth({
 
         .midi-synth-rack {
           position: relative;
-          background: #08090d;
-          border: 2px solid #1f2833;
+          background: 
+            linear-gradient(rgba(0, 243, 255, 0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 243, 255, 0.04) 1px, transparent 1px),
+            rgba(5, 7, 12, 0.48);
+          background-size: 24px 24px, 24px 24px, auto;
+          background-position: center;
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 2px solid rgba(0, 243, 255, 0.35);
           border-radius: 8px;
           padding: 1.25rem 1.25rem 0.5rem 1.25rem;
           box-shadow: 
@@ -12797,18 +12942,18 @@ export default function MidiSynth({
           transition: transform 0.1s ease-out;
         }
 
-        /* Wood cheeks */
+        /* Glowing Vector Bars (Abel Look) */
         .midi-synth-rack::before {
           content: "";
           position: absolute;
           top: 0;
           left: 0;
-          width: 18px;
+          width: 12px;
           height: 100%;
-          background: linear-gradient(to right, #2c1a0e, #5a3825 30%, #3e2417 70%, #1a0f08);
-          border-right: 2px solid #100a06;
+          background: linear-gradient(to right, rgba(0, 243, 255, 0.8), rgba(0, 243, 255, 0.2) 50%, rgba(0, 243, 255, 0.05));
+          border-right: 1.5px solid #00f3ff;
           z-index: 10;
-          box-shadow: inset 1px 0 3px rgba(255,255,255,0.1), 3px 0 10px rgba(0,0,0,0.5);
+          box-shadow: 0 0 15px rgba(0, 243, 255, 0.6), inset 1px 0 2px rgba(255,255,255,0.2);
         }
 
         .midi-synth-rack::after {
@@ -12816,22 +12961,23 @@ export default function MidiSynth({
           position: absolute;
           top: 0;
           right: 0;
-          width: 18px;
+          width: 12px;
           height: 100%;
-          background: linear-gradient(to left, #2c1a0e, #5a3825 30%, #3e2417 70%, #1a0f08);
-          border-left: 2px solid #100a06;
+          background: linear-gradient(to left, rgba(255, 0, 127, 0.8), rgba(255, 0, 127, 0.2) 50%, rgba(255, 0, 127, 0.05));
+          border-left: 1.5px solid #ff007f;
           z-index: 10;
-          box-shadow: inset -1px 0 3px rgba(255,255,255,0.1), -3px 0 10px rgba(0,0,0,0.5);
+          box-shadow: 0 0 15px rgba(255, 0, 127, 0.6), inset -1px 0 2px rgba(255,255,255,0.2);
         }
 
         /* Robert Abel Glow Accents */
         .vector-border {
           position: absolute;
-          left: 18px;
-          right: 18px;
+          left: 12px;
+          right: 12px;
           height: 2px;
-          opacity: 0.8;
-          box-shadow: 0 0 10px rgba(0, 243, 255, 0.7);
+          opacity: 0.9;
+          box-shadow: 0 0 15px rgba(0, 243, 255, 0.85);
+          z-index: 15;
         }
         .vector-border.top {
           top: 0;
@@ -12993,11 +13139,13 @@ export default function MidiSynth({
         }
 
         .display-window {
-          background: #02060c;
+          background: rgba(2, 6, 12, 0.75);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
           border: 1.5px solid rgba(0, 243, 255, 0.45);
           border-radius: 6px;
           padding: 0.4rem 0.6rem;
-          box-shadow: inset 0 0 15px rgba(0, 243, 255, 0.15), 0 0 8px rgba(0, 243, 255, 0.08);
+          box-shadow: inset 0 0 15px rgba(0, 243, 255, 0.25), 0 0 8px rgba(0, 243, 255, 0.1);
           position: relative;
           overflow: hidden;
         }
@@ -13137,8 +13285,10 @@ export default function MidiSynth({
         }
 
         .scope-outer {
-          background: #040507;
-          border: 1.2px solid rgba(0, 243, 255, 0.25);
+          background: rgba(4, 5, 7, 0.55);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1.2px solid rgba(0, 243, 255, 0.35);
           padding: 0.7rem;
         }
 
@@ -13152,7 +13302,7 @@ export default function MidiSynth({
           position: absolute;
           top: -6px;
           left: 8px;
-          background: #08090d;
+          background: rgba(8, 9, 13, 0.85);
           padding: 0 4px;
         }
 
@@ -13300,8 +13450,14 @@ export default function MidiSynth({
 
         /* Scope bezel alignment inside equal-width column */
         .scope-bezel {
-          background: #020406;
-          border: 1.5px solid rgba(0, 243, 255, 0.45);
+          background: 
+            radial-gradient(circle, transparent 50%, rgba(2, 4, 6, 0.9)),
+            linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px),
+            #020406;
+          background-size: auto, 15px 15px, 15px 15px, auto;
+          background-position: center;
+          border: 1.5px solid rgba(0, 243, 255, 0.55);
           border-radius: 4px;
           overflow: hidden;
           width: 100%;
@@ -13309,7 +13465,7 @@ export default function MidiSynth({
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 243, 255, 0.15);
+          box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 243, 255, 0.25);
         }
 
         .scope-canvas {
@@ -13404,8 +13560,10 @@ export default function MidiSynth({
           justify-content: center;
           align-items: center;
           height: 95px;
-          background: #050608;
-          border: 1px solid rgba(0, 243, 255, 0.2);
+          background: rgba(5, 6, 8, 0.55);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+          border: 1px solid rgba(0, 243, 255, 0.35);
           border-radius: 4px;
           padding: 0 0.5rem;
         }
@@ -13486,10 +13644,12 @@ export default function MidiSynth({
         .virtual-keyboard {
           position: relative;
           display: flex;
-          background: #08090c;
-          border: 2.2px solid #1f2833;
+          background: rgba(8, 9, 12, 0.55);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+          border: 2.2px solid rgba(0, 243, 255, 0.35);
           border-radius: 4px;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.85);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.85), 0 0 10px rgba(0, 243, 255, 0.1);
           height: 95px;
           overflow: hidden;
           width: 100%;
@@ -13513,7 +13673,8 @@ export default function MidiSynth({
 
         .white-key.pressed {
           background: linear-gradient(to bottom, #00f3ff 0%, #00ff96 100%);
-          box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+          box-shadow: 0 0 15px rgba(0, 243, 255, 0.8), inset 0 2px 4px rgba(0,0,0,0.5);
+          z-index: 5;
         }
 
         .black-key {
@@ -13529,12 +13690,13 @@ export default function MidiSynth({
 
         .black-key.pressed {
           background: linear-gradient(to bottom, #ff007f 0%, #ff00ff 100%);
-          box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+          box-shadow: 0 0 15px rgba(255, 0, 127, 0.8), inset 0 2px 4px rgba(0,0,0,0.6);
+          z-index: 5;
         }
 
         .virtual-keyboard.synth-active {
           border-color: #ff007f;
-          box-shadow: 0 0 8px rgba(255, 0, 127, 0.35);
+          box-shadow: 0 0 15px rgba(255, 0, 127, 0.5);
         }
 
         /* MIDI Learn Badges */

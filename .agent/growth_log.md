@@ -400,7 +400,18 @@
   - **Dockable/Undockable Flexibilities**: Letting the performer detach complex modules like the Loom looper into a floating resizable glass console allows configuring optimal streaming/OBS layouts.
   - **Vertical console tower (400px wide)**: A vertical stacked tower mode for the DeltaVi synth console fits beautifully in space-constrained margins while keeping dials and sliders extremely usable.
   - **Unified Focus Zoom transition**: Extending the chassis-wide Focus Zoom scale to floating panels ensures they respond naturally to mouse hover events, reinforcing the physical instrument design theme.
+## Session: 2026-06-28 (Part 13)
+- **Task**: Collapsible DeltaVi Synthesizer Integrated Gap Layout.
+- **Jimmy's Preferences**:
+  - **Collapsible Console Integration**: Embedding the full synthesizer console in a collapsible drawer/gap inside the Performance Deck allows immediate layout flexibility—collapsing it provides a clean, streamlined performance view while expanding it exposes full synthesizer synthesis parameters.
+  - **Widescope Compact View Accessibility**: When collapsed, hiding the upper oscillators and filter panels while keeping the CRT vectorscope visualizer and virtual performance keys/wheels visible maintains visual telemetry and playability.
+  - **Relocating Primary Controls Adjacent to Displays**: Moving the Preset Manager (patch selection and saving) down to the vectorscope's mode control bar ensures that preset shifting remains fully functional even in compact mode.
+  - **Dynamic Scaling & Nested Grid Layouts**: Using conditional CSS transformations and margins allows scaling down complex modular faceplates so they fit neatly in horizontal console gaps without overlapping adjacent sidebars.
 
-
-
-
+## Session: 2026-06-28 (Part 14)
+- **Task**: Dedicated MIDI Keyboard controller routing and Robert Abel Vector Aesthetics.
+- **Jimmy's Preferences**:
+  - **Dedicated Controller Routing**: When a physical MIDI keyboard is designated for the synthesizer, the parent chassis should block note triggers on MIDI Channel 1 from triggering sampler performance pads. The child synth bypasses MIDI channel filters so the performer can play the synth on any channel from that dedicated controller.
+  - **Robert Abel Vector Graphics signature**: Integrating glowing wireframe grids directly into the glassmorphic faceplate background, and replacing solid wood end cheeks with backlit neon vector bars (using cyan and hot-pink gradients and glowing box shadows), creates an authentic retro-futuristic Abel visual identity.
+  - **CRT Oscilloscope Bezel Grid**: Layering a logarithmic/radial vector grid pattern and a soft edge-darkening vignette under the visualizer screen bezel creates a high-fidelity physical radar/vectorscope radar texture.
+  - **Backlit Glowing Controls**: Adding permanent neon-glow box shadows to panels, and vibrant trailing glow effects to pressed virtual keys and mod wheels, makes the synth feel alive and responsive.

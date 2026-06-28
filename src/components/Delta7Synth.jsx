@@ -4,6 +4,7 @@ import Knob from './Knob.jsx';
 import CircularAlignModal from './CircularAlignModal.jsx';
 import HelpMenuModal from './HelpMenuModal.jsx';
 import DeltaViSynthPanel from './DeltaViSynthPanel.jsx';
+import MidiSynth from './MidiSynth.jsx';
 import LoomConsolePanel from './LoomConsolePanel.jsx';
 import RecordCrates from './RecordCrates.jsx';
 import './delta7-styles.css';
@@ -597,6 +598,11 @@ export default function Delta7Synth() {
   const [isMidiSupported, setIsMidiSupported] = useState(false);
   const [midiDevices, setMidiDevices] = useState([]);
   const [selectedMidiDevice, setSelectedMidiDevice] = useState('');
+  const [selectedSynthMidiDevice, setSelectedSynthMidiDevice] = useState(() => localStorage.getItem('deltavi_selected_midi_device') || 'all');
+  const selectedSynthMidiDeviceRef = useRef(selectedSynthMidiDevice);
+  useEffect(() => {
+    selectedSynthMidiDeviceRef.current = selectedSynthMidiDevice;
+  }, [selectedSynthMidiDevice]);
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedAudioDevice, setSelectedAudioDevice] = useState('');
   const [midiActivity, setMidiActivity] = useState(false);
@@ -626,6 +632,13 @@ export default function Delta7Synth() {
   const [midiMenuOpen, setMidiMenuOpen] = useState(false);
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [showMidiSynth, setShowMidiSynth] = useState(false);
+  const [isEmbeddedSynthExpanded, setIsEmbeddedSynthExpanded] = useState(() => {
+    return localStorage.getItem('isEmbeddedSynthExpanded') === 'true';
+  });
+  useEffect(() => {
+    localStorage.setItem('isEmbeddedSynthExpanded', String(isEmbeddedSynthExpanded));
+  }, [isEmbeddedSynthExpanded]);
+
   const [showLoomConsole, setShowLoomConsole] = useState(() => {
     return localStorage.getItem('showLoomConsole') === 'true';
   });
@@ -14220,6 +14233,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         }
         
         // 6.5 Nixie/Tron Projector Core (Center Bar/Beat Display)
+        const currentBeat = seqCurrentBeatRef.current;
+        const currentBeatPhase = currentBeat % beats;
         const barNumber = Math.floor(currentBeatPhase / 4) + 1;
         const beatOfBar = Math.floor(currentBeatPhase % 4) + 1;
         
@@ -14316,9 +14331,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         ctx.fillText('BAR', centerX, centerY + 16);
         
         // 7. Active Recording Wedge / Ring Highlight (Neon Red)
-        const currentBeat = seqCurrentBeatRef.current;
-        const currentBeatPhase = currentBeat % beats;
-        
         if (looperStateRef.current === 1) {
           // Armed: Pulse inner ring yellow
           const pulseIntensity = Math.abs(Math.sin(performance.now() / 150)) * 0.4 + 0.1;
@@ -15115,6 +15127,12 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       window.dispatchEvent(new CustomEvent('delta7_midi_message', { 
         detail: { data: message.data, deviceName: input.name } 
       }));
+
+      // Bypass performance pad/looper triggers if this device is dedicated to the DeltaVi synth
+      const isDeviceSelectedForSynth = selectedSynthMidiDeviceRef.current !== 'all' && input.name === selectedSynthMidiDeviceRef.current;
+      if (isDeviceSelectedForSynth) {
+        return;
+      }
 
       const cmd = status >> 4;
 
@@ -19411,6 +19429,65 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Integrated Collapsible DeltaVi Synthesizer inside the gap */}
+        <div className="embedded-synth-container font-mono" style={{ 
+          marginTop: '6px', 
+          border: '1px solid rgba(0, 243, 255, 0.25)', 
+          background: 'rgba(5, 8, 18, 0.95)', 
+          borderRadius: '4px',
+          overflow: 'hidden',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5), 0 0 10px rgba(0, 243, 255, 0.1)'
+        }}>
+          {/* Collapse/Expand Toggle Bar */}
+          <div 
+            onClick={() => setIsEmbeddedSynthExpanded(prev => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'linear-gradient(90deg, #050d1a 0%, #0a1733 100%)',
+              padding: '4px 10px',
+              cursor: 'pointer',
+              borderBottom: isEmbeddedSynthExpanded ? '1px solid rgba(0, 243, 255, 0.2)' : 'none',
+              userSelect: 'none',
+              height: '24px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.52rem', animation: 'led-blink-cyan 1.5s infinite alternate' }}>⚡</span>
+              <span style={{ fontSize: '0.52rem', fontWeight: 'bold', color: '#00f3ff', letterSpacing: '0.8px', textShadow: '0 0 4px rgba(0, 243, 255, 0.4)' }}>
+                INTEGRATED DELTAVI SYNTHESIZER
+              </span>
+            </div>
+            <span style={{ fontSize: '0.52rem', color: '#ffe600', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+              {isEmbeddedSynthExpanded ? '🗕 COLLAPSE CONTROL RACK' : '🗖 EXPAND CONTROL RACK'}
+            </span>
+          </div>
+
+          {/* Synth Panel Container */}
+          <div style={{ 
+            maxHeight: isEmbeddedSynthExpanded ? '900px' : '235px', 
+            overflowY: 'auto',
+            transition: 'max-height 0.3s ease-in-out',
+            background: 'rgba(1, 2, 4, 0.25)',
+            position: 'relative'
+          }}>
+            <MidiSynth 
+              layoutMode="horizontal"
+              embeddedCompactMode={!isEmbeddedSynthExpanded}
+              recordingInputMode={recordingInputMode}
+              setRecordingInputMode={setRecordingInputMode}
+              liveRecTargetSlot={liveRecTargetSlot}
+              setLiveRecTargetSlot={setLiveRecTargetSlot}
+              setSelectedEditSlotId={setSelectedEditSlotId}
+              recordingTargetSlotIdRef={recordingTargetSlotIdRef}
+              recordingInputModeRef={recordingInputModeRef}
+              selectedMidiDeviceName={selectedSynthMidiDevice}
+              setSelectedMidiDeviceName={setSelectedSynthMidiDevice}
+            />
           </div>
         </div>
 
