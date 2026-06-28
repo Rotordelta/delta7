@@ -633,12 +633,6 @@ export default function Delta7Synth() {
   const [midiMenuOpen, setMidiMenuOpen] = useState(false);
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [showMidiSynth, setShowMidiSynth] = useState(false);
-  const [isEmbeddedSynthExpanded, setIsEmbeddedSynthExpanded] = useState(() => {
-    return localStorage.getItem('isEmbeddedSynthExpanded') === 'true';
-  });
-  useEffect(() => {
-    localStorage.setItem('isEmbeddedSynthExpanded', String(isEmbeddedSynthExpanded));
-  }, [isEmbeddedSynthExpanded]);
 
   const [showLoomConsole, setShowLoomConsole] = useState(() => {
     return localStorage.getItem('showLoomConsole') === 'true';
@@ -19531,64 +19525,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           </div>
         </div>
 
-        {/* Integrated Collapsible DeltaVi Synthesizer inside the gap */}
-        <div className="embedded-synth-container font-mono" style={{ 
-          marginTop: '6px', 
-          border: '1px solid rgba(0, 243, 255, 0.25)', 
-          background: 'rgba(5, 8, 18, 0.95)', 
-          borderRadius: '4px',
-          overflow: 'hidden',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5), 0 0 10px rgba(0, 243, 255, 0.1)'
-        }}>
-          {/* Collapse/Expand Toggle Bar */}
-          <div 
-            onClick={() => setIsEmbeddedSynthExpanded(prev => !prev)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'linear-gradient(90deg, #050d1a 0%, #0a1733 100%)',
-              padding: '4px 10px',
-              cursor: 'pointer',
-              borderBottom: isEmbeddedSynthExpanded ? '1px solid rgba(0, 243, 255, 0.2)' : 'none',
-              userSelect: 'none',
-              height: '24px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '0.52rem', animation: 'led-blink-cyan 1.5s infinite alternate' }}>⚡</span>
-              <span style={{ fontSize: '0.52rem', fontWeight: 'bold', color: '#00f3ff', letterSpacing: '0.8px', textShadow: '0 0 4px rgba(0, 243, 255, 0.4)' }}>
-                INTEGRATED DELTAVI SYNTHESIZER
-              </span>
-            </div>
-            <span style={{ fontSize: '0.52rem', color: '#ffe600', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-              {isEmbeddedSynthExpanded ? '🗕 COLLAPSE CONTROL RACK' : '🗖 EXPAND CONTROL RACK'}
-            </span>
-          </div>
-
-          {/* Synth Panel Container */}
-          <div style={{ 
-            maxHeight: isEmbeddedSynthExpanded ? '900px' : '235px', 
-            overflowY: 'auto',
-            transition: 'max-height 0.3s ease-in-out',
-            background: 'rgba(1, 2, 4, 0.25)',
-            position: 'relative'
-          }}>
-            <MidiSynth 
-              layoutMode="horizontal"
-              embeddedCompactMode={!isEmbeddedSynthExpanded}
-              recordingInputMode={recordingInputMode}
-              setRecordingInputMode={setRecordingInputMode}
-              liveRecTargetSlot={liveRecTargetSlot}
-              setLiveRecTargetSlot={setLiveRecTargetSlot}
-              setSelectedEditSlotId={setSelectedEditSlotId}
-              recordingTargetSlotIdRef={recordingTargetSlotIdRef}
-              recordingInputModeRef={recordingInputModeRef}
-              selectedMidiDeviceName={selectedSynthMidiDevice}
-              setSelectedMidiDeviceName={setSelectedSynthMidiDevice}
-            />
-          </div>
-        </div>
 
       </div>
     );
