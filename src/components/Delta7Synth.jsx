@@ -6,6 +6,7 @@ import HelpMenuModal from './HelpMenuModal.jsx';
 import DeltaViSynthPanel from './DeltaViSynthPanel.jsx';
 import MidiSynth from './MidiSynth.jsx';
 import LoomConsolePanel from './LoomConsolePanel.jsx';
+import Ronin9Panel from './Ronin9Panel.jsx';
 import RecordCrates from './RecordCrates.jsx';
 import './delta7-styles.css';
 
@@ -645,6 +646,13 @@ export default function Delta7Synth() {
   useEffect(() => {
     localStorage.setItem('showLoomConsole', String(showLoomConsole));
   }, [showLoomConsole]);
+
+  const [showRonin9, setShowRonin9] = useState(() => {
+    return localStorage.getItem('showRonin9') === 'true';
+  });
+  useEffect(() => {
+    localStorage.setItem('showRonin9', String(showRonin9));
+  }, [showRonin9]);
   const [dragOverDeck, setDragOverDeck] = useState(null);
   const [crates, setCrates] = useState(Array.from({ length: 8 }, (_, idx) => ({
     id: `crate_${idx}`,
@@ -2951,6 +2959,28 @@ export default function Delta7Synth() {
       }
       setupLosslessRecorderNode(ctx, resamplerGainNodeRef.current);
       triggerLiveLoopRecInternal();
+    } else if (inputMode === 'drums') {
+      const drumNode = window.__rdDrumMachineOutputNode;
+      if (!drumNode) {
+        showEditorStatus("Error: Ronin9 not active! ✖️");
+        return;
+      }
+      if (!resamplerGainNodeRef.current) {
+        const resamplerGainNode = ctx.createGain();
+        resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+        resamplerGainNodeRef.current = resamplerGainNode;
+        try {
+          drumNode.connect(resamplerGainNode);
+        } catch (err) {
+          console.error("Failed to connect drum node to resampler:", err);
+        }
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        micAnalyserRef.current = analyser;
+        resamplerGainNode.connect(analyser);
+      }
+      setupLosslessRecorderNode(ctx, resamplerGainNodeRef.current);
+      triggerLiveLoopRecInternal();
     } else if (!streamRef.current) {
       const isMonitor = inputMode === 'monitor';
       showEditorStatus(isMonitor ? "Arming browser audio monitor... 🖥️" : "Arming mic/instrument input... 🎤");
@@ -2991,7 +3021,7 @@ export default function Delta7Synth() {
     
     // Calculate latency offset samples to record extra at the end
     // For internal resample, latency is 0 since it is inside the audio graph
-    const isInternal = (recordingInputModeRef.current === 'resample' || recordingInputModeRef.current === 'synth');
+    const isInternal = (recordingInputModeRef.current === 'resample' || recordingInputModeRef.current === 'synth' || recordingInputModeRef.current === 'drums');
     const latencyMs = isInternal ? 0 : (recLatencyOffsetRef.current || 0);
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     const limitSamples = liveRecTotalSamplesRef.current + Math.max(0, latencySamples);
@@ -3078,7 +3108,7 @@ export default function Delta7Synth() {
       offset += chunksL[i].length;
     }
 
-    const isInternal = (recordingInputModeRef.current === 'resample' || recordingInputModeRef.current === 'synth');
+    const isInternal = (recordingInputModeRef.current === 'resample' || recordingInputModeRef.current === 'synth' || recordingInputModeRef.current === 'drums');
     const latencyMs = isInternal ? 0 : (recLatencyOffsetRef.current || 0);
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     const targetLength = liveRecTotalSamplesRef.current || totalLength;
@@ -3999,7 +4029,7 @@ export default function Delta7Synth() {
     
     // Apply latency offset shifting
     // For internal resample, latency is 0 since it is inside the audio graph
-    const isInternal = (recordingInputModeRef.current === 'resample' || recordingInputModeRef.current === 'synth');
+    const isInternal = (recordingInputModeRef.current === 'resample' || recordingInputModeRef.current === 'synth' || recordingInputModeRef.current === 'drums');
     const latencyMs = isInternal ? 0 : (recLatencyOffsetRef.current || 0);
     const latencySamples = Math.round((latencyMs / 1000) * ctx.sampleRate);
     console.log(`[Looper] saveResampledAudio: latencyMs = ${latencyMs}ms, latencySamples = ${latencySamples}, totalLength = ${totalLength}`);
@@ -4373,6 +4403,75 @@ export default function Delta7Synth() {
     } catch (err) {
       console.error("Error arming synth recorder:", err);
       alert("Synth recorder arming failed.");
+    }
+  };
+
+  const armDrumsRecorder = () => {
+    if (isArmed) {
+      disarmMicrophone();
+      return;
+    }
+    
+    // Check if the drum's output node is available
+    const drumNode = window.__rdDrumMachineOutputNode;
+    if (!drumNode) {
+      alert("Error: Ronin9 not active! Please open/start it first.");
+      return;
+    }
+    
+    let destInput = window.prompt("Enter destination slot to record to (e.g. A1-A8 or B1-B8):", selectedEditSlotId.toUpperCase());
+    if (destInput === null) return; // User cancelled
+    destInput = destInput.trim().toLowerCase();
+    
+    let prefix = selectedEditSlotId[0]; // default to current bank
+    if (destInput.startsWith('a')) {
+      prefix = 'a';
+    } else if (destInput.startsWith('b')) {
+      prefix = 'b';
+    } else if (destInput.startsWith('c')) {
+      prefix = 'c';
+    }
+    
+    const match = destInput.match(/\d+/);
+    if (!match) {
+      alert("Invalid slot. Please enter a slot like A1-A8 or B1-B8.");
+      return;
+    }
+    const slotNum = parseInt(match[0]);
+    if (slotNum < 1 || slotNum > 8) {
+      alert("Invalid slot number. Please enter a slot between 1 and 8.");
+      return;
+    }
+    const targetSlotId = `${prefix}0${slotNum}`;
+    setSelectedEditSlotId(targetSlotId);
+    recordingTargetSlotIdRef.current = targetSlotId;
+ 
+    try {
+      if (!audioCtxRef.current) initAudio();
+      const ctx = audioCtxRef.current;
+ 
+      // Create resampler gain node to apply REC GAIN
+      const resamplerGainNode = ctx.createGain();
+      resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
+      resamplerGainNodeRef.current = resamplerGainNode;
+ 
+      // Connect drum output node to resamplerGainNode
+      drumNode.connect(resamplerGainNode);
+ 
+      // Connect resamplerGainNode -> level analyser for visual feedback
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      micAnalyserRef.current = analyser;
+      resamplerGainNode.connect(analyser);
+ 
+      setupLosslessRecorderNode(ctx, resamplerGainNode);
+ 
+      setIsArmed(true);
+      startMicMonitor();
+      showEditorStatus(`Ronin9 Drums armed for ${prefix.toUpperCase()}${slotNum}! ⏺️`);
+    } catch (err) {
+      console.error("Error arming drums recorder:", err);
+      alert("Drums recorder arming failed.");
     }
   };
 
@@ -19881,6 +19980,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         </button>
 
         <button 
+          className={`btn btn-xs ${showRonin9 ? 'active-orange' : ''}`}
+          onClick={() => setShowRonin9(prev => !prev)}
+          style={{
+            marginRight: '12px',
+            borderColor: '#ff6e00',
+            color: '#ff6e00',
+            fontSize: '0.58rem',
+            padding: '2px 8px',
+            fontWeight: 'bold',
+            letterSpacing: '0.8px',
+            background: showRonin9 ? 'rgba(255, 110, 0, 0.15)' : 'transparent',
+            boxShadow: showRonin9 ? '0 0 10px #ff6e00' : '0 0 6px rgba(255, 110, 0, 0.15)',
+            cursor: 'pointer',
+            fontFamily: 'monospace'
+          }}
+        >
+          ⚡ RONIN9
+        </button>
+
+        <button 
           className="btn btn-xs" 
           onClick={() => setHelpMenuOpen(true)}
           style={{
@@ -22049,7 +22168,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '6px', marginTop: '4px' }}>
                       <button 
                         className={`btn btn-xs ${isArmed ? 'active-yellow' : ''}`} 
-                        onClick={recordingInputMode === 'mic' ? armMicrophone : (recordingInputMode === 'monitor' ? armMonitor : (recordingInputMode === 'synth' ? armSynthRecorder : armResampler))}
+                        onClick={recordingInputMode === 'mic' ? armMicrophone : (recordingInputMode === 'monitor' ? armMonitor : (recordingInputMode === 'synth' ? armSynthRecorder : (recordingInputMode === 'drums' ? armDrumsRecorder : armResampler)))}
                         style={{ margin: 0, fontSize: '0.62rem', padding: '3px' }}
                       >
                         {isArmed ? `DISARM ${recordingInputMode.toUpperCase()}` : `ARM ${recordingInputMode.toUpperCase()}`}
@@ -22931,6 +23050,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       <option value="mic">MIC/LINE</option>
                       <option value="monitor">MONITOR</option>
                       <option value="synth">DELTA-VI SYNTH</option>
+                      <option value="drums">RONIN9 DRUMS</option>
                     </select>
                   </div>
                 </div>
@@ -23786,6 +23906,23 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       {showMidiSynth && (
         <DeltaViSynthPanel 
           onClose={() => setShowMidiSynth(false)}
+          recordingInputMode={recordingInputMode}
+          setRecordingInputMode={setRecordingInputMode}
+          liveRecTargetSlot={liveRecTargetSlot}
+          setLiveRecTargetSlot={setLiveRecTargetSlot}
+          setSelectedEditSlotId={setSelectedEditSlotId}
+          recordingTargetSlotIdRef={recordingTargetSlotIdRef}
+          recordingInputModeRef={recordingInputModeRef}
+        />
+      )}
+
+      {showRonin9 && (
+        <Ronin9Panel 
+          onClose={() => setShowRonin9(false)}
+          audioCtx={audioCtxRef.current}
+          seqCurrentBeatRef={seqCurrentBeatRef}
+          isPlaying={isPlaying}
+          activeSampleRegistry={sampleSlots}
           recordingInputMode={recordingInputMode}
           setRecordingInputMode={setRecordingInputMode}
           liveRecTargetSlot={liveRecTargetSlot}
