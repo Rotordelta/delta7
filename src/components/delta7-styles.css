@@ -587,8 +587,8 @@
         }
 
         .steel-plate {
-          background: rgba(10, 12, 18, 0.94);
-          backdrop-filter: blur(16px);
+          background: rgba(10, 12, 18, 0.72);
+          backdrop-filter: blur(12px);
           border: 1px solid rgba(0, 243, 255, 0.22);
           box-shadow: 
             0 8px 32px 0 rgba(0, 0, 0, 0.7),

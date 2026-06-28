@@ -8,6 +8,7 @@ import MidiSynth from './MidiSynth.jsx';
 import LoomConsolePanel from './LoomConsolePanel.jsx';
 import Ronin9Panel from './Ronin9Panel.jsx';
 import RecordCrates from './RecordCrates.jsx';
+import OculusEngine from './OculusEngine';
 import './delta7-styles.css';
 
 // SharedArrayBuffer configuration constants
@@ -647,6 +648,7 @@ export default function Delta7Synth() {
   useEffect(() => {
     localStorage.setItem('showRonin9', String(showRonin9));
   }, [showRonin9]);
+
   const [dragOverDeck, setDragOverDeck] = useState(null);
   const [crates, setCrates] = useState(Array.from({ length: 8 }, (_, idx) => ({
     id: `crate_${idx}`,
@@ -2530,6 +2532,32 @@ export default function Delta7Synth() {
   const [recordingInputMode, setRecordingInputMode] = useState('mic'); // 'mic', 'monitor', or 'resample'
   const recordingInputModeRef = useRef('mic');
   useEffect(() => { recordingInputModeRef.current = recordingInputMode; }, [recordingInputMode]);
+
+  // Keyboard routing priority logic ('main' triggers Delta7, 'deltavi' triggers DeltaVi Synth)
+  const [keyboardRouteTarget, setKeyboardRouteTarget] = useState('main');
+  const keyboardRouteTargetRef = useRef('main');
+  useEffect(() => {
+    keyboardRouteTargetRef.current = keyboardRouteTarget;
+  }, [keyboardRouteTarget]);
+
+  // Automatically sync keyboard route target when recording input mode changes
+  useEffect(() => {
+    if (recordingInputMode === 'synth') {
+      setKeyboardRouteTarget('deltavi');
+    } else {
+      setKeyboardRouteTarget('main');
+    }
+  }, [recordingInputMode]);
+
+  const handleToggleKeyboardRoute = (target) => {
+    setKeyboardRouteTarget(target);
+    if (target === 'deltavi') {
+      setRecordingInputMode('synth');
+      setShowMidiSynth(true);
+    } else {
+      setRecordingInputMode(prev => prev === 'synth' ? 'mic' : prev);
+    }
+  };
   const [selectionStart, setSelectionStart] = useState(null);
   const [selectionEnd, setSelectionEnd] = useState(null);
   const [clipboard, setClipboard] = useState(null);
@@ -12107,6 +12135,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
       setMidiLearnParam(null);
       return;
     }
+
+    // Intercept target DeltaVi synth routing
+    if (keyboardRouteTargetRef.current === 'deltavi') {
+      setActiveNotes(prev => {
+        const next = new Set(prev);
+        next.add(note);
+        return next;
+      });
+      window.dispatchEvent(new CustomEvent('delta7_midi_message', { 
+        detail: { 
+          data: [144, note, velocity],
+          deviceName: 'delta7_internal_keys' 
+        } 
+      }));
+      return;
+    }
     
     // Intercept custom note mappings
     let noteMappedHandled = false;
@@ -12444,6 +12488,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const stopVoice = (note) => {
+    // Intercept target DeltaVi synth routing
+    if (keyboardRouteTargetRef.current === 'deltavi') {
+      setActiveNotes(prev => {
+        const next = new Set(prev);
+        next.delete(note);
+        return next;
+      });
+      window.dispatchEvent(new CustomEvent('delta7_midi_message', { 
+        detail: { 
+          data: [128, note, 0],
+          deviceName: 'delta7_internal_keys' 
+        } 
+      }));
+      return;
+    }
+
     // Intercept Bank C keyboard slice mapping
     if (keyboardMapBankCRef.current && note >= 48 && note <= 63) {
       const sliceIndex = note - 48;
@@ -12697,6 +12757,20 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
   };
 
   const triggerPerfPadInternal = (deck, type, index, velocity, isNoteOn, shouldRecord = false) => {
+    // Output standard MIDI note messages to all connected output ports for external visualizers/recorders
+    if (midiOutputsRef.current && midiOutputsRef.current.length > 0) {
+      const status = isNoteOn ? 0x99 : 0x89; // Channel 10 Note On (0x99) / Note Off (0x89)
+      const note = 36 + index; // Note number (36 = Kick, 37 = Snare, etc.)
+      const vel = isNoteOn ? Math.min(127, Math.round((velocity || 100) * 1.27)) : 0;
+      midiOutputsRef.current.forEach(output => {
+        try {
+          output.send([status, note, vel]);
+        } catch (e) {
+          // Ignore closed port errors
+        }
+      });
+    }
+
     if (!audioCtxRef.current) {
       initAudio();
       return;
@@ -19898,6 +19972,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           ⚡ DELTAVI
         </button>
 
+
+
         <button 
           className={`btn btn-xs ${showLoomConsole ? 'active-cyan' : ''}`}
           onClick={() => setShowLoomConsole(prev => !prev)}
@@ -23831,8 +23907,29 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           })}
         </div>
         <div className="keyboard-footer-strip">
-          <button className="btn btn-sm btn-panic" onClick={stopAllNotes}>PANIC RESET</button>
-          <span className="keyboard-notes-display font-mono">
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button className="btn btn-sm btn-panic" onClick={stopAllNotes}>PANIC RESET</button>
+            
+            {/* Keyboard Route Priority Control */}
+            <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0, 0, 0, 0.4)', borderRadius: '3px', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '2px' }}>
+              <span style={{ fontSize: '0.52rem', color: '#ff0055', marginRight: '6px', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.5px' }}>KEYS TARGET:</span>
+              <button
+                className={`segmented-btn btn-xs ${keyboardRouteTarget === 'main' ? 'active' : ''}`}
+                onClick={() => handleToggleKeyboardRoute('main')}
+                style={{ fontSize: '0.52rem', padding: '1px 5px', fontWeight: 'bold' }}
+              >
+                DELTA7
+              </button>
+              <button
+                className={`segmented-btn btn-xs ${keyboardRouteTarget === 'deltavi' ? 'active' : ''}`}
+                onClick={() => handleToggleKeyboardRoute('deltavi')}
+                style={{ fontSize: '0.52rem', padding: '1px 5px', fontWeight: 'bold' }}
+              >
+                DELTAVI (SYNTH REC FEED)
+              </button>
+            </div>
+          </div>
+          <span className="keyboard-notes-display font-mono" style={{ margin: 0 }}>
             PLAY KEYS WITH COMPUTER KEYBOARD (A-K ROW ON HOME ROW)
           </span>
         </div>
@@ -23840,6 +23937,17 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
       {/* Computer Keyboard Triggers listener */}
       <KeyboardTrigger playVoice={playVoice} stopVoice={stopVoice} />
+
+      {/* Persistent Fullscreen Visualizer Background */}
+      <OculusEngine
+        mode="mic"
+        stream={null}
+        audioFile={null}
+        audioCtx={audioCtxRef.current}
+        analyserNode={limiterAnalyserRef.current || analyserRef.current}
+        bpm={params.arpBpm || 120}
+        isPlaying={(metronomeRef.current && metronomeRef.current.isPlaying) || perfPlaybackActive || perfRecordActive}
+      />
 
 
       {showMidiSynth && (
@@ -23854,6 +23962,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           recordingInputModeRef={recordingInputModeRef}
         />
       )}
+
+
 
       {showRonin9 && (
         <Ronin9Panel 

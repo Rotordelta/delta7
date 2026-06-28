@@ -27,3 +27,4 @@ dist/
 
 # Electron builds
 dist_electron/
+chrome-profile/

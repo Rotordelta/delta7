@@ -7552,6 +7552,7 @@ export default function MidiSynth({
   // Canvas visualizer refs
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
+  const midiAccessRef = useRef(null);
 
   // Reverb tail generator
   const createReverbBuffer = (ctx, decayTime) => {
@@ -8626,6 +8627,7 @@ export default function MidiSynth({
   useEffect(() => {
     if (navigator.requestMIDIAccess) {
       navigator.requestMIDIAccess().then(access => {
+        midiAccessRef.current = access;
         const inputs = Array.from(access.inputs.values());
         setMidiDevices(inputs.map(i => i.name));
         if (inputs.length > 0) {
@@ -8667,12 +8669,12 @@ export default function MidiSynth({
       const command = status & 0xf0;
       
       if (status < 240) {
-        const channel = (status & 0x0f) + 1;
-        const targetDevice = selectedMidiDeviceNameRef.current;
-        const bypassChannelFilter = targetDevice && targetDevice !== 'all';
-        if (!bypassChannelFilter && synthMidiChannelRef.current !== 0 && channel !== synthMidiChannelRef.current) {
-          return;
-        }
+         const channel = (status & 0x0f) + 1;
+         const targetDevice = selectedMidiDeviceNameRef.current;
+         const bypassChannelFilter = targetDevice && targetDevice !== 'all';
+         if (!bypassChannelFilter && synthMidiChannelRef.current !== 0 && channel !== synthMidiChannelRef.current) {
+           return;
+         }
       }
 
       // Note On
@@ -8757,6 +8759,10 @@ export default function MidiSynth({
 
     return () => {
       window.removeEventListener('delta7_midi_message', handleGlobalMidi);
+      if (midiAccessRef.current) {
+        midiAccessRef.current.onstatechange = null;
+        midiAccessRef.current = null;
+      }
     };
   }, []);
 
@@ -10037,7 +10043,8 @@ export default function MidiSynth({
         analyserNode.getByteTimeDomainData(dataArray);
         const sliceWidth = canvas.width / bufferLength;
 
-        traces.forEach(trace => {
+        for (let ti = 0; ti < traces.length; ti++) {
+          const trace = traces[ti];
           canvasCtx.lineWidth = 1.5;
           canvasCtx.strokeStyle = trace.color;
           canvasCtx.shadowBlur = 6;
@@ -10058,7 +10065,7 @@ export default function MidiSynth({
           }
           canvasCtx.lineTo(canvas.width, canvas.height / 2 + trace.offset);
           canvasCtx.stroke();
-        });
+        }
       }
 
       canvasCtx.shadowBlur = 0;
@@ -12048,7 +12055,9 @@ export default function MidiSynth({
                             background: '#070a0f',
                             border: '1px solid rgba(255, 230, 0, 0.3)',
                             borderRadius: '2px',
-                            boxShadow: 'inset 0 0 4px rgba(0,0,0,0.8)'
+                            boxShadow: 'inset 0 0 4px rgba(0,0,0,0.8)',
+                            willChange: 'transform',
+                            transform: 'translateZ(0)'
                           }}
                         />
                       </div>
@@ -13472,6 +13481,8 @@ export default function MidiSynth({
           display: block;
           width: 100%;
           height: 100%;
+          will-change: transform;
+          transform: translateZ(0);
         }
 
         .scope-controls-row {
