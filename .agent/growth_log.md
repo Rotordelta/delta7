@@ -415,3 +415,11 @@
   - **Robert Abel Vector Graphics signature**: Integrating glowing wireframe grids directly into the glassmorphic faceplate background, and replacing solid wood end cheeks with backlit neon vector bars (using cyan and hot-pink gradients and glowing box shadows), creates an authentic retro-futuristic Abel visual identity.
   - **CRT Oscilloscope Bezel Grid**: Layering a logarithmic/radial vector grid pattern and a soft edge-darkening vignette under the visualizer screen bezel creates a high-fidelity physical radar/vectorscope radar texture.
   - **Backlit Glowing Controls**: Adding permanent neon-glow box shadows to panels, and vibrant trailing glow effects to pressed virtual keys and mod wheels, makes the synth feel alive and responsive.
+
+## Session: 2026-06-28 (Part 15)
+- **Task**: Ronin9 Circular Euclidean & Breakbeat Drum Workstation.
+- **Jimmy's Preferences**:
+  - **Euclidean Step Visualizer Layout**: Projecting 16 sequencer steps as concentric radial segments (rather than standard linear grids) creates a highly engaging, intuitive interface for sculpting polyrhythmic beats.
+  - **Interactive Polar Vector Rendering**: Rendering glowing wireframe circles, rotating playheads, and vector shape outlines for the active voice triggers aligns the drum machine's visuals with the overall Robert Abel style.
+  - **Direct Looper Capture Routing**: Adding a dedicated `'drums'` source mode to the looper config enables capturing live breakbeats directly onto sampler pads without external routing, maximizing performance workflow.
+  - **Saturated Analog Synthesis Blocks**: Using custom Web Audio synth voice paths (such as kick pitch sweeps, noise-burst claps/snares, and resonant frequency modulation toms) yields rich, retro analog drum timbres out of the box.
