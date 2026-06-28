@@ -13,7 +13,7 @@ export default function DeltaViSynthPanel({
 }) {
   const [position, setPosition] = useState({ x: 100, y: 80 });
   const [isMinimized, setIsMinimized] = useState(false);
-  const [size, setSize] = useState({ width: 1180, height: 650 });
+  const [size, setSize] = useState({ width: 1000, height: 835 });
   const [layoutMode, setLayoutMode] = useState(() => {
     return localStorage.getItem('deltavi_layout_mode') || 'horizontal';
   });
@@ -26,8 +26,8 @@ export default function DeltaViSynthPanel({
         setSize({ width: 420, height: 800 });
         localStorage.setItem('deltavi_panel_size', JSON.stringify({ width: 420, height: 800 }));
       } else {
-        setSize({ width: 1180, height: 650 });
-        localStorage.setItem('deltavi_panel_size', JSON.stringify({ width: 1180, height: 650 }));
+        setSize({ width: 1000, height: 835 });
+        localStorage.setItem('deltavi_panel_size', JSON.stringify({ width: 1000, height: 835 }));
       }
       return next;
     });
@@ -53,7 +53,12 @@ export default function DeltaViSynthPanel({
       try {
         const parsed = JSON.parse(savedSize);
         if (parsed && typeof parsed.width === 'number' && typeof parsed.height === 'number') {
-          setSize(parsed);
+          if (parsed.width === 1180 && parsed.height === 650) {
+            setSize({ width: 1000, height: 835 });
+            localStorage.setItem('deltavi_panel_size', JSON.stringify({ width: 1000, height: 835 }));
+          } else {
+            setSize(parsed);
+          }
         }
       } catch (e) {}
     }
