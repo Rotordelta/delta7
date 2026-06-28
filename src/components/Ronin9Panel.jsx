@@ -53,6 +53,148 @@ function getNoiseBuffer(ctx) {
   return buffer;
 }
 
+// Generate stereo exponential decay noise buffer for convolution reverb
+function createReverbImpulseResponse(ctx, duration = 1.8, decay = 2.0) {
+  const sampleRate = ctx.sampleRate;
+  const length = sampleRate * duration;
+  const impulse = ctx.createBuffer(2, length, sampleRate);
+  const left = impulse.getChannelData(0);
+  const right = impulse.getChannelData(1);
+  for (let i = 0; i < length; i++) {
+    const pct = i / length;
+    const val = (Math.random() * 2 - 1) * Math.pow(1 - pct, decay);
+    left[i] = val;
+    right[i] = (Math.random() * 2 - 1) * Math.pow(1 - pct, decay);
+  }
+  return impulse;
+}
+
+
+// A circular vector knob with a retro neon indicator and click-drag tracking
+function VectorKnob({ value, onChange, min = 0, max = 1, step = 0.01, label = '', color = '#00f3ff', size = 36 }) {
+  const isDraggingRef = useRef(false);
+  const startYRef = useRef(0);
+  const startValueRef = useRef(0);
+
+  const handleMouseDown = (e) => {
+    isDraggingRef.current = true;
+    startYRef.current = e.clientY;
+    startValueRef.current = value;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDraggingRef.current) return;
+    const deltaY = startYRef.current - e.clientY; // drag up increases value
+    const range = max - min;
+    const dragSensitivity = 150; // pixels to drag full range
+    const deltaVal = (deltaY / dragSensitivity) * range;
+    let nextVal = startValueRef.current + deltaVal;
+    
+    // Snapping to step
+    nextVal = Math.round(nextVal / step) * step;
+    nextVal = Math.max(min, Math.min(max, nextVal));
+    onChange(nextVal);
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // Calculate angle for indicator dot (from -135deg to +135deg)
+  const pct = (value - min) / (max - min || 1);
+  const startAngle = -135;
+  const endAngle = 135;
+  const angle = startAngle + pct * (endAngle - startAngle);
+  const rad = (angle * Math.PI) / 180;
+
+  // Dot coordinates relative to center (radius = size / 2)
+  const r = size * 0.32;
+  const cx = size / 2;
+  const cy = size / 2;
+  const dx = cx + Math.sin(rad) * r;
+  const dy = cy - Math.cos(rad) * r; // invert Y for SVG space
+
+  // Arc path for the value track
+  const pathRadius = size * 0.38;
+  const x1 = cx + Math.sin((startAngle * Math.PI) / 180) * pathRadius;
+  const y1 = cy - Math.cos((startAngle * Math.PI) / 180) * pathRadius;
+  const x2 = cx + Math.sin((angle * Math.PI) / 180) * pathRadius;
+  const y2 = cy - Math.cos((angle * Math.PI) / 180) * pathRadius;
+  
+  const largeArcFlag = angle - startAngle > 180 ? 1 : 0;
+  const arcPath = pct > 0.01 
+    ? `M ${x1} ${y1} A ${pathRadius} ${pathRadius} 0 ${largeArcFlag} 1 ${x2} ${y2}`
+    : '';
+
+  return (
+    <div 
+      style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        gap: '4px',
+        userSelect: 'none',
+        cursor: 'ns-resize'
+      }}
+      title={`${label}: ${value}`}
+    >
+      {label && <span style={{ fontSize: '0.36rem', color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: 'bold' }}>{label}</span>}
+      <div 
+        onMouseDown={handleMouseDown}
+        style={{ 
+          width: `${size}px`, 
+          height: `${size}px`, 
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '50%',
+          background: 'rgba(5, 10, 18, 0.85)',
+          border: `1.5px solid rgba(255, 255, 255, 0.05)`,
+          boxShadow: `inset 0 0 10px rgba(0, 0, 0, 0.8)`
+        }}
+      >
+        <svg width={size} height={size} style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}>
+          {/* Base background ring */}
+          <circle cx={cx} cy={cy} r={pathRadius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" strokeDasharray="3 2" />
+          
+          {/* Active glowing value track */}
+          {arcPath && (
+            <path 
+              d={arcPath} 
+              fill="none" 
+              stroke={color} 
+              strokeWidth="2.5" 
+              style={{ filter: `drop-shadow(0 0 4px ${color})` }}
+            />
+          )}
+
+          {/* Indicator dial face */}
+          <circle cx={cx} cy={cy} r={r} fill="rgba(10, 14, 23, 0.9)" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+          
+          {/* Neon pointer line */}
+          <line x1={cx} y1={cy} x2={dx} y2={dy} stroke={color} strokeWidth="2.5" style={{ filter: `drop-shadow(0 0 2px ${color})` }} />
+          
+          {/* Center axis cap */}
+          <circle cx={cx} cy={cy} r="2.5" fill="#ffffff" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export default function Ronin9Panel({
   onClose,
   audioCtx,
@@ -68,8 +210,19 @@ export default function Ronin9Panel({
   recordingInputModeRef
 }) {
   const [position, setPosition] = useState({ x: 150, y: 100 });
-  const [size, setSize] = useState({ width: 950, height: 600 });
+  const [size, setSize] = useState({ width: 950, height: 680 });
   const [activeChannel, setActiveChannel] = useState(0); // 0=Kick, 1=Snare, 2=Cl.Hat, 3=Op.Hat, 4=Clap, 5=Tom
+
+  const getMaxSliceIndex = (slotId) => {
+    if (!slotId) return 15;
+    const normalizedSlotId = slotId.toLowerCase().trim().replace(/^([a-c])(\d)$/, '$10$2');
+    const activeSample = activeSampleRegistry.find(s => s.id === normalizedSlotId);
+    if (activeSample) {
+      return (activeSample.sliceCount || 16) - 1;
+    }
+    return 15; // default
+  };
+
 
   // Sequencer playback settings
   const [tempo, setTempo] = useState(120);
@@ -86,6 +239,14 @@ export default function Ronin9Panel({
   const [crushBits, setCrushBits] = useState(12);
   const [crushSR, setCrushSR] = useState(48000);
   const [crushLowpass, setCrushLowpass] = useState(15000);
+  // Onboard Studio FX Rack controls
+  const [delayTime, setDelayTime] = useState(0.3);
+  const [delayFeedback, setDelayFeedback] = useState(0.4);
+  const [delayMix, setDelayMix] = useState(0.0);
+  const [reverbMix, setReverbMix] = useState(0.0);
+  const [filterType, setFilterType] = useState('lowpass');
+  const [filterCutoff, setFilterCutoff] = useState(20000);
+  const [filterReso, setFilterReso] = useState(0.7);
 
   // Rec Routing
   const [recRoutingSlot, setRecRoutingSlot] = useState('none');
@@ -115,6 +276,13 @@ export default function Ronin9Panel({
   const masterSaturationRef = useRef(null);
   const bitcrusherNodeRef = useRef(null);
   const bitcrusherLpRef = useRef(null);
+  const studioFilterRef = useRef(null);
+  const studioDelayRef = useRef(null);
+  const studioDelayFeedbackRef = useRef(null);
+  const studioDelayWetRef = useRef(null);
+  const studioReverbRef = useRef(null);
+  const studioReverbWetRef = useRef(null);
+
 
   // References for scheduler loop
   const nextStepTimeRef = useRef(0);
@@ -232,12 +400,57 @@ export default function Ronin9Panel({
     gain.gain.setValueAtTime(0.8, ctx.currentTime);
     masterGainRef.current = gain;
 
+    // 1. Studio Resonant Filter Sweep Node
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(20000, ctx.currentTime);
+    filter.Q.setValueAtTime(0.7, ctx.currentTime);
+    studioFilterRef.current = filter;
+
+    // 2. Studio Space Echo Delay Node
+    const delay = ctx.createDelay(2.0);
+    delay.delayTime.setValueAtTime(0.3, ctx.currentTime);
+    const fb = ctx.createGain();
+    fb.gain.setValueAtTime(0.4, ctx.currentTime);
+    const delayWet = ctx.createGain();
+    delayWet.gain.setValueAtTime(0.0, ctx.currentTime);
+    
+    delay.connect(fb);
+    fb.connect(delay);
+    
+    studioDelayRef.current = delay;
+    studioDelayFeedbackRef.current = fb;
+    studioDelayWetRef.current = delayWet;
+
+    // 3. Studio Convolution Reverb Node
+    const reverb = ctx.createConvolver();
+    reverb.buffer = createReverbImpulseResponse(ctx, 1.8, 2.0);
+    const reverbWet = ctx.createGain();
+    reverbWet.gain.setValueAtTime(0.0, ctx.currentTime);
+    
+    studioReverbRef.current = reverb;
+    studioReverbWetRef.current = reverbWet;
+
     // Audio Graph Connections
-    // Inputs (from triggers) -> Shaper -> Compressor -> Crusher -> Lowpass -> Gain -> Destination & Global hook
     shaper.connect(comp);
     comp.connect(crusher);
     crusher.connect(lp);
-    lp.connect(gain);
+    
+    // Crusher LP -> Studio Resonant Filter
+    lp.connect(filter);
+    
+    // Filter output -> splits to Dry / Delay / Reverb sends
+    // Dry send
+    filter.connect(gain);
+    // Delay send
+    filter.connect(delay);
+    delay.connect(delayWet);
+    delayWet.connect(gain);
+    // Reverb send
+    filter.connect(reverb);
+    reverb.connect(reverbWet);
+    reverbWet.connect(gain);
+
     gain.connect(ctx.destination);
 
     // Save master output gain to global hook
@@ -249,6 +462,12 @@ export default function Ronin9Panel({
         comp.disconnect();
         crusher.disconnect();
         lp.disconnect();
+        filter.disconnect();
+        delay.disconnect();
+        fb.disconnect();
+        delayWet.disconnect();
+        reverb.disconnect();
+        reverbWet.disconnect();
         gain.disconnect();
       } catch (e) {}
     };
@@ -277,7 +496,24 @@ export default function Ronin9Panel({
     if (bitcrusherLpRef.current) {
       bitcrusherLpRef.current.frequency.setTargetAtTime(crushLowpass, ctx.currentTime, 0.03);
     }
-  }, [masterVolume, masterHeavyLight, crushActive, crushBits, crushSR, crushLowpass]);
+    if (studioFilterRef.current) {
+      studioFilterRef.current.type = filterType;
+      studioFilterRef.current.frequency.setTargetAtTime(filterCutoff, ctx.currentTime, 0.02);
+      studioFilterRef.current.Q.setTargetAtTime(filterReso, ctx.currentTime, 0.02);
+    }
+    if (studioDelayRef.current) {
+      studioDelayRef.current.delayTime.setTargetAtTime(delayTime, ctx.currentTime, 0.02);
+    }
+    if (studioDelayFeedbackRef.current) {
+      studioDelayFeedbackRef.current.gain.setTargetAtTime(delayFeedback, ctx.currentTime, 0.02);
+    }
+    if (studioDelayWetRef.current) {
+      studioDelayWetRef.current.gain.setTargetAtTime(delayMix, ctx.currentTime, 0.02);
+    }
+    if (studioReverbWetRef.current) {
+      studioReverbWetRef.current.gain.setTargetAtTime(reverbMix, ctx.currentTime, 0.02);
+    }
+  }, [masterVolume, masterHeavyLight, crushActive, crushBits, crushSR, crushLowpass, delayTime, delayFeedback, delayMix, reverbMix, filterType, filterCutoff, filterReso]);
 
   // Bjorklund Pattern Generator triggers
   const triggerGenerateEuclidean = (idx) => {
@@ -458,7 +694,8 @@ export default function Ronin9Panel({
       }
     } else {
       // 2. Play from Sample buffer registries
-      const activeSample = activeSampleRegistry.find(s => s.id === ch.sampleSlot);
+      const normalizedSlotId = ch.sampleSlot.toLowerCase().trim().replace(/^([a-c])(\d)$/, '$10$2');
+      const activeSample = activeSampleRegistry.find(s => s.id === normalizedSlotId);
       if (activeSample && activeSample.buffer) {
         const src = ctx.createBufferSource();
         src.buffer = activeSample.buffer;
@@ -467,9 +704,28 @@ export default function Ronin9Panel({
         const playbackRateVal = Math.pow(2.0, ch.pitch / 12.0);
         src.playbackRate.setValueAtTime(playbackRateVal, time);
 
+        // Slice calculations
+        const sliceCount = activeSample.sliceCount || 16;
+        const sliceIndex = (ch.sliceIdx || 0) % sliceCount;
+        const sliceParam = (activeSample.sliceParams && activeSample.sliceParams[sliceIndex]) || {};
+
+        let sliceStartNorm = sliceParam.start !== undefined ? sliceParam.start : (activeSample.start + (sliceIndex / sliceCount) * (activeSample.end - activeSample.start));
+        let sliceEndNorm = sliceParam.end !== undefined ? sliceParam.end : (activeSample.start + ((sliceIndex + 1) / sliceCount) * (activeSample.end - activeSample.start));
+        
+        sliceStartNorm = Math.max(0, Math.min(1, sliceStartNorm));
+        sliceEndNorm = Math.max(0, Math.min(1, sliceEndNorm));
+        if (sliceStartNorm > sliceEndNorm) {
+          const tmp = sliceStartNorm;
+          sliceStartNorm = sliceEndNorm;
+          sliceEndNorm = tmp;
+        }
+
+        const startOffsetSec = sliceStartNorm * activeSample.buffer.duration;
+        const sliceDurationSec = (sliceEndNorm - sliceStartNorm) * activeSample.buffer.duration;
+
         src.connect(chGain);
-        src.start(time);
-        src.stop(time + ch.decay);
+        // Play the calculated slice portion
+        src.start(time, startOffsetSec, Math.min(ch.decay, sliceDurationSec));
       } else {
         // Fallback tone if sample is missing
         const osc = ctx.createOscillator();
@@ -1080,56 +1336,63 @@ export default function Ronin9Panel({
 
             {/* Source controls */}
             {ch.source === 'synth' ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                <div className="control-node" style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <span style={{ fontSize: '0.45rem', color: '#c5c6c7' }}>PITCH OFFSET</span>
-                  <input
-                    type="range" min="-12" max="12" step="1" value={ch.pitch}
-                    onChange={(e) => setChannels(prev => {
-                      const next = [...prev];
-                      next[activeChannel] = { ...next[activeChannel], pitch: parseInt(e.target.value) };
-                      return next;
-                    })}
-                    className="synth-slider neon-cyan"
-                  />
-                  <span style={{ fontSize: '0.48rem', color: '#00f3ff', textAlign: 'right' }}>{ch.pitch > 0 ? `+${ch.pitch}` : ch.pitch} st</span>
-                </div>
-                <div className="control-node" style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <span style={{ fontSize: '0.45rem', color: '#c5c6c7' }}>DECAY LENGTH</span>
-                  <input
-                    type="range" min="0.05" max="1.5" step="0.05" value={ch.decay}
-                    onChange={(e) => setChannels(prev => {
-                      const next = [...prev];
-                      next[activeChannel] = { ...next[activeChannel], decay: parseFloat(e.target.value) };
-                      return next;
-                    })}
-                    className="synth-slider neon-cyan"
-                  />
-                  <span style={{ fontSize: '0.48rem', color: '#00f3ff', textAlign: 'right' }}>{ch.decay.toFixed(2)}s</span>
-                </div>
-                <div className="control-node" style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <span style={{ fontSize: '0.45rem', color: '#c5c6c7' }}>DRIVE SHAPE</span>
-                  <input
-                    type="range" min="0" max="0.8" step="0.05" value={ch.saturation}
-                    onChange={(e) => setChannels(prev => {
-                      const next = [...prev];
-                      next[activeChannel] = { ...next[activeChannel], saturation: parseFloat(e.target.value) };
-                      return next;
-                    })}
-                    className="synth-slider neon-cyan"
-                  />
-                  <span style={{ fontSize: '0.48rem', color: '#00f3ff', textAlign: 'right' }}>{Math.round(ch.saturation * 100)}%</span>
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', alignItems: 'center', justifyContent: 'center', minHeight: '62px' }}>
+                <VectorKnob
+                  value={ch.pitch}
+                  min={-12}
+                  max={12}
+                  step={1}
+                  label="PITCH OFFSET"
+                  color={channelColors[activeChannel]}
+                  onChange={(val) => setChannels(prev => {
+                    const next = [...prev];
+                    next[activeChannel] = { ...next[activeChannel], pitch: val };
+                    return next;
+                  })}
+                />
+                <VectorKnob
+                  value={ch.decay}
+                  min={0.05}
+                  max={1.5}
+                  step={0.05}
+                  label="DECAY LENGTH"
+                  color={channelColors[activeChannel]}
+                  onChange={(val) => setChannels(prev => {
+                    const next = [...prev];
+                    next[activeChannel] = { ...next[activeChannel], decay: val };
+                    return next;
+                  })}
+                />
+                <VectorKnob
+                  value={ch.saturation}
+                  min={0}
+                  max={0.8}
+                  step={0.05}
+                  label="DRIVE SHAPE"
+                  color={channelColors[activeChannel]}
+                  onChange={(val) => setChannels(prev => {
+                    const next = [...prev];
+                    next[activeChannel] = { ...next[activeChannel], saturation: val };
+                    return next;
+                  })}
+                />
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                <div className="control-node" style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <span style={{ fontSize: '0.45rem', color: '#c5c6c7' }}>SELECT PAD / BUFFER</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', alignItems: 'center', minHeight: '62px' }}>
+                <div className="control-node" style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.36rem', color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.3px', fontWeight: 'bold' }}>PAD BUFFER</span>
                   <select
                     value={ch.sampleSlot}
                     onChange={(e) => setChannels(prev => {
                       const next = [...prev];
-                      next[activeChannel] = { ...next[activeChannel], sampleSlot: e.target.value };
+                      const slotVal = e.target.value;
+                      const maxIdx = getMaxSliceIndex(slotVal);
+                      const currentSliceIdx = next[activeChannel].sliceIdx || 0;
+                      next[activeChannel] = { 
+                        ...next[activeChannel], 
+                        sampleSlot: slotVal,
+                        sliceIdx: Math.min(currentSliceIdx, maxIdx)
+                      };
                       return next;
                     })}
                     style={{
@@ -1140,7 +1403,9 @@ export default function Ronin9Panel({
                       fontSize: '0.48rem',
                       outline: 'none',
                       padding: '2px 4px',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      height: '24px',
+                      marginTop: '6px'
                     }}
                   >
                     {Array.from({ length: 8 }).map((_, i) => (
@@ -1154,32 +1419,45 @@ export default function Ronin9Panel({
                     ))}
                   </select>
                 </div>
-                <div className="control-node" style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <span style={{ fontSize: '0.45rem', color: '#c5c6c7' }}>PITCH TRANSPOSE</span>
-                  <input
-                    type="range" min="-12" max="12" step="1" value={ch.pitch}
-                    onChange={(e) => setChannels(prev => {
-                      const next = [...prev];
-                      next[activeChannel] = { ...next[activeChannel], pitch: parseInt(e.target.value) };
-                      return next;
-                    })}
-                    className="synth-slider neon-cyan"
-                  />
-                  <span style={{ fontSize: '0.48rem', color: '#00f3ff', textAlign: 'right' }}>{ch.pitch > 0 ? `+${ch.pitch}` : ch.pitch} st</span>
-                </div>
-                <div className="control-node" style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                  <span style={{ fontSize: '0.45rem', color: '#c5c6c7' }}>GATE TIME</span>
-                  <input
-                    type="range" min="0.05" max="1.5" step="0.05" value={ch.decay}
-                    onChange={(e) => setChannels(prev => {
-                      const next = [...prev];
-                      next[activeChannel] = { ...next[activeChannel], decay: parseFloat(e.target.value) };
-                      return next;
-                    })}
-                    className="synth-slider neon-cyan"
-                  />
-                  <span style={{ fontSize: '0.48rem', color: '#00f3ff', textAlign: 'right' }}>{ch.decay.toFixed(2)}s</span>
-                </div>
+                <VectorKnob
+                  value={ch.pitch}
+                  min={-12}
+                  max={12}
+                  step={1}
+                  label="PITCH TRANS"
+                  color={channelColors[activeChannel]}
+                  onChange={(val) => setChannels(prev => {
+                    const next = [...prev];
+                    next[activeChannel] = { ...next[activeChannel], pitch: val };
+                    return next;
+                  })}
+                />
+                <VectorKnob
+                  value={ch.decay}
+                  min={0.05}
+                  max={1.5}
+                  step={0.05}
+                  label="GATE TIME"
+                  color={channelColors[activeChannel]}
+                  onChange={(val) => setChannels(prev => {
+                    const next = [...prev];
+                    next[activeChannel] = { ...next[activeChannel], decay: val };
+                    return next;
+                  })}
+                />
+                <VectorKnob
+                  value={ch.sliceIdx || 0}
+                  min={0}
+                  max={getMaxSliceIndex(ch.sampleSlot)}
+                  step={1}
+                  label="SLICE INDEX"
+                  color={channelColors[activeChannel]}
+                  onChange={(val) => setChannels(prev => {
+                    const next = [...prev];
+                    next[activeChannel] = { ...next[activeChannel], sliceIdx: val };
+                    return next;
+                  })}
+                />
               </div>
             )}
 
@@ -1369,83 +1647,189 @@ export default function Ronin9Panel({
             </div>
 
             {/* Middle Row: Knobs & Bitcrusher */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.8fr 2.4fr 1.6fr', gap: '10px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px', minHeight: '105px' }}>
               
-              {/* Sliders column */}
+              {/* Column 1: Master Dynamics */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.45rem', color: '#c5c6c7' }}>MASTER VOLUME</span>
-                  <input
-                    type="range" min="0" max="1" step="0.05" value={masterVolume}
-                    onChange={(e) => setMasterVolume(parseFloat(e.target.value))}
-                    className="synth-slider neon-pink"
+                <span style={{ fontSize: '0.42rem', color: '#ff0055', fontWeight: 'bold', borderBottom: '1px solid rgba(255, 0, 85, 0.15)', paddingBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Master Dynamics</span>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-around', marginTop: '4px' }}>
+                  <VectorKnob
+                    value={masterVolume}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    label="VOL"
+                    color="#ff0055"
+                    size={36}
+                    onChange={(val) => setMasterVolume(val)}
+                  />
+                  <VectorKnob
+                    value={masterHeavyLight}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    label="COMP"
+                    color="#ff0055"
+                    size={36}
+                    onChange={(val) => setMasterHeavyLight(val)}
                   />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{ fontSize: '0.45rem', color: '#c5c6c7' }}>HEAVY / LIGHT DYNAMICS</span>
-                  <input
-                    type="range" min="0" max="1.0" step="0.05" value={masterHeavyLight}
-                    onChange={(e) => setMasterHeavyLight(parseFloat(e.target.value))}
-                    className="synth-slider neon-pink"
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.38rem', color: '#8892b0' }}>
-                    <span>LIGHT</span>
-                    <span>HEAVY COMP</span>
-                  </div>
-                </div>
+                <span style={{ fontSize: '0.36rem', color: '#8892b0', textAlign: 'center', marginTop: '2px' }}>Vol: {Math.round(masterVolume * 100)}% | Comp: {Math.round(masterHeavyLight * 100)}%</span>
               </div>
 
-              {/* Bitcrusher column */}
-              <div style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.48rem', color: '#00f3ff', fontWeight: 'bold' }}>12-BIT RESAMPLER CRUSHER</span>
+              {/* Column 2: Bitcrusher */}
+              <div style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 243, 255, 0.15)', paddingBottom: '2px' }}>
+                  <span style={{ fontSize: '0.42rem', color: '#00f3ff', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>12-Bit Crusher</span>
                   <button
                     onClick={() => setCrushActive(prev => !prev)}
                     style={{
                       background: crushActive ? '#00f3ff' : '#040508',
-                      border: '1.2px solid #00f3ff',
-                      borderRadius: '3px',
+                      border: '1px solid #00f3ff',
+                      borderRadius: '2px',
                       color: crushActive ? '#000000' : '#00f3ff',
-                      fontSize: '0.45rem',
+                      fontSize: '0.38rem',
                       fontWeight: 'bold',
-                      padding: '1px 5px',
-                      cursor: 'pointer'
+                      padding: '0px 4px',
+                      cursor: 'pointer',
+                      height: '14px',
+                      lineHeight: '12px'
                     }}
                   >
-                    {crushActive ? 'ACTIVE' : 'BYPASS'}
+                    {crushActive ? 'ON' : 'BYP'}
                   </button>
                 </div>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginTop: '2px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '0.38rem', color: '#8892b0' }}>BITS</span>
-                    <input
-                      type="range" min="8" max="16" step="1" value={crushBits}
-                      onChange={(e) => setCrushBits(parseInt(e.target.value))}
-                      className="synth-slider neon-cyan"
-                    />
-                    <span style={{ fontSize: '0.42rem', color: '#00f3ff', textAlign: 'right' }}>{crushBits} bit</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '0.38rem', color: '#8892b0' }}>SR REDUX</span>
-                    <input
-                      type="range" min="8000" max="48000" step="1000" value={crushSR}
-                      onChange={(e) => setCrushSR(parseInt(e.target.value))}
-                      className="synth-slider neon-cyan"
-                    />
-                    <span style={{ fontSize: '0.42rem', color: '#00f3ff', textAlign: 'right' }}>{(crushSR / 1000).toFixed(1)}k</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontSize: '0.38rem', color: '#8892b0' }}>LOWPASS</span>
-                    <input
-                      type="range" min="2000" max="20000" step="500" value={crushLowpass}
-                      onChange={(e) => setCrushLowpass(parseInt(e.target.value))}
-                      className="synth-slider neon-cyan"
-                    />
-                    <span style={{ fontSize: '0.42rem', color: '#00f3ff', textAlign: 'right' }}>{(crushLowpass / 1000).toFixed(1)}k</span>
-                  </div>
+                <div style={{ display: 'flex', gap: '6px', justifyContent: 'space-between', marginTop: '4px' }}>
+                  <VectorKnob
+                    value={crushBits}
+                    min={8}
+                    max={16}
+                    step={1}
+                    label="BITS"
+                    color="#00f3ff"
+                    size={32}
+                    onChange={(val) => setCrushBits(val)}
+                  />
+                  <VectorKnob
+                    value={crushSR}
+                    min={8000}
+                    max={48000}
+                    step={1000}
+                    label="SR"
+                    color="#00f3ff"
+                    size={32}
+                    onChange={(val) => setCrushSR(val)}
+                  />
+                  <VectorKnob
+                    value={crushLowpass}
+                    min={2000}
+                    max={20000}
+                    step={500}
+                    label="LPF"
+                    color="#00f3ff"
+                    size={32}
+                    onChange={(val) => setCrushLowpass(val)}
+                  />
                 </div>
+                <span style={{ fontSize: '0.36rem', color: '#8892b0', textAlign: 'center', marginTop: '2px' }}>{crushBits}bit | {(crushSR/1000).toFixed(1)}k | {(crushLowpass/1000).toFixed(1)}k</span>
+              </div>
 
+              {/* Column 3: Space FX (Delay & Reverb) */}
+              <div style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.42rem', color: '#ff6e00', fontWeight: 'bold', borderBottom: '1px solid rgba(255, 110, 0, 0.15)', paddingBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Space Delay & Reverb Send</span>
+                
+                <div style={{ display: 'flex', gap: '6px', justifyContent: 'space-between', marginTop: '4px' }}>
+                  <VectorKnob
+                    value={delayTime}
+                    min={0.05}
+                    max={1.0}
+                    step={0.05}
+                    label="TIME"
+                    color="#ff6e00"
+                    size={32}
+                    onChange={(val) => setDelayTime(val)}
+                  />
+                  <VectorKnob
+                    value={delayFeedback}
+                    min={0.0}
+                    max={0.9}
+                    step={0.05}
+                    label="FDBK"
+                    color="#ff6e00"
+                    size={32}
+                    onChange={(val) => setDelayFeedback(val)}
+                  />
+                  <VectorKnob
+                    value={delayMix}
+                    min={0.0}
+                    max={1.0}
+                    step={0.05}
+                    label="D-MIX"
+                    color="#ff6e00"
+                    size={32}
+                    onChange={(val) => setDelayMix(val)}
+                  />
+                  <VectorKnob
+                    value={reverbMix}
+                    min={0.0}
+                    max={1.0}
+                    step={0.05}
+                    label="R-MIX"
+                    color="#ff6e00"
+                    size={32}
+                    onChange={(val) => setReverbMix(val)}
+                  />
+                </div>
+                <span style={{ fontSize: '0.36rem', color: '#8892b0', textAlign: 'center', marginTop: '2px' }}>Dly: {delayTime.toFixed(2)}s ({Math.round(delayMix*100)}%) | Rev: {Math.round(reverbMix*100)}%</span>
+              </div>
+
+              {/* Column 4: Resonant Filter Sweep */}
+              <div style={{ borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 255, 150, 0.15)', paddingBottom: '2px' }}>
+                  <span style={{ fontSize: '0.42rem', color: '#00ff96', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Filter Sweep</span>
+                  <button
+                    onClick={() => setFilterType(prev => prev === 'lowpass' ? 'highpass' : 'lowpass')}
+                    style={{
+                      background: '#040508',
+                      border: '1px solid #00ff96',
+                      borderRadius: '2px',
+                      color: '#00ff96',
+                      fontSize: '0.38rem',
+                      fontWeight: 'bold',
+                      padding: '0px 4px',
+                      cursor: 'pointer',
+                      height: '14px',
+                      lineHeight: '12px'
+                    }}
+                  >
+                    {filterType === 'lowpass' ? 'LPF' : 'HPF'}
+                  </button>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-around', marginTop: '4px' }}>
+                  <VectorKnob
+                    value={filterCutoff}
+                    min={100}
+                    max={18000}
+                    step={50}
+                    label="CUTOFF"
+                    color="#00ff96"
+                    size={36}
+                    onChange={(val) => setFilterCutoff(val)}
+                  />
+                  <VectorKnob
+                    value={filterReso}
+                    min={0.1}
+                    max={10.0}
+                    step={0.1}
+                    label="RESO"
+                    color="#00ff96"
+                    size={36}
+                    onChange={(val) => setFilterReso(val)}
+                  />
+                </div>
+                <span style={{ fontSize: '0.36rem', color: '#8892b0', textAlign: 'center', marginTop: '2px' }}>Cut: {filterCutoff}Hz | Res: {filterReso.toFixed(1)}</span>
               </div>
 
             </div>
