@@ -14,6 +14,24 @@ export default function DeltaViSynthPanel({
   const [position, setPosition] = useState({ x: 100, y: 80 });
   const [isMinimized, setIsMinimized] = useState(false);
   const [size, setSize] = useState({ width: 1180, height: 650 });
+  const [layoutMode, setLayoutMode] = useState(() => {
+    return localStorage.getItem('deltavi_layout_mode') || 'horizontal';
+  });
+
+  const toggleLayoutMode = () => {
+    setLayoutMode(prev => {
+      const next = prev === 'horizontal' ? 'vertical' : 'horizontal';
+      localStorage.setItem('deltavi_layout_mode', next);
+      if (next === 'vertical') {
+        setSize({ width: 420, height: 800 });
+        localStorage.setItem('deltavi_panel_size', JSON.stringify({ width: 420, height: 800 }));
+      } else {
+        setSize({ width: 1180, height: 650 });
+        localStorage.setItem('deltavi_panel_size', JSON.stringify({ width: 1180, height: 650 }));
+      }
+      return next;
+    });
+  };
   
   const dragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
   const resizeStartRef = useRef({ x: 0, y: 0, startWidth: 0, startHeight: 0 });
@@ -133,6 +151,7 @@ export default function DeltaViSynthPanel({
   return (
     <div
       ref={panelRef}
+      className="floating-focus-zoom-panel"
       style={{
         position: 'fixed',
         left: `${position.x}px`,
@@ -181,6 +200,26 @@ export default function DeltaViSynthPanel({
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Layout mode button */}
+          <button
+            className="titlebar-btn"
+            onClick={toggleLayoutMode}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#00f3ff',
+              cursor: 'pointer',
+              fontSize: '0.55rem',
+              fontWeight: 'bold',
+              padding: '0 4px',
+              fontFamily: 'monospace',
+              letterSpacing: '0.5px'
+            }}
+            title="Toggle Horizontal/Vertical Layout"
+          >
+            {layoutMode === 'horizontal' ? '⇄ HORIZ' : '⇅ VERT'}
+          </button>
+
           {/* Minimize button */}
           <button
             className="titlebar-btn"
@@ -235,6 +274,7 @@ export default function DeltaViSynthPanel({
           }}
         >
           <MidiSynth 
+            layoutMode={layoutMode}
             recordingInputMode={recordingInputMode}
             setRecordingInputMode={setRecordingInputMode}
             liveRecTargetSlot={liveRecTargetSlot}

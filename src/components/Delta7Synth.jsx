@@ -4,6 +4,7 @@ import Knob from './Knob.jsx';
 import CircularAlignModal from './CircularAlignModal.jsx';
 import HelpMenuModal from './HelpMenuModal.jsx';
 import DeltaViSynthPanel from './DeltaViSynthPanel.jsx';
+import LoomConsolePanel from './LoomConsolePanel.jsx';
 import RecordCrates from './RecordCrates.jsx';
 import './delta7-styles.css';
 
@@ -625,6 +626,12 @@ export default function Delta7Synth() {
   const [midiMenuOpen, setMidiMenuOpen] = useState(false);
   const [helpMenuOpen, setHelpMenuOpen] = useState(false);
   const [showMidiSynth, setShowMidiSynth] = useState(false);
+  const [showLoomConsole, setShowLoomConsole] = useState(() => {
+    return localStorage.getItem('showLoomConsole') === 'true';
+  });
+  useEffect(() => {
+    localStorage.setItem('showLoomConsole', String(showLoomConsole));
+  }, [showLoomConsole]);
   const [dragOverDeck, setDragOverDeck] = useState(null);
   const [crates, setCrates] = useState(Array.from({ length: 8 }, (_, idx) => ({
     id: `crate_${idx}`,
@@ -14030,11 +14037,24 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const innerRad = outerRad - 22;
         const centerRad = (outerRad + innerRad) / 2;
         
-        // 1. Draw radar sweep background
-        ctx.fillStyle = '#020712';
+        // 1. Draw radial gradient cyber turntable background
+        const bgGrad = ctx.createRadialGradient(centerX, centerY, 5, centerX, centerY, w / 2);
+        bgGrad.addColorStop(0, '#040b1e');
+        bgGrad.addColorStop(0.7, '#02050c');
+        bgGrad.addColorStop(1, '#000103');
+        ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, w, h);
         
-        ctx.strokeStyle = 'rgba(0, 243, 255, 0.03)';
+        // Concentric vinyl turntable grooves
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.025)';
+        ctx.lineWidth = 0.5;
+        for (let r = innerRad + 4; r < outerRad - 4; r += 3) {
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, r, 0, 2 * Math.PI);
+          ctx.stroke();
+        }
+        
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.035)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         for (let r = 20; r < w / 2; r += 20) {
@@ -14051,7 +14071,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const latencyAngle = (latencySec / loopDuration) * 2 * Math.PI;
         
         if (latencyAngle > 0) {
-          ctx.fillStyle = 'rgba(255, 110, 0, 0.16)';
+          ctx.fillStyle = 'rgba(255, 110, 0, 0.14)';
           ctx.strokeStyle = 'rgba(255, 110, 0, 0.45)';
           ctx.lineWidth = 1.2;
           ctx.beginPath();
@@ -14114,22 +14134,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           }
         }
         
-        // 5. Draw Circular Waveform (Green/Cyan Gradient Wrap)
+        // 5. Draw Circular Waveform (Green/Cyan Gradient Wrap & Neon Glass Fill)
         const peaks = chronoPeaksRef.current;
         if (peaks && peaks.length > 0) {
           const amplitudeScale = 11;
           
-          const grad = ctx.createRadialGradient(centerX, centerY, innerRad, centerX, centerY, outerRad);
-          grad.addColorStop(0, 'rgba(0, 255, 150, 0.08)');
-          grad.addColorStop(0.5, 'rgba(0, 243, 255, 0.4)');
-          grad.addColorStop(1, 'rgba(0, 85, 255, 0.08)');
-          
-          ctx.fillStyle = grad;
-          ctx.strokeStyle = 'rgba(0, 243, 255, 0.65)';
-          ctx.lineWidth = 1.0;
-          ctx.shadowBlur = 4;
+          // Outer Glow Neon Outline
+          ctx.strokeStyle = '#00f3ff';
+          ctx.lineWidth = 1.6;
+          ctx.shadowBlur = 6;
           ctx.shadowColor = '#00f3ff';
-          
           ctx.beginPath();
           for (let i = 0; i <= peaks.length; i++) {
             const idx = i % peaks.length;
@@ -14143,6 +14157,32 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           }
           ctx.stroke();
           ctx.shadowBlur = 0; // reset
+          
+          // Translucent gradient filled area under the waveform
+          const grad = ctx.createRadialGradient(centerX, centerY, innerRad - 4, centerX, centerY, outerRad + 4);
+          grad.addColorStop(0, 'rgba(0, 243, 255, 0.0)');
+          grad.addColorStop(0.5, 'rgba(0, 243, 255, 0.16)');
+          grad.addColorStop(1, 'rgba(0, 243, 255, 0.0)');
+          ctx.fillStyle = grad;
+          
+          ctx.beginPath();
+          for (let i = 0; i <= peaks.length; i++) {
+            const idx = i % peaks.length;
+            const theta = (i / peaks.length) * 2 * Math.PI - Math.PI / 2;
+            const peak = peaks[idx] || 0;
+            const r = centerRad + (peak - 0.5) * amplitudeScale;
+            const x = centerX + Math.cos(theta) * r;
+            const y = centerY + Math.sin(theta) * r;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          for (let i = peaks.length; i >= 0; i--) {
+            const theta = (i / peaks.length) * 2 * Math.PI - Math.PI / 2;
+            const x = centerX + Math.cos(theta) * innerRad;
+            const y = centerY + Math.sin(theta) * innerRad;
+            ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+          ctx.fill();
         }
         
         // 6. FX Automation Motion Envelope Path (Neon Magenta Loop)
@@ -14183,13 +14223,27 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         const barNumber = Math.floor(currentBeatPhase / 4) + 1;
         const beatOfBar = Math.floor(currentBeatPhase % 4) + 1;
         
-        // Draw glass envelope bulb background
+        // Draw glass envelope bulb background with subtle shadow glow
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = 'rgba(0, 243, 255, 0.2)';
         ctx.beginPath();
         ctx.arc(centerX, centerY, 38, 0, 2 * Math.PI);
         ctx.fillStyle = '#01040a';
         ctx.fill();
-        ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
-        ctx.lineWidth = 1;
+        ctx.shadowBlur = 0;
+        
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.25)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        
+        // Glass envelope bulb glare reflection arcs
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 34, -Math.PI / 3, -Math.PI / 8);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 34, Math.PI * 0.7, Math.PI * 0.85);
         ctx.stroke();
         
         // Fine anode wire mesh grid
@@ -14286,8 +14340,22 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           ctx.shadowBlur = 0;
         }
         
-        // 8. Rotating Laser Playhead Sweep (White/Cyan Glow)
+        // 8. Rotating Laser Playhead Sweep (White/Cyan Glow with Trail)
         const angle = (currentBeatPhase / beats) * 2 * Math.PI - Math.PI / 2;
+        
+        // Draw trailing decay sweep laser arcs
+        const trailSteps = 12;
+        for (let t = 0; t < trailSteps; t++) {
+          const trailAngle = angle - (t * 0.04);
+          const alpha = 1.0 - (t / trailSteps);
+          ctx.strokeStyle = `rgba(0, 243, 255, ${alpha * 0.35})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.lineTo(centerX + Math.cos(trailAngle) * (outerRad + 2), centerY + Math.sin(trailAngle) * (outerRad + 2));
+          ctx.stroke();
+        }
+
         ctx.shadowBlur = 10;
         ctx.shadowColor = '#00f3ff';
         ctx.strokeStyle = '#ffffff';
@@ -19716,6 +19784,26 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         </button>
 
         <button 
+          className={`btn btn-xs ${showLoomConsole ? 'active-cyan' : ''}`}
+          onClick={() => setShowLoomConsole(prev => !prev)}
+          style={{
+            marginRight: '12px',
+            borderColor: '#00f3ff',
+            color: '#00f3ff',
+            fontSize: '0.58rem',
+            padding: '2px 8px',
+            fontWeight: 'bold',
+            letterSpacing: '0.8px',
+            background: showLoomConsole ? 'rgba(0, 243, 255, 0.15)' : 'transparent',
+            boxShadow: showLoomConsole ? '0 0 10px #00f3ff' : '0 0 6px rgba(0, 243, 255, 0.15)',
+            cursor: 'pointer',
+            fontFamily: 'monospace'
+          }}
+        >
+          ⚡ LOOM
+        </button>
+
+        <button 
           className="btn btn-xs" 
           onClick={() => setHelpMenuOpen(true)}
           style={{
@@ -22560,188 +22648,228 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         <div className="rack-panel-right steel-plate">
           
           {/* The Loom: Sophisticated Circular Looper & FX Performance Recording Space */}
-          <div className="kaoss-pad-container" style={{ borderColor: '#00f3ff', boxShadow: '0 0 12px rgba(0, 243, 255, 0.15)', marginBottom: '8px' }}>
-            <div className="section-label" style={{ color: '#00f3ff', textShadow: '0 0 6px #00f3ff', letterSpacing: '1px' }}>
-              THE LOOM - MULTI-TOUCH DECK
+          {showLoomConsole ? (
+            <div className="loom-placeholder-card font-mono" style={{
+              background: 'rgba(2, 7, 18, 0.45)',
+              border: '1px dashed rgba(0, 243, 255, 0.35)',
+              boxShadow: '0 0 10px rgba(0, 243, 255, 0.05)',
+              borderRadius: '6px',
+              padding: '12px 10px',
+              textAlign: 'center',
+              color: '#00f3ff',
+              marginBottom: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              height: '350px'
+            }}>
+              <div style={{ fontSize: '1.2rem', animation: 'knob-pulse-cyan 2s infinite alternate' }}>⚡</div>
+              <div style={{ fontSize: '0.48rem', fontWeight: 'bold', letterSpacing: '1.5px' }}>THE LOOM OUT-OF-BODY</div>
+              <div style={{ fontSize: '0.36rem', color: '#888', maxWidth: '160px', lineHeight: '1.3' }}>
+                Floating console active. Drag, resize, and place it in the screen margins for OBS overlays.
+              </div>
+              <button
+                className="btn btn-xs"
+                onClick={() => setShowLoomConsole(false)}
+                style={{
+                  borderColor: '#ffe600',
+                  color: '#ffe600',
+                  fontSize: '0.38rem',
+                  padding: '2px 8px',
+                  cursor: 'pointer',
+                  marginTop: '6px'
+                }}
+              >
+                📥 DOCK TO SIDEBAR
+              </button>
             </div>
-            
-            {/* Platter Canvas Wrapper */}
-            <div className="chrono-canvas-wrapper" style={{ 
-              position: 'relative', 
-              width: '100%', 
-              height: '160px', 
-              background: '#020712', 
-              border: '1px solid rgba(0, 243, 255, 0.3)', 
-              boxShadow: 'inset 0 0 10px rgba(0,243,255,0.1)',
-              borderRadius: '4px', 
-              overflow: 'hidden',
-              cursor: sculptTool !== 'none' ? 'crosshair' : 'default',
-              marginTop: '4px'
-            }}
-              onMouseDown={(e) => {
-                if (sculptTool !== 'none') {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  sculptWaveform(e.clientX, e.clientY, rect, sculptTool);
-                }
-              }}
-              onMouseMove={(e) => {
-                if (e.buttons === 1 && sculptTool !== 'none') {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  sculptWaveform(e.clientX, e.clientY, rect, sculptTool);
-                }
-              }}
-            >
-              <canvas 
-                ref={chronoCanvasRef} 
-                width={280} 
-                height={160} 
-                style={{ display: 'block', width: '100%', height: '100%' }} 
-              />
+          ) : (
+            <div className="kaoss-pad-container" style={{ borderColor: '#00f3ff', boxShadow: '0 0 12px rgba(0, 243, 255, 0.15)', marginBottom: '8px' }}>
+              <div className="section-label" style={{ color: '#00f3ff', textShadow: '0 0 6px #00f3ff', letterSpacing: '1px' }}>
+                THE LOOM - MULTI-TOUCH DECK
+              </div>
               
-              {/* Overlay HUD indicators */}
-              <div style={{ position: 'absolute', top: '6px', left: '6px', pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: '1px', fontFamily: 'monospace', fontSize: '0.42rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <span className={`led-${isLiveRecording ? 'red' : (liveRecPendingStart ? 'yellow' : 'cyan')}`} style={{
-                    width: '5px', height: '5px', borderRadius: '50%',
-                    background: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#00f3ff'),
-                    boxShadow: isLiveRecording ? '0 0 6px #ff0055' : (liveRecPendingStart ? '0 0 6px #ffe600' : '0 0 6px #00f3ff')
-                  }}></span>
-                  <span style={{ color: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#00f3ff'), fontWeight: 'bold' }}>
-                    {isLiveRecording ? 'RECORDING' : (liveRecPendingStart ? 'WAITING BEAT 1' : 'LOOPER READY')}
+              {/* Platter Canvas Wrapper */}
+              <div className="chrono-canvas-wrapper" style={{ 
+                position: 'relative', 
+                width: '100%', 
+                height: '160px', 
+                background: '#020712', 
+                border: '1px solid rgba(0, 243, 255, 0.3)', 
+                boxShadow: 'inset 0 0 10px rgba(0,243,255,0.1)',
+                borderRadius: '4px', 
+                overflow: 'hidden',
+                cursor: sculptTool !== 'none' ? 'crosshair' : 'default',
+                marginTop: '4px'
+              }}
+                onMouseDown={(e) => {
+                  if (sculptTool !== 'none') {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    sculptWaveform(e.clientX, e.clientY, rect, sculptTool);
+                  }
+                }}
+                onMouseMove={(e) => {
+                  if (e.buttons === 1 && sculptTool !== 'none') {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    sculptWaveform(e.clientX, e.clientY, rect, sculptTool);
+                  }
+                }}
+              >
+                <canvas 
+                  ref={chronoCanvasRef} 
+                  width={280} 
+                  height={160} 
+                  style={{ display: 'block', width: '100%', height: '100%' }} 
+                />
+                
+                {/* Overlay HUD indicators */}
+                <div style={{ position: 'absolute', top: '6px', left: '6px', pointerEvents: 'none', display: 'flex', flexDirection: 'column', gap: '1px', fontFamily: 'monospace', fontSize: '0.42rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <span className={`led-${isLiveRecording ? 'red' : (liveRecPendingStart ? 'yellow' : 'cyan')}`} style={{
+                      width: '5px', height: '5px', borderRadius: '50%',
+                      background: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#00f3ff'),
+                      boxShadow: isLiveRecording ? '0 0 6px #ff0055' : (liveRecPendingStart ? '0 0 6px #ffe600' : '0 0 6px #00f3ff')
+                    }}></span>
+                    <span style={{ color: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : '#00f3ff'), fontWeight: 'bold' }}>
+                      {isLiveRecording ? 'RECORDING' : (liveRecPendingStart ? 'WAITING BEAT 1' : 'LOOPER READY')}
+                    </span>
+                  </div>
+                  <span style={{ color: '#888' }}>
+                    SLOT: {liveRecTargetSlot.toUpperCase()} ({liveRecBeats} BEATS)
                   </span>
                 </div>
-                <span style={{ color: '#888' }}>
-                  SLOT: {liveRecTargetSlot.toUpperCase()} ({liveRecBeats} BEATS)
-                </span>
-              </div>
-              
-              <div style={{ position: 'absolute', top: '6px', right: '6px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: 'monospace', fontSize: '0.42rem' }}>
-                <span className="led-midi" style={{ 
-                  display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', 
-                  background: (seqCurrentBeatRef.current % 1 < 0.15) ? '#ffe600' : '#333', 
-                  boxShadow: (seqCurrentBeatRef.current % 1 < 0.15) ? '0 0 6px #ffe600' : 'none' 
-                }}></span>
-                <span style={{ color: '#aaa' }}>SYNC CLK</span>
-              </div>
-            </div>
-
-            {/* Mic Recording Level Meter */}
-            <div style={{ width: '100%', marginTop: '3px' }}>
-              <div className="mic-level-meter-container" style={{ padding: '1px 2px', height: '7px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '2px' }}>
-                <div className="mic-level-bar-track" style={{ height: '3px', background: 'rgba(255,255,255,0.02)', borderRadius: '1px', overflow: 'hidden' }}>
-                  <div id="looper-level-bar-fill" className="mic-level-bar-fill" style={{ width: '0%', height: '100%', background: 'linear-gradient(90deg, #00ff96 70%, #ffc000 85%, #ff0055 100%)', borderRadius: '1px', transition: 'width 0.05s ease' }}></div>
+                
+                <div style={{ position: 'absolute', top: '6px', right: '6px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px', fontFamily: 'monospace', fontSize: '0.42rem' }}>
+                  <span className="led-midi" style={{ 
+                    display: 'inline-block', width: '5px', height: '5px', borderRadius: '50%', 
+                    background: (seqCurrentBeatRef.current % 1 < 0.15) ? '#ffe600' : '#333', 
+                    boxShadow: (seqCurrentBeatRef.current % 1 < 0.15) ? '0 0 6px #ffe600' : 'none' 
+                  }}></span>
+                  <span style={{ color: '#aaa' }}>SYNC CLK</span>
                 </div>
               </div>
-            </div>
 
-            {/* Waveform Sculpting Brush Tools Panel */}
-            <div style={{ marginTop: '5px', background: 'rgba(0,0,0,0.4)', padding: '4px', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '3px' }}>
-              <div style={{ fontSize: '0.36rem', color: '#888', fontFamily: 'monospace', marginBottom: '2px', textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-                WAVEFORM SCULPTING BRUSHES
+              {/* Mic Recording Level Meter */}
+              <div style={{ width: '100%', marginTop: '3px' }}>
+                <div className="mic-level-meter-container" style={{ padding: '1px 2px', height: '7px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '2px' }}>
+                  <div className="mic-level-bar-track" style={{ height: '3px', background: 'rgba(255,255,255,0.02)', borderRadius: '1px', overflow: 'hidden' }}>
+                    <div id="looper-level-bar-fill" className="mic-level-bar-fill" style={{ width: '0%', height: '100%', background: 'linear-gradient(90deg, #00ff96 70%, #ffc000 85%, #ff0055 100%)', borderRadius: '1px', transition: 'width 0.05s ease' }}></div>
+                  </div>
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px' }}>
-                {[
-                  { id: 'none', label: 'SELECT 🔍', color: '#aaa', activeColor: 'rgba(255,255,255,0.12)', border: '#888' },
-                  { id: 'mute', label: 'GATE 🔴', color: '#ff4444', activeColor: 'rgba(255,0,85,0.2)', border: '#ff0055' },
-                  { id: 'boost', label: 'BOOST ⚡', color: '#00f3ff', activeColor: 'rgba(0,243,255,0.2)', border: '#00f3ff' },
-                  { id: 'attenuate', label: 'DAMP ⏳', color: '#ffe600', activeColor: 'rgba(255,230,0,0.2)', border: '#ffe600' },
-                  { id: 'reverse', label: 'FLIP 🔄', color: '#ff00ff', activeColor: 'rgba(255,0,255,0.2)', border: '#ff00ff' }
-                ].map(tool => {
-                  const isSel = sculptTool === tool.id;
-                  return (
-                    <button
-                      key={tool.id}
-                      onClick={() => setSculptTool(tool.id)}
-                      className="btn btn-xs"
-                      style={{
-                        fontSize: '0.34rem',
-                        padding: '2px 0',
-                        margin: 0,
-                        color: isSel ? '#fff' : tool.color,
-                        background: isSel ? tool.activeColor : '#000',
-                        borderColor: isSel ? tool.border : 'rgba(255,255,255,0.1)',
-                        fontWeight: isSel ? 'bold' : 'normal',
-                        boxShadow: isSel ? `0 0 6px ${tool.border}` : 'none',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
+
+              {/* Waveform Sculpting Brush Tools Panel */}
+              <div style={{ marginTop: '5px', background: 'rgba(0,0,0,0.4)', padding: '4px', border: '1px solid rgba(0, 243, 255, 0.15)', borderRadius: '3px' }}>
+                <div style={{ fontSize: '0.36rem', color: '#888', fontFamily: 'monospace', marginBottom: '2px', textAlign: 'center', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+                  WAVEFORM SCULPTING BRUSHES
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px' }}>
+                  {[
+                    { id: 'none', label: 'SELECT 🔍', color: '#aaa', activeColor: 'rgba(255,255,255,0.12)', border: '#888' },
+                    { id: 'mute', label: 'GATE 🔴', color: '#ff4444', activeColor: 'rgba(255,0,85,0.2)', border: '#ff0055' },
+                    { id: 'boost', label: 'BOOST ⚡', color: '#00f3ff', activeColor: 'rgba(0,243,255,0.2)', border: '#00f3ff' },
+                    { id: 'attenuate', label: 'DAMP ⏳', color: '#ffe600', activeColor: 'rgba(255,230,0,0.2)', border: '#ffe600' },
+                    { id: 'reverse', label: 'FLIP 🔄', color: '#ff00ff', activeColor: 'rgba(255,0,255,0.2)', border: '#ff00ff' }
+                  ].map(tool => {
+                    const isSel = sculptTool === tool.id;
+                    return (
+                      <button
+                        key={tool.id}
+                        onClick={() => setSculptTool(tool.id)}
+                        className="btn btn-xs"
+                        style={{
+                          fontSize: '0.34rem',
+                          padding: '2px 0',
+                          margin: 0,
+                          color: isSel ? '#fff' : tool.color,
+                          background: isSel ? tool.activeColor : '#000',
+                          borderColor: isSel ? tool.border : 'rgba(255,255,255,0.1)',
+                          fontWeight: isSel ? 'bold' : 'normal',
+                          boxShadow: isSel ? `0 0 6px ${tool.border}` : 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {tool.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Transport & Routing Selectors */}
+              <div className="chrono-control-panel font-mono" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '5px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <span style={{ fontSize: '0.36rem', color: '#888' }}>TARGET PAD:</span>
+                    <select
+                      value={liveRecTargetSlot}
+                      onChange={(e) => {
+                        setLiveRecTargetSlot(e.target.value);
+                        setSelectedEditSlotId(e.target.value);
                       }}
+                      style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#ffe600', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
                     >
-                      {tool.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                      {Array.from({ length: 8 }).map((_, i) => <option key={`a-${i}`} value={`a0${i+1}`}>A{i+1}</option>)}
+                      {Array.from({ length: 8 }).map((_, i) => <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>)}
+                      {Array.from({ length: 8 }).map((_, i) => <option key={`c-${i}`} value={`c0${i+1}`}>C{i+1}</option>)}
+                    </select>
+                  </div>
 
-            {/* Transport & Routing Selectors */}
-            <div className="chrono-control-panel font-mono" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '5px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  <span style={{ fontSize: '0.36rem', color: '#888' }}>TARGET PAD:</span>
-                  <select
-                    value={liveRecTargetSlot}
-                    onChange={(e) => {
-                      setLiveRecTargetSlot(e.target.value);
-                      setSelectedEditSlotId(e.target.value);
-                    }}
-                    style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#ffe600', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
-                  >
-                    {Array.from({ length: 8 }).map((_, i) => <option key={`a-${i}`} value={`a0${i+1}`}>A{i+1}</option>)}
-                    {Array.from({ length: 8 }).map((_, i) => <option key={`b-${i}`} value={`b0${i+1}`}>B{i+1}</option>)}
-                    {Array.from({ length: 8 }).map((_, i) => <option key={`c-${i}`} value={`c0${i+1}`}>C{i+1}</option>)}
-                  </select>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <span style={{ fontSize: '0.36rem', color: '#888' }}>LENGTH:</span>
+                    <select
+                      value={liveRecBeats}
+                      onChange={(e) => setLiveRecBeats(parseInt(e.target.value))}
+                      style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#00f3ff', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
+                    >
+                      {[2, 4, 8, 12, 16, 32, 64].map(b => <option key={b} value={b}>{b} Beats</option>)}
+                    </select>
+                  </div>
+
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <span style={{ fontSize: '0.36rem', color: '#888' }}>REC ALIGN:</span>
+                    <select
+                      value={recAlignGrid}
+                      onChange={(e) => setRecAlignGrid(e.target.value)}
+                      style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#ffe600', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
+                    >
+                      <option value="cycle">LOOP</option>
+                      <option value="bar">BAR</option>
+                      <option value="beat">BEAT</option>
+                      <option value="immediate">IMMED</option>
+                    </select>
+                  </div>
+
+                  <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    <span style={{ fontSize: '0.36rem', color: '#888' }}>REC SOURCE:</span>
+                    <select
+                      value={recordingInputMode}
+                      onChange={(e) => setRecordingInputMode(e.target.value)}
+                      style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#00ff96', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
+                    >
+                      <option value="resample">INTERNAL</option>
+                      <option value="mic">MIC/LINE</option>
+                      <option value="monitor">MONITOR</option>
+                      <option value="synth">DELTA-VI SYNTH</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  <span style={{ fontSize: '0.36rem', color: '#888' }}>LENGTH:</span>
-                  <select
-                    value={liveRecBeats}
-                    onChange={(e) => setLiveRecBeats(parseInt(e.target.value))}
-                    style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#00f3ff', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
-                  >
-                    {[2, 4, 8, 12, 16, 32, 64].map(b => <option key={b} value={b}>{b} Beats</option>)}
-                  </select>
-                </div>
-
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  <span style={{ fontSize: '0.36rem', color: '#888' }}>REC ALIGN:</span>
-                  <select
-                    value={recAlignGrid}
-                    onChange={(e) => setRecAlignGrid(e.target.value)}
-                    style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#ffe600', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
-                  >
-                    <option value="cycle">LOOP</option>
-                    <option value="bar">BAR</option>
-                    <option value="beat">BEAT</option>
-                    <option value="immediate">IMMED</option>
-                  </select>
-                </div>
-
-                <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  <span style={{ fontSize: '0.36rem', color: '#888' }}>REC SOURCE:</span>
-                  <select
-                    value={recordingInputMode}
-                    onChange={(e) => setRecordingInputMode(e.target.value)}
-                    style={{ background: '#000', border: '1px solid rgba(0, 243, 255, 0.25)', color: '#00ff96', fontSize: '0.45rem', padding: '1px 2px', borderRadius: '3px', outline: 'none', height: '19px' }}
-                  >
-                    <option value="resample">INTERNAL</option>
-                    <option value="mic">MIC/LINE</option>
-                    <option value="monitor">MONITOR</option>
-                    <option value="synth">DELTA-VI SYNTH</option>
-                  </select>
+                {/* Snap Playback to Beat checkbox row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1px', background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '3px', border: '1px solid rgba(0,243,255,0.08)' }}>
+                  <span style={{ fontSize: '0.36rem', color: '#888', letterSpacing: '0.5px' }}>SNAP PLAYBACK TO BEAT:</span>
+                  <input 
+                    type="checkbox" 
+                    checked={quantizeOnBeat}
+                    onChange={(e) => setQuantizeOnBeat(e.target.checked)}
+                    style={{ accentColor: '#00f3ff', cursor: 'pointer', margin: 0, width: '10px', height: '10px' }}
+                  />
                 </div>
               </div>
 
-              {/* Snap Playback to Beat checkbox row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1px', background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '3px', border: '1px solid rgba(0,243,255,0.08)' }}>
-                <span style={{ fontSize: '0.36rem', color: '#888', letterSpacing: '0.5px' }}>SNAP PLAYBACK TO BEAT:</span>
-                <input 
-                  type="checkbox" 
-                  checked={quantizeOnBeat}
-                  onChange={(e) => setQuantizeOnBeat(e.target.checked)}
-                  style={{ accentColor: '#00f3ff', cursor: 'pointer', margin: 0, width: '10px', height: '10px' }}
-                />
-              </div>
               {/* Input Gain & Saturation Row */}
               <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' }}>
@@ -22945,7 +23073,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               </div>
 
             </div>
-          </div>
+          )}
 
           {/* Sample Kit Banks */}
           <div className="patches-quick-category">
@@ -23588,6 +23716,54 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           setSelectedEditSlotId={setSelectedEditSlotId}
           recordingTargetSlotIdRef={recordingTargetSlotIdRef}
           recordingInputModeRef={recordingInputModeRef}
+        />
+      )}
+
+      {showLoomConsole && (
+        <LoomConsolePanel 
+          onClose={() => setShowLoomConsole(false)}
+          chronoCanvasRef={chronoCanvasRef}
+          sculptTool={sculptTool}
+          setSculptTool={setSculptTool}
+          liveRecTargetSlot={liveRecTargetSlot}
+          setLiveRecTargetSlot={setLiveRecTargetSlot}
+          setSelectedEditSlotId={setSelectedEditSlotId}
+          liveRecBeats={liveRecBeats}
+          setLiveRecBeats={setLiveRecBeats}
+          recAlignGrid={recAlignGrid}
+          setRecAlignGrid={setRecAlignGrid}
+          recordingInputMode={recordingInputMode}
+          setRecordingInputMode={setRecordingInputMode}
+          quantizeOnBeat={quantizeOnBeat}
+          setQuantizeOnBeat={setQuantizeOnBeat}
+          recordingInputGain={recordingInputGain}
+          setRecordingInputGain={setRecordingInputGain}
+          inputGainSat={inputGainSat}
+          setInputGainSat={setInputGainSat}
+          isLiveRecording={isLiveRecording}
+          liveRecPendingStart={liveRecPendingStart}
+          isArmed={isArmed}
+          liveRecOverdub={liveRecOverdub}
+          setLiveRecOverdub={setLiveRecOverdub}
+          clearLooperBuffer={clearLooperBuffer}
+          undoLastLooperAction={undoLastLooperAction}
+          looperHasUndo={looperHasUndo}
+          recLatencyOffset={recLatencyOffset}
+          setRecLatencyOffset={setRecLatencyOffset}
+          selectedSlotNudge={selectedSlotNudge}
+          setSelectedSlotNudge={setSelectedSlotNudge}
+          isPlayingFxAutomation={isPlayingFxAutomation}
+          isRecordingFxAutomation={isRecordingFxAutomation}
+          toggleFxAutomationRec={toggleFxAutomationRec}
+          toggleFxAutomationPlay={toggleFxAutomationPlay}
+          clearFxAutomation={clearFxAutomation}
+          fxAutomationEvents={fxAutomationEvents}
+          startLiveLoopRecording={startLiveLoopRecording}
+          updateLiveInputSaturation={updateLiveInputSaturation}
+          resamplerGainNodeRef={resamplerGainNodeRef}
+          audioCtxRef={audioCtxRef}
+          focusZoomEnabled={focusZoomEnabled}
+          sculptWaveform={sculptWaveform}
         />
       )}
 

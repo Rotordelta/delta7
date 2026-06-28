@@ -7203,6 +7203,7 @@ const getDwgsWave = (ctx, type) => {
 };
 
 export default function MidiSynth({
+  layoutMode = 'horizontal',
   recordingInputMode = 'mic',
   setRecordingInputMode = () => {},
   liveRecTargetSlot = 'a01',
@@ -10343,11 +10344,11 @@ export default function MidiSynth({
       </div>
 
       <div 
-        className="midi-synth-rack horizontal-console"
+        className={`midi-synth-rack ${layoutMode === 'vertical' ? 'vertical-console' : 'horizontal-console'}`}
         style={{ 
           transform: `scale(${uiScale})`,
           transformOrigin: 'top center',
-          marginBottom: `${(1 - uiScale) * -520}px` 
+          marginBottom: layoutMode === 'vertical' ? `${(1 - uiScale) * -800}px` : `${(1 - uiScale) * -520}px` 
         }}
       >
         <div className="vector-border top"></div>
@@ -12704,6 +12705,56 @@ export default function MidiSynth({
       )}
 
       <style dangerouslySetInnerHTML={{ __html: `
+        /* Vertical console tower overrides */
+        .vertical-console {
+          max-width: 400px !important;
+          flex-direction: column !important;
+          padding: 1rem 0.75rem 0.5rem 0.75rem !important;
+          gap: 0.8rem !important;
+        }
+        .vertical-console .synth-header {
+          grid-template-columns: 1fr !important;
+          gap: 0.65rem !important;
+          border-bottom: 1.5px solid rgba(0, 243, 255, 0.15);
+          padding-bottom: 0.65rem;
+          text-align: center;
+        }
+        .vertical-console .synth-header > * {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+        .vertical-console .synth-header .header-left {
+          flex-direction: column;
+          align-items: center;
+        }
+        .vertical-console .synth-header .power-casing {
+          flex-direction: row !important;
+          gap: 8px !important;
+        }
+        .vertical-console .synth-modules-horizontal {
+          grid-template-columns: 1fr !important;
+          gap: 0.8rem !important;
+        }
+        .vertical-console .arp-fx-panel-span {
+          grid-column: span 1 !important;
+        }
+        .vertical-console .vectorscope-full-span {
+          grid-column: span 1 !important;
+          min-height: 180px !important;
+        }
+        .vertical-console .keyboard-container-row {
+          grid-template-columns: 1fr !important;
+          gap: 0.75rem !important;
+          border-top: 1.5px solid rgba(0, 243, 255, 0.15);
+          padding-top: 0.75rem;
+        }
+        .vertical-console .keyboard-wheels-container {
+          justify-content: center;
+          margin: 0.4rem 0;
+          height: 95px !important;
+        }
+
         .midi-synth-wrapper {
           width: 100%;
           margin: 0 auto;
