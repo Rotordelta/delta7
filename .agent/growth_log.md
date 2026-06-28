@@ -394,6 +394,13 @@
   - **Flexible Timing Alignments**: Offering different snap levels (Loop cycle, Bar boundaries, Beat triggers, or Immediate capture) gives the performer deep control over their loop start times.
   - **Quantized Playback Handover**: Letting the first onset of a manual pad trigger optionally snap directly to the next transport beat division prevents rhythm drift during live looping performance.
 
+## Session: 2026-06-28 (Part 12)
+- **Task**: Floating Loom Console & Vertical Layout Tower Mode.
+- **Jimmy's Preferences**:
+  - **Dockable/Undockable Flexibilities**: Letting the performer detach complex modules like the Loom looper into a floating resizable glass console allows configuring optimal streaming/OBS layouts.
+  - **Vertical console tower (400px wide)**: A vertical stacked tower mode for the DeltaVi synth console fits beautifully in space-constrained margins while keeping dials and sliders extremely usable.
+  - **Unified Focus Zoom transition**: Extending the chassis-wide Focus Zoom scale to floating panels ensures they respond naturally to mouse hover events, reinforcing the physical instrument design theme.
+
 
 
 
