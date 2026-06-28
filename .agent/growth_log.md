@@ -423,3 +423,9 @@
   - **Interactive Polar Vector Rendering**: Rendering glowing wireframe circles, rotating playheads, and vector shape outlines for the active voice triggers aligns the drum machine's visuals with the overall Robert Abel style.
   - **Direct Looper Capture Routing**: Adding a dedicated `'drums'` source mode to the looper config enables capturing live breakbeats directly onto sampler pads without external routing, maximizing performance workflow.
   - **Saturated Analog Synthesis Blocks**: Using custom Web Audio synth voice paths (such as kick pitch sweeps, noise-burst claps/snares, and resonant frequency modulation toms) yields rich, retro analog drum timbres out of the box.
+
+## Session: 2026-06-28 (Part 16)
+- **Task**: Ronin9 Mounting ReferenceErrors Bug Fix.
+- **Jimmy's Preferences**:
+  - **Robust Reference Scoping**: Ensuring all external props (such as transport play state `isPlaying` expressions and looper latency bounds) are mapped cleanly to active state scopes rather than global/implicit names prevents fatal React mount crashes.
+  - **Full latency calibration bindings**: Preserving and binding state values like `recLatencyOffset` inside the main component workspace ensures sliders in child windows operate correctly instead of throwing silent ReferenceErrors.
