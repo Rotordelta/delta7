@@ -1581,9 +1581,12 @@ export default function Delta7Synth() {
 
   const [showLatencyCal, setShowLatencyCal] = useState(false);
   const [circularAlignState, setCircularAlignState] = useState({ visible: false, deck: 'A', index: 0, initialOffset: 0 });
-  // Latency calibration removed — offset is always 0ms
-  const recLatencyOffset = 0;
+  // Latency calibration restored as state
+  const [recLatencyOffset, setRecLatencyOffset] = useState(0);
   const recLatencyOffsetRef = useRef(0);
+  useEffect(() => {
+    recLatencyOffsetRef.current = recLatencyOffset;
+  }, [recLatencyOffset]);
   const [workstationSampleRate, setWorkstationSampleRate] = useState(() => {
     const val = localStorage.getItem('workstationSampleRate');
     return val !== null ? parseInt(val, 10) : 48000;
@@ -23857,7 +23860,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           onClose={() => setShowRonin9(false)}
           audioCtx={audioCtxRef.current}
           seqCurrentBeatRef={seqCurrentBeatRef}
-          isPlaying={isPlaying}
+          isPlaying={(metronomeRef.current && metronomeRef.current.isPlaying) || perfPlaybackActive || perfRecordActive}
           activeSampleRegistry={sampleSlots}
           recordingInputMode={recordingInputMode}
           setRecordingInputMode={setRecordingInputMode}
