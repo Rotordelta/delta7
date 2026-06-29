@@ -1787,6 +1787,14 @@ export default function Delta7Synth() {
   const [isArmed, setIsArmed] = useState(false);
   const isArmedRef = useRef(false);
   useEffect(() => { isArmedRef.current = isArmed; }, [isArmed]);
+
+  const [liveRecMidiTriggered, setLiveRecMidiTriggered] = useState(false);
+  const liveRecMidiTriggeredRef = useRef(liveRecMidiTriggered);
+  useEffect(() => { liveRecMidiTriggeredRef.current = liveRecMidiTriggered; }, [liveRecMidiTriggered]);
+
+  const [isRecMidiArmed, setIsRecMidiArmed] = useState(false);
+  const isRecMidiArmedRef = useRef(isRecMidiArmed);
+  useEffect(() => { isRecMidiArmedRef.current = isRecMidiArmed; }, [isRecMidiArmed]);
   const [recordingInputGain, setRecordingInputGain] = useState(1.0);
   const recordingInputGainRef = useRef(1.0);
 
@@ -14984,13 +14992,39 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
         detail: { data: message.data, deviceName: input.name } 
       }));
 
+      const cmd = status >> 4;
+
+      // 1. Check MIDI-Triggered recording arm (NoteOn with velocity > 0)
+      if (cmd === 9 && data2 > 0) {
+        if (isRecMidiArmedRef.current) {
+          setIsRecMidiArmed(false);
+          setTimeout(() => {
+            startLiveLoopRecording();
+          }, 0);
+        }
+      }
+
+      // 2. Check Keyboard Transport Mappings (CC buttons)
+      if (cmd === 11) {
+        if (data1 === 115 || data1 === 118) { // Play
+          togglePerformancePlayback();
+          return;
+        }
+        if (data1 === 114 || data1 === 119) { // Stop
+          stopPerformancePlayback();
+          return;
+        }
+        if (data1 === 117) { // Record
+          togglePerformanceRecord(false);
+          return;
+        }
+      }
+
       // Bypass performance pad/looper triggers if this device is dedicated to the DeltaVi synth
       const isDeviceSelectedForSynth = selectedSynthMidiDeviceRef.current !== 'all' && input.name === selectedSynthMidiDeviceRef.current;
       if (isDeviceSelectedForSynth) {
         return;
       }
-
-      const cmd = status >> 4;
 
       // Check MIDI Learn for Chocolate Pedal
       if (midiLearnChocolateRef.current) {
@@ -19831,6 +19865,28 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                 </div>
               </div>
 
+              {/* MIDI Auto Arm Option */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '3px 0 4px 0' }}>
+                <span style={{ fontSize: '0.36rem', color: '#888', fontFamily: 'monospace' }}>AUTO-TRIG RESAMPLE:</span>
+                <button
+                  onClick={() => setLiveRecMidiTriggered(prev => !prev)}
+                  className="btn btn-xs"
+                  style={{
+                    padding: '1px 8px',
+                    fontSize: '0.36rem',
+                    fontWeight: 'bold',
+                    background: liveRecMidiTriggered ? 'rgba(255, 0, 127, 0.15)' : 'transparent',
+                    borderColor: liveRecMidiTriggered ? '#ff007f' : 'rgba(255,255,255,0.15)',
+                    color: liveRecMidiTriggered ? '#ff007f' : '#888',
+                    cursor: 'pointer',
+                    boxShadow: liveRecMidiTriggered ? '0 0 5px rgba(255,0,127,0.3)' : 'none'
+                  }}
+                  title="When active, the looper waits in armed state and starts recording automatically when you play the first MIDI NoteOn"
+                >
+                  {liveRecMidiTriggered ? '⌨️ MIDI NOTE START (ON)' : '⌨️ MANUAL START'}
+                </button>
+              </div>
+
               {/* Primary Atomic ARM Button */}
               <button
                 onClick={() => {
@@ -19848,28 +19904,34 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       schedulerNodeRef.current.port.postMessage({ type: 'DISARM_RECORD_GATE' });
                     }
                     showEditorStatus('ARM cancelled ✖️');
+                  } else if (isRecMidiArmed) {
+                    setIsRecMidiArmed(false);
+                    showEditorStatus('MIDI ARM cancelled ✖️');
+                  } else if (liveRecMidiTriggered) {
+                    setIsRecMidiArmed(true);
+                    showEditorStatus('Armed! Play Note on Keyboard to Start... ⏱️');
                   } else {
                     liveRecOverdubRef.current = false;
                     setLooperState(1);
                     startLiveLoopRecording();
                   }
                 }}
-                className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : (isArmed ? 'active-yellow' : ''))}`}
+                className={`btn btn-xs ${isLiveRecording ? 'active-red' : (liveRecPendingStart ? 'active-yellow' : (isRecMidiArmed ? 'active-yellow' : (isArmed ? 'active-yellow' : '')))}`}
                 style={{
                   width: '100%',
                   fontSize: '0.42rem',
                   padding: '4px 0',
                   fontWeight: 'bold',
                   margin: '2px 0 1px 0',
-                  color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : (isArmed ? '#ffe600' : '#aaa')),
-                  borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : (isArmed ? '#ffe600' : 'rgba(255,255,255,0.15)')),
+                  color: isLiveRecording ? '#fff' : (liveRecPendingStart ? '#000' : (isRecMidiArmed ? '#ffe600' : (isArmed ? '#ffe600' : '#aaa'))),
+                  borderColor: isLiveRecording ? '#ff0055' : (liveRecPendingStart ? '#ffe600' : (isRecMidiArmed ? '#ffe600' : (isArmed ? '#ffe600' : 'rgba(255,255,255,0.15)'))),
                   background: isLiveRecording
                     ? 'rgba(255, 0, 85, 0.25)'
-                    : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.85)' : (isArmed ? 'rgba(255,230,0,0.12)' : 'rgba(0,0,0,0.3)')),
+                    : (liveRecPendingStart ? 'rgba(255, 230, 0, 0.85)' : (isRecMidiArmed ? 'rgba(255,230,0,0.15)' : (isArmed ? 'rgba(255,230,0,0.12)' : 'rgba(0,0,0,0.3)'))),
                   boxShadow: isLiveRecording
                     ? '0 0 10px rgba(255, 0, 85, 0.5)'
-                    : (liveRecPendingStart ? '0 0 10px rgba(255, 230, 0, 0.5)' : 'none'),
-                  animation: liveRecPendingStart ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none',
+                    : (liveRecPendingStart ? '0 0 10px rgba(255, 230, 0, 0.5)' : (isRecMidiArmed ? '0 0 8px rgba(255, 230, 0, 0.3)' : 'none')),
+                  animation: (liveRecPendingStart || isRecMidiArmed) ? 'knob-pulse-yellow 0.6s infinite alternate' : 'none',
                   transition: 'all 0.15s ease',
                   cursor: 'pointer'
                 }}
@@ -19878,9 +19940,11 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                   ? '⏹️ STOP REC'
                   : liveRecPendingStart
                     ? '⏳ WAITING BEAT 1...'
-                    : isArmed
-                      ? '⚡ ARM → QUEUE GATE'
-                      : '🔴 ARM + REC'}
+                    : isRecMidiArmed
+                      ? '⏳ MIDI ARM ACTIVE (PLAY KEY)...'
+                      : isArmed
+                        ? '⚡ ARM → QUEUE GATE'
+                        : '🔴 ARM + REC'}
               </button>
 
               {/* Overdub & Clear & Undo Row */}
@@ -20669,6 +20733,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           setRecordingInputMode={setRecordingInputMode}
           liveRecTargetSlot={liveRecTargetSlot}
           setLiveRecTargetSlot={setLiveRecTargetSlot}
+          selectedEditSlotId={selectedEditSlotId}
           setSelectedEditSlotId={setSelectedEditSlotId}
           recordingTargetSlotIdRef={recordingTargetSlotIdRef}
           recordingInputModeRef={recordingInputModeRef}

@@ -7,11 +7,41 @@ export default function DeltaViSynthPanel({
   setRecordingInputMode,
   liveRecTargetSlot,
   setLiveRecTargetSlot,
+  selectedEditSlotId,
   setSelectedEditSlotId,
   recordingTargetSlotIdRef,
   recordingInputModeRef
 }) {
   const [position, setPosition] = useState({ x: 100, y: 80 });
+  const [midiActivity, setMidiActivity] = useState(null);
+
+  useEffect(() => {
+    let timeoutId;
+    const handleMidiMessage = (e) => {
+      const { data } = e.detail;
+      const [status, , data2] = data;
+      const cmd = status & 0xf0;
+      
+      if (cmd === 0x90 && data2 > 0) {
+        setMidiActivity('note');
+      } else if (cmd === 0xB0) {
+        setMidiActivity('cc');
+      } else {
+        return;
+      }
+      
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setMidiActivity(null);
+      }, 80);
+    };
+    
+    window.addEventListener('delta7_midi_message', handleMidiMessage);
+    return () => {
+      window.removeEventListener('delta7_midi_message', handleMidiMessage);
+      clearTimeout(timeoutId);
+    };
+  }, []);
   const [isMinimized, setIsMinimized] = useState(false);
   const [size, setSize] = useState({ width: 1000, height: 835 });
   const [layoutMode, setLayoutMode] = useState(() => {
@@ -198,6 +228,19 @@ export default function DeltaViSynthPanel({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span 
+            style={{ 
+              width: '8px', 
+              height: '8px', 
+              borderRadius: '50%', 
+              background: midiActivity === 'note' ? '#00ff88' : midiActivity === 'cc' ? '#ffa000' : '#444', 
+              boxShadow: midiActivity === 'note' ? '0 0 8px #00ff88' : midiActivity === 'cc' ? '0 0 8px #ffa000' : 'none',
+              transition: 'background 0.05s, box-shadow 0.05s',
+              display: 'inline-block',
+              marginRight: '2px'
+            }} 
+            title="MIDI Activity LED (Green: Notes, Orange: CC)"
+          />
           <span style={{ fontSize: '0.58rem', animation: 'led-blink-cyan 1.5s infinite alternate' }}>⚡</span>
           <span style={{ fontFamily: 'monospace', fontSize: '0.62rem', fontWeight: 'bold', color: '#00f3ff', letterSpacing: '0.8px', textShadow: '0 0 4px rgba(0, 243, 255, 0.5)' }}>
             DELTAVI SYNTH CONSOLE (ARIES/LIBRA/LEO)
@@ -284,6 +327,7 @@ export default function DeltaViSynthPanel({
             setRecordingInputMode={setRecordingInputMode}
             liveRecTargetSlot={liveRecTargetSlot}
             setLiveRecTargetSlot={setLiveRecTargetSlot}
+            selectedEditSlotId={selectedEditSlotId}
             setSelectedEditSlotId={setSelectedEditSlotId}
             recordingTargetSlotIdRef={recordingTargetSlotIdRef}
             recordingInputModeRef={recordingInputModeRef}

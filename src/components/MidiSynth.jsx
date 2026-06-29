@@ -7213,9 +7213,20 @@ export default function MidiSynth({
   recordingTargetSlotIdRef = null,
   recordingInputModeRef = null,
   selectedMidiDeviceName = 'all',
-  setSelectedMidiDeviceName = () => {}
+  setSelectedMidiDeviceName = () => {},
+  selectedEditSlotId = 'a01'
 }) {
   const [synthOn, setSynthOn] = useState(false);
+  const [followSelectedPad, setFollowSelectedPad] = useState(true);
+
+  useEffect(() => {
+    if (followSelectedPad && selectedEditSlotId && selectedEditSlotId !== 'None') {
+      setLiveRecTargetSlot(selectedEditSlotId);
+      if (recordingTargetSlotIdRef) recordingTargetSlotIdRef.current = selectedEditSlotId;
+      setRecordingInputMode('synth');
+      if (recordingInputModeRef) recordingInputModeRef.current = 'synth';
+    }
+  }, [selectedEditSlotId, followSelectedPad]);
   const [dwgsType, setDwgsType] = useState('organ');
   const [midiDevices, setMidiDevices] = useState([]);
   const [connectedDevice, setConnectedDevice] = useState('NO CONTROLLER DETECTED');
@@ -10417,6 +10428,15 @@ export default function MidiSynth({
               <div className="preset-dashboard" style={{ borderLeft: '1px solid rgba(0,243,255,0.15)', paddingLeft: '15px' }}>
                 <span className="section-title" style={{ color: '#ff007f', textShadow: '0 0 4px rgba(255,0,127,0.3)' }}>REC ROUTING</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer', fontSize: '0.5rem', color: '#ff007f', fontFamily: 'monospace', letterSpacing: '0.3px', marginRight: '2px' }} title="Automatically route synth output to whatever pad is selected in Delta7">
+                    <input 
+                      type="checkbox" 
+                      checked={followSelectedPad} 
+                      onChange={(e) => setFollowSelectedPad(e.target.checked)}
+                      style={{ accentColor: '#ff007f', cursor: 'pointer', width: '9px', height: '9px', margin: 0, padding: 0 }}
+                    />
+                    FOLLOW
+                  </label>
                   <select 
                     className="preset-select font-mono"
                     style={{ 
