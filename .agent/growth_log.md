@@ -129,3 +129,12 @@ When Jimmy asks for a "Book" or "Long-Form" project, I must immediately initiali
 
 ## Preference Learning:
 - **Feature Pruning:** Jimmy values lean, focused workflows. If an experimental feature or component (like Ronin9) doesn't convince him, he prefers to prune it entirely from the codebase rather than letting it linger as legacy code.
+
+## Task: Codebase Audit & ESLint Setup (2026-06-29)
+**Outcome:** Performed a comprehensive audit of the workstation code. Configured ESLint v9 (flat config) and resolved critical undefined variable errors that would have crashed the application at runtime. Rebuilt and packaged the Electron app.
+**The Lesson:**
+- Running a linter is invaluable for catching silent runtime crashes, like undefined state setters (`setPlatterAngleA/B`) and undeclared local variables (`sliceDurationB`) inside complex logic blocks before they reach the user.
+- If Electron files are locked during build (`EBUSY`), check for zombie background instances using `Get-Process` and kill them using `Stop-Process -Force` in PowerShell.
+
+## Preference Learning:
+- **Static Analysis Value:** Emphasized the importance of strict static checking (ESLint) to safeguard codebase reliability for Jimmy's workstation projects.
