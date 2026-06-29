@@ -147,3 +147,12 @@ When Jimmy asks for a "Book" or "Long-Form" project, I must immediately initiali
 
 ## Preference Learning:
 - **DSP Modernization:** Jimmy supports moving towards standard modern Web Audio APIs (AudioWorklets) and cleaning up legacy technical debt to secure high-performance, glitch-free audio execution.
+
+## Task: Performance View Code-Splitting (2026-06-29)
+**Outcome:** Successfully extracted the monolithic `renderPerformanceDeck` block out of `Delta7Synth.jsx` and modularized it into the new component `PerformanceView.jsx`. This reduced the size of the main workstation file `Delta7Synth.jsx` by over **3,150 lines of code** and resolved all undefined props/state references under ESLint.
+**The Lesson:**
+- When code-splitting massive interactive React components, writing short Node.js parsing scripts to extract code ranges is significantly safer and faster than copy-pasting manually.
+- Props/ref mappings should be verified immediately using ESLint `no-undef` checks to ensure that no state linkages are broken during extraction.
+
+## Preference Learning:
+- **Component Modularization:** Jimmy prefers extracting distinct workstation views (like the Performance view, sequencer timeline, and mixers) into isolated React components to speed up Vite compilation/HMR and keep files clean and maintainable.
