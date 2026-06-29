@@ -11344,6 +11344,7 @@ export default function Delta7Synth() {
         let isLoopB = false;
         let useReverseB = false;
         let playhead;
+        let sliceDurationB = 0;
 
         if (isSliceGranularB) {
           sliceDurationB = sliceDurationBPrecalc;
@@ -13715,10 +13716,16 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     
     if (isA) {
       scratchStartAngleA.current = angle;
-      setPlatterAngleA(prev => (prev + delta * (180 / Math.PI)) % 360);
+      platterAngleARef.current = (platterAngleARef.current + delta * (180 / Math.PI) + 360) % 360;
+      if (platterRefA.current) {
+        platterRefA.current.style.transform = `translate3d(0, 0, 0) rotate(${platterAngleARef.current}deg)`;
+      }
     } else {
       scratchStartAngleB.current = angle;
-      setPlatterAngleB(prev => (prev + delta * (180 / Math.PI)) % 360);
+      platterAngleBRef.current = (platterAngleBRef.current + delta * (180 / Math.PI) + 360) % 360;
+      if (platterRefB.current) {
+        platterRefB.current.style.transform = `translate3d(0, 0, 0) rotate(${platterAngleBRef.current}deg)`;
+      }
     }
     
     const speed = delta * 20;
