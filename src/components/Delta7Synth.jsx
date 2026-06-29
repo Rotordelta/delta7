@@ -2684,252 +2684,57 @@ export default function Delta7Synth() {
       recordingScriptNodeRef.current = null;
     }
 
-    try {
-      const workletNode = new AudioWorkletNode(ctx, 'recorder-processor');
-      workletNode.port.onmessage = (e) => {
-        const msg = e.data;
-        if (msg.type === 'STARTED') {
-          if (liveRecPendingStartRef.current) {
-            isLiveRecordingRef.current = true;
-            liveRecPendingStartRef.current = false;
-            setIsLiveRecording(true);
-            setLiveRecPendingStart(false);
-            showEditorStatus("Live Recording Started! 🔴");
-          } else {
-            isRecordingRef.current = true;
-            manualRecPendingStartRef.current = false;
-            setIsRecording(true);
-            setManualRecPendingStart(false);
-            showEditorStatus("Recording Started... ⏺️");
-          }
-        } else if (msg.type === 'STOPPED') {
-          if (isLiveRecordingRef.current) {
-            isLiveRecordingRef.current = false;
-            setIsLiveRecording(false);
-          } else {
-            isRecordingRef.current = false;
-            setIsRecording(false);
-            manualRecPendingStopRef.current = false;
-            setManualRecPendingStop(false);
-          }
-        } else if (msg.type === 'RECORDING_COMPLETE') {
-          recordedChunksL.current = [msg.bufferL];
-          recordedChunksR.current = [msg.bufferR];
-          
-          if (liveLoopInProgressRef.current) {
-            liveLoopInProgressRef.current = false;
-            liveRecCollectedSamplesRef.current = msg.bufferL.length;
-            isLiveRecordingRef.current = false;
-            setIsLiveRecording(false);
-            saveLiveLoopRecording();
-            liveRecCollectedSamplesRef.current = 0;
-          } else {
-            isRecordingRef.current = false;
-            setIsRecording(false);
-            manualRecPendingStopRef.current = false;
-            setManualRecPendingStop(false);
-            saveResampledAudio();
-          }
-        }
-      };
-
-      recordingWorkletNodeRef.current = workletNode;
-      sourceNode.connect(workletNode);
-      workletNode.connect(ctx.destination);
-      return;
-    } catch (err) {
-      console.warn("Failed to create AudioWorkletNode for recorder, falling back to ScriptProcessorNode:", err);
-    }
-
-    // FALLBACK: Legacy ScriptProcessorNode
-    const scriptNode = ctx.createScriptProcessor(8192, 2, 2);
-    scriptNode.onaudioprocess = (e) => {
-      const inputL = e.inputBuffer.getChannelData(0);
-      const inputR = e.inputBuffer.getChannelData(1);
-      
-      const outputL = e.outputBuffer.getChannelData(0);
-      const outputR = e.outputBuffer.getChannelData(1);
-      outputL.fill(0);
-      outputR.fill(0);
-      
-      const blockTime = e.playbackTime || ctx.currentTime;
-      const blockLength = inputL.length;
-      const sampleDuration = 1.0 / ctx.sampleRate;
-      const blockEndTime = blockTime + blockLength * sampleDuration;
-
-      // Handle beat-synced start
-      if (manualRecPendingStartRef.current) {
-        const targetStartTime = manualRecStartTimeRef.current;
-        if (blockTime <= targetStartTime && targetStartTime < blockEndTime) {
-          const startOffset = Math.max(0, Math.min(blockLength - 1, Math.round((targetStartTime - blockTime) * ctx.sampleRate)));
-          const countToCopy = blockLength - startOffset;
-          
-          recordedChunksL.current = [];
-          recordedChunksR.current = [];
-          
-          const chunkL = new Float32Array(countToCopy);
-          const chunkR = new Float32Array(countToCopy);
-          for (let i = 0; i < countToCopy; i++) {
-            chunkL[i] = inputL[startOffset + i];
-            chunkR[i] = inputR[startOffset + i];
-          }
-          recordedChunksL.current.push(chunkL);
-          recordedChunksR.current.push(chunkR);
-          
+    const workletNode = new AudioWorkletNode(ctx, 'recorder-processor');
+    workletNode.port.onmessage = (e) => {
+      const msg = e.data;
+      if (msg.type === 'STARTED') {
+        if (liveRecPendingStartRef.current) {
+          isLiveRecordingRef.current = true;
+          liveRecPendingStartRef.current = false;
+          setIsLiveRecording(true);
+          setLiveRecPendingStart(false);
+          showEditorStatus("Live Recording Started! 🔴");
+        } else {
           isRecordingRef.current = true;
           manualRecPendingStartRef.current = false;
-          
-          setTimeout(() => {
-            setIsRecording(true);
-            setManualRecPendingStart(false);
-            showEditorStatus("Recording Started... ⏺️");
-          }, 0);
-          return;
-        } else if (blockTime > targetStartTime) {
-          // Missed start time fallback (start recording immediately)
-          recordedChunksL.current = [];
-          recordedChunksR.current = [];
-          
-          const chunkL = new Float32Array(inputL);
-          const chunkR = new Float32Array(inputR);
-          recordedChunksL.current.push(chunkL);
-          recordedChunksR.current.push(chunkR);
-          
-          isRecordingRef.current = true;
-          manualRecPendingStartRef.current = false;
-          
-          setTimeout(() => {
-            setIsRecording(true);
-            setManualRecPendingStart(false);
-            showEditorStatus("Recording Started... ⏺️");
-          }, 0);
-          return;
+          setIsRecording(true);
+          setManualRecPendingStart(false);
+          showEditorStatus("Recording Started... ⏺️");
         }
-      }
-
-      // Handle beat-synced stop
-      if (manualRecPendingStopRef.current && isRecordingRef.current) {
-        const targetStopTime = manualRecStopTimeRef.current;
-        if (blockTime <= targetStopTime && targetStopTime < blockEndTime) {
-          const stopOffset = Math.max(0, Math.min(blockLength - 1, Math.round((targetStopTime - blockTime) * ctx.sampleRate)));
-          
-          const chunkL = new Float32Array(stopOffset);
-          const chunkR = new Float32Array(stopOffset);
-          for (let i = 0; i < stopOffset; i++) {
-            chunkL[i] = inputL[i];
-            chunkR[i] = inputR[i];
-          }
-          recordedChunksL.current.push(chunkL);
-          recordedChunksR.current.push(chunkR);
-          
+      } else if (msg.type === 'STOPPED') {
+        if (isLiveRecordingRef.current) {
+          isLiveRecordingRef.current = false;
+          setIsLiveRecording(false);
+        } else {
           isRecordingRef.current = false;
+          setIsRecording(false);
           manualRecPendingStopRef.current = false;
-          
-          const bpm = paramsRef.current.arpBpm || 120;
-          const beatDuration = 60 / bpm;
-          const duration = targetStopTime - manualRecStartTimeRef.current;
-          manualRecBeatsRef.current = Math.max(1, Math.round(duration / beatDuration));
-
-          setTimeout(() => {
-            setIsRecording(false);
-            setManualRecPendingStop(false);
-            saveResampledAudio();
-          }, 0);
-          return;
+          setManualRecPendingStop(false);
         }
-      }
-
-      if (liveRecPendingStartRef.current) {
-        const targetStartTime = liveRecStartTimeRef.current;
-        if (blockTime <= targetStartTime && targetStartTime < blockEndTime) {
-          const startOffset = Math.max(0, Math.min(blockLength - 1, Math.round((targetStartTime - blockTime) * ctx.sampleRate)));
-          const countToCopy = blockLength - startOffset;
-          
-          recordedChunksL.current = [];
-          recordedChunksR.current = [];
+      } else if (msg.type === 'RECORDING_COMPLETE') {
+        recordedChunksL.current = [msg.bufferL];
+        recordedChunksR.current = [msg.bufferR];
+        
+        if (liveLoopInProgressRef.current) {
+          liveLoopInProgressRef.current = false;
+          liveRecCollectedSamplesRef.current = msg.bufferL.length;
+          isLiveRecordingRef.current = false;
+          setIsLiveRecording(false);
+          saveLiveLoopRecording();
           liveRecCollectedSamplesRef.current = 0;
-          
-          const chunkL = new Float32Array(countToCopy);
-          const chunkR = new Float32Array(countToCopy);
-          for (let i = 0; i < countToCopy; i++) {
-            chunkL[i] = inputL[startOffset + i];
-            chunkR[i] = inputR[startOffset + i];
-          }
-          recordedChunksL.current.push(chunkL);
-          recordedChunksR.current.push(chunkR);
-          liveRecCollectedSamplesRef.current += countToCopy;
-          
-          isLiveRecordingRef.current = true;
-          liveRecPendingStartRef.current = false;
-          
-          setTimeout(() => {
-            setIsLiveRecording(true);
-            setLiveRecPendingStart(false);
-            showEditorStatus("Live Recording Started! 🔴");
-          }, 0);
-          return;
-        } else if (blockTime > targetStartTime) {
-          // Missed start time fallback (start recording immediately)
-          recordedChunksL.current = [];
-          recordedChunksR.current = [];
-          liveRecCollectedSamplesRef.current = 0;
-          
-          const chunkL = new Float32Array(inputL);
-          const chunkR = new Float32Array(inputR);
-          recordedChunksL.current.push(chunkL);
-          recordedChunksR.current.push(chunkR);
-          liveRecCollectedSamplesRef.current += blockLength;
-          
-          isLiveRecordingRef.current = true;
-          liveRecPendingStartRef.current = false;
-          
-          setTimeout(() => {
-            setIsLiveRecording(true);
-            setLiveRecPendingStart(false);
-            showEditorStatus("Live Recording Started! 🔴");
-          }, 0);
-          return;
+        } else {
+          isRecordingRef.current = false;
+          setIsRecording(false);
+          manualRecPendingStopRef.current = false;
+          setManualRecPendingStop(false);
+          saveResampledAudio();
         }
-      }
-
-      if (isLiveRecordingRef.current) {
-        const blockLength = inputL.length;
-        const remaining = liveRecLimitSamplesRef.current - liveRecCollectedSamplesRef.current;
-        if (remaining > 0) {
-          const countToCopy = Math.min(blockLength, remaining);
-          const chunkL = new Float32Array(countToCopy);
-          const chunkR = new Float32Array(countToCopy);
-          for (let i = 0; i < countToCopy; i++) {
-            chunkL[i] = inputL[i];
-            chunkR[i] = inputR[i];
-          }
-          recordedChunksL.current.push(chunkL);
-          recordedChunksR.current.push(chunkR);
-          liveRecCollectedSamplesRef.current += countToCopy;
-
-          if (!liveRecHandoverStartedRef.current && liveRecCollectedSamplesRef.current >= liveRecTotalSamplesRef.current) {
-            liveRecHandoverStartedRef.current = true;
-          }
-
-          if (liveRecCollectedSamplesRef.current >= liveRecLimitSamplesRef.current) {
-            isLiveRecordingRef.current = false;
-            setTimeout(() => {
-              setIsLiveRecording(false);
-              saveLiveLoopRecording();
-            }, 0);
-          }
-        }
-        return;
-      }
-
-      if (isRecordingRef.current) {
-        recordedChunksL.current.push(new Float32Array(inputL));
-        recordedChunksR.current.push(new Float32Array(inputR));
       }
     };
-    recordingScriptNodeRef.current = scriptNode;
-    sourceNode.connect(scriptNode);
-    scriptNode.connect(ctx.destination);
+
+    recordingWorkletNodeRef.current = workletNode;
+    sourceNode.connect(workletNode);
+    workletNode.connect(ctx.destination);
   };
 
   const startLiveLoopRecording = () => {
@@ -7488,44 +7293,12 @@ export default function Delta7Synth() {
     const bitcrusherBlob = new Blob([bitcrusherCode], { type: 'application/javascript' });
     const bitcrusherBlobUrl = URL.createObjectURL(bitcrusherBlob);
 
-    let bitcrusherNode;
-    try {
-      await ctx.audioWorklet.addModule(bitcrusherBlobUrl);
-      if (ctx !== audioCtxRef.current) return;
-      bitcrusherNode = new AudioWorkletNode(ctx, 'bitcrusher-processor');
-      // Expose parameter setters on the node for compatibility with existing update code
-      bitcrusherNode._isBitcrusherWorklet = true;
-      bitcrusherNode._blobUrl = bitcrusherBlobUrl;
-    } catch (err) {
-      if (ctx !== audioCtxRef.current) return;
-      // Fallback: keep ScriptProcessor if AudioWorklet unavailable
-      console.warn('BitcrusherWorklet failed, falling back to ScriptProcessor:', err);
-      bitcrusherNode = ctx.createScriptProcessor(1024, 1, 1);
-      bitcrusherNode.onaudioprocess = (e) => {
-        const input = e.inputBuffer.getChannelData(0);
-        const output = e.outputBuffer.getChannelData(0);
-        const depth = bitDepthRef.current;
-        const ratio = sampleRateRatioRef.current;
-        const step = Math.pow(0.5, depth);
-        let lastVal = 0;
-        for (let i = 0; i < input.length; i++) {
-          if (ratio <= 1.0) {
-            let val = input[i];
-            if (depth < 16.0) val = Math.round(val / step) * step;
-            output[i] = val;
-          } else {
-            if (i % Math.floor(ratio) === 0) {
-              let val = input[i];
-              if (depth < 16.0) val = Math.round(val / step) * step;
-              lastVal = val;
-            }
-            output[i] = lastVal;
-          }
-        }
-      };
-    } finally {
-      URL.revokeObjectURL(bitcrusherBlobUrl);
-    }
+    await ctx.audioWorklet.addModule(bitcrusherBlobUrl);
+    if (ctx !== audioCtxRef.current) return;
+    const bitcrusherNode = new AudioWorkletNode(ctx, 'bitcrusher-processor');
+    bitcrusherNode._isBitcrusherWorklet = true;
+    bitcrusherNode._blobUrl = bitcrusherBlobUrl;
+    URL.revokeObjectURL(bitcrusherBlobUrl);
     if (ctx !== audioCtxRef.current) return;
     bitcrusherInput.connect(bitcrusherNode);
     bitcrusherNode.connect(bitcrusherOutput);
