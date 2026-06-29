@@ -138,3 +138,12 @@ When Jimmy asks for a "Book" or "Long-Form" project, I must immediately initiali
 
 ## Preference Learning:
 - **Static Analysis Value:** Emphasized the importance of strict static checking (ESLint) to safeguard codebase reliability for Jimmy's workstation projects.
+
+## Task: Web Audio DSP Pipeline Refactoring (2026-06-29)
+**Outcome:** Successfully refactored the workstation audio engine to remove deprecated `ScriptProcessorNode` fallback code paths for the live recorder and bitcrusher effect in `Delta7Synth.jsx`. Enforced modern `AudioWorkletNode` objects running entirely on the high-priority Web Audio audio thread, reducing component size and eliminating main-thread latency risks.
+**The Lesson:**
+- Removing unused fallback code paths from modern desktop apps (like Electron targets with fixed modern Chromium runtimes) is an excellent way to prune complex logic and improve code legibility.
+- Custom AudioWorklet implementations (using inline Blob URLs) remain highly portable and reliable across local development and packaged Electron environments.
+
+## Preference Learning:
+- **DSP Modernization:** Jimmy supports moving towards standard modern Web Audio APIs (AudioWorklets) and cleaning up legacy technical debt to secure high-performance, glitch-free audio execution.
