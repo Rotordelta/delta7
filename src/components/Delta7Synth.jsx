@@ -20737,6 +20737,8 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
           setSelectedEditSlotId={setSelectedEditSlotId}
           recordingTargetSlotIdRef={recordingTargetSlotIdRef}
           recordingInputModeRef={recordingInputModeRef}
+          selectedMidiDeviceName={selectedSynthMidiDevice}
+          setSelectedMidiDeviceName={setSelectedSynthMidiDevice}
         />
       )}
 

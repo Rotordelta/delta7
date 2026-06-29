@@ -10,7 +10,9 @@ export default function DeltaViSynthPanel({
   selectedEditSlotId,
   setSelectedEditSlotId,
   recordingTargetSlotIdRef,
-  recordingInputModeRef
+  recordingInputModeRef,
+  selectedMidiDeviceName,
+  setSelectedMidiDeviceName
 }) {
   const [position, setPosition] = useState({ x: 100, y: 80 });
   const [midiActivity, setMidiActivity] = useState(null);
@@ -331,6 +333,8 @@ export default function DeltaViSynthPanel({
             setSelectedEditSlotId={setSelectedEditSlotId}
             recordingTargetSlotIdRef={recordingTargetSlotIdRef}
             recordingInputModeRef={recordingInputModeRef}
+            selectedMidiDeviceName={selectedMidiDeviceName}
+            setSelectedMidiDeviceName={setSelectedMidiDeviceName}
           />
         </div>
       )}
