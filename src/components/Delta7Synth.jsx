@@ -19222,6 +19222,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
             {/* Performance View contents */}
             <PerformanceView
+              MidiBadge={MidiBadge}
               params={params}
               setParams={setParams}
               uiScale={uiScale}

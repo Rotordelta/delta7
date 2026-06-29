@@ -20,6 +20,7 @@ const ROTOR_PRESETS = [
 ];
 
 export default function PerformanceView({
+  MidiBadge,
   params,
   setParams,
   uiScale,
