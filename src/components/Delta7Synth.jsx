@@ -8,7 +8,6 @@ import MidiSynth from './MidiSynth.jsx';
 import LoomConsolePanel from './LoomConsolePanel.jsx';
 import RecordCrates from './RecordCrates.jsx';
 import PerformanceView from './PerformanceView.jsx';
-import OculusEngine from './OculusEngine';
 import './delta7-styles.css';
 
 // SharedArrayBuffer configuration constants
@@ -204,109 +203,7 @@ const generateSynthesizedKit = (ctx, kitType) => {
   const createBuffer = (seconds) => ctx.createBuffer(1, Math.round(seconds * sampleRate), sampleRate);
   const kit = [];
 
-  if (kitType === 'DRUMS') {
-    // 1. Kick
-    const kick = createBuffer(0.3);
-    const kData = kick.getChannelData(0);
-    for (let i = 0; i < kData.length; i++) {
-      const t = i / sampleRate;
-      const freq = 150 * Math.exp(-t * 40) + 45;
-      const env = Math.exp(-t * 15);
-      kData[i] = Math.sin(2 * Math.PI * freq * t) * env;
-    }
-    kit.push({ name: 'Synth Kick', buffer: kick });
 
-    // 2. Snare
-    const snare = createBuffer(0.25);
-    const sData = snare.getChannelData(0);
-    for (let i = 0; i < sData.length; i++) {
-      const t = i / sampleRate;
-      const noise = Math.random() * 2 - 1;
-      const noiseEnv = Math.exp(-t * 20);
-      const tone = Math.sin(2 * Math.PI * 180 * t) * Math.exp(-t * 40);
-      sData[i] = (noise * noiseEnv * 0.7 + tone * 0.3) * Math.exp(-t * 5);
-    }
-    kit.push({ name: 'Synth Snare', buffer: snare });
-
-    // 3. Closed Hat
-    const hat = createBuffer(0.08);
-    const hData = hat.getChannelData(0);
-    let lastNoise = 0;
-    for (let i = 0; i < hData.length; i++) {
-      const t = i / sampleRate;
-      const noise = Math.random() * 2 - 1;
-      const filtered = noise - lastNoise;
-      lastNoise = noise;
-      const env = Math.exp(-t * 70);
-      hData[i] = filtered * env * 0.5;
-    }
-    kit.push({ name: 'Synth Hat', buffer: hat });
-
-    // 4. Open Hat
-    const oHat = createBuffer(0.35);
-    const ohData = oHat.getChannelData(0);
-    let lastNoiseO = 0;
-    for (let i = 0; i < ohData.length; i++) {
-      const t = i / sampleRate;
-      const noise = Math.random() * 2 - 1;
-      const filtered = noise - lastNoiseO;
-      lastNoiseO = noise;
-      const env = Math.exp(-t * 12);
-      ohData[i] = filtered * env * 0.4;
-    }
-    kit.push({ name: 'Open Hat', buffer: oHat });
-
-    // 5. Synth Tom
-    const tom = createBuffer(0.4);
-    const tData = tom.getChannelData(0);
-    for (let i = 0; i < tData.length; i++) {
-      const t = i / sampleRate;
-      const freq = 120 * Math.exp(-t * 10) + 60;
-      const env = Math.exp(-t * 8);
-      tData[i] = Math.sin(2 * Math.PI * freq * t) * env;
-    }
-    kit.push({ name: 'Synth Tom', buffer: tom });
-
-    // 6. Cowbell
-    const bell = createBuffer(0.25);
-    const bData = bell.getChannelData(0);
-    for (let i = 0; i < bData.length; i++) {
-      const t = i / sampleRate;
-      const f1 = 800;
-      const f2 = 540;
-      const s1 = Math.sin(2 * Math.PI * f1 * t) > 0 ? 1 : -1;
-      const s2 = Math.sin(2 * Math.PI * f2 * t) > 0 ? 1 : -1;
-      const env = Math.exp(-t * 15);
-      bData[i] = (s1 + s2) * 0.3 * env;
-    }
-    kit.push({ name: 'Cowbell', buffer: bell });
-
-    // 7. Clap
-    const clap = createBuffer(0.3);
-    const cData = clap.getChannelData(0);
-    for (let i = 0; i < cData.length; i++) {
-      const t = i / sampleRate;
-      let env = 0;
-      if (t < 0.01) env = Math.exp(-t * 200);
-      else if (t < 0.02) env = Math.exp(-(t - 0.01) * 200);
-      else if (t < 0.03) env = Math.exp(-(t - 0.02) * 200);
-      else env = Math.exp(-(t - 0.03) * 15);
-      cData[i] = (Math.random() * 2 - 1) * env * 0.5;
-    }
-    kit.push({ name: 'Hand Clap', buffer: clap });
-
-    // 8. Sub Bass
-    const sub = createBuffer(0.6);
-    const subData = sub.getChannelData(0);
-    for (let i = 0; i < subData.length; i++) {
-      const t = i / sampleRate;
-      const freq = 55;
-      const env = Math.exp(-t * 3) * (1 - Math.exp(-t * 50));
-      subData[i] = Math.sin(2 * Math.PI * freq * t) * env * 0.8;
-    }
-    kit.push({ name: 'Sub Bass 55Hz', buffer: sub });
-  } 
-  else if (kitType === 'WAVES') {
     const addWave = (name, lengthSec, func) => {
       const buf = createBuffer(lengthSec);
       const data = buf.getChannelData(0);
@@ -1063,7 +960,7 @@ export default function Delta7Synth() {
 
 
   const [selectedEditSlotId, setSelectedEditSlotId] = useState('a01'); // Target slot in Editor
-  const [uiScale, setUiScale] = useState(0.8);
+  const [uiScale, setUiScale] = useState(0.65);
   const [projectDirHandle, setProjectDirHandle] = useState(null);
   const [projectDirName, setProjectDirName] = useState('');
   const [localBanks, setLocalBanks] = useState([]);
@@ -1537,23 +1434,28 @@ export default function Delta7Synth() {
   const overdubOriginalBufferRef = useRef(null);
   const overdubOriginalRawBufferRef = useRef(null);
 
-  const [liveRecProgress, setLiveRecProgress] = useState(0);
+  // DOM ref for live-rec progress bar — avoids 60fps React re-renders during recording
+  const liveRecProgressBarRef = useRef(null);
 
   useEffect(() => {
     if (!isLiveRecording) {
-      setLiveRecProgress(0);
+      // Recording stopped — reset bar via ref, no state re-render needed
+      if (liveRecProgressBarRef.current) {
+        liveRecProgressBarRef.current.style.transform = 'scaleX(0)';
+      }
       return;
     }
     let animId;
     const updateProgress = () => {
       const ctx = audioCtxRef.current;
-      if (ctx && liveRecStartTimeRef.current) {
+      if (ctx && liveRecStartTimeRef.current && liveRecProgressBarRef.current) {
         const elapsed = ctx.currentTime - liveRecStartTimeRef.current;
         const bpm = paramsRef.current.arpBpm || 120;
         const beatDuration = 60 / bpm;
         const totalSec = beatDuration * liveRecBeatsRef.current;
-        const pct = Math.min(100, Math.max(0, (elapsed / totalSec) * 100));
-        setLiveRecProgress(pct);
+        const pct = Math.min(1, Math.max(0, elapsed / totalSec));
+        // Direct DOM write — zero React re-renders, GPU composited
+        liveRecProgressBarRef.current.style.transform = `scaleX(${pct})`;
       }
       animId = requestAnimationFrame(updateProgress);
     };
@@ -3678,36 +3580,37 @@ export default function Delta7Synth() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
-    const bar = document.getElementById('mic-level-bar-fill');
-    if (bar) bar.style.width = '0%';
-    const barLooper = document.getElementById('looper-level-bar-fill');
-    if (barLooper) barLooper.style.width = '0%';
+    // GPU-composited scaleX reset — matches startMicMonitor approach
+    const bar     = document.getElementById('mic-level-bar-fill');
+    const barLoop = document.getElementById('looper-level-bar-fill');
     const barMini = document.getElementById('looper-level-bar-fill-mini');
-    if (barMini) barMini.style.width = '0%';
+    if (bar)     bar.style.transform     = 'scaleX(0)';
+    if (barLoop) barLoop.style.transform = 'scaleX(0)';
+    if (barMini) barMini.style.transform = 'scaleX(0)';
   };
 
   const startMicMonitor = () => {
     const analyser = micAnalyserRef.current;
     if (!analyser) return;
     const array = new Uint8Array(analyser.frequencyBinCount);
-    
+
+    // Pre-resolve elements once — avoids getElementById on every frame
+    const bar     = document.getElementById('mic-level-bar-fill');
+    const barLoop = document.getElementById('looper-level-bar-fill');
+    const barMini = document.getElementById('looper-level-bar-fill-mini');
+
     const updateLevel = () => {
       analyser.getByteFrequencyData(array);
       let sum = 0;
       for (let i = 0; i < array.length; i++) sum += array[i];
-      const avg = sum / array.length;
-      
-      const valPct = `${Math.min(100, (avg / 150) * 100)}%`;
-      
-      const bar = document.getElementById('mic-level-bar-fill');
-      if (bar) bar.style.width = valPct;
-      
-      const barLooper = document.getElementById('looper-level-bar-fill');
-      if (barLooper) barLooper.style.width = valPct;
-      
-      const barMini = document.getElementById('looper-level-bar-fill-mini');
-      if (barMini) barMini.style.width = valPct;
-      
+      const scale = Math.min(1, (sum / array.length) / 150);
+
+      // GPU-composited scaleX — no layout recalculation
+      const xform = `scaleX(${scale})`;
+      if (bar)     bar.style.transform     = xform;
+      if (barLoop) barLoop.style.transform = xform;
+      if (barMini) barMini.style.transform = xform;
+
       recordAnimationFrameIdRef.current = requestAnimationFrame(updateLevel);
     };
     updateLevel();
@@ -9105,7 +9008,7 @@ export default function Delta7Synth() {
           `Bank ${bankType.toUpperCase()} Preset ${presetNum} is empty. Would you like to load the factory default kit?`
         );
         if (loadDefault) {
-          const defaultKit = bankType === 'a' ? 'DRUMS' : (bankType === 'b' ? 'AMBIENT' : 'CHIPTUNE');
+          const defaultKit = bankType === 'a' ? 'WAVES' : (bankType === 'b' ? 'AMBIENT' : 'CHIPTUNE');
           await loadKitPreset(defaultKit, bankType);
         } else {
           showEditorStatus("Load cancelled.");
@@ -14978,13 +14881,15 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
   const setupMidiListeners = (input) => {
     input.onmidimessage = (message) => {
-      const isDrumMachine = input.name && (
-        input.name.toUpperCase().includes('TR-8') || 
-        input.name.toUpperCase().includes('TR8') || 
-        input.name.toUpperCase().includes('TR-08') || 
+      // Block MIDI note messages from Roland TR-8/TR-09 — used for sampling,
+      // not for triggering the synth engine directly.
+      const isRolandDrumSampler = input.name && (
+        input.name.toUpperCase().includes('TR-8') ||
+        input.name.toUpperCase().includes('TR8') ||
+        input.name.toUpperCase().includes('TR-08') ||
         input.name.toUpperCase().includes('TR-09')
       );
-      if (isDrumMachine) return;
+      if (isRolandDrumSampler) return;
 
       const [status, data1, data2] = message.data;
       
@@ -18800,7 +18705,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
                       {/* Level meter */}
                       <div className="mic-level-meter-container" style={{ padding: '3px 6px', height: '22px' }}>
                         <div className="mic-level-bar-track" style={{ height: '4px' }}>
-                          <div id="mic-level-bar-fill" className="mic-level-bar-fill"></div>
+                          <div ref={liveRecProgressBarRef} id="mic-level-bar-fill" className="mic-level-bar-fill"></div>
                         </div>
                       </div>
 
@@ -19713,7 +19618,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
               <div style={{ width: '100%', marginTop: '3px' }}>
                 <div className="mic-level-meter-container" style={{ padding: '1px 2px', height: '7px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '2px' }}>
                   <div className="mic-level-bar-track" style={{ height: '3px', background: 'rgba(255,255,255,0.02)', borderRadius: '1px', overflow: 'hidden' }}>
-                    <div id="looper-level-bar-fill" className="mic-level-bar-fill" style={{ width: '0%', height: '100%', background: 'linear-gradient(90deg, #00ff96 70%, #ffc000 85%, #ff0055 100%)', borderRadius: '1px', transition: 'width 0.05s ease' }}></div>
+                    <div id="looper-level-bar-fill" className="mic-level-bar-fill" style={{ height: '100%', background: 'linear-gradient(90deg, #00ff96 70%, #ffc000 85%, #ff0055 100%)', borderRadius: '1px' }}></div>
                   </div>
                 </div>
               </div>
@@ -20713,17 +20618,6 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
 
       {/* Computer Keyboard Triggers listener */}
       <KeyboardTrigger playVoice={playVoice} stopVoice={stopVoice} />
-
-      {/* Persistent Fullscreen Visualizer Background */}
-      <OculusEngine
-        mode="mic"
-        stream={null}
-        audioFile={null}
-        audioCtx={audioCtxRef.current}
-        analyserNode={limiterAnalyserRef.current || analyserRef.current}
-        bpm={params.arpBpm || 120}
-        isPlaying={(metronomeRef.current && metronomeRef.current.isPlaying) || perfPlaybackActive || perfRecordActive}
-      />
 
 
       {showMidiSynth && (

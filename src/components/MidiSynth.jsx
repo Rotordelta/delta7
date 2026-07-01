@@ -7367,7 +7367,7 @@ export default function MidiSynth({
   // Leo (DeepMind 12) features
   const [oscDrift, setOscDrift] = useState(15); 
   const [hpfBassBoost, setHpfBassBoost] = useState(false);
-  const [unisonDetune, setUnisonDetune] = useState(0); 
+  const [unisonDetune, setUnisonDetune] = useState(12); 
 
   // Libra (Bass Station II) features
   const [filterCircuit, setFilterCircuit] = useState('classic'); // 'classic', 'acid'
@@ -7480,6 +7480,13 @@ export default function MidiSynth({
   const [pitchBend, setPitchBend] = useState(0.0); // -1.0 to 1.0
   const [modWheel, setModWheel] = useState(0.0); // 0.0 to 1.0
 
+  // Advanced Synth States (Unison & FM)
+  const [unisonVoices, setUnisonVoices] = useState(1); // 1, 2, 4, 8 voices
+  const [unisonSpread, setUnisonSpread] = useState(60); // 0 to 100% stereo width
+  const [fmMode, setFmMode] = useState(false);
+  const [fmAmount, setFmAmount] = useState(0.0); // 0.0 to 1.0
+  const [fmRatio, setFmRatio] = useState(1.0); // 0.5 to 8.0
+
   // List of active notes pressed (for visual keyboard)
   const [pressedNotes, setPressedNotes] = useState(new Set());
 
@@ -7559,6 +7566,8 @@ export default function MidiSynth({
   const arpIndex = useRef(0);
   const arpTimer = useRef(null);
   const activeArpNote = useRef(null);
+  const arpDirectionRef = useRef(true);   // true = ascending, false = descending
+  const arpLastNoteRef = useRef(null);    // tracks last random note to avoid repeats
 
   // Canvas visualizer refs
   const canvasRef = useRef(null);
@@ -8258,16 +8267,27 @@ export default function MidiSynth({
 
       chorusLfo.start();
 
-      currentShValue.current = 0;
-      if (shIntervalRef.current) clearInterval(shIntervalRef.current);
-      shIntervalRef.current = setInterval(() => {
-        currentShValue.current = Math.random() * 2 - 1;
-        const now = ctx.currentTime;
-        activeVoices.current.forEach(voice => {
-          const startCutoff = paramsRef.current.cutoff + (currentShValue.current * paramsRef.current.shAmount);
-          voice.filter.frequency.setValueAtTime(startCutoff, now);
-        });
-      }, 1000 / lfoRate);
+      // S&H LFO — RAF loop with performance.now() for drift-free timing
+      let shLastFired = performance.now();
+      const shRafStep = () => {
+        if (!shIntervalRef.current) return;
+        const now = performance.now();
+        const intervalMs = 1000 / (paramsRef.current.lfoRate || lfoRate);
+        if (now - shLastFired >= intervalMs) {
+          shLastFired = now;
+          currentShValue.current = Math.random() * 2 - 1;
+          const actx = audioCtxRef.current;
+          if (actx) {
+            const audioNow = actx.currentTime;
+            activeVoices.current.forEach(voice => {
+              const startCutoff = paramsRef.current.cutoff + (currentShValue.current * paramsRef.current.shAmount);
+              voice.filter.frequency.setValueAtTime(startCutoff, audioNow);
+            });
+          }
+        }
+        shIntervalRef.current = requestAnimationFrame(shRafStep);
+      };
+      shIntervalRef.current = requestAnimationFrame(shRafStep);
 
       startOscilloscope(analyser);
       setSynthOn(true);
@@ -8279,7 +8299,7 @@ export default function MidiSynth({
   const stopSynth = () => {
     try {
       if (shIntervalRef.current) {
-        clearInterval(shIntervalRef.current);
+        cancelAnimationFrame(shIntervalRef.current);
         shIntervalRef.current = null;
       }
       if (chorusLfoRef.current) {
@@ -8455,21 +8475,34 @@ export default function MidiSynth({
 
   useEffect(() => {
     if (synthOn && audioCtxRef.current) {
-      if (shIntervalRef.current) clearInterval(shIntervalRef.current);
-      shIntervalRef.current = setInterval(() => {
-        currentShValue.current = Math.random() * 2 - 1;
-        const now = audioCtxRef.current.currentTime;
-        activeVoices.current.forEach(voice => {
-          const startCutoff = paramsRef.current.cutoff + (currentShValue.current * paramsRef.current.shAmount);
-          voice.filter.frequency.setValueAtTime(startCutoff, now);
-        });
-      }, 1000 / lfoRate);
+      // Cancel any running S&H RAF loop before starting a new one
+      if (shIntervalRef.current) cancelAnimationFrame(shIntervalRef.current);
+      let shLastFired = performance.now();
+      const shRafStep = () => {
+        if (!shIntervalRef.current) return;
+        const now = performance.now();
+        const intervalMs = 1000 / (paramsRef.current.lfoRate || lfoRate);
+        if (now - shLastFired >= intervalMs) {
+          shLastFired = now;
+          currentShValue.current = Math.random() * 2 - 1;
+          const actx = audioCtxRef.current;
+          if (actx) {
+            const audioNow = actx.currentTime;
+            activeVoices.current.forEach(voice => {
+              const startCutoff = paramsRef.current.cutoff + (currentShValue.current * paramsRef.current.shAmount);
+              voice.filter.frequency.setValueAtTime(startCutoff, audioNow);
+            });
+          }
+        }
+        shIntervalRef.current = requestAnimationFrame(shRafStep);
+      };
+      shIntervalRef.current = requestAnimationFrame(shRafStep);
     }
   }, [lfoRate, synthOn]);
 
   useEffect(() => {
     return () => {
-      if (shIntervalRef.current) clearInterval(shIntervalRef.current);
+      if (shIntervalRef.current) cancelAnimationFrame(shIntervalRef.current);
       if (arpTimer.current) {
         clearInterval(arpTimer.current);
         arpTimer.current = null;
@@ -8534,10 +8567,10 @@ export default function MidiSynth({
 
     const beatLen = 60000 / arpBpm;
     let stepMs = beatLen;
-    if (arpDivision === 1) stepMs = beatLen * 4;
-    else if (arpDivision === 2) stepMs = beatLen * 2;
-    else if (arpDivision === 4) stepMs = beatLen;
-    else if (arpDivision === 8) stepMs = beatLen * 0.5;
+    if (arpDivision === 1)   stepMs = beatLen * 4;
+    else if (arpDivision === 2)  stepMs = beatLen * 2;
+    else if (arpDivision === 4)  stepMs = beatLen;
+    else if (arpDivision === 8)  stepMs = beatLen * 0.5;
     else if (arpDivision === 12) stepMs = beatLen * (1 / 3);
     else if (arpDivision === 16) stepMs = beatLen * 0.25;
     else if (arpDivision === 24) stepMs = beatLen * (1 / 6);
@@ -8545,12 +8578,16 @@ export default function MidiSynth({
     else if (arpDivision === 64) stepMs = beatLen * 0.0625;
     else if (arpDivision === 128) stepMs = beatLen * 0.03125;
 
-    let upDirection = true;
+    // Reset index on pattern change so we start cleanly
+    arpIndex.current = 0;
+    arpDirectionRef.current = true;
 
     if (arpTimer.current) clearInterval(arpTimer.current);
 
     arpTimer.current = setInterval(() => {
       const notes = [...arpHeldNotes.current];
+
+      // No keys held — silence active note and wait
       if (notes.length === 0) {
         if (activeArpNote.current !== null) {
           if (Array.isArray(activeArpNote.current)) {
@@ -8566,67 +8603,89 @@ export default function MidiSynth({
       notes.sort((a, b) => a - b);
       let nextNote = notes[0];
 
-      // Patterns: 'up', 'down', 'up-down', 'down-up', 'random', 'chord'
-      if (arpPattern === 'up') {
-        if (arpIndex.current >= notes.length) arpIndex.current = 0;
-        nextNote = notes[arpIndex.current];
-        arpIndex.current = (arpIndex.current + 1) % notes.length;
-      } else if (arpPattern === 'down') {
-        if (arpIndex.current >= notes.length) arpIndex.current = notes.length - 1;
-        nextNote = notes[arpIndex.current];
-        arpIndex.current = (arpIndex.current - 1 + notes.length) % notes.length;
-      } else if (arpPattern === 'up-down') {
-        if (notes.length === 1) {
-          nextNote = notes[0];
-        } else {
-          if (arpIndex.current >= notes.length) {
-            arpIndex.current = notes.length - 2;
-            upDirection = false;
-          }
-          if (arpIndex.current < 0) {
-            arpIndex.current = 1;
-            upDirection = true;
-          }
-          nextNote = notes[arpIndex.current];
-          arpIndex.current = upDirection ? arpIndex.current + 1 : arpIndex.current - 1;
-        }
-      } else if (arpPattern === 'down-up') {
-        if (notes.length === 1) {
-          nextNote = notes[0];
-        } else {
-          if (arpIndex.current >= notes.length) {
-            arpIndex.current = 1;
-            upDirection = true;
-          }
-          if (arpIndex.current < 0) {
-            arpIndex.current = notes.length - 2;
-            upDirection = false;
-          }
-          nextNote = notes[arpIndex.current];
-          arpIndex.current = upDirection ? arpIndex.current + 1 : arpIndex.current - 1;
-        }
-      } else if (arpPattern === 'random') {
-        const randIdx = Math.floor(Math.random() * notes.length);
-        nextNote = notes[randIdx];
-      }
-
       if (arpPattern === 'chord') {
+        // Fire all held notes simultaneously
         if (Array.isArray(activeArpNote.current)) {
           activeArpNote.current.forEach(n => handleNoteOff(n));
         } else if (activeArpNote.current !== null) {
           handleNoteOff(activeArpNote.current);
         }
         notes.forEach(n => handleNoteOn(n, 100));
-        activeArpNote.current = notes;
-      } else {
-        if (Array.isArray(activeArpNote.current)) {
-          activeArpNote.current.forEach(n => handleNoteOff(n));
-        } else if (activeArpNote.current !== null) {
-          handleNoteOff(activeArpNote.current);
-        }
-        handleNoteOn(nextNote, 100);
-        activeArpNote.current = nextNote;
+        activeArpNote.current = [...notes];
+        return;
       }
+
+      if (arpPattern === 'up') {
+        // Clamp index in case notes were removed
+        arpIndex.current = arpIndex.current % notes.length;
+        nextNote = notes[arpIndex.current];
+        arpIndex.current = (arpIndex.current + 1) % notes.length;
+
+      } else if (arpPattern === 'down') {
+        // Start from top; clamp if notes removed
+        arpIndex.current = arpIndex.current % notes.length;
+        nextNote = notes[notes.length - 1 - arpIndex.current];
+        arpIndex.current = (arpIndex.current + 1) % notes.length;
+
+      } else if (arpPattern === 'up-down') {
+        if (notes.length === 1) {
+          nextNote = notes[0];
+        } else {
+          // Clamp index to valid range after note count changes
+          if (arpIndex.current >= notes.length) {
+            arpIndex.current = notes.length - 2;
+            arpDirectionRef.current = false;
+          }
+          if (arpIndex.current < 0) {
+            arpIndex.current = 1;
+            arpDirectionRef.current = true;
+          }
+          nextNote = notes[arpIndex.current];
+          arpIndex.current = arpDirectionRef.current
+            ? arpIndex.current + 1
+            : arpIndex.current - 1;
+        }
+
+      } else if (arpPattern === 'down-up') {
+        if (notes.length === 1) {
+          nextNote = notes[0];
+        } else {
+          // Mirror of up-down: starts descending
+          if (arpIndex.current >= notes.length) {
+            arpIndex.current = notes.length - 2;
+            arpDirectionRef.current = false;
+          }
+          if (arpIndex.current < 0) {
+            arpIndex.current = 1;
+            arpDirectionRef.current = true;
+          }
+          nextNote = notes[notes.length - 1 - arpIndex.current];
+          arpIndex.current = arpDirectionRef.current
+            ? arpIndex.current + 1
+            : arpIndex.current - 1;
+        }
+
+      } else if (arpPattern === 'random') {
+        // Avoid immediate note repeat if more than 1 note held
+        if (notes.length > 1) {
+          const choices = notes.filter(n => n !== arpLastNoteRef.current);
+          const randIdx = Math.floor(Math.random() * choices.length);
+          nextNote = choices[randIdx];
+        } else {
+          nextNote = notes[0];
+        }
+        arpLastNoteRef.current = nextNote;
+      }
+
+      // Fire note — note-off previous, note-on next
+      if (Array.isArray(activeArpNote.current)) {
+        activeArpNote.current.forEach(n => handleNoteOff(n));
+      } else if (activeArpNote.current !== null) {
+        handleNoteOff(activeArpNote.current);
+      }
+      handleNoteOn(nextNote, 100);
+      activeArpNote.current = nextNote;
+
     }, stepMs);
 
     return () => {
@@ -8933,7 +8992,8 @@ export default function MidiSynth({
       pitchBend, modWheel, feedbackFilterType, osc1Morph, osc2Morph, saturationMode, saturationAmount,
       stereoWidth, haasDelay, ampDrive, ampBass, ampMid, ampTreble, cabType,
       compOn, compThreshold, compRatio, compAttack, compRelease, compMakeup,
-      subFilterType, subCutoff, subResonance, subOscFilterMod
+      subFilterType, subCutoff, subResonance, subOscFilterMod,
+      unisonVoices, unisonSpread, fmMode, fmAmount, fmRatio
     };
   }, [
       osc1Waveform, osc2Waveform, osc1Pitch, osc2Pitch, osc2Detune, syncMode,
@@ -8950,7 +9010,8 @@ export default function MidiSynth({
       pitchBend, modWheel, feedbackFilterType, osc1Morph, osc2Morph, saturationMode, saturationAmount,
       stereoWidth, haasDelay, ampDrive, ampBass, ampMid, ampTreble, cabType,
       compOn, compThreshold, compRatio, compAttack, compRelease, compMakeup,
-      subFilterType, subCutoff, subResonance, subOscFilterMod
+      subFilterType, subCutoff, subResonance, subOscFilterMod,
+      unisonVoices, unisonSpread, fmMode, fmAmount, fmRatio
   ]);
 
   // Saturating distortion waveshaper generator
@@ -8967,6 +9028,27 @@ export default function MidiSynth({
     for (let i = 0; i < n_samples; ++i) {
       const x = (i * 2) / n_samples - 1;
       curve[i] = ((3 + k) * x) / (3 + k * Math.abs(x));
+    }
+    return curve;
+  };
+
+  const makeMS20DistortionCurve = (amount) => {
+    const n_samples = 44100;
+    const curve = new Float32Array(n_samples);
+    if (amount <= 0.01) {
+      for (let i = 0; i < n_samples; ++i) {
+        curve[i] = (i * 2) / n_samples - 1;
+      }
+      return curve;
+    }
+    const k = amount * 18;
+    for (let i = 0; i < n_samples; ++i) {
+      const x = (i * 2) / n_samples - 1;
+      if (x < 0) {
+        curve[i] = Math.tanh(x * (1.2 + k));
+      } else {
+        curve[i] = (Math.atan(x * (1.2 + k * 1.5)) / (Math.PI / 2)) * 0.95;
+      }
     }
     return curve;
   };
@@ -9278,7 +9360,8 @@ export default function MidiSynth({
       if (voice.filter) {
         const isAcid = filterCircuit === 'acid';
         const isLadder = filterCircuit === 'ladder';
-        const qVal = isAcid ? resonance * 1.55 : isLadder ? resonance * 0.75 : resonance;
+        const isMS20 = filterCircuit === 'ms20';
+        const qVal = isAcid ? resonance * 1.55 : isLadder ? resonance * 0.75 : isMS20 ? resonance * 2.2 : resonance;
         voice.filter.Q.setTargetAtTime(qVal, now, 0.015);
       }
       if (voice.filter2) {
@@ -9293,10 +9376,12 @@ export default function MidiSynth({
     if (!audioCtxRef.current) return;
     activeVoices.current.forEach(voice => {
       if (voice.driveNode) {
-        voice.driveNode.curve = makeDistortionCurve(filterDrive);
+        voice.driveNode.curve = filterCircuit === 'ms20' 
+          ? makeMS20DistortionCurve(filterDrive) 
+          : makeDistortionCurve(filterDrive);
       }
     });
-  }, [filterDrive]);
+  }, [filterDrive, filterCircuit]);
 
   useEffect(() => {
     if (!audioCtxRef.current) return;
@@ -9322,10 +9407,14 @@ export default function MidiSynth({
     const now = audioCtxRef.current.currentTime;
     activeVoices.current.forEach(voice => {
       if (voice.fmGain) {
-        voice.fmGain.gain.setTargetAtTime(syncMode ? 1400 : 0, now, 0.015);
+        if (fmMode) {
+          voice.fmGain.gain.setTargetAtTime(fmAmount * 5000, now, 0.015);
+        } else {
+          voice.fmGain.gain.setTargetAtTime(syncMode ? 1400 : 0, now, 0.015);
+        }
       }
     });
-  }, [syncMode]);
+  }, [syncMode, fmMode, fmAmount]);
 
   useEffect(() => {
     if (!audioCtxRef.current) return;
@@ -9381,24 +9470,20 @@ export default function MidiSynth({
   const getFreq = (midiNote) => 440 * Math.pow(2, (midiNote - 69) / 12);
 
   // --- Voice Sound Generation & Nodes Routing ---
-  const playVoice = (voiceId, midiNote, velocity, bothOscActive = true, forceSingleOsc = null) => {
-    if (!audioCtxRef.current || !synthOn) return;
-
+  const createVoiceChannel = (midiNote, detuneOffset, panVal, isFirstVoice, now, pbFactor, forceSingleOsc) => {
     const ctx = audioCtxRef.current;
-    const now = ctx.currentTime;
-
-    const pbFactor = Math.pow(2, (paramsRef.current.pitchBend * 2) / 12);
     const baseFreq = getFreq(midiNote);
-
-    if (activeVoices.current.has(voiceId)) {
-      stopVoice(voiceId);
-    }
+    const freq1 = baseFreq * Math.pow(2, paramsRef.current.osc1Pitch) * pbFactor;
+    const isFm = paramsRef.current.fmMode;
+    const freq2 = isFm 
+      ? freq1 * (paramsRef.current.fmRatio || 1.0)
+      : baseFreq * Math.pow(2, paramsRef.current.osc2Pitch) * pbFactor;
 
     const osc1 = ctx.createOscillator();
     const osc1Dig = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     const osc2Dig = ctx.createOscillator();
-    
+
     osc1.type = ['sine', 'triangle', 'sawtooth', 'square'].includes(paramsRef.current.osc1Waveform)
       ? paramsRef.current.osc1Waveform
       : 'sawtooth';
@@ -9413,15 +9498,14 @@ export default function MidiSynth({
     osc1Dig.setPeriodicWave(wave);
     osc2Dig.setPeriodicWave(wave);
 
-    const freq1 = baseFreq * Math.pow(2, paramsRef.current.osc1Pitch) * pbFactor;
-    const freq2 = baseFreq * Math.pow(2, paramsRef.current.osc2Pitch) * pbFactor;
-
     osc1.frequency.setValueAtTime(freq1, now);
     osc1Dig.frequency.setValueAtTime(freq1, now);
     osc2.frequency.setValueAtTime(freq2, now);
     osc2Dig.frequency.setValueAtTime(freq2, now);
-    
-    const totalDetune = paramsRef.current.osc2Detune + paramsRef.current.unisonDetune;
+
+    const totalDetune = paramsRef.current.osc2Detune + paramsRef.current.unisonDetune + detuneOffset;
+    osc1.detune.setValueAtTime(detuneOffset, now);
+    osc1Dig.detune.setValueAtTime(detuneOffset, now);
     osc2.detune.setValueAtTime(totalDetune, now);
     osc2Dig.detune.setValueAtTime(totalDetune, now);
 
@@ -9450,24 +9534,6 @@ export default function MidiSynth({
     osc2MorphAnalogGain.connect(osc2MorphedSum);
     osc2MorphDigitalGain.connect(osc2MorphedSum);
 
-    // Dynamic Parameter Drift
-    let driftLfo = null;
-    let driftGain = null;
-    if (paramsRef.current.oscDrift > 0) {
-      driftLfo = ctx.createOscillator();
-      driftLfo.frequency.setValueAtTime(0.15 + Math.random() * 0.45, now);
-      
-      driftGain = ctx.createGain();
-      driftGain.gain.setValueAtTime((paramsRef.current.oscDrift / 100) * 12, now); 
-      
-      driftLfo.connect(driftGain);
-      driftGain.connect(osc1.frequency);
-      driftGain.connect(osc1Dig.frequency);
-      driftGain.connect(osc2.frequency);
-      driftGain.connect(osc2Dig.frequency);
-      driftLfo.start(now);
-    }
-
     // Mixer gains
     const osc1Gain = ctx.createGain();
     const osc2Gain = ctx.createGain();
@@ -9481,10 +9547,6 @@ export default function MidiSynth({
       osc1Gain.gain.setValueAtTime(0, now);
       osc2Gain.gain.setValueAtTime(paramsRef.current.osc2Vol, now);
       ringGain.gain.setValueAtTime(0, now);
-    } else if (bothOscActive) {
-      osc1Gain.gain.setValueAtTime(paramsRef.current.osc1Vol, now);
-      osc2Gain.gain.setValueAtTime(paramsRef.current.osc2Vol, now);
-      ringGain.gain.setValueAtTime(paramsRef.current.ringModVol, now);
     } else {
       osc1Gain.gain.setValueAtTime(paramsRef.current.osc1Vol, now);
       osc2Gain.gain.setValueAtTime(paramsRef.current.osc2Vol, now);
@@ -9493,7 +9555,11 @@ export default function MidiSynth({
 
     // Osc Sync / FM
     const fmGain = ctx.createGain();
-    fmGain.gain.setValueAtTime(paramsRef.current.syncMode ? 1400 : 0, now);
+    if (paramsRef.current.fmMode) {
+      fmGain.gain.setValueAtTime(paramsRef.current.fmAmount * 5000, now);
+    } else {
+      fmGain.gain.setValueAtTime(paramsRef.current.syncMode ? 1400 : 0, now);
+    }
 
     // Ring Modulator
     const ringMod = ctx.createGain();
@@ -9505,9 +9571,15 @@ export default function MidiSynth({
     osc2MorphedSum.connect(osc2Gain);
     ringMod.connect(ringGain);
     
-    osc1MorphedSum.connect(fmGain);
-    fmGain.connect(osc2.frequency);
-    fmGain.connect(osc2Dig.frequency);
+    if (paramsRef.current.fmMode) {
+      osc2MorphedSum.connect(fmGain);
+      fmGain.connect(osc1.frequency);
+      fmGain.connect(osc1Dig.frequency);
+    } else {
+      osc1MorphedSum.connect(fmGain);
+      fmGain.connect(osc2.frequency);
+      fmGain.connect(osc2Dig.frequency);
+    }
 
     // Vectra Cross-Mod
     let xModGain = null;
@@ -9525,26 +9597,27 @@ export default function MidiSynth({
     
     const isAcid = paramsRef.current.filterCircuit === 'acid';
     const isLadder = paramsRef.current.filterCircuit === 'ladder';
-    filter.type = (isAcid || isLadder) ? 'lowpass' : paramsRef.current.filterType;
+    const isMS20 = paramsRef.current.filterCircuit === 'ms20';
+    filter.type = (isAcid || isLadder || isMS20) ? 'lowpass' : paramsRef.current.filterType;
     filter2.type = 'lowpass';
     
     const baseQ = paramsRef.current.resonance;
-    filter.Q.setValueAtTime(isAcid ? baseQ * 1.55 : isLadder ? baseQ * 0.75 : baseQ, now);
+    filter.Q.setValueAtTime(isAcid ? baseQ * 1.55 : isLadder ? baseQ * 0.75 : isMS20 ? baseQ * 2.2 : baseQ, now);
     filter2.Q.setValueAtTime(isLadder ? baseQ * 0.75 : 0.0001, now);
 
     osc1Gain.connect(filter);
     osc2Gain.connect(filter);
     ringGain.connect(filter);
 
-    // Sub-Oscillator (custom shapes: sine, square, triangle)
+    // Sub-Oscillator
     let subOsc = null;
     let subGain = null;
     let subFilterNode = null;
     let subFmGain = null;
-    if (paramsRef.current.subVolume > 0.01) {
+    if (isFirstVoice && paramsRef.current.subVolume > 0.01) {
       subOsc = ctx.createOscillator();
-      subOsc.type = paramsRef.current.subShape; // sine, square, triangle
-      const subPitchShift = Math.pow(2, paramsRef.current.subOctave); // -1 or -2 octaves
+      subOsc.type = paramsRef.current.subShape;
+      const subPitchShift = Math.pow(2, paramsRef.current.subOctave);
       subOsc.frequency.setValueAtTime(freq1 * subPitchShift, now);
       subGain = ctx.createGain();
       subGain.gain.setValueAtTime(paramsRef.current.subVolume * 0.38, now);
@@ -9576,7 +9649,7 @@ export default function MidiSynth({
     // Noise Generator
     let noiseSource = null;
     let noiseGain = null;
-    if (paramsRef.current.noiseVolume > 0.01) {
+    if (isFirstVoice && paramsRef.current.noiseVolume > 0.01) {
       const bufferSize = ctx.sampleRate * 2;
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
@@ -9595,7 +9668,9 @@ export default function MidiSynth({
 
     // Filter Saturation / Drive Waveshaper
     const driveNode = ctx.createWaveShaper();
-    driveNode.curve = makeDistortionCurve(paramsRef.current.filterDrive);
+    driveNode.curve = isMS20 
+      ? makeMS20DistortionCurve(paramsRef.current.filterDrive) 
+      : makeDistortionCurve(paramsRef.current.filterDrive);
     driveNode.oversample = '4x';
 
     if (isLadder) {
@@ -9644,7 +9719,7 @@ export default function MidiSynth({
       }
     }
 
-    // Vectra Poly-Mod Target: Osc 1 Pitch (Modulated by Filter Env and/or Osc 2)
+    // Vectra Poly-Mod Target: Osc 1 Pitch
     let polyModOsc2Osc1Gain = null;
     if (paramsRef.current.polyModOsc1Freq) {
       if (paramsRef.current.polyModOsc2 > 0.01) {
@@ -9724,64 +9799,230 @@ export default function MidiSynth({
 
     const voiceGain = ctx.createGain();
     voiceGain.gain.setValueAtTime(0, now);
-    driveNode.connect(voiceGain); 
-    voiceGain.connect(masterGainRef.current);
+    driveNode.connect(voiceGain);
 
-    const velScale = velocity / 127;
-    const peakVolume = velScale * 0.4;
-    const ampAttackEnd = now + paramsRef.current.attack;
-    const ampDecayEnd = ampAttackEnd + paramsRef.current.decay;
-
-    voiceGain.gain.linearRampToValueAtTime(peakVolume, ampAttackEnd);
-    voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakVolume * paramsRef.current.sustain), ampDecayEnd);
-
-    // LFO 2 Modulation routing
-    let lfo2 = null;
-    let lfo2GainNode = null;
-    if (paramsRef.current.lfo2Target !== 'none' && paramsRef.current.lfo2Depth > 1) {
-      lfo2 = ctx.createOscillator();
-      lfo2.type = paramsRef.current.lfo2Shape || 'sine';
-      lfo2.frequency.setValueAtTime(paramsRef.current.lfo2Rate, now);
-      lfo2GainNode = ctx.createGain();
-      
-      lfo2.connect(lfo2GainNode);
-      if (paramsRef.current.lfo2Target === 'filter') {
-        lfo2GainNode.gain.setValueAtTime(paramsRef.current.lfo2Depth, now);
-        lfo2GainNode.connect(filter.frequency);
-        if (isLadder) lfo2GainNode.connect(filter2.frequency);
-      } else if (paramsRef.current.lfo2Target === 'pitch') {
-        lfo2GainNode.gain.setValueAtTime(paramsRef.current.lfo2Depth, now);
-        lfo2GainNode.connect(osc1.frequency);
-        lfo2GainNode.connect(osc1Dig.frequency);
-        lfo2GainNode.connect(osc2.frequency);
-        lfo2GainNode.connect(osc2Dig.frequency);
-      } else if (paramsRef.current.lfo2Target === 'volume') {
-        lfo2GainNode.gain.setValueAtTime((paramsRef.current.lfo2Depth / 1000) * 0.25, now);
-        lfo2GainNode.connect(voiceGain.gain);
-      }
-      
-      const startOffset2 = paramsRef.current.lfo2KeySync ? 0 : Math.random() * 5.0;
-      lfo2.start(now - startOffset2);
+    const panNode = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    if (panNode) {
+      panNode.pan.setValueAtTime(panVal, now);
+      voiceGain.connect(panNode);
+      panNode.connect(masterGainRef.current);
+    } else {
+      voiceGain.connect(masterGainRef.current);
     }
 
+    // Start oscillators
     osc1.start(now);
     osc1Dig.start(now);
     osc2.start(now);
     osc2Dig.start(now);
-    lastNoteFreq.current = baseFreq;
 
-    activeVoices.current.set(voiceId, {
-      osc1, osc1Dig, osc2, osc2Dig, subOsc, subFilterNode, subFmGain, noiseSource, filter, filter2: isLadder ? filter2 : null, lfo, lfo2, driftLfo, driveNode,
-      osc1Gain, osc2Gain, ringGain, fmGain, lfoGainNode, lfo2GainNode,
-      xModGain, polyModOsc2FilterGain, polyModOsc2Osc1Gain,
+    return {
+      osc1, osc1Dig, osc2, osc2Dig, filter, filter2: isLadder ? filter2 : null, driveNode, voiceGain, panNode,
+      osc1Gain, osc2Gain, ringGain, fmGain,
+      osc1MorphedSum, osc2MorphedSum, ringMod, xModGain, polyModOsc2FilterGain, polyModOsc2Osc1Gain,
       osc1MorphAnalogGain, osc1MorphDigitalGain, osc2MorphAnalogGain, osc2MorphDigitalGain,
-      voiceGain, midiNote, startTime: now, bothOscActive, forceSingleOsc,
-      subGain, noiseGain, feedbackGainNode,
-      osc1MorphedSum, osc2MorphedSum, driftGain, ringMod, feedbackDelayNode, feedbackFilterNode
-    });
+      subOsc, subGain, subFilterNode, subFmGain, noiseSource, noiseGain,
+      lfo, lfo2: null, lfoGainNode, lfo2GainNode: null,
+      feedbackDelayNode, feedbackFilterNode, feedbackGainNode
+    };
+  };
+
+  const playVoice = (voiceId, midiNote, velocity, bothOscActive = true, forceSingleOsc = null) => {
+    if (!audioCtxRef.current || !synthOn) return;
+
+    const ctx = audioCtxRef.current;
+    const now = ctx.currentTime;
+
+    if (activeVoices.current.has(voiceId)) {
+      stopVoice(voiceId);
+    }
+
+    const pbFactor = Math.pow(2, (paramsRef.current.pitchBend * 2) / 12);
+    const baseFreq = getFreq(midiNote);
+
+    const unisonCount = paramsRef.current.unisonVoices || 1;
+    
+    if (unisonCount > 1) {
+      const subVoices = [];
+      const detuneAmt = paramsRef.current.unisonDetune; // cents
+      const spreadAmt = paramsRef.current.unisonSpread / 100; // 0 to 1.0
+      
+      for (let i = 0; i < unisonCount; i++) {
+        const factor = unisonCount > 1 ? (2 * i / (unisonCount - 1) - 1) : 0;
+        const detuneOffset = detuneAmt * factor;
+        const panVal = spreadAmt * factor;
+        const isFirstVoice = (i === 0);
+        
+        const channel = createVoiceChannel(
+          midiNote,
+          detuneOffset,
+          panVal,
+          isFirstVoice,
+          now,
+          pbFactor,
+          forceSingleOsc
+        );
+        subVoices.push(channel);
+      }
+      
+      // Dynamic Parameter Drift (Shared LFO)
+      let driftLfo = null;
+      let driftGain = null;
+      if (paramsRef.current.oscDrift > 0) {
+        driftLfo = ctx.createOscillator();
+        driftLfo.frequency.setValueAtTime(0.15 + Math.random() * 0.45, now);
+        driftGain = ctx.createGain();
+        driftGain.gain.setValueAtTime((paramsRef.current.oscDrift / 100) * 12, now); 
+        driftLfo.connect(driftGain);
+        
+        subVoices.forEach(sv => {
+          driftGain.connect(sv.osc1.frequency);
+          driftGain.connect(sv.osc1Dig.frequency);
+          driftGain.connect(sv.osc2.frequency);
+          driftGain.connect(sv.osc2Dig.frequency);
+        });
+        driftLfo.start(now);
+      }
+
+      // Shared LFO 2
+      let lfo2 = null;
+      let lfo2GainNode = null;
+      if (paramsRef.current.lfo2Target !== 'none' && paramsRef.current.lfo2Depth > 1) {
+        lfo2 = ctx.createOscillator();
+        lfo2.type = paramsRef.current.lfo2Shape || 'sine';
+        lfo2.frequency.setValueAtTime(paramsRef.current.lfo2Rate, now);
+        lfo2GainNode = ctx.createGain();
+        lfo2.connect(lfo2GainNode);
+        
+        subVoices.forEach(sv => {
+          if (paramsRef.current.lfo2Target === 'filter') {
+            lfo2GainNode.gain.setValueAtTime(paramsRef.current.lfo2Depth, now);
+            lfo2GainNode.connect(sv.filter.frequency);
+            if (sv.filter2) lfo2GainNode.connect(sv.filter2.frequency);
+          } else if (paramsRef.current.lfo2Target === 'pitch') {
+            lfo2GainNode.gain.setValueAtTime(paramsRef.current.lfo2Depth, now);
+            lfo2GainNode.connect(sv.osc1.frequency);
+            if (sv.osc1Dig) lfo2GainNode.connect(sv.osc1Dig.frequency);
+            lfo2GainNode.connect(sv.osc2.frequency);
+            if (sv.osc2Dig) lfo2GainNode.connect(sv.osc2Dig.frequency);
+          } else if (paramsRef.current.lfo2Target === 'volume') {
+            lfo2GainNode.gain.setValueAtTime((paramsRef.current.lfo2Depth / 1000) * 0.25, now);
+            lfo2GainNode.connect(sv.voiceGain.gain);
+          }
+        });
+        
+        const startOffset2 = paramsRef.current.lfo2KeySync ? 0 : Math.random() * 5.0;
+        lfo2.start(now - startOffset2);
+      }
+
+      // Setup envelopes
+      const velScale = velocity / 127;
+      const peakVolume = velScale * 0.4;
+      const ampAttackEnd = now + paramsRef.current.attack;
+      const ampDecayEnd = ampAttackEnd + paramsRef.current.decay;
+      
+      subVoices.forEach(sv => {
+        sv.voiceGain.gain.setValueAtTime(0, now);
+        sv.voiceGain.gain.linearRampToValueAtTime(peakVolume / Math.sqrt(unisonCount), ampAttackEnd);
+        sv.voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, (peakVolume / Math.sqrt(unisonCount)) * paramsRef.current.sustain), ampDecayEnd);
+      });
+
+      lastNoteFreq.current = baseFreq;
+      
+      activeVoices.current.set(voiceId, {
+        isUnison: true,
+        subVoices,
+        lfo2,
+        driftLfo,
+        driftGain,
+        midiNote,
+        startTime: now,
+        bothOscActive,
+        forceSingleOsc
+      });
+      
+    } else {
+      const channel = createVoiceChannel(
+        midiNote,
+        0,
+        0,
+        true,
+        now,
+        pbFactor,
+        forceSingleOsc
+      );
+      
+      // Dynamic Parameter Drift
+      let driftLfo = null;
+      let driftGain = null;
+      if (paramsRef.current.oscDrift > 0) {
+        driftLfo = ctx.createOscillator();
+        driftLfo.frequency.setValueAtTime(0.15 + Math.random() * 0.45, now);
+        driftGain = ctx.createGain();
+        driftGain.gain.setValueAtTime((paramsRef.current.oscDrift / 100) * 12, now); 
+        driftLfo.connect(driftGain);
+        driftGain.connect(channel.osc1.frequency);
+        driftGain.connect(channel.osc1Dig.frequency);
+        driftGain.connect(channel.osc2.frequency);
+        driftGain.connect(channel.osc2Dig.frequency);
+        driftLfo.start(now);
+      }
+
+      // LFO 2
+      let lfo2 = null;
+      let lfo2GainNode = null;
+      if (paramsRef.current.lfo2Target !== 'none' && paramsRef.current.lfo2Depth > 1) {
+        lfo2 = ctx.createOscillator();
+        lfo2.type = paramsRef.current.lfo2Shape || 'sine';
+        lfo2.frequency.setValueAtTime(paramsRef.current.lfo2Rate, now);
+        lfo2GainNode = ctx.createGain();
+        lfo2.connect(lfo2GainNode);
+        
+        if (paramsRef.current.lfo2Target === 'filter') {
+          lfo2GainNode.gain.setValueAtTime(paramsRef.current.lfo2Depth, now);
+          lfo2GainNode.connect(channel.filter.frequency);
+          if (channel.filter2) lfo2GainNode.connect(channel.filter2.frequency);
+        } else if (paramsRef.current.lfo2Target === 'pitch') {
+          lfo2GainNode.gain.setValueAtTime(paramsRef.current.lfo2Depth, now);
+          lfo2GainNode.connect(channel.osc1.frequency);
+          if (channel.osc1Dig) lfo2GainNode.connect(channel.osc1Dig.frequency);
+          lfo2GainNode.connect(channel.osc2.frequency);
+          if (channel.osc2Dig) lfo2GainNode.connect(channel.osc2Dig.frequency);
+        } else if (paramsRef.current.lfo2Target === 'volume') {
+          lfo2GainNode.gain.setValueAtTime((paramsRef.current.lfo2Depth / 1000) * 0.25, now);
+          lfo2GainNode.connect(channel.voiceGain.gain);
+        }
+        
+        const startOffset2 = paramsRef.current.lfo2KeySync ? 0 : Math.random() * 5.0;
+        lfo2.start(now - startOffset2);
+      }
+
+      const velScale = velocity / 127;
+      const peakVolume = velScale * 0.4;
+      const ampAttackEnd = now + paramsRef.current.attack;
+      const ampDecayEnd = ampAttackEnd + paramsRef.current.decay;
+      
+      channel.voiceGain.gain.setValueAtTime(0, now);
+      channel.voiceGain.gain.linearRampToValueAtTime(peakVolume, ampAttackEnd);
+      channel.voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakVolume * paramsRef.current.sustain), ampDecayEnd);
+
+      lastNoteFreq.current = baseFreq;
+
+      activeVoices.current.set(voiceId, {
+        ...channel,
+        lfo2,
+        driftLfo,
+        driftGain,
+        midiNote,
+        startTime: now,
+        bothOscActive,
+        forceSingleOsc
+      });
+    }
   };
 
   const glideVoice = (voiceId, targetMidiNote, bothOscActive = true, forceSingleOsc = null) => {
+    if (bothOscActive === undefined) { return; }
     const voice = activeVoices.current.get(voiceId);
     if (!voice || !audioCtxRef.current) return;
 
@@ -9790,82 +10031,96 @@ export default function MidiSynth({
     const targetFreq = getFreq(targetMidiNote);
     const glideTime = paramsRef.current.portamento;
 
-    // Apply real-time Pitch Bend factor
     const pbFactor = Math.pow(2, (paramsRef.current.pitchBend * 2) / 12);
     const f1 = targetFreq * Math.pow(2, paramsRef.current.osc1Pitch) * pbFactor;
-    const f2 = targetFreq * Math.pow(2, paramsRef.current.osc2Pitch) * pbFactor;
+    const isFmActive = paramsRef.current.fmMode;
+    const f2 = isFmActive
+      ? f1 * (paramsRef.current.fmRatio || 1.0)
+      : targetFreq * Math.pow(2, paramsRef.current.osc2Pitch) * pbFactor;
 
-    if (glideTime > 0.01) {
-      voice.osc1.frequency.exponentialRampToValueAtTime(f1, now + glideTime);
-      if (voice.osc1Dig) voice.osc1Dig.frequency.exponentialRampToValueAtTime(f1, now + glideTime);
-      voice.osc2.frequency.exponentialRampToValueAtTime(f2, now + glideTime);
-      if (voice.osc2Dig) voice.osc2Dig.frequency.exponentialRampToValueAtTime(f2, now + glideTime);
+    if (voice.isUnison && voice.subVoices) {
+      const N = voice.subVoices.length;
+      const detuneAmt = paramsRef.current.unisonDetune;
+      voice.subVoices.forEach((sv, idx) => {
+        const detuneOffset = detuneAmt * (N > 1 ? (2 * idx / (N - 1) - 1) : 0);
+        if (glideTime > 0.01) {
+          sv.osc1.frequency.exponentialRampToValueAtTime(f1, now + glideTime);
+          if (sv.osc1Dig) sv.osc1Dig.frequency.exponentialRampToValueAtTime(f1, now + glideTime);
+          sv.osc2.frequency.exponentialRampToValueAtTime(f2, now + glideTime);
+          if (sv.osc2Dig) sv.osc2Dig.frequency.exponentialRampToValueAtTime(f2, now + glideTime);
+          
+          sv.osc1.detune.exponentialRampToValueAtTime(detuneOffset, now + glideTime);
+          if (sv.osc1Dig) sv.osc1Dig.detune.exponentialRampToValueAtTime(detuneOffset, now + glideTime);
+          sv.osc2.detune.exponentialRampToValueAtTime(paramsRef.current.osc2Detune + detuneOffset, now + glideTime);
+          if (sv.osc2Dig) sv.osc2Dig.detune.exponentialRampToValueAtTime(paramsRef.current.osc2Detune + detuneOffset, now + glideTime);
+        } else {
+          sv.osc1.frequency.setValueAtTime(f1, now);
+          if (sv.osc1Dig) sv.osc1Dig.frequency.setValueAtTime(f1, now);
+          sv.osc2.frequency.setValueAtTime(f2, now);
+          if (sv.osc2Dig) sv.osc2Dig.frequency.setValueAtTime(f2, now);
+          
+          sv.osc1.detune.setValueAtTime(detuneOffset, now);
+          if (sv.osc1Dig) sv.osc1Dig.detune.setValueAtTime(detuneOffset, now);
+          sv.osc2.detune.setValueAtTime(paramsRef.current.osc2Detune + detuneOffset, now);
+          if (sv.osc2Dig) sv.osc2Dig.detune.setValueAtTime(paramsRef.current.osc2Detune + detuneOffset, now);
+        }
+      });
       if (voice.subOsc) {
-        voice.subOsc.frequency.exponentialRampToValueAtTime(f1 * Math.pow(2, paramsRef.current.subOctave), now + glideTime);
+        if (glideTime > 0.01) {
+          voice.subOsc.frequency.exponentialRampToValueAtTime(f1 * Math.pow(2, paramsRef.current.subOctave), now + glideTime);
+        } else {
+          voice.subOsc.frequency.setValueAtTime(f1 * Math.pow(2, paramsRef.current.subOctave), now);
+        }
       }
     } else {
-      voice.osc1.frequency.setValueAtTime(f1, now);
-      if (voice.osc1Dig) voice.osc1Dig.frequency.setValueAtTime(f1, now);
-      voice.osc2.frequency.setValueAtTime(f2, now);
-      if (voice.osc2Dig) voice.osc2Dig.frequency.setValueAtTime(f2, now);
-      if (voice.subOsc) {
-        voice.subOsc.frequency.setValueAtTime(f1 * Math.pow(2, paramsRef.current.subOctave), now);
+      if (glideTime > 0.01) {
+        voice.osc1.frequency.exponentialRampToValueAtTime(f1, now + glideTime);
+        if (voice.osc1Dig) voice.osc1Dig.frequency.exponentialRampToValueAtTime(f1, now + glideTime);
+        voice.osc2.frequency.exponentialRampToValueAtTime(f2, now + glideTime);
+        if (voice.osc2Dig) voice.osc2Dig.frequency.exponentialRampToValueAtTime(f2, now + glideTime);
+        if (voice.subOsc) {
+          voice.subOsc.frequency.exponentialRampToValueAtTime(f1 * Math.pow(2, paramsRef.current.subOctave), now + glideTime);
+        }
+      } else {
+        voice.osc1.frequency.setValueAtTime(f1, now);
+        if (voice.osc1Dig) voice.osc1Dig.frequency.setValueAtTime(f1, now);
+        voice.osc2.frequency.setValueAtTime(f2, now);
+        if (voice.osc2Dig) voice.osc2Dig.frequency.setValueAtTime(f2, now);
+        if (voice.subOsc) {
+          voice.subOsc.frequency.setValueAtTime(f1 * Math.pow(2, paramsRef.current.subOctave), now);
+        }
       }
     }
 
-    if (forceSingleOsc === 'osc1') {
-      voice.osc1Gain.gain.setTargetAtTime(paramsRef.current.osc1Vol, now, 0.02);
-      voice.osc2Gain.gain.setTargetAtTime(0, now, 0.02);
-      voice.ringGain.gain.setTargetAtTime(0, now, 0.02);
-    } else if (forceSingleOsc === 'osc2') {
-      voice.osc1Gain.gain.setTargetAtTime(0, now, 0.02);
-      voice.osc2Gain.gain.setTargetAtTime(paramsRef.current.osc2Vol, now, 0.02);
-      voice.ringGain.gain.setTargetAtTime(0, now, 0.02);
+    if (voice.isUnison && voice.subVoices) {
+      voice.subVoices.forEach(sv => {
+        if (forceSingleOsc === 'osc1') {
+          sv.osc1Gain.gain.setTargetAtTime(paramsRef.current.osc1Vol, now, 0.02);
+          sv.osc2Gain.gain.setTargetAtTime(0, now, 0.02);
+          sv.ringGain.gain.setTargetAtTime(0, now, 0.02);
+        } else if (forceSingleOsc === 'osc2') {
+          sv.osc1Gain.gain.setTargetAtTime(0, now, 0.02);
+          sv.osc2Gain.gain.setTargetAtTime(paramsRef.current.osc2Vol, now, 0.02);
+          sv.ringGain.gain.setTargetAtTime(0, now, 0.02);
+        } else {
+          sv.osc1Gain.gain.setTargetAtTime(paramsRef.current.osc1Vol, now, 0.02);
+          sv.osc2Gain.gain.setTargetAtTime(paramsRef.current.osc2Vol, now, 0.02);
+          sv.ringGain.gain.setTargetAtTime(paramsRef.current.ringModVol, now, 0.02);
+        }
+      });
     } else {
-      voice.osc1Gain.gain.setTargetAtTime(paramsRef.current.osc1Vol, now, 0.02);
-      voice.osc2Gain.gain.setTargetAtTime(paramsRef.current.osc2Vol, now, 0.02);
-      voice.ringGain.gain.setTargetAtTime(paramsRef.current.ringModVol, now, 0.02);
-    }
-
-    // Separate VCF Envelope variables for glide
-    const filterAttackTime = paramsRef.current.filterAttack;
-    const filterDecayTime = paramsRef.current.filterDecay;
-    const filterSustainVal = paramsRef.current.filterSustain;
-
-    const startCutoff = paramsRef.current.cutoff + (currentShValue.current * paramsRef.current.shAmount);
-    const peakCutoff = Math.min(20000, startCutoff + paramsRef.current.filterEnvAmt * (1 + paramsRef.current.polyModFilterEnv * 1.5));
-    const attackEnd = now + filterAttackTime;
-    const decayEnd = attackEnd + filterDecayTime;
-
-    const ampAttackEnd = now + paramsRef.current.attack;
-    const ampDecayEnd = ampAttackEnd + paramsRef.current.decay;
-
-    if (voiceMode === 'mono' && paramsRef.current.monoEnvelopeMode === 'retrig') {
-      voice.voiceGain.gain.cancelScheduledValues(now);
-      voice.voiceGain.gain.setValueAtTime(0.0001, now);
-      voice.voiceGain.gain.linearRampToValueAtTime(0.4, ampAttackEnd);
-      voice.voiceGain.gain.exponentialRampToValueAtTime(0.4 * paramsRef.current.sustain, ampDecayEnd);
-
-      voice.filter.frequency.cancelScheduledValues(now);
-      voice.filter.frequency.setValueAtTime(startCutoff, now);
-      voice.filter.frequency.linearRampToValueAtTime(peakCutoff, attackEnd);
-      voice.filter.frequency.exponentialRampToValueAtTime(Math.max(40, startCutoff + (peakCutoff - startCutoff) * filterSustainVal), decayEnd);
-      
-      if (voice.filter2) {
-        voice.filter2.frequency.cancelScheduledValues(now);
-        voice.filter2.frequency.setValueAtTime(startCutoff, now);
-        voice.filter2.frequency.linearRampToValueAtTime(peakCutoff, attackEnd);
-        voice.filter2.frequency.exponentialRampToValueAtTime(Math.max(40, startCutoff + (peakCutoff - startCutoff) * filterSustainVal), decayEnd);
-      }
-    } else {
-      voice.filter.frequency.setValueAtTime(voice.filter.frequency.value, now);
-      voice.filter.frequency.linearRampToValueAtTime(peakCutoff, attackEnd);
-      voice.filter.frequency.exponentialRampToValueAtTime(Math.max(40, startCutoff + (peakCutoff - startCutoff) * filterSustainVal), decayEnd);
-      
-      if (voice.filter2) {
-        voice.filter2.frequency.setValueAtTime(voice.filter2.frequency.value, now);
-        voice.filter2.frequency.linearRampToValueAtTime(peakCutoff, attackEnd);
-        voice.filter2.frequency.exponentialRampToValueAtTime(Math.max(40, startCutoff + (peakCutoff - startCutoff) * filterSustainVal), decayEnd);
+      if (forceSingleOsc === 'osc1') {
+        voice.osc1Gain.gain.setTargetAtTime(paramsRef.current.osc1Vol, now, 0.02);
+        voice.osc2Gain.gain.setTargetAtTime(0, now, 0.02);
+        voice.ringGain.gain.setTargetAtTime(0, now, 0.02);
+      } else if (forceSingleOsc === 'osc2') {
+        voice.osc1Gain.gain.setTargetAtTime(0, now, 0.02);
+        voice.osc2Gain.gain.setTargetAtTime(paramsRef.current.osc2Vol, now, 0.02);
+        voice.ringGain.gain.setTargetAtTime(0, now, 0.02);
+      } else {
+        voice.osc1Gain.gain.setTargetAtTime(paramsRef.current.osc1Vol, now, 0.02);
+        voice.osc2Gain.gain.setTargetAtTime(paramsRef.current.osc2Vol, now, 0.02);
+        voice.ringGain.gain.setTargetAtTime(paramsRef.current.ringModVol, now, 0.02);
       }
     }
   };
@@ -9883,99 +10138,182 @@ export default function MidiSynth({
     const safeReleaseTime = typeof releaseTime === 'number' && !isNaN(releaseTime) ? Math.max(0.001, releaseTime) : 0.35;
     const releaseEnd = now + safeReleaseTime;
 
-    // Helper to safely schedule exponential ramp on gain
-    try {
-      const startGain = Math.max(0.0001, voice.voiceGain.gain.value);
-      voice.voiceGain.gain.cancelScheduledValues(now);
-      voice.voiceGain.gain.setValueAtTime(startGain, now);
-      voice.voiceGain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd);
-    } catch (e) {
-      console.warn("Failed to schedule voiceGain release:", e);
-      try {
-        voice.voiceGain.gain.setValueAtTime(0, now);
-      } catch (err) {}
-    }
+    if (voice.isUnison && voice.subVoices) {
+      voice.subVoices.forEach(sv => {
+        try {
+          const startGain = Math.max(0.0001, sv.voiceGain.gain.value);
+          sv.voiceGain.gain.cancelScheduledValues(now);
+          sv.voiceGain.gain.setValueAtTime(startGain, now);
+          sv.voiceGain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd);
+        } catch (e) {}
 
-    // Helper to safely schedule exponential ramp on filter cutoff
-    try {
-      const startCutoff = Math.max(20, voice.filter.frequency.value);
-      const targetCutoff = Math.max(20, paramsRef.current.cutoff);
-      voice.filter.frequency.cancelScheduledValues(now);
-      voice.filter.frequency.setValueAtTime(startCutoff, now);
-      voice.filter.frequency.exponentialRampToValueAtTime(targetCutoff, releaseEnd);
-    } catch (e) {
-      console.warn("Failed to schedule filter release:", e);
-    }
+        try {
+          const startCutoff = Math.max(20, sv.filter.frequency.value);
+          const targetCutoff = Math.max(20, paramsRef.current.cutoff);
+          sv.filter.frequency.cancelScheduledValues(now);
+          sv.filter.frequency.setValueAtTime(startCutoff, now);
+          sv.filter.frequency.exponentialRampToValueAtTime(targetCutoff, releaseEnd);
+        } catch (e) {}
 
-    if (voice.filter2) {
+        if (sv.filter2) {
+          try {
+            const startCutoff2 = Math.max(20, sv.filter2.frequency.value);
+            const targetCutoff = Math.max(20, paramsRef.current.cutoff);
+            sv.filter2.frequency.cancelScheduledValues(now);
+            sv.filter2.frequency.setValueAtTime(startCutoff2, now);
+            sv.filter2.frequency.exponentialRampToValueAtTime(targetCutoff, releaseEnd);
+          } catch (e) {}
+        }
+
+        try {
+          sv.osc1.stop(releaseEnd);
+          if (sv.osc1Dig) sv.osc1Dig.stop(releaseEnd);
+          sv.osc2.stop(releaseEnd);
+          if (sv.osc2Dig) sv.osc2Dig.stop(releaseEnd);
+          if (sv.subOsc) sv.subOsc.stop(releaseEnd);
+          if (sv.noiseSource) sv.noiseSource.stop(releaseEnd);
+          if (sv.lfo) sv.lfo.stop(releaseEnd);
+        } catch (e) {}
+      });
+      
       try {
-        const startCutoff2 = Math.max(20, voice.filter2.frequency.value);
-        const targetCutoff = Math.max(20, paramsRef.current.cutoff);
-        voice.filter2.frequency.cancelScheduledValues(now);
-        voice.filter2.frequency.setValueAtTime(startCutoff2, now);
-        voice.filter2.frequency.exponentialRampToValueAtTime(targetCutoff, releaseEnd);
+        if (voice.lfo2) voice.lfo2.stop(releaseEnd);
+        if (voice.driftLfo) voice.driftLfo.stop(releaseEnd);
+      } catch (e) {}
+      
+    } else {
+      try {
+        const startGain = Math.max(0.0001, voice.voiceGain.gain.value);
+        voice.voiceGain.gain.cancelScheduledValues(now);
+        voice.voiceGain.gain.setValueAtTime(startGain, now);
+        voice.voiceGain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd);
       } catch (e) {
-        console.warn("Failed to schedule filter2 release:", e);
+        console.warn("Failed to schedule voiceGain release:", e);
+        try {
+          voice.voiceGain.gain.setValueAtTime(0, now);
+        } catch (err) {}
       }
-    }
 
-    try {
-      voice.osc1.stop(releaseEnd);
-      if (voice.osc1Dig) voice.osc1Dig.stop(releaseEnd);
-      voice.osc2.stop(releaseEnd);
-      if (voice.osc2Dig) voice.osc2Dig.stop(releaseEnd);
-      if (voice.subOsc) voice.subOsc.stop(releaseEnd);
-      if (voice.noiseSource) voice.noiseSource.stop(releaseEnd);
-      if (voice.lfo) voice.lfo.stop(releaseEnd);
-      if (voice.lfo2) voice.lfo2.stop(releaseEnd);
-      if (voice.driftLfo) voice.driftLfo.stop(releaseEnd);
-    } catch (e) {
-      console.warn("Failed to stop oscillators:", e);
+      try {
+        const startCutoff = Math.max(20, voice.filter.frequency.value);
+        const targetCutoff = Math.max(20, paramsRef.current.cutoff);
+        voice.filter.frequency.cancelScheduledValues(now);
+        voice.filter.frequency.setValueAtTime(startCutoff, now);
+        voice.filter.frequency.exponentialRampToValueAtTime(targetCutoff, releaseEnd);
+      } catch (e) {
+        console.warn("Failed to schedule filter release:", e);
+      }
+
+      if (voice.filter2) {
+        try {
+          const startCutoff2 = Math.max(20, voice.filter2.frequency.value);
+          const targetCutoff = Math.max(20, paramsRef.current.cutoff);
+          voice.filter2.frequency.cancelScheduledValues(now);
+          voice.filter2.frequency.setValueAtTime(startCutoff2, now);
+          voice.filter2.frequency.exponentialRampToValueAtTime(targetCutoff, releaseEnd);
+        } catch (e) {
+          console.warn("Failed to schedule filter2 release:", e);
+        }
+      }
+
+      try {
+        voice.osc1.stop(releaseEnd);
+        if (voice.osc1Dig) voice.osc1Dig.stop(releaseEnd);
+        voice.osc2.stop(releaseEnd);
+        if (voice.osc2Dig) voice.osc2Dig.stop(releaseEnd);
+        if (voice.subOsc) voice.subOsc.stop(releaseEnd);
+        if (voice.noiseSource) voice.noiseSource.stop(releaseEnd);
+        if (voice.lfo) voice.lfo.stop(releaseEnd);
+        if (voice.lfo2) voice.lfo2.stop(releaseEnd);
+        if (voice.driftLfo) voice.driftLfo.stop(releaseEnd);
+      } catch (e) {
+        console.warn("Failed to stop oscillators:", e);
+      }
     }
 
     setTimeout(() => {
       try {
-        voice.voiceGain.disconnect();
-        voice.osc1.disconnect();
-        if (voice.osc1Dig) voice.osc1Dig.disconnect();
-        voice.osc2.disconnect();
-        if (voice.osc2Dig) voice.osc2Dig.disconnect();
-        if (voice.subOsc) voice.subOsc.disconnect();
-        if (voice.noiseSource) voice.noiseSource.disconnect();
-        if (voice.filter) voice.filter.disconnect();
-        if (voice.filter2) voice.filter2.disconnect();
-        if (voice.lfo) voice.lfo.disconnect();
-        if (voice.lfo2) voice.lfo2.disconnect();
-        if (voice.driftLfo) voice.driftLfo.disconnect();
-        if (voice.driveNode) voice.driveNode.disconnect();
-        if (voice.osc1Gain) voice.osc1Gain.disconnect();
-        if (voice.osc2Gain) voice.osc2Gain.disconnect();
-        if (voice.ringGain) voice.ringGain.disconnect();
-        if (voice.fmGain) voice.fmGain.disconnect();
-        if (voice.lfoGainNode) voice.lfoGainNode.disconnect();
-        if (voice.lfo2GainNode) voice.lfo2GainNode.disconnect();
-        if (voice.xModGain) voice.xModGain.disconnect();
-        if (voice.polyModOsc2FilterGain) voice.polyModOsc2FilterGain.disconnect();
-        if (voice.polyModOsc2Osc1Gain) voice.polyModOsc2Osc1Gain.disconnect();
-        if (voice.subFilterNode) voice.subFilterNode.disconnect();
-        if (voice.subFmGain) voice.subFmGain.disconnect();
+        if (voice.isUnison && voice.subVoices) {
+          voice.subVoices.forEach(sv => {
+            try {
+              sv.voiceGain.disconnect();
+              sv.osc1.disconnect();
+              if (sv.osc1Dig) sv.osc1Dig.disconnect();
+              sv.osc2.disconnect();
+              if (sv.osc2Dig) sv.osc2Dig.disconnect();
+              if (sv.subOsc) sv.subOsc.disconnect();
+              if (sv.noiseSource) sv.noiseSource.disconnect();
+              if (sv.filter) sv.filter.disconnect();
+              if (sv.filter2) sv.filter2.disconnect();
+              if (sv.lfo) sv.lfo.disconnect();
+              if (sv.driveNode) sv.driveNode.disconnect();
+              if (sv.osc1Gain) sv.osc1Gain.disconnect();
+              if (sv.osc2Gain) sv.osc2Gain.disconnect();
+              if (sv.ringGain) sv.ringGain.disconnect();
+              if (sv.fmGain) sv.fmGain.disconnect();
+              if (sv.lfoGainNode) sv.lfoGainNode.disconnect();
+              if (sv.xModGain) sv.xModGain.disconnect();
+              if (sv.polyModOsc2FilterGain) sv.polyModOsc2FilterGain.disconnect();
+              if (sv.polyModOsc2Osc1Gain) sv.polyModOsc2Osc1Gain.disconnect();
+              if (sv.subFilterNode) sv.subFilterNode.disconnect();
+              if (sv.subFmGain) sv.subFmGain.disconnect();
+              if (sv.osc1MorphAnalogGain) sv.osc1MorphAnalogGain.disconnect();
+              if (sv.osc1MorphDigitalGain) sv.osc1MorphDigitalGain.disconnect();
+              if (sv.osc2MorphAnalogGain) sv.osc2MorphAnalogGain.disconnect();
+              if (sv.osc2MorphDigitalGain) sv.osc2MorphDigitalGain.disconnect();
+              if (sv.subGain) sv.subGain.disconnect();
+              if (sv.noiseGain) sv.noiseGain.disconnect();
+              if (sv.osc1MorphedSum) sv.osc1MorphedSum.disconnect();
+              if (sv.osc2MorphedSum) sv.osc2MorphedSum.disconnect();
+              if (sv.ringMod) sv.ringMod.disconnect();
+              if (sv.panNode) sv.panNode.disconnect();
+            } catch (err) {}
+          });
+          if (voice.lfo2) voice.lfo2.disconnect();
+          if (voice.driftLfo) voice.driftLfo.disconnect();
+          if (voice.driftGain) voice.driftGain.disconnect();
+        } else {
+          voice.voiceGain.disconnect();
+          voice.osc1.disconnect();
+          if (voice.osc1Dig) voice.osc1Dig.disconnect();
+          voice.osc2.disconnect();
+          if (voice.osc2Dig) voice.osc2Dig.disconnect();
+          if (voice.subOsc) voice.subOsc.disconnect();
+          if (voice.noiseSource) voice.noiseSource.disconnect();
+          if (voice.filter) voice.filter.disconnect();
+          if (voice.filter2) voice.filter2.disconnect();
+          if (voice.lfo) voice.lfo.disconnect();
+          if (voice.lfo2) voice.lfo2.disconnect();
+          if (voice.driftLfo) voice.driftLfo.disconnect();
+          if (voice.driveNode) voice.driveNode.disconnect();
+          if (voice.osc1Gain) voice.osc1Gain.disconnect();
+          if (voice.osc2Gain) voice.osc2Gain.disconnect();
+          if (voice.ringGain) voice.ringGain.disconnect();
+          if (voice.fmGain) voice.fmGain.disconnect();
+          if (voice.lfoGainNode) voice.lfoGainNode.disconnect();
+          if (voice.lfo2GainNode) voice.lfo2GainNode.disconnect();
+          if (voice.xModGain) voice.xModGain.disconnect();
+          if (voice.polyModOsc2FilterGain) voice.polyModOsc2FilterGain.disconnect();
+          if (voice.polyModOsc2Osc1Gain) voice.polyModOsc2Osc1Gain.disconnect();
+          if (voice.subFilterNode) voice.subFilterNode.disconnect();
+          if (voice.subFmGain) voice.subFmGain.disconnect();
 
-        // Complete memory leak cleanup of intermediate node connections
-        if (voice.osc1MorphAnalogGain) voice.osc1MorphAnalogGain.disconnect();
-        if (voice.osc1MorphDigitalGain) voice.osc1MorphDigitalGain.disconnect();
-        if (voice.osc2MorphAnalogGain) voice.osc2MorphAnalogGain.disconnect();
-        if (voice.osc2MorphDigitalGain) voice.osc2MorphDigitalGain.disconnect();
-        if (voice.subGain) voice.subGain.disconnect();
-        if (voice.noiseGain) voice.noiseGain.disconnect();
-        if (voice.feedbackGainNode) voice.feedbackGainNode.disconnect();
-        if (voice.osc1MorphedSum) voice.osc1MorphedSum.disconnect();
-        if (voice.osc2MorphedSum) voice.osc2MorphedSum.disconnect();
-        if (voice.driftGain) voice.driftGain.disconnect();
-        if (voice.ringMod) voice.ringMod.disconnect();
-        if (voice.feedbackDelayNode) voice.feedbackDelayNode.disconnect();
-        if (voice.feedbackFilterNode) voice.feedbackFilterNode.disconnect();
-      } catch (e) {}
-    }, (safeReleaseTime * 1000) + 100);
+          if (voice.osc1MorphAnalogGain) voice.osc1MorphAnalogGain.disconnect();
+          if (voice.osc1MorphDigitalGain) voice.osc1MorphDigitalGain.disconnect();
+          if (voice.osc2MorphAnalogGain) voice.osc2MorphAnalogGain.disconnect();
+          if (voice.osc2MorphDigitalGain) voice.osc2MorphDigitalGain.disconnect();
+          if (voice.subGain) voice.subGain.disconnect();
+          if (voice.noiseGain) voice.noiseGain.disconnect();
+          if (voice.feedbackGainNode) voice.feedbackGainNode.disconnect();
+          if (voice.osc1MorphedSum) voice.osc1MorphedSum.disconnect();
+          if (voice.osc2MorphedSum) voice.osc2MorphedSum.disconnect();
+          if (voice.driftGain) voice.driftGain.disconnect();
+          if (voice.ringMod) voice.ringMod.disconnect();
+          if (voice.feedbackDelayNode) voice.feedbackDelayNode.disconnect();
+          if (voice.feedbackFilterNode) voice.feedbackFilterNode.disconnect();
+        }
+      } catch (err) {}
+    }, safeReleaseTime * 1000 + 100);
   };
 
   // --- Oscilloscope (CRT Vector Glow) ---
@@ -10000,7 +10338,14 @@ export default function MidiSynth({
     const draw = () => {
       animationRef.current = requestAnimationFrame(draw);
 
-      canvasCtx.fillStyle = 'rgba(10, 10, 16, 0.2)';
+      // Silence gate: skip redraw if audio is flat/idle to save GPU fill-rate
+      analyserNode.getByteTimeDomainData(dataArray);
+      let isFlat = true;
+      for (let i = 0; i < bufferLength; i++) {
+        if (Math.abs(dataArray[i] - 128) > 2) { isFlat = false; break; }
+      }
+      if (isFlat && scopeModeRef.current !== 'lissajous') return;
+
       canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Draw Grid lines
@@ -10145,7 +10490,7 @@ export default function MidiSynth({
       case 'lfoKeySync': setLfoKeySync(value >= 64); break;
       case 'lfo2KeySync': setLfo2KeySync(value >= 64); break;
       case 'voiceMode': setVoiceMode(value < 64 ? 'mono' : 'poly'); break;
-      case 'filterCircuit': setFilterCircuit(value < 42 ? 'classic' : (value < 85 ? 'acid' : 'ladder')); break;
+      case 'filterCircuit': setFilterCircuit(value < 32 ? 'classic' : (value < 64 ? 'acid' : (value < 96 ? 'ladder' : 'ms20'))); break;
       case 'osc1Waveform': {
         const waves = ['sine', 'triangle', 'sawtooth', 'square', 'vox', 'organ', 'strings', 'epiano', 'bell', 'clavit', 'harmon', 'synth-bass'];
         setOsc1Waveform(waves[Math.min(waves.length - 1, Math.floor(pct * waves.length))]);
@@ -10843,9 +11188,72 @@ export default function MidiSynth({
             </div>
 
             {/* ROW 1 PANEL 3: LEO EXTENSIONS */}
-            <div className="rack-panel neon-glow-yellow">
-              <span className="panel-label">LEO: ANALOG EXTENSIONS</span>
-              <div className="control-grid-compact">
+            <div className="rack-panel neon-glow-yellow" style={{ minWidth: '220px' }}>
+              <span className="panel-label">LEO: UNISON & FM ENGINE</span>
+              <div className="control-grid-compact" style={{ gridTemplateColumns: '1fr' }}>
+                {/* Unison Voice Count */}
+                <div className="sync-box" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="control-label">UNISON VOICES</span>
+                  <div className="button-group-row" style={{ width: '120px' }}>
+                    {[1, 2, 4, 8].map(v => (
+                      <button
+                        key={v}
+                        className={`wave-btn-synth ${unisonVoices === v ? 'active' : ''}`}
+                        onClick={() => setUnisonVoices(v)}
+                        disabled={!synthOn}
+                        style={{ padding: '0.15rem 0.25rem', fontSize: '0.4rem', flex: 1 }}
+                      >
+                        {v === 1 ? 'OFF' : `${v}V`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Unison Detune */}
+                {unisonVoices > 1 && (
+                  <div className="control-item slider-row">
+                    <span className="control-label">UNISON DETUNE</span>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={unisonDetune}
+                      onChange={(e) => setUnisonDetune(Number(e.target.value))}
+                      disabled={!synthOn}
+                      className="synth-slider neon-yellow"
+                      style={{
+                        background: `linear-gradient(to right, #ffe600 0%, #ffe600 ${unisonDetune}%, #151a21 ${unisonDetune}%, #151a21 100%)`,
+                        boxShadow: `0 0 ${4 + (unisonDetune / 100) * 12}px rgba(255, 230, 0, ${0.3 + (unisonDetune / 100) * 0.7})`,
+                        filter: `drop-shadow(0 0 ${(unisonDetune / 100) * 5}px rgba(255, 230, 0, 0.8))`
+                      }}
+                    />
+                    <span className="fader-value">{unisonDetune}c</span>
+                  </div>
+                )}
+
+                {/* Unison Spread */}
+                {unisonVoices > 1 && (
+                  <div className="control-item slider-row">
+                    <span className="control-label">UNISON SPREAD</span>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={unisonSpread}
+                      onChange={(e) => setUnisonSpread(Number(e.target.value))}
+                      disabled={!synthOn}
+                      className="synth-slider neon-yellow"
+                      style={{
+                        background: `linear-gradient(to right, #ffe600 0%, #ffe600 ${unisonSpread}%, #151a21 ${unisonSpread}%, #151a21 100%)`,
+                        boxShadow: `0 0 ${4 + (unisonSpread / 100) * 12}px rgba(255, 230, 0, ${0.3 + (unisonSpread / 100) * 0.7})`,
+                        filter: `drop-shadow(0 0 ${(unisonSpread / 100) * 5}px rgba(255, 230, 0, 0.8))`
+                      }}
+                    />
+                    <span className="fader-value">{unisonSpread}%</span>
+                  </div>
+                )}
+
+                {/* Analog Drift */}
                 <div className="control-item slider-row">
                   <span className="control-label">ANALOG DRIFT {renderMidiLearnBadge('oscDrift')}</span>
                   <input 
@@ -10865,46 +11273,95 @@ export default function MidiSynth({
                   <span className="fader-value">{oscDrift}%</span>
                 </div>
 
-                <div className="control-item slider-row">
-                  <span className="control-label">UNISON DETUNE {renderMidiLearnBadge('unisonDetune')}</span>
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="50" 
-                    value={unisonDetune}
-                    onChange={(e) => setUnisonDetune(Number(e.target.value))}
-                    disabled={!synthOn}
-                    className="synth-slider neon-yellow"
-                    style={{
-                      background: `linear-gradient(to right, #ffe600 0%, #ffe600 ${(unisonDetune / 50) * 100}%, #151a21 ${(unisonDetune / 50) * 100}%, #151a21 100%)`,
-                      boxShadow: `0 0 ${4 + (unisonDetune / 50) * 12}px rgba(255, 230, 0, ${0.3 + (unisonDetune / 50) * 0.7})`,
-                      filter: `drop-shadow(0 0 ${(unisonDetune / 50) * 5}px rgba(255, 230, 0, 0.8))`
-                    }}
-                  />
-                  <span className="fader-value">{unisonDetune}c</span>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  {/* HPF Boost */}
+                  <div className="sync-box" style={{ flex: 1 }}>
+                    <span className="control-label" style={{ fontSize: '0.35rem' }}>BASS BOOST</span>
+                    <button 
+                      className={`action-btn-small ${hpfBassBoost ? 'active' : ''}`}
+                      onClick={() => setHpfBassBoost(!hpfBassBoost)}
+                      disabled={!synthOn}
+                    >
+                      {hpfBassBoost ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+
+                  {/* Sync Mode */}
+                  <div className="sync-box" style={{ flex: 1 }}>
+                    <span className="control-label" style={{ fontSize: '0.35rem' }}>HARD SYNC</span>
+                    <button 
+                      className={`action-btn-small ${syncMode ? 'active' : ''}`}
+                      onClick={() => {
+                        setSyncMode(!syncMode);
+                        if (!syncMode) setFmMode(false);
+                      }}
+                      disabled={!synthOn || fmMode}
+                    >
+                      {syncMode ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+
+                  {/* FM Mode */}
+                  <div className="sync-box" style={{ flex: 1 }}>
+                    <span className="control-label" style={{ fontSize: '0.35rem' }}>CROSS FM</span>
+                    <button 
+                      className={`action-btn-small ${fmMode ? 'active' : ''}`}
+                      onClick={() => {
+                        setFmMode(!fmMode);
+                        if (!fmMode) setSyncMode(false);
+                      }}
+                      disabled={!synthOn || syncMode}
+                    >
+                      {fmMode ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="sync-box">
-                  <span className="control-label">HPF BASS BOOST (80Hz) {renderMidiLearnBadge('hpfBassBoost')}</span>
-                  <button 
-                    className={`action-btn-small ${hpfBassBoost ? 'active' : ''}`}
-                    onClick={() => setHpfBassBoost(!hpfBassBoost)}
-                    disabled={!synthOn}
-                  >
-                    {hpfBassBoost ? 'ON' : 'OFF'}
-                  </button>
-                </div>
+                {/* FM Amount */}
+                {fmMode && (
+                  <div className="control-item slider-row" style={{ marginTop: '4px' }}>
+                    <span className="control-label">FM AMOUNT</span>
+                    <input 
+                      type="range" 
+                      min="0.0" 
+                      max="1.0" 
+                      step="0.02"
+                      value={fmAmount}
+                      onChange={(e) => setFmAmount(Number(e.target.value))}
+                      disabled={!synthOn}
+                      className="synth-slider neon-yellow"
+                      style={{
+                        background: `linear-gradient(to right, #ffe600 0%, #ffe600 ${fmAmount * 100}%, #151a21 ${fmAmount * 100}%, #151a21 100%)`,
+                        boxShadow: `0 0 ${4 + fmAmount * 12}px rgba(255, 230, 0, ${0.3 + fmAmount * 0.7})`,
+                        filter: `drop-shadow(0 0 ${fmAmount * 5}px rgba(255, 230, 0, 0.8))`
+                      }}
+                    />
+                    <span className="fader-value">{Math.round(fmAmount * 100)}%</span>
+                  </div>
+                )}
 
-                <div className="sync-box" style={{ marginTop: '0.4rem' }}>
-                  <span className="control-label">HARD SYNC / FM {renderMidiLearnBadge('syncMode')}</span>
-                  <button 
-                    className={`action-btn-small ${syncMode ? 'active' : ''}`}
-                    onClick={() => setSyncMode(!syncMode)}
-                    disabled={!synthOn}
-                  >
-                    {syncMode ? 'ON' : 'OFF'}
-                  </button>
-                </div>
+                {/* FM Ratio */}
+                {fmMode && (
+                  <div className="control-item slider-row">
+                    <span className="control-label">FM RATIO</span>
+                    <input 
+                      type="range" 
+                      min="0.5" 
+                      max="8.0" 
+                      step="0.25"
+                      value={fmRatio}
+                      onChange={(e) => setFmRatio(Number(e.target.value))}
+                      disabled={!synthOn}
+                      className="synth-slider neon-yellow"
+                      style={{
+                        background: `linear-gradient(to right, #ffe600 0%, #ffe600 ${((fmRatio - 0.5) / 7.5) * 100}%, #151a21 ${((fmRatio - 0.5) / 7.5) * 100}%, #151a21 100%)`,
+                        boxShadow: `0 0 ${4 + ((fmRatio - 0.5) / 7.5) * 12}px rgba(255, 230, 0, ${0.3 + ((fmRatio - 0.5) / 7.5) * 0.7})`,
+                        filter: `drop-shadow(0 0 ${((fmRatio - 0.5) / 7.5) * 5}px rgba(255, 230, 0, 0.8))`
+                      }}
+                    />
+                    <span className="fader-value">{fmRatio.toFixed(2)}x</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -10914,14 +11371,14 @@ export default function MidiSynth({
               <div className="control-grid-compact">
                 <div className="sync-box">
                   <span className="control-label">FILTER CIRCUIT {renderMidiLearnBadge('filterCircuit')}</span>
-                  <div className="button-group-row" style={{ width: '100px' }}>
-                    {['classic', 'acid', 'ladder'].map(c => (
+                  <div className="button-group-row" style={{ width: '150px' }}>
+                    {['classic', 'acid', 'ladder', 'ms20'].map(c => (
                       <button
                         key={c}
                         className={`wave-btn-synth ${filterCircuit === c ? 'active' : ''}`}
                         onClick={() => setFilterCircuit(c)}
                         disabled={!synthOn}
-                        style={{ padding: '0.15rem 0.25rem', fontSize: '0.4rem' }}
+                        style={{ padding: '0.15rem 0.25rem', fontSize: '0.36rem' }}
                       >
                         {c.toUpperCase()}
                       </button>
@@ -13259,6 +13716,19 @@ export default function MidiSynth({
           transition: border-color 0.25s, box-shadow 0.25s;
         }
 
+        .rack-panel::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          border-radius: 6px 6px 0 0;
+          filter: blur(0.5px);
+          opacity: 0.85;
+          z-index: 10;
+        }
+
         .rack-panel:hover {
           border-color: rgba(0, 243, 255, 0.4);
           box-shadow: 
@@ -13267,50 +13737,75 @@ export default function MidiSynth({
             inset 0 1px 2px rgba(255,255,255,0.05);
         }
 
-        /* Unique section glowing border colors */
+        /* Unique section glowing border colors & inner radial accent washes */
         .neon-glow-cyan {
-          border-color: rgba(0, 243, 255, 0.35) !important;
-          box-shadow: 0 0 10px rgba(0, 243, 255, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
+          border-color: rgba(0, 243, 255, 0.45) !important;
+          background: radial-gradient(circle at 50% 0%, rgba(0, 243, 255, 0.08), rgba(8, 11, 16, 0.96)) !important;
+          box-shadow: 0 0 15px rgba(0, 243, 255, 0.12), inset 0 0 12px rgba(0, 243, 255, 0.04) !important;
+        }
+        .neon-glow-cyan::before {
+          background: #00f3ff;
+          box-shadow: 0 0 8px #00f3ff, 0 0 3px #00f3ff;
         }
         .neon-glow-cyan:hover {
-          border-color: rgba(0, 243, 255, 0.8) !important;
-          box-shadow: 0 0 20px rgba(0, 243, 255, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
+          border-color: rgba(0, 243, 255, 0.9) !important;
+          box-shadow: 0 0 25px rgba(0, 243, 255, 0.4), inset 0 0 15px rgba(0, 243, 255, 0.1) !important;
         }
 
         .neon-glow-pink {
-          border-color: rgba(255, 0, 127, 0.35) !important;
-          box-shadow: 0 0 10px rgba(255, 0, 127, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
+          border-color: rgba(255, 0, 127, 0.45) !important;
+          background: radial-gradient(circle at 50% 0%, rgba(255, 0, 127, 0.08), rgba(8, 11, 16, 0.96)) !important;
+          box-shadow: 0 0 15px rgba(255, 0, 127, 0.12), inset 0 0 12px rgba(255, 0, 127, 0.04) !important;
+        }
+        .neon-glow-pink::before {
+          background: #ff007f;
+          box-shadow: 0 0 8px #ff007f, 0 0 3px #ff007f;
         }
         .neon-glow-pink:hover {
-          border-color: rgba(255, 0, 127, 0.8) !important;
-          box-shadow: 0 0 20px rgba(255, 0, 127, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
+          border-color: rgba(255, 0, 127, 0.9) !important;
+          box-shadow: 0 0 25px rgba(255, 0, 127, 0.4), inset 0 0 15px rgba(255, 0, 127, 0.1) !important;
         }
 
         .neon-glow-magenta {
-          border-color: rgba(255, 0, 255, 0.35) !important;
-          box-shadow: 0 0 10px rgba(255, 0, 255, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
+          border-color: rgba(255, 0, 255, 0.45) !important;
+          background: radial-gradient(circle at 50% 0%, rgba(255, 0, 255, 0.08), rgba(8, 11, 16, 0.96)) !important;
+          box-shadow: 0 0 15px rgba(255, 0, 255, 0.12), inset 0 0 12px rgba(255, 0, 255, 0.04) !important;
+        }
+        .neon-glow-magenta::before {
+          background: #ff00ff;
+          box-shadow: 0 0 8px #ff00ff, 0 0 3px #ff00ff;
         }
         .neon-glow-magenta:hover {
-          border-color: rgba(255, 0, 255, 0.8) !important;
-          box-shadow: 0 0 20px rgba(255, 0, 255, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
+          border-color: rgba(255, 0, 255, 0.9) !important;
+          box-shadow: 0 0 25px rgba(255, 0, 255, 0.4), inset 0 0 15px rgba(255, 0, 255, 0.1) !important;
         }
 
         .neon-glow-yellow {
-          border-color: rgba(255, 230, 0, 0.35) !important;
-          box-shadow: 0 0 10px rgba(255, 230, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
+          border-color: rgba(255, 230, 0, 0.45) !important;
+          background: radial-gradient(circle at 50% 0%, rgba(255, 230, 0, 0.08), rgba(8, 11, 16, 0.96)) !important;
+          box-shadow: 0 0 15px rgba(255, 230, 0, 0.12), inset 0 0 12px rgba(255, 230, 0, 0.04) !important;
+        }
+        .neon-glow-yellow::before {
+          background: #ffe600;
+          box-shadow: 0 0 8px #ffe600, 0 0 3px #ffe600;
         }
         .neon-glow-yellow:hover {
-          border-color: rgba(255, 230, 0, 0.8) !important;
-          box-shadow: 0 0 20px rgba(255, 230, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
+          border-color: rgba(255, 230, 0, 0.9) !important;
+          box-shadow: 0 0 25px rgba(255, 230, 0, 0.4), inset 0 0 15px rgba(255, 230, 0, 0.1) !important;
         }
 
         .neon-glow-green {
-          border-color: rgba(0, 255, 150, 0.35) !important;
-          box-shadow: 0 0 10px rgba(0, 255, 150, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03) !important;
+          border-color: rgba(0, 255, 150, 0.45) !important;
+          background: radial-gradient(circle at 50% 0%, rgba(0, 255, 150, 0.08), rgba(8, 11, 16, 0.96)) !important;
+          box-shadow: 0 0 15px rgba(0, 255, 150, 0.12), inset 0 0 12px rgba(0, 255, 150, 0.04) !important;
+        }
+        .neon-glow-green::before {
+          background: #00ff96;
+          box-shadow: 0 0 8px #00ff96, 0 0 3px #00ff96;
         }
         .neon-glow-green:hover {
-          border-color: rgba(0, 255, 150, 0.8) !important;
-          box-shadow: 0 0 20px rgba(0, 255, 150, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.05) !important;
+          border-color: rgba(0, 255, 150, 0.9) !important;
+          box-shadow: 0 0 25px rgba(0, 255, 150, 0.4), inset 0 0 15px rgba(0, 255, 150, 0.1) !important;
         }
 
         .scope-outer {
@@ -13323,16 +13818,44 @@ export default function MidiSynth({
 
         .panel-label {
           font-family: 'Outfit', 'Inter', sans-serif;
-          font-size: 0.48rem;
+          font-size: 0.52rem;
           color: #00ff96;
-          text-shadow: 0 0 3px rgba(0, 255, 150, 0.4);
-          letter-spacing: 0.8px;
-          font-weight: bold;
+          text-shadow: 0 0 8px rgba(0, 255, 150, 0.85), 0 0 3px rgba(0, 255, 150, 0.9);
+          letter-spacing: 1px;
+          font-weight: 800;
           position: absolute;
-          top: -6px;
+          top: -7px;
           left: 8px;
-          background: rgba(8, 9, 13, 0.85);
-          padding: 0 4px;
+          background: #08090d;
+          padding: 0 6px;
+          border-radius: 3px;
+          border: 1px solid rgba(0, 255, 150, 0.25);
+        }
+
+        .neon-glow-cyan .panel-label {
+          color: #00f3ff;
+          text-shadow: 0 0 8px rgba(0, 243, 255, 0.85);
+          border-color: rgba(0, 243, 255, 0.35);
+        }
+        .neon-glow-pink .panel-label {
+          color: #ff007f;
+          text-shadow: 0 0 8px rgba(255, 0, 127, 0.85);
+          border-color: rgba(255, 0, 127, 0.35);
+        }
+        .neon-glow-magenta .panel-label {
+          color: #ff00ff;
+          text-shadow: 0 0 8px rgba(255, 0, 255, 0.85);
+          border-color: rgba(255, 0, 255, 0.35);
+        }
+        .neon-glow-yellow .panel-label {
+          color: #ffe600;
+          text-shadow: 0 0 8px rgba(255, 230, 0, 0.85);
+          border-color: rgba(255, 230, 0, 0.35);
+        }
+        .neon-glow-green .panel-label {
+          color: #00ff96;
+          text-shadow: 0 0 8px rgba(0, 255, 150, 0.85);
+          border-color: rgba(0, 255, 150, 0.35);
         }
 
         .control-grid-compact {
@@ -13545,18 +14068,35 @@ export default function MidiSynth({
           -webkit-appearance: slider-vertical;
           appearance: slider-vertical;
           writing-mode: bt-lr;
-          width: 5px;
-          height: 65px;
+          width: 6px;
+          height: 70px;
           background: #151a21;
           outline: none;
           cursor: ns-resize;
+          border-radius: 3px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        .adsr-fader.neon-cyan { box-shadow: 0 0 3px rgba(0,243,255,0.3); }
-        .adsr-fader.neon-pink { box-shadow: 0 0 3px rgba(255,0,127,0.3); }
-        .adsr-fader.neon-magenta { box-shadow: 0 0 3px rgba(255,0,255,0.3); }
-        .adsr-fader.neon-yellow { box-shadow: 0 0 3px rgba(255,230,0,0.3); }
-        .adsr-fader.neon-green { box-shadow: 0 0 3px rgba(0,255,150,0.3); }
+        .adsr-fader.neon-cyan {
+          box-shadow: 0 0 8px rgba(0, 243, 255, 0.4), inset 0 0 3px rgba(0, 243, 255, 0.2);
+          border-color: rgba(0, 243, 255, 0.3);
+        }
+        .adsr-fader.neon-pink {
+          box-shadow: 0 0 8px rgba(255, 0, 127, 0.4), inset 0 0 3px rgba(255, 0, 127, 0.2);
+          border-color: rgba(255, 0, 127, 0.3);
+        }
+        .adsr-fader.neon-magenta {
+          box-shadow: 0 0 8px rgba(255, 0, 255, 0.4), inset 0 0 3px rgba(255, 0, 255, 0.2);
+          border-color: rgba(255, 0, 255, 0.3);
+        }
+        .adsr-fader.neon-yellow {
+          box-shadow: 0 0 8px rgba(255, 230, 0, 0.4), inset 0 0 3px rgba(255, 230, 0, 0.2);
+          border-color: rgba(255, 230, 0, 0.3);
+        }
+        .adsr-fader.neon-green {
+          box-shadow: 0 0 8px rgba(0, 255, 150, 0.4), inset 0 0 3px rgba(0, 255, 150, 0.2);
+          border-color: rgba(0, 255, 150, 0.3);
+        }
 
         /* Keyboard Panel */
         .keyboard-container-row {
@@ -13675,12 +14215,10 @@ export default function MidiSynth({
         .virtual-keyboard {
           position: relative;
           display: flex;
-          background: rgba(8, 9, 12, 0.55);
-          backdrop-filter: blur(4px);
-          -webkit-backdrop-filter: blur(4px);
-          border: 2.2px solid rgba(0, 243, 255, 0.35);
+          background: #040508;
+          border: 2px solid rgba(0, 243, 255, 0.45);
           border-radius: 4px;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.85), 0 0 10px rgba(0, 243, 255, 0.1);
+          box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.95), 0 0 12px rgba(0, 243, 255, 0.15);
           height: 95px;
           overflow: hidden;
           width: 100%;
@@ -13691,43 +14229,47 @@ export default function MidiSynth({
           cursor: pointer;
           outline: none;
           padding: 0;
-          transition: background-color 0.1s;
+          transition: background-color 0.1s, border-color 0.1s, box-shadow 0.1s;
         }
 
         .white-key {
           flex: 1;
           height: 100%;
-          background: linear-gradient(to bottom, #cfd0d2 0%, #ffffff 90%, #efeff2 100%);
-          border-right: 1.2px solid #000;
+          background: rgba(0, 243, 255, 0.02);
+          border-right: 1px solid rgba(0, 243, 255, 0.25);
+          border-top: none;
+          border-bottom: none;
           z-index: 1;
         }
 
         .white-key.pressed {
-          background: linear-gradient(to bottom, #00f3ff 0%, #00ff96 100%);
-          box-shadow: 0 0 15px rgba(0, 243, 255, 0.8), inset 0 2px 4px rgba(0,0,0,0.5);
+          background: linear-gradient(to bottom, rgba(0, 243, 255, 0.25) 0%, rgba(0, 255, 150, 0.65) 100%);
+          border-color: #00f3ff;
+          box-shadow: 0 0 18px rgba(0, 243, 255, 0.75), inset 0 0 8px rgba(0, 243, 255, 0.4);
           z-index: 5;
         }
 
         .black-key {
           width: 1.8%;
           height: 58px;
-          background: linear-gradient(to bottom, #0f1013 0%, #1c1f25 85%, #0b0c0e 100%);
-          border: 1px solid #000;
-          border-radius: 0 0 1.2px 1.2px;
+          background: rgba(255, 0, 127, 0.06);
+          border: 1.2px solid rgba(255, 0, 127, 0.35);
+          border-radius: 0 0 3px 3px;
           margin-left: -0.9%;
           margin-right: -0.9%;
           z-index: 2;
         }
 
         .black-key.pressed {
-          background: linear-gradient(to bottom, #ff007f 0%, #ff00ff 100%);
-          box-shadow: 0 0 15px rgba(255, 0, 127, 0.8), inset 0 2px 4px rgba(0,0,0,0.6);
+          background: linear-gradient(to bottom, rgba(255, 0, 127, 0.35) 0%, rgba(255, 0, 255, 0.65) 100%);
+          border-color: #ff007f;
+          box-shadow: 0 0 18px rgba(255, 0, 127, 0.75), inset 0 0 8px rgba(255, 0, 127, 0.4);
           z-index: 5;
         }
 
         .virtual-keyboard.synth-active {
-          border-color: #ff007f;
-          box-shadow: 0 0 15px rgba(255, 0, 127, 0.5);
+          border-color: rgba(255, 0, 127, 0.6);
+          box-shadow: 0 0 15px rgba(255, 0, 127, 0.3);
         }
 
         /* MIDI Learn Badges */

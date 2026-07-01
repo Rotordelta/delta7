@@ -3,14 +3,14 @@ import Knob from './Knob.jsx';
 
 const EIGHT_INDICES = Array.from({ length: 8 }, (_, i) => i);
 const ringColors = [
-  '#00f3ff', // Cyan
-  '#ff00ff', // Magenta
-  '#ffe600', // Yellow
-  '#00ff96', // Emerald
-  '#ff0055', // Red
-  '#7b00ff', // Purple
-  '#ff6e00', // Orange
-  '#00ff00'  // Green
+  '#ff0055', // Neon Pink/Red
+  '#ff5500', // Neon Orange
+  '#ffcc00', // Neon Yellow
+  '#00ff66', // Neon Green
+  '#00f3ff', // Neon Cyan
+  '#0066ff', // Neon Blue
+  '#9900ff', // Neon Purple
+  '#ff00ff'  // Neon Magenta
 ];
 
 const ROTOR_PRESETS = [

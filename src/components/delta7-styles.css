@@ -312,7 +312,7 @@
           font-family: monospace;
           font-weight: bold;
           user-select: none;
-          transition: all 0.08s ease;
+          transition: transform 0.08s ease, background 0.08s ease, box-shadow 0.08s ease;
           padding: 2px;
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
           will-change: transform;
@@ -599,7 +599,7 @@
           display: flex;
           flex-direction: column;
           gap: 1rem;
-          transition: all 0.3s ease;
+          transition: border-color 0.3s ease, box-shadow 0.3s ease;
         }
 
         .steel-plate:hover {
@@ -907,7 +907,7 @@
           font-weight: 700;
           padding: 0.4rem 0.65rem;
           cursor: pointer;
-          transition: all 0.15s ease;
+          transition: color 0.15s ease, background 0.15s ease;
         }
 
         .tab-btn:hover {
@@ -1347,7 +1347,7 @@
           border: 1px solid transparent;
           border-radius: 4px;
           cursor: pointer;
-          transition: all 0.1s ease;
+          transition: background 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease, color 0.1s ease;
           text-shadow: 0 0 2px currentColor;
         }
 
@@ -1496,7 +1496,7 @@
           flex-direction: column;
           align-items: flex-start;
           cursor: pointer;
-          transition: all 0.1s ease;
+          transition: background 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease;
           min-height: 34px;
           justify-content: center;
         }
@@ -1577,7 +1577,7 @@
           font-size: 0.54rem;
           padding: 2px 4px;
           cursor: pointer;
-          transition: all 0.1s ease;
+          transition: background 0.1s ease, color 0.1s ease;
           border-radius: 2px;
           text-align: center;
           white-space: nowrap;
@@ -1632,7 +1632,7 @@
           padding: 2px 4px;
           border-radius: 3px;
           cursor: pointer;
-          transition: all 0.1s;
+          transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
         }
 
         .target-btn:hover {
@@ -1687,10 +1687,13 @@
 
         .mic-level-bar-fill {
           height: 100%;
-          width: 0%;
+          width: 100%;              /* Always full-width — JS drives scaleX instead */
           background: linear-gradient(90deg, #00ff66 0%, #ffe600 70%, #ff0055 100%);
           border-radius: 3px;
-          transition: width 0.05s ease-out;
+          transform: scaleX(0);
+          transform-origin: left center;
+          will-change: transform;
+          transition: none;         /* RAF updates every frame — no CSS transition needed */
         }
 
         .active-yellow {
@@ -1818,7 +1821,7 @@
           cursor: pointer;
           background: rgba(10, 15, 25, 0.8);
           color: #888;
-          transition: all 0.1s ease;
+          transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease, transform 0.1s ease;
           user-select: none;
         }
 
@@ -2509,7 +2512,7 @@
   padding: 2px 6px;
   border-radius: 3px;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .eq-global-toggle-btn[data-active="true"] {
@@ -2583,7 +2586,7 @@
   padding: 1px 4px;
   border-radius: 2px;
   cursor: pointer;
-  transition: all 0.1s ease;
+  transition: background 0.1s ease, border-color 0.1s ease, color 0.1s ease;
 }
 
 .eq-band-bypass-btn[data-active="true"] {
@@ -2689,7 +2692,7 @@
   font-size: 0.55rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  transition: all 0.1s ease;
+  transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
   width: 100%;
   box-sizing: border-box;
 }
@@ -2707,7 +2710,7 @@
   cursor: pointer;
   font-family: monospace;
   font-size: 0.5rem;
-  transition: all 0.1s ease;
+  transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
   box-sizing: border-box;
 }
 .btn-seg-pad0:hover {
@@ -2936,7 +2939,7 @@
   box-shadow: 0 0 20px rgba(0, 243, 255, 0.45) !important;
   background: rgba(0, 243, 255, 0.08) !important;
   border-radius: 6px;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .performance-pads-grid-2x4.drag-over-active-B {
@@ -2944,11 +2947,12 @@
   box-shadow: 0 0 20px rgba(255, 0, 255, 0.45) !important;
   background: rgba(255, 0, 255, 0.08) !important;
   border-radius: 6px;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .crate-card-container {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
 .crate-card-container.dragging {

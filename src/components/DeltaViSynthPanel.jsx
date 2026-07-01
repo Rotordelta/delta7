@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import MidiSynth from './MidiSynth.jsx';
 
 export default function DeltaViSynthPanel({
@@ -15,6 +16,7 @@ export default function DeltaViSynthPanel({
   setSelectedMidiDeviceName
 }) {
   const [position, setPosition] = useState({ x: 100, y: 80 });
+  const [isPoppedOut, setIsPoppedOut] = useState(false);
   const [midiActivity, setMidiActivity] = useState(null);
 
   useEffect(() => {
@@ -78,7 +80,7 @@ export default function DeltaViSynthPanel({
         if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
           setPosition(parsed);
         }
-      } catch (e) {}
+      } catch (e) { return; }
     }
     const savedSize = localStorage.getItem('deltavi_panel_size');
     if (savedSize) {
@@ -92,7 +94,7 @@ export default function DeltaViSynthPanel({
             setSize(parsed);
           }
         }
-      } catch (e) {}
+      } catch (e) { return; }
     }
   }, []);
 
@@ -185,6 +187,95 @@ export default function DeltaViSynthPanel({
     });
   };
 
+  if (isPoppedOut) {
+    return (
+      <div
+        ref={panelRef}
+        className="floating-focus-zoom-panel"
+        style={{
+          position: 'fixed',
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          width: '320px',
+          height: '110px',
+          zIndex: 9999,
+          background: 'rgba(8, 9, 13, 0.95)',
+          border: '2px solid rgba(0, 243, 255, 0.65)',
+          borderRadius: '6px',
+          boxShadow: '0 15px 45px rgba(0, 0, 0, 0.85), 0 0 20px rgba(0, 243, 255, 0.25)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          flexDirection: 'column',
+          userSelect: 'none',
+          overflow: 'hidden'
+        }}
+      >
+        <div
+          className="panel-titlebar"
+          onMouseDown={handleMouseDown}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(90deg, #050d1a 0%, #0a1733 100%)',
+            borderBottom: '1px solid rgba(0, 243, 255, 0.3)',
+            padding: '5px 12px',
+            cursor: 'move',
+            height: '24px',
+            flexShrink: 0
+          }}
+        >
+          <span style={{ fontFamily: 'monospace', fontSize: '0.62rem', fontWeight: 'bold', color: '#00f3ff' }}>
+            DELTAVI SYNTH (POPPED OUT)
+          </span>
+          <button
+            className="titlebar-btn"
+            onClick={onClose}
+            style={{ background: 'transparent', border: 'none', color: '#ff4444', cursor: 'pointer', fontSize: '0.7rem' }}
+          >
+            ✕
+          </button>
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
+          <span style={{ fontSize: '0.52rem', color: '#888', marginBottom: '8px' }}>Active on separate screen</span>
+          <button
+            onClick={() => setIsPoppedOut(false)}
+            style={{
+              background: '#0a1733',
+              border: '1px solid #00f3ff',
+              borderRadius: '4px',
+              color: '#00f3ff',
+              fontSize: '0.55rem',
+              padding: '3px 8px',
+              cursor: 'pointer',
+              fontFamily: 'monospace'
+            }}
+          >
+            🗗 DOCK WINDOW
+          </button>
+        </div>
+
+        <PopoutWindow title="DeltaVi Synthesizer Dashboard" onClose={() => setIsPoppedOut(false)}>
+          <div style={{ padding: '8px' }}>
+            <MidiSynth 
+              layoutMode="horizontal"
+              recordingInputMode={recordingInputMode}
+              setRecordingInputMode={setRecordingInputMode}
+              liveRecTargetSlot={liveRecTargetSlot}
+              setLiveRecTargetSlot={setLiveRecTargetSlot}
+              selectedEditSlotId={selectedEditSlotId}
+              setSelectedEditSlotId={setSelectedEditSlotId}
+              recordingTargetSlotIdRef={recordingTargetSlotIdRef}
+              recordingInputModeRef={recordingInputModeRef}
+              selectedMidiDeviceName={selectedMidiDeviceName}
+              setSelectedMidiDeviceName={setSelectedMidiDeviceName}
+            />
+          </div>
+        </PopoutWindow>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={panelRef}
@@ -250,6 +341,26 @@ export default function DeltaViSynthPanel({
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Popout button */}
+          <button
+            className="titlebar-btn"
+            onClick={() => setIsPoppedOut(true)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#00f3ff',
+              cursor: 'pointer',
+              fontSize: '0.55rem',
+              fontWeight: 'bold',
+              padding: '0 4px',
+              fontFamily: 'monospace',
+              letterSpacing: '0.5px'
+            }}
+            title="Pop out window to another monitor"
+          >
+            ❐ POP OUT
+          </button>
+
           {/* Layout mode button */}
           <button
             className="titlebar-btn"
@@ -366,4 +477,84 @@ export default function DeltaViSynthPanel({
       )}
     </div>
   );
+}
+
+// PopoutWindow component using ReactDOM.createPortal
+function PopoutWindow({ title, onClose, children }) {
+  const [container, setContainer] = useState(null);
+  const externalWindow = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  // Maintain reference to the latest callback to prevent stale closures
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    // Open a new, opaque native window
+    const width = 1000;
+    const height = 835;
+    const left = window.screenX + (window.innerWidth - width) / 2;
+    const top = window.screenY + (window.innerHeight - height) / 2;
+    
+    const win = window.open(
+      'about:blank',
+      'deltavi_popout',
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,menubar=no,toolbar=no`
+    );
+    
+    if (!win) {
+      alert("Popout blocked! Please allow popups for Delta7 Workstation.");
+      if (onCloseRef.current) onCloseRef.current();
+      return;
+    }
+
+    externalWindow.current = win;
+    win.document.title = title || 'DeltaVi Synthesizer';
+
+    // Set background color to opaque black/dark
+    win.document.body.style.background = '#08090d';
+    win.document.body.style.margin = '0';
+    win.document.body.style.padding = '8px';
+    win.document.body.style.overflowX = 'hidden';
+    win.document.body.style.color = '#ffffff';
+
+    // Create container element
+    const div = win.document.createElement('div');
+    div.id = 'popout-root';
+    win.document.body.appendChild(div);
+    setContainer(div);
+
+    // Copy parent document head elements (stylesheets, links, google fonts, style tags)
+    // so that the exact same neon styling is applied in the popout window!
+    const headElements = document.head.cloneNode(true);
+    win.document.head.innerHTML = headElements.innerHTML;
+
+    // Monitor popout window closure
+    const checkClosedInterval = setInterval(() => {
+      if (win.closed) {
+        clearInterval(checkClosedInterval);
+        if (onCloseRef.current) onCloseRef.current();
+      }
+    }, 500);
+
+    // Handle beforeunload to notify parent
+    const handleBeforeUnload = () => {
+      clearInterval(checkClosedInterval);
+      if (onCloseRef.current) onCloseRef.current();
+    };
+    win.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearInterval(checkClosedInterval);
+      win.removeEventListener('beforeunload', handleBeforeUnload);
+      if (!win.closed) {
+        win.close();
+      }
+    };
+  }, [title]);
+
+  if (!container) return null;
+
+  return ReactDOM.createPortal(children, container);
 }
