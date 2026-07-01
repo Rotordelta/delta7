@@ -3491,7 +3491,9 @@ export default function Delta7Synth() {
         sampleSize: { ideal: 24 }
       };
       if (selectedAudioDevice) {
-        audioConstraints.deviceId = { exact: selectedAudioDevice };
+        // Use 'ideal' not 'exact' — 'exact' throws NotFoundError if device was
+        // unplugged or changed since last session, silently breaking arm.
+        audioConstraints.deviceId = { ideal: selectedAudioDevice };
       }
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: audioConstraints
@@ -3500,7 +3502,11 @@ export default function Delta7Synth() {
       
       await loadAudioInputDevices();
       
-      if (!audioCtxRef.current) initAudio();
+      // Must await initAudio — it's async (registers AudioWorklet modules).
+      // Calling setupLosslessRecorderNode before the worklet loads throws silently.
+      if (!audioCtxRef.current) await initAudio();
+      // Wait for recorder worklet to be ready if initAudio was racing
+      if (!recorderBlobUrlRef.current) await initAudio();
       const ctx = audioCtxRef.current;
       
       const source = ctx.createMediaStreamSource(stream);
@@ -3621,7 +3627,7 @@ export default function Delta7Synth() {
     updateLevel();
   };
 
-  const armLooperInput = () => {
+  const armLooperInput = async () => {
     if (isArmed) {
       disarmMicrophone();
       return;
@@ -3635,7 +3641,7 @@ export default function Delta7Synth() {
     } else if (recordingInputMode === 'monitor') {
       armMonitor();
     } else if (recordingInputMode === 'resample') {
-      if (!audioCtxRef.current) initAudio();
+      if (!audioCtxRef.current || !recorderBlobUrlRef.current) await initAudio();
       const ctx = audioCtxRef.current;
       const resamplerGainNode = ctx.createGain();
       resamplerGainNode.gain.setValueAtTime(recordingInputGainRef.current, ctx.currentTime);
@@ -3652,7 +3658,7 @@ export default function Delta7Synth() {
       startMicMonitor();
       showEditorStatus("Internal Resampler armed! ⏺️");
     } else if (recordingInputMode === 'synth') {
-      if (!audioCtxRef.current) initAudio();
+      if (!audioCtxRef.current || !recorderBlobUrlRef.current) await initAudio();
       const ctx = audioCtxRef.current;
       const synthNode = window.__rdSynthOutputNode;
       if (!synthNode) {
