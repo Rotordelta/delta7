@@ -203,7 +203,7 @@ const generateSynthesizedKit = (ctx, kitType) => {
   const createBuffer = (seconds) => ctx.createBuffer(1, Math.round(seconds * sampleRate), sampleRate);
   const kit = [];
 
-
+  if (kitType === 'WAVES') {
     const addWave = (name, lengthSec, func) => {
       const buf = createBuffer(lengthSec);
       const data = buf.getChannelData(0);
