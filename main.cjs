@@ -77,6 +77,25 @@ if (!gotTheLock) {
       });
     });
 
+    // Grant mic, camera and media-device permissions to the renderer.
+    // Without this Electron silently denies all getUserMedia calls.
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      const allowed = [
+        'media',          // getUserMedia (mic + camera)
+        'mediaKeySystem', // EME
+        'geolocation',
+        'notifications',
+        'midiSysex',
+        'midi',
+      ];
+      callback(allowed.includes(permission));
+    });
+
+    session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+      const allowed = ['media', 'mediaKeySystem', 'midi', 'midiSysex'];
+      return allowed.includes(permission);
+    });
+
     createWindow();
 
     app.on('activate', () => {
