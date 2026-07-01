@@ -2761,8 +2761,13 @@ export default function Delta7Synth() {
         loopBeats: liveRecBeatsRef.current,
         alignGrid: recAlignGridRef.current || 'cycle',
         // Pass timing epoch so the worklet can detect the boundary even if
-        // START_PLAYBACK / syncSabPlaybackState was not called in this session
-        playbackStartTime: perfPlayStartTimeRef.current,
+        // START_PLAYBACK / syncSabPlaybackState was not called in this session.
+        // Fall back to metronome epochTime when perf playback hasn't started
+        // (metronome-only mode) — without this the gate fires at time=0 and
+        // RECORD_GATE_BOUNDARY is never sent.
+        playbackStartTime: perfPlayStartTimeRef.current > 0
+          ? perfPlayStartTimeRef.current
+          : (metronomeRef.current.epochTime > 0 ? metronomeRef.current.epochTime : 0),
         playbackStartBeatOffset: seqStartBeatOffsetRef.current || 0,
         bpm: paramsRef.current.arpBpm || 120
       });
