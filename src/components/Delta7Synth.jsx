@@ -1478,7 +1478,6 @@ export default function Delta7Synth() {
   const sustainPedalPressedRef = useRef(false);
   const sustainPedalPressTimeRef = useRef(0);
 
-  const [showLatencyCal, setShowLatencyCal] = useState(false);
   const [circularAlignState, setCircularAlignState] = useState({ visible: false, deck: 'A', index: 0, initialOffset: 0 });
   // Latency calibration restored as state
   const [recLatencyOffset, setRecLatencyOffset] = useState(0);
@@ -13515,7 +13514,7 @@ grainSource.buffer = isRevB && currentRevBuf ? currentRevBuf : currentBuf;
     const isOscASlice = paramsRef.current.oscATriggerMode === 'slice';
     const isOscBSlice = paramsRef.current.oscMode === 'double' && paramsRef.current.oscBTriggerMode === 'slice';
     const isSliceMode = isOscASlice || isOscBSlice;
-    console.log("[Leo Debug] handleArpTick stepIndex:", stepIndex, "held:", held, "isSliceMode:", isSliceMode);
+
     if (held.length === 0) {
       stopArpeggiator();
       return;
