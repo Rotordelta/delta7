@@ -77,23 +77,15 @@ if (!gotTheLock) {
       });
     });
 
-    // Grant mic, camera and media-device permissions to the renderer.
-    // Without this Electron silently denies all getUserMedia calls.
+    // Grant all permissions (audioCapture, midi, etc.) unconditionally to the renderer.
+    // This resolves permission issues where Chromium requests 'audioCapture' or other
+    // platform-specific names that aren't mapped to standard 'media' strings.
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-      const allowed = [
-        'media',          // getUserMedia (mic + camera)
-        'mediaKeySystem', // EME
-        'geolocation',
-        'notifications',
-        'midiSysex',
-        'midi',
-      ];
-      callback(allowed.includes(permission));
+      callback(true);
     });
 
     session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
-      const allowed = ['media', 'mediaKeySystem', 'midi', 'midiSysex'];
-      return allowed.includes(permission);
+      return true;
     });
 
     createWindow();
